@@ -4,7 +4,9 @@ NB parite kodu **Faz 6–12** ile tamamlandı. Canlı “yeşil” için altyap�
 
 ## Sıra
 
-1. **Faz 6 altyapı** — DNS (SPF/DKIM/DMARC), Postfix veya harici relay, `EKOLOJIK_SMTP_HOST=mail.ekolojikmarket.com.tr` (VPS IP değil)
+1. **Faz 6 altyapı** — DNS (SPF/DKIM/DMARC), Postfix veya harici relay  
+   - Aynı VPS: `bash scripts/sunucu-ekolojik-postfix-yerel-relay-kur.sh --apply`  
+   - Runbook: `docs/EKOLOJIK-FAZ6-SMTP-RUNBOOK.md`
 2. **`.env` audit** — NB env karışmıyor, köprü kapalı
 3. **Parite smoke** — hub API, export, SSE
 4. **Yedek cron** — `sunucu-ekolojik-data-yedek.sh`

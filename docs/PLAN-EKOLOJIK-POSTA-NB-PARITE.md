@@ -57,6 +57,7 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 | 6.2 | **Seçenek A:** `mail.ekolojikmarket.com.tr` Postfix 587/465 + auth | `EKOLOJIK_SMTP_HOST=mail.…` | VPS |
 | 6.3 | **Seçenek B:** Harici relay (SendGrid/Resend **Ekolojik hesap**) | Env + outbox aynı kalır | Siz |
 | 6.4 | `.env` şablon + doğrulama script (`scripts/sunucu-ekolojik-smtp-dogrula.sh`) | Deploy sonrası otomatik test | Kod |
+| 6.4b | Aynı VPS yerel relay | `scripts/sunucu-ekolojik-postfix-yerel-relay-kur.sh` · `docs/EKOLOJIK-FAZ6-SMTP-RUNBOOK.md` | Kod |
 | 6.5 | `info@` / `bildirim@` ayrımı dokümante | From = bildirim, Reply-To = info | Doküman |
 
 **Kabul:** Ayarlar → E-posta: SMTP **Hazır**; test maili gider.

@@ -52,7 +52,11 @@ else
 fi
 
 if [[ "${HOST}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  bad "EKOLOJIK_SMTP_HOST VPS IP (${HOST}) — mail.ekolojikmarket.com.tr veya relay kullanın"
+  if [[ "${HOST}" == "127.0.0.1" ]]; then
+    ok "SMTP host yerel relay (${HOST}:25 — Faz 6 script)"
+  else
+    bad "EKOLOJIK_SMTP_HOST VPS IP (${HOST}) — mail.ekolojikmarket.com.tr veya 127.0.0.1 kullanın"
+  fi
 elif [[ "${HOST}" == "localhost" || "${HOST}" == "127.0.0.1" ]]; then
   warn "SMTP host localhost — üretimde mail subdomain önerilir"
 else
