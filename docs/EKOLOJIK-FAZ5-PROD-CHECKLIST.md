@@ -49,6 +49,7 @@ Ayarlar → Sistem → **Faz 5 ayrım kontrolü** veya:
 
 - [ ] Günlük yedek cron aktif (`sunucu-ekolojik-data-yedek.sh`)
 - [ ] `.env` audit: yalnızca `EKOLOJIK_*`, SMTP host = mail subdomain (VPS IP değil)
+- [ ] `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh` exit 0 (env + parite)
 - [ ] `bash scripts/sunucu-ekolojik-smtp-dogrula.sh` yeşil (Faz 6)
 
 ## VPS yedek örneği

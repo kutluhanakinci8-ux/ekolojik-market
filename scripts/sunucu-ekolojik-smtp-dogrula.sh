@@ -15,9 +15,12 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+# shellcheck source=scripts/lib/ekolojik-env-load.sh
+source "${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/scripts/lib/ekolojik-env-load.sh"
+
 # shellcheck disable=SC1090
 set -a
-source "${ENV_FILE}"
+ekolojik_load_env "${ENV_FILE}"
 set +a
 
 HOST="${EKOLOJIK_SMTP_HOST:-}"
