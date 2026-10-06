@@ -55,6 +55,8 @@ Ayarlar → Sistem → **Faz 5 ayrım kontrolü** veya:
 - [ ] Akış C sonrası sıra: `EKOLOJIK_SKIP_E2E=1 bash scripts/sunucu-ekolojik-posta-kabul-sira.sh`
 - [ ] DNS TXT: `EKOLOJIK_RUN_DNS=1 bash scripts/sunucu-ekolojik-dns-mail-dogrula.sh`
 - [ ] Outbox failed temizliği: `bash scripts/sunucu-ekolojik-outbox-failed-arsivle.sh` (önce `EKOLOJIK_DRY_RUN=1`)
+- [ ] Ops sıra (yedek + cron + settings): `bash scripts/sunucu-ekolojik-faz5-ops-dogrula.sh`
+- [ ] Cron kurulum (root): `bash scripts/sunucu-ekolojik-data-yedek-cron-kur.sh`
 
 ## VPS yedek örneği
 
