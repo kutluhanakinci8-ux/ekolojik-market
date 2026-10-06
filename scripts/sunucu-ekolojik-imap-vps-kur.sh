@@ -81,22 +81,8 @@ passdb {
 EOF
 systemctl reload dovecot
 
-PIPE='|/usr/local/bin/ekolojik-postfix-deliver-info.sh'
-INSTALL_PIPE="/usr/local/bin/ekolojik-postfix-deliver-info.sh"
-SCRIPT_PIPE="${REPO_ROOT}/scripts/ekolojik-postfix-deliver-info.sh"
-
-if [[ -f "${SCRIPT_PIPE}" ]]; then
-  install -m 755 "${SCRIPT_PIPE}" "${INSTALL_PIPE}"
-fi
-
-echo "info@ekolojikmarket.com.tr ${PIPE}" > /etc/postfix/ekolojik-inbound-virtual
-postmap /etc/postfix/ekolojik-inbound-virtual
-
-VA="$(postconf -h virtual_alias_maps)"
-if [[ "${VA}" != *ekolojik-inbound-virtual* ]]; then
-  postconf -e "virtual_alias_maps = ${VA}, hash:/etc/postfix/ekolojik-inbound-virtual"
-fi
-systemctl reload postfix
+export EKOLOJIK_REPO_ROOT="${REPO_ROOT}"
+bash "${REPO_ROOT}/scripts/sunucu-ekolojik-imap-vps-alias-fix.sh"
 
 cp -a "${ENV_FILE}" "${ENV_FILE}.bak.imap.$(date +%Y%m%d%H%M%S)"
 set_env_kv EKOLOJIK_IMAP_HOST 127.0.0.1
