@@ -5,5 +5,5 @@
  */
 export type WarehouseStockPolicy = 'empty' | 'irsaliye-luy2026000000002';
 
-/** İrsaliye ile tek tek giriş yapılacaksa önce `empty` bırakın */
-export const WAREHOUSE_STOCK_POLICY: WarehouseStockPolicy = 'empty';
+/** İrsaliye LUY2026000000002 adetleri otomatik uygulanır (barkod = stok kodu) */
+export const WAREHOUSE_STOCK_POLICY: WarehouseStockPolicy = 'irsaliye-luy2026000000002';

@@ -5,7 +5,7 @@
  * `empty` = tüm stoklar 0; irsaliye girişi için `irsaliye-luy2026000000002` yapın
  * (src/data/warehouseStockPolicy.ts ile aynı mantık).
  */
-export const WAREHOUSE_STOCK_POLICY = 'empty';
+export const WAREHOUSE_STOCK_POLICY = 'irsaliye-luy2026000000002';
 
 export const IRSALIYE_STOCK_BY_CODE = {
   ASF066: 96,
