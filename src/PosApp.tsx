@@ -108,19 +108,41 @@ export function PosApp() {
   useEffect(() => {
     if (!store.authSession?.allowedTabs.includes('posta')) return;
     let cancelled = false;
-    const tick = async () => {
+    const applyCounts = (total?: number) => {
+      if (!cancelled && total != null) setPostaUnread(total);
+    };
+    const poll = async () => {
       try {
         const r = await fetchPostaUnreadCounts();
-        if (!cancelled && r.ok) setPostaUnread(r.total ?? 0);
+        if (r.ok) applyCounts(r.total ?? 0);
       } catch {
         /* ignore */
       }
     };
-    void tick();
-    const id = window.setInterval(tick, 15000);
+    void poll();
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/posta/events');
+      es.addEventListener('unread', (ev) => {
+        try {
+          const data = JSON.parse(String((ev as MessageEvent).data)) as { total?: number };
+          applyCounts(data.total ?? 0);
+        } catch {
+          /* ignore */
+        }
+      });
+      es.onerror = () => {
+        es?.close();
+        es = null;
+      };
+    } catch {
+      es = null;
+    }
+    const id = window.setInterval(poll, 15000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      es?.close();
     };
   }, [store.authSession]);
 

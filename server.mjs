@@ -41,6 +41,7 @@ import {
   createMessagingThread,
   listMessagingMessages,
   appendMessagingMessage,
+  markMessagingThreadStaffRead,
 } from './server/messaging/store.mjs';
 import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
@@ -531,6 +532,31 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/events' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+      });
+      const push = async () => {
+        try {
+          const payload = await getPostaUnreadCounts(DATA_DIR, tenantId);
+          res.write(`event: unread\ndata: ${JSON.stringify(payload)}\n\n`);
+        } catch (error) {
+          res.write(
+            `event: error\ndata: ${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'SSE hatası' })}\n\n`,
+          );
+        }
+      };
+      await push();
+      const timer = setInterval(() => {
+        void push();
+      }, 15000);
+      req.on('close', () => clearInterval(timer));
+      return;
+    }
+
     if (pathname === '/api/posta/templates' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, templates: listMailTemplates() }));
@@ -688,6 +714,18 @@ const server = createServer(async (req, res) => {
       const threadId = parts[3];
       const sub = parts[4];
       const tenantId = resolveTenantId(url);
+
+      if (sub === 'read' && threadId && req.method === 'POST') {
+        try {
+          const result = await markMessagingThreadStaffRead(DATA_DIR, tenantId, threadId);
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu hatası' }));
+        }
+        return;
+      }
 
       if (sub === 'messages' && threadId && req.method === 'GET') {
         const limit = Number(url.searchParams.get('limit') || 100);

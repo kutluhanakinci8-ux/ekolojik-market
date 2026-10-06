@@ -171,8 +171,41 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
   thread.lastMessageAt = message.createdAt;
   thread.lastMessagePreview = preview(bodyText || message.attachments[0]?.fileName || '');
   thread.messageCount = (thread.messageCount ?? 0) + 1;
+  thread.lastMessageDirection = direction;
+  if (direction === 'staff') {
+    thread.staffLastReadAt = message.createdAt;
+  }
   threads[idx] = thread;
   await writeThreads(root, threads);
 
   return { ok: true, thread, message };
+}
+
+export async function markMessagingThreadStaffRead(dataDir, tenantId, threadId) {
+  const root = await ensureRoot(dataDir, tenantId);
+  const threads = await readThreads(root);
+  const idx = threads.findIndex((t) => t.id === threadId);
+  if (idx < 0) return { ok: false, error: 'Thread bulunamadı' };
+  threads[idx].staffLastReadAt = new Date().toISOString();
+  await writeThreads(root, threads);
+  return { ok: true, thread: threads[idx] };
+}
+
+export async function countStaffUnreadMessagingThreads(dataDir, tenantId = 'main') {
+  const root = messagingRoot(dataDir, tenantId);
+  let threads = [];
+  try {
+    threads = await readThreads(root);
+  } catch {
+    return 0;
+  }
+  let count = 0;
+  for (const t of threads) {
+    if (t.lastMessageDirection !== 'customer') continue;
+    const readAt = t.staffLastReadAt ? Date.parse(t.staffLastReadAt) : 0;
+    const lastAt = Date.parse(t.lastMessageAt || t.updatedAt || 0);
+    if (!Number.isFinite(lastAt)) continue;
+    if (!readAt || readAt < lastAt) count += 1;
+  }
+  return count;
 }

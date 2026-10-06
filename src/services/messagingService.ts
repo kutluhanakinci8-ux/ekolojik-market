@@ -10,6 +10,8 @@ export type MessagingThread = {
   lastMessageAt: string;
   lastMessagePreview: string;
   messageCount: number;
+  lastMessageDirection?: 'staff' | 'customer';
+  staffLastReadAt?: string | null;
 };
 
 export type MessagingAttachment = {
@@ -77,6 +79,11 @@ export async function fetchMessagingMessages(
   const qs = q.toString();
   const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/messages${qs ? `?${qs}` : ''}`);
   return res.json();
+}
+
+export async function markMessagingThreadRead(threadId: string) {
+  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' });
+  return res.json() as Promise<{ ok: boolean }>;
 }
 
 export async function postMessagingMessage(

@@ -8,6 +8,7 @@ import {
 } from './postaInboxStore.mjs';
 import { listContactMessages, markContactMessageRead, archiveContactMessage } from './tenantAuth.mjs';
 import { getEkolojikImapConfig, isEkolojikImapConfigured } from './ekolojikMailConfig.mjs';
+import { countStaffUnreadMessagingThreads } from './messaging/store.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -246,10 +247,12 @@ export async function getPostaUnreadCounts(dataDir, tenantId = 'main') {
   const fatura = await listUnifiedPostaInbox(dataDir, tenantId, { folder: 'fatura', limit: 200 });
   const gelenUnread = inbox.items.filter((i) => i.unread).length;
   const faturaUnread = fatura.items.filter((i) => i.unread).length;
+  const messagingUnread = await countStaffUnreadMessagingThreads(dataDir, tenantId);
   return {
     ok: true,
     gelen: gelenUnread,
     fatura: faturaUnread,
-    total: gelenUnread + faturaUnread,
+    messaging: messagingUnread,
+    total: gelenUnread + faturaUnread + messagingUnread,
   };
 }
