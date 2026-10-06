@@ -25,6 +25,13 @@ bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-prod-kapat.sh
 
 **DNS:** Giden posta için SPF/DKIM/DMARC yine `ekolojikmarket.com.tr` üzerinde tanımlı olmalı (Postfix hostname ayrı olsa bile From adresi markanız).
 
+OpenDKIM (VPS, yalnızca `@ekolojikmarket.com.tr` imzası):
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-opendkim-kur.sh --apply
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-dns-kabul-dogrula.sh
+```
+
 ## Seçenek B — Harici relay
 
 SendGrid, Resend, kurumsal SMTP vb.:

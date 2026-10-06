@@ -26,5 +26,7 @@ Tamamlayınca: `docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md` maddelerini işaretleyin.
 Otomatik API doğrulama (VPS):
 
 ```bash
-bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-checklist-dogrula.sh
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-ui-yuruyus.sh
 ```
+
+Detay: `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md`
