@@ -96,7 +96,16 @@ if [[ "${EKOLOJIK_RUN_E2E:-0}" == "1" ]]; then
   bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-e2e-tam.sh" "${INSTALL_DIR}" || FAIL=1
 fi
 
+if [[ "${EKOLOJIK_RUN_DNS:-0}" == "1" ]]; then
+  echo ""
+  bash "${REPO_ROOT}/scripts/sunucu-ekolojik-dns-mail-dogrula.sh" || {
+    [[ "${EKOLOJIK_DNS_STRICT:-0}" == "1" ]] && FAIL=1
+  }
+fi
+
 echo ""
+echo "Tam sıra (E2E + Faz 5): bash ${REPO_ROOT}/scripts/sunucu-ekolojik-posta-kabul-sira.sh"
+echo "Akış C sonrası: EKOLOJIK_SKIP_E2E=1 EKOLOJIK_RUN_DNS=1 bash ${REPO_ROOT}/scripts/sunucu-ekolojik-posta-kabul-sira.sh"
 echo "Manuel (checklist): SPF/DKIM/DMARC, fatura IMAP, NB UI 30 dk — docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md"
 echo ""
 

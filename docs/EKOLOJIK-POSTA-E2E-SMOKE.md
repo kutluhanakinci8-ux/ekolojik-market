@@ -37,6 +37,27 @@ bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-checklist-dog
 
 Beklenen: health `smtpVerified: true`, `imapVerified: true`, Gelen smoke test maili listede.
 
+## Akış C sonrası — Faz 5 kabul sırası
+
+Akış C’yi zaten çalıştırdıysanız:
+
+```bash
+EKOLOJIK_SKIP_E2E=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-kabul-sira.sh
+```
+
+DNS TXT + failed arşiv dahil:
+
+```bash
+EKOLOJIK_SKIP_E2E=1 EKOLOJIK_RUN_DNS=1 EKOLOJIK_ARCHIVE_FAILED=1 \
+  bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-kabul-sira.sh
+```
+
+Yalnızca Faz 5 otomatik kapı:
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-faz5-prod-dogrula.sh
+```
+
 ## Bilinen sınırlar (NB farkı)
 
 - Dovecot/JMAP yok — IMAP tek kutu.

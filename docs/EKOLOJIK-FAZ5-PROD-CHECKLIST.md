@@ -52,6 +52,9 @@ Ayarlar → Sistem → **Faz 5 ayrım kontrolü** veya:
 - [ ] `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh` exit 0 (env + parite)
 - [ ] `bash scripts/sunucu-ekolojik-smtp-dogrula.sh` yeşil (Faz 6)
 - [ ] Otomatik özet: `bash scripts/sunucu-ekolojik-faz5-prod-dogrula.sh` (E2E için `EKOLOJIK_RUN_E2E=1`)
+- [ ] Akış C sonrası sıra: `EKOLOJIK_SKIP_E2E=1 bash scripts/sunucu-ekolojik-posta-kabul-sira.sh`
+- [ ] DNS TXT: `EKOLOJIK_RUN_DNS=1 bash scripts/sunucu-ekolojik-dns-mail-dogrula.sh`
+- [ ] Outbox failed temizliği: `bash scripts/sunucu-ekolojik-outbox-failed-arsivle.sh` (önce `EKOLOJIK_DRY_RUN=1`)
 
 ## VPS yedek örneği
 
