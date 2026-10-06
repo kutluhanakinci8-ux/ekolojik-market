@@ -98,8 +98,8 @@ console.log('OK   outbox kaydı', hit.id||hit.filename, hit.folder||hit.status);
 " <<<"${RECENT}" || exit 5
 
 CSV="$(curl -fsS "${BASE_URL}/api/posta/export/outbox.csv" 2>/dev/null || true)"
-if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -q "${REPLY_BODY}"; then
-  echo "HATA: outbox CSV export hedef e-postayı içermiyor"
+if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -q "${REPLY_TO}"; then
+  echo "HATA: outbox CSV export yanıt alıcısını içermiyor"
   exit 6
 fi
 echo "OK   outbox.csv export"

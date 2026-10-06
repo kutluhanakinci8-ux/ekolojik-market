@@ -33,6 +33,8 @@ bash scripts/sunucu-ekolojik-imap-vps-alias-fix.sh   # virtual + transport + mas
 bash scripts/sunucu-ekolojik-posta-gelen-smoke.sh
 ```
 
+Akış A otomatik smoke (VPS): yanıt teslimi için varsayılan `info@ekolojikmarket.com.tr` (`EKOLOJIK_AKIS_A_REPLY_TO`).
+
 ## Seçenek B — Harici IMAP (Gmail / kurumsal)
 
 `.env`:
