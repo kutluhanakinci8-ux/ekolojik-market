@@ -92,7 +92,8 @@ export async function sendEkolojikMail(dataDir, payload) {
     };
   }
 
-  const run = await processPendingOutbox(dataDir, deliverMessage, { limit: 5 });
+  const deliver = createDeliverMessage(dataDir);
+  const run = await processPendingOutbox(dataDir, deliver, { limit: 5 });
   const after = await findOutboxByIdempotency(dataDir, key);
   if (after?.status === 'sent') {
     return {
