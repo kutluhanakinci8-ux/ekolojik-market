@@ -53,6 +53,19 @@ fi
 
 systemctl reload postfix
 
+if [[ -f /etc/dovecot/conf.d/99-ekolojik-mail.conf ]]; then
+  if ! grep -q 'userdb {' /etc/dovecot/conf.d/99-ekolojik-mail.conf; then
+    cat >> /etc/dovecot/conf.d/99-ekolojik-mail.conf <<'EOF'
+userdb {
+  driver = static
+  args = uid=vmail gid=mail home=/var/mail/vhosts/%d/%n
+}
+EOF
+    systemctl reload dovecot
+    echo "OK   Dovecot userdb (vmail) eklendi"
+  fi
+fi
+
 echo "OK   ${LOCAL_USER} → ${TOKEN} → deliver pipe"
 postmap -q "${LOCAL_USER}" "hash:${VIRTUAL_FILE}"
 postmap -q "${TOKEN}" "hash:${ALIAS_FILE}"

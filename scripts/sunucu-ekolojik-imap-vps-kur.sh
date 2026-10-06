@@ -78,6 +78,10 @@ passdb {
   driver = passwd-file
   args = scheme=BLF-CRYPT username_format=%u /etc/dovecot/ekolojik-imap-passwd
 }
+userdb {
+  driver = static
+  args = uid=vmail gid=mail home=/var/mail/vhosts/%d/%n
+}
 EOF
 systemctl reload dovecot
 
