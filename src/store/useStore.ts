@@ -811,36 +811,39 @@ export function useStore() {
   const buildCurrentSnapshot = useCallback((overrides?: {
     users?: PosUser[];
     cashSessions?: DailyCashSession[];
-  }): PersistedStoreSnapshot => buildLocalSnapshot(
-    products,
-    productSets,
-    sales,
-    saleReturns,
-    stockMovements,
-    customers,
-    expenses,
-    cashHandovers,
-    overrides?.cashSessions ?? cashSessions,
-    purchaseInvoices,
-    settings,
-    priceType,
-    overrides?.users ?? users,
-    loginAuditLog,
-    activityAuditLog,
-    suppliers,
-    customerLedger,
-    supplierLedger,
-    bankAccounts,
-    bankTransactions,
-    periodClosures,
-    cashCountVariances,
-    checkNotes,
-    stockAdjustments,
-    journalVouchers,
-    equityPartners,
-    capitalContributions,
-    crmData,
-  ), [
+  }): PersistedStoreSnapshot => {
+    const { products: irsaliyeProducts } = applyIrsaliyeStockToProducts(products);
+    return buildLocalSnapshot(
+      irsaliyeProducts,
+      productSets,
+      sales,
+      saleReturns,
+      stockMovements,
+      customers,
+      expenses,
+      cashHandovers,
+      overrides?.cashSessions ?? cashSessions,
+      purchaseInvoices,
+      settings,
+      priceType,
+      overrides?.users ?? users,
+      loginAuditLog,
+      activityAuditLog,
+      suppliers,
+      customerLedger,
+      supplierLedger,
+      bankAccounts,
+      bankTransactions,
+      periodClosures,
+      cashCountVariances,
+      checkNotes,
+      stockAdjustments,
+      journalVouchers,
+      equityPartners,
+      capitalContributions,
+      crmData,
+    );
+  }, [
     products, productSets, sales, saleReturns, stockMovements, customers, expenses,
     cashHandovers, cashSessions, purchaseInvoices, settings, priceType, users,
     loginAuditLog, activityAuditLog, suppliers, customerLedger, supplierLedger,
@@ -933,17 +936,27 @@ export function useStore() {
         const remoteUsers = (remote.users ?? []).map((user) => normalizeUser(user as unknown as Record<string, unknown>));
         const localUsers = loadUsers();
         const mergedUsers = mergeUserLists(remoteUsers, localUsers);
-        const mergedSnapshot = mergedUsers.length !== remoteUsers.length
-          ? { ...remote, users: mergedUsers, updatedAt: new Date().toISOString() }
-          : remote;
+        const { products: migratedRemoteProducts } = applyIrsaliyeStockToProducts(remote.products ?? []);
+        const mergedSnapshot = {
+          ...(mergedUsers.length !== remoteUsers.length
+            ? { ...remote, users: mergedUsers, updatedAt: new Date().toISOString() }
+            : remote),
+          products: migratedRemoteProducts,
+          updatedAt: new Date().toISOString(),
+        };
 
         applySnapshot(mergedSnapshot);
-        if (mergedUsers.length !== remoteUsers.length) {
-          await saveStoreSnapshot(mergedSnapshot);
-        }
+        await saveStoreSnapshot(mergedSnapshot);
         setSyncStatus('synced');
       } else if (hasPersistedStoreData(localSnapshot)) {
-        const saved = await saveStoreSnapshot(localSnapshot);
+        const { products: migratedLocal } = applyIrsaliyeStockToProducts(localSnapshot.products ?? []);
+        const localFixed = {
+          ...localSnapshot,
+          products: migratedLocal,
+          updatedAt: new Date().toISOString(),
+        };
+        setProducts(mergeWithSeed(migratedLocal));
+        const saved = await saveStoreSnapshot(localFixed);
         setSyncStatus(saved ? 'synced' : 'local-only');
       } else {
         setSyncStatus('synced');
