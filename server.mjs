@@ -43,6 +43,11 @@ import {
 } from './server/messaging/store.mjs';
 import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
+import { readMessagingAttachment } from './server/messaging/attachments.mjs';
+import {
+  runEkolojikDataRetention,
+  getRetentionPolicySummary,
+} from './server/dataRetention.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -594,6 +599,49 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (pathname.startsWith('/api/messaging/attachments/') && req.method === 'GET') {
+      const parts = pathname.split('/').filter(Boolean);
+      const attachmentId = decodeURIComponent(parts[3] ?? '');
+      const tenantId = resolveTenantId(url);
+      try {
+        const file = await readMessagingAttachment(DATA_DIR, tenantId, attachmentId);
+        if (!file.ok) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(file));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': file.mimeType,
+          'Content-Length': file.size,
+          'Content-Disposition': `inline; filename="${file.fileName.replace(/"/g, '')}"`,
+        });
+        res.end(file.data);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ek okunamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/system/data-retention/policy' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, policy: getRetentionPolicySummary() }));
+      return;
+    }
+
+    if (pathname === '/api/system/data-retention/run' && req.method === 'POST') {
+      try {
+        const tenantId = resolveTenantId(url);
+        const result = await runEkolojikDataRetention(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Retention hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/lerta/messaging/threads' && req.method === 'GET') {
       if (!isLertaPlatformConfigured()) {
         res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -745,6 +793,21 @@ setInterval(() => {
     console.warn('email-outbox drain:', error instanceof Error ? error.message : error);
   });
 }, OUTBOX_DRAIN_MS);
+
+const RETENTION_MS = 24 * 60 * 60 * 1000;
+const runRetention = () => {
+  runEkolojikDataRetention(DATA_DIR, 'main').then((result) => {
+    const r = result.removed;
+    const total = (r.outboxSentFailed ?? 0) + (r.messagingAttachments ?? 0) + (r.contactMessages ?? 0);
+    if (total > 0) {
+      console.log('data-retention:', JSON.stringify(r));
+    }
+  }).catch((error) => {
+    console.warn('data-retention:', error instanceof Error ? error.message : error);
+  });
+};
+setTimeout(runRetention, 60_000);
+setInterval(runRetention, RETENTION_MS);
 
 server.listen(PORT, HOST, () => {
   console.log(`Market POS → http://${HOST}:${PORT}`);

@@ -49,6 +49,7 @@ export async function getEkolojikIsolationReport(dataDir) {
       'data/email-outbox/',
       'data/messaging/',
       'data/bill-email-inbox/',
+      'data/messaging-attachments/',
       'data/contact-messages.json',
     ],
     envHints: [

@@ -11,7 +11,7 @@ ARCHIVE="${BACKUP_ROOT}/ekolojik-data-${STAMP}.tar.gz"
 mkdir -p "${BACKUP_ROOT}"
 
 INCLUDE=()
-for name in email-outbox messaging bill-email-inbox contact-messages.json; do
+for name in email-outbox messaging bill-email-inbox messaging-attachments contact-messages.json; do
   if [[ -e "${DATA_DIR}/${name}" ]]; then
     INCLUDE+=("${name}")
   fi

@@ -3,6 +3,8 @@ import {
   fetchEmailHealth,
   fetchRecentOutbox,
   fetchEkolojikIsolationReport,
+  fetchRetentionPolicy,
+  runDataRetention,
   processEmailOutbox,
   sendEmailTest,
 } from '../../services/emailOutboxService';
@@ -39,18 +41,21 @@ export function EmailOutboxSettingsPanel() {
   const [health, setHealth] = useState<Awaited<ReturnType<typeof fetchEmailHealth>> | null>(null);
   const [outboxRows, setOutboxRows] = useState<OutboxRow[]>([]);
   const [isolation, setIsolation] = useState<Awaited<ReturnType<typeof fetchEkolojikIsolationReport>> | null>(null);
+  const [retention, setRetention] = useState<Awaited<ReturnType<typeof fetchRetentionPolicy>>['policy'] | null>(null);
   const [testTo, setTestTo] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso] = await Promise.all([
+    const [h, recent, iso, ret] = await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
+      fetchRetentionPolicy(),
     ]);
     setHealth(h);
     setIsolation(iso);
+    if (ret.ok && ret.policy) setRetention(ret.policy);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
     }
@@ -192,6 +197,34 @@ export function EmailOutboxSettingsPanel() {
             ))}
           </ul>
         </>
+      )}
+
+      {retention && (
+        <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+          <div>
+            <h3>KVKK / saklama (Faz 5)</h3>
+            <p>
+              Outbox gönderilen: {retention.outboxDays} gün · Mesaj ekleri: {retention.messagingDays} gün · İletişim
+              formu: {retention.contactDays} gün
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              try {
+                const r = await runDataRetention();
+                setFlash(r.ok ? `Temizlik: ${JSON.stringify(r.removed ?? {})}` : 'Temizlik başarısız');
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            Saklama temizliği çalıştır
+          </button>
+        </div>
       )}
 
       <div className="settings-panel-head" style={{ marginTop: '1.5rem' }}>

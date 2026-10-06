@@ -71,7 +71,7 @@
 | 3.2 | API: `GET/POST /api/messaging/threads`, `…/messages` (Ekolojik `server.mjs`) | ✅ |
 | 3.3 | POS: CRM müşteri kartında “Mesajlar” sekmesi | ✅ `MessagingPanel` |
 | 3.4 | Bildirim: yeni mesaj → Faz 1 outbox (e-posta özeti) veya ileride push | ✅ `messaging/notify.mjs` |
-| 3.5 | Dosya eki (opsiyonel Faz 3b): `data/messaging-attachments/` | (sonra) |
+| 3.5 | Dosya eki (opsiyonel Faz 3b): `data/messaging-attachments/` | ✅ max 5 MB, PDF/resim |
 
 **Kabul:** NB `public/lerta-messaging/v1` **çağrılmaz**; thread id’ler Ekolojik namespace’inde.
 
@@ -92,11 +92,12 @@
 ## Faz 5 — Sertleştirme & ayrım kontrol listesi
 
 - [x] API özeti: `GET /api/system/ekolojik-isolation` + Ayarlar paneli
-- [ ] VPS: Ekolojik `market-pos` ayrı process; NB ayrı PM2 / port
-- [ ] Env dosyaları karışmıyor (`EKOLOJIK_*` vs `MAIL_PLATFORM_*`)
+- [x] `.env` yükleme: `server/loadEnv.mjs` + `sunucu-ekolojik-env-kur.sh`
+- [x] Yedek script: `scripts/sunucu-ekolojik-data-yedek.sh` (cron sizin)
+- [ ] VPS: Ekolojik `market-pos` ayrı process; NB ayrı PM2 / port (✓ pratikte ayrı; dokümante)
+- [ ] Env dosyaları karışmıyor (`EKOLOJIK_*` vs `MAIL_PLATFORM_*`) — `.env` doldurulmalı
 - [x] Monitoring: Ekolojik outbox failed sayacı (email health)
-- [ ] Yedek: `data/email-outbox` + `data/messaging` + `data/bill-email-inbox` günlük backup
-- [ ] KVKK: mesaj/mail retention politikası (Ekolojik ayarlardan)
+- [x] KVKK: saklama süresi + otomatik temizlik (`dataRetention.mjs`, Ayarlar paneli)
 
 Detay: `docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md`
 

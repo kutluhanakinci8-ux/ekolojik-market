@@ -48,3 +48,20 @@ export async function fetchEkolojikIsolationReport(): Promise<{
   const res = await fetch('/api/system/ekolojik-isolation');
   return res.json();
 }
+
+export async function fetchRetentionPolicy(): Promise<{
+  ok: boolean;
+  policy?: { outboxDays: number; messagingDays: number; contactDays: number };
+}> {
+  const res = await fetch('/api/system/data-retention/policy');
+  return res.json();
+}
+
+export async function runDataRetention(): Promise<{
+  ok: boolean;
+  removed?: Record<string, number>;
+  policy?: Record<string, number>;
+}> {
+  const res = await fetch('/api/system/data-retention/run', { method: 'POST' });
+  return res.json();
+}

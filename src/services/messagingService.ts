@@ -12,6 +12,14 @@ export type MessagingThread = {
   messageCount: number;
 };
 
+export type MessagingAttachment = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+};
+
 export type MessagingMessage = {
   id: string;
   threadId: string;
@@ -19,6 +27,7 @@ export type MessagingMessage = {
   bodyText: string;
   authorName: string;
   createdAt: string;
+  attachments?: MessagingAttachment[];
 };
 
 function tenantQuery(tenant?: string) {
@@ -77,6 +86,7 @@ export async function postMessagingMessage(
     direction?: 'staff' | 'customer';
     authorName?: string;
     tenant?: string;
+    attachments?: Array<{ fileName: string; mimeType: string; dataBase64: string }>;
   },
 ): Promise<{ ok: boolean; message?: MessagingMessage; thread?: MessagingThread; error?: string }> {
   const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/messages${tenantQuery(payload.tenant)}`, {

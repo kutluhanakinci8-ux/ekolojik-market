@@ -22,6 +22,21 @@ export function MessagingPanel({ customer, authorName = 'Mağaza' }: MessagingPa
   const [direction, setDirection] = useState<'staff' | 'customer'>('staff');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<
+    Array<{ fileName: string; mimeType: string; dataBase64: string }>
+  >([]);
+
+  const readFileAsAttachment = (file: File) =>
+    new Promise<{ fileName: string; mimeType: string; dataBase64: string }>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result ?? '');
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve({ fileName: file.name, mimeType: file.type || 'application/octet-stream', dataBase64: base64 });
+      };
+      reader.onerror = () => reject(new Error('Dosya okunamadı'));
+      reader.readAsDataURL(file);
+    });
 
   const loadThreads = useCallback(async () => {
     const result = await fetchMessagingThreads({ customerId: customer.id, limit: 20 });
@@ -81,7 +96,7 @@ export function MessagingPanel({ customer, authorName = 'Mağaza' }: MessagingPa
   };
 
   const sendMessage = async () => {
-    if (!activeThreadId || !draft.trim()) return;
+    if (!activeThreadId || (!draft.trim() && pendingFiles.length === 0)) return;
     setLoading(true);
     setStatus(null);
     try {
@@ -89,12 +104,14 @@ export function MessagingPanel({ customer, authorName = 'Mağaza' }: MessagingPa
         bodyText: draft.trim(),
         direction,
         authorName: direction === 'staff' ? authorName : customer.name,
+        attachments: pendingFiles.length ? pendingFiles : undefined,
       });
       if (!result.ok) {
         setStatus(result.error ?? 'Gönderilemedi');
         return;
       }
       setDraft('');
+      setPendingFiles([]);
       await loadThreads();
       await loadMessages(activeThreadId);
       setStatus('Mesaj kaydedildi.');
@@ -147,6 +164,17 @@ export function MessagingPanel({ customer, authorName = 'Mağaza' }: MessagingPa
                       <time>{new Date(m.createdAt).toLocaleString('tr-TR')}</time>
                     </header>
                     <p>{m.bodyText}</p>
+                    {m.attachments?.length ? (
+                      <ul className="crm-msg-attachments">
+                        {m.attachments.map((a) => (
+                          <li key={a.id}>
+                            <a href={a.url} target="_blank" rel="noreferrer">
+                              {a.fileName} ({Math.round(a.size / 1024)} KB)
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -164,10 +192,44 @@ export function MessagingPanel({ customer, authorName = 'Mağaza' }: MessagingPa
                   placeholder="Mesajınız…"
                   onChange={(e) => setDraft(e.target.value)}
                 />
+                <label className="settings-field">
+                  <span>Ek (max 5 MB, PDF/resim)</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,text/plain"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      if (file.size > 5 * 1024 * 1024) {
+                        setStatus('Dosya 5 MB sınırını aşıyor');
+                        return;
+                      }
+                      try {
+                        const att = await readFileAsAttachment(file);
+                        setPendingFiles((prev) => [...prev, att].slice(0, 3));
+                      } catch {
+                        setStatus('Ek okunamadı');
+                      }
+                    }}
+                  />
+                </label>
+                {pendingFiles.length > 0 && (
+                  <ul className="crm-msg-attachments">
+                    {pendingFiles.map((f, i) => (
+                      <li key={`${f.fileName}-${i}`}>
+                        {f.fileName}
+                        <button type="button" className="btn btn-sm btn-outline" onClick={() => setPendingFiles((p) => p.filter((_, j) => j !== i))}>
+                          Kaldır
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <button
                   type="button"
                   className="btn btn-sm btn-primary"
-                  disabled={loading || !draft.trim()}
+                  disabled={loading || (!draft.trim() && pendingFiles.length === 0)}
                   onClick={() => void sendMessage()}
                 >
                   Gönder

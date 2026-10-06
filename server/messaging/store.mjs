@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { saveMessageAttachments } from './attachments.mjs';
 
 function messagingRoot(dataDir, tenantId = 'main') {
   return join(dataDir, 'messaging', tenantId);
@@ -122,8 +123,9 @@ export async function listMessagingMessages(dataDir, tenantId, threadId, { limit
 
 export async function appendMessagingMessage(dataDir, tenantId, threadId, payload) {
   const bodyText = String(payload.bodyText ?? '').trim();
-  if (!bodyText) {
-    return { ok: false, error: 'Mesaj metni zorunlu' };
+  const hasAttachments = Array.isArray(payload.attachments) && payload.attachments.length > 0;
+  if (!bodyText && !hasAttachments) {
+    return { ok: false, error: 'Mesaj metni veya ek zorunlu' };
   }
 
   const root = await ensureRoot(dataDir, tenantId);
@@ -138,10 +140,27 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
     id: `msg-${randomUUID()}`,
     threadId,
     direction,
-    bodyText,
+    bodyText: bodyText || (hasAttachments ? '(ek dosya)' : ''),
     authorName: String(payload.authorName ?? (direction === 'customer' ? 'Müşteri' : 'POS')).trim(),
     createdAt: new Date().toISOString(),
+    attachments: [],
   };
+
+  if (hasAttachments) {
+    try {
+      message.attachments = await saveMessageAttachments(
+        dataDir,
+        tenantId,
+        message.id,
+        payload.attachments,
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Ek kaydedilemedi',
+      };
+    }
+  }
 
   const messages = await readMessages(root, threadId);
   messages.push(message);
@@ -150,7 +169,7 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
   const thread = threads[idx];
   thread.updatedAt = message.createdAt;
   thread.lastMessageAt = message.createdAt;
-  thread.lastMessagePreview = preview(bodyText);
+  thread.lastMessagePreview = preview(bodyText || message.attachments[0]?.fileName || '');
   thread.messageCount = (thread.messageCount ?? 0) + 1;
   threads[idx] = thread;
   await writeThreads(root, threads);
