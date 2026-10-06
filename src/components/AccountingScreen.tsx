@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Store } from '../store/useStore';
 import type { ReportPeriod } from '../utils/analytics';
 import { getFullChartOfAccounts } from '../data/chartOfAccounts';
@@ -34,7 +34,7 @@ import { CurrencyReportsPanel } from './reports/CurrencyReportsPanel';
 import { SecurityReportsPanel } from './reports/SecurityReportsPanel';
 import { SystemActivityReportsPanel } from './reports/SystemActivityReportsPanel';
 import { VOUCHER_TYPE_LABELS } from '../types/journalVoucher';
-import { canAccessPage } from '../utils/userAccess';
+import { resolveUserTabPermissions } from '../utils/userAccess';
 
 export type ReportsSubTab =
   | 'gelir'
@@ -71,6 +71,7 @@ interface AccountingScreenProps {
   /** Üst menü Raporlar sekmesi: muhasebe alt sekmeleri gizlenir, sadece rapor menüsü */
   reportsOnly?: boolean;
   initialReportsSubTab?: ReportsSubTab;
+  transactionsOnlyMenu?: boolean;
 }
 
 type AccountingTab =
@@ -110,12 +111,19 @@ function ReportsTypeMenu({
   active,
   onSelect,
   includeAdminReports,
+  transactionsOnly = false,
 }: {
   active: ReportsSubTab;
   onSelect: (id: ReportsSubTab) => void;
   includeAdminReports: boolean;
+  transactionsOnly?: boolean;
 }) {
-  const visibleItems = REPORTS_SUBTABS.filter((item) => !item.adminOnly || includeAdminReports);
+  const visibleItems = REPORTS_SUBTABS.filter((item) => {
+    if (transactionsOnly) return item.id === 'islemler';
+    if (item.id === 'islemler') return true;
+    if (item.adminOnly && !includeAdminReports) return false;
+    return true;
+  });
 
   return (
     <nav className="reports-type-menu" aria-label="Rapor türü">
@@ -211,11 +219,16 @@ export function AccountingScreen({
   initialTab,
   reportsOnly = false,
   initialReportsSubTab,
+  transactionsOnlyMenu = false,
 }: AccountingScreenProps) {
-  const hasAccounting = canAccessPage(store.authSession, 'accounting');
-  const hasTransactions = canAccessPage(store.authSession, 'transactions');
-  const hasCashier = canAccessPage(store.authSession, 'cashier');
-  const hasCustomers = canAccessPage(store.authSession, 'customers');
+  const tabPerms = resolveUserTabPermissions(
+    store.users.find((u) => u.id === store.authSession?.userId),
+    store.authSession,
+  );
+  const hasAccounting = tabPerms.hasFullAccounting;
+  const hasTransactions = tabPerms.hasTransactions;
+  const hasCashier = tabPerms.hasCashier;
+  const hasCustomers = tabPerms.hasCustomers;
   const visibleTabs = TABS.filter((item) => {
     if (item.id === 'fis') return hasAccounting;
     if (item.id === 'kasa') return hasCashier || hasAccounting;
@@ -233,8 +246,15 @@ export function AccountingScreen({
   const [tab, setTab] = useState<AccountingTab>(reportsOnly ? 'rapor' : defaultTab);
   const activeTab: AccountingTab = reportsOnly ? 'rapor' : tab;
   const [reportsSubTab, setReportsSubTab] = useState<ReportsSubTab>(
-    initialReportsSubTab ?? 'gelir',
+    initialReportsSubTab ?? (transactionsOnlyMenu ? 'islemler' : 'gelir'),
   );
+
+  useEffect(() => {
+    if (reportsOnly || !initialTab) return;
+    if (visibleTabs.some((item) => item.id === initialTab)) {
+      setTab(initialTab);
+    }
+  }, [initialTab, reportsOnly, visibleTabs]);
   const [period, setPeriod] = useState<ReportPeriod>('month');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
@@ -495,6 +515,7 @@ export function AccountingScreen({
               active={reportsSubTab}
               onSelect={setReportsSubTab}
               includeAdminReports={isAdmin}
+              transactionsOnly={transactionsOnlyMenu}
             />
             <div className="accounting-reports-panel">
           {reportsSubTab === 'gelir' && (

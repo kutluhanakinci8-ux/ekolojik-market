@@ -1,4 +1,4 @@
-import { NAV_ITEMS } from '../data/navigation';
+import { buildVisibleNavItems } from '../data/navigation';
 import type { Store } from '../store/useStore';
 import { formatBusinessBrand, formatCurrency } from '../utils/format';
 
@@ -32,7 +32,7 @@ export function AppShell({
   onBrandSecretClick,
   children,
 }: AppShellProps) {
-  const visibleNavItems = NAV_ITEMS.filter((item) => allowedTabs.includes(item.id));
+  const visibleNavItems = buildVisibleNavItems(allowedTabs);
 
   return (
     <div className="app-shell">

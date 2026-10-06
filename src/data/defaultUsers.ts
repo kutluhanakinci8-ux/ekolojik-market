@@ -25,6 +25,7 @@ export const DEFAULT_USERS: PosUser[] = [
       'sales',
       'stock',
       'reports',
+      'accounting',
       'transactions',
       'customers',
       'cashier',

@@ -12,30 +12,38 @@ import { StockScreen } from './components/StockScreen';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useStore } from './store/useStore';
 import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './utils/userAccess';
+import { resolveTopNavHighlight } from './data/navigation';
 import type { AppPage } from './components/AppShell';
 
 function renderPage(page: AppPage, store: ReturnType<typeof useStore>) {
   switch (page) {
     case 'dashboard':
-      return <DashboardScreen store={store} />;
+      return <DashboardScreen key={page} store={store} />;
     case 'sales':
-      return <SalesScreen store={store} />;
+      return <SalesScreen key={page} store={store} />;
     case 'stock':
-      return <StockScreen store={store} />;
+      return <StockScreen key={page} store={store} />;
     case 'reports':
-      return <ReportsScreen store={store} />;
+      return <ReportsScreen key={page} store={store} />;
     case 'accounting':
-      return <AccountingScreen store={store} />;
+      return <AccountingScreen key={page} store={store} />;
     case 'transactions':
-      return <ReportsScreen store={store} initialReportsSubTab="islemler" />;
+      return (
+        <ReportsScreen
+          key={page}
+          store={store}
+          initialReportsSubTab="islemler"
+          transactionsOnlyMenu
+        />
+      );
     case 'customers':
-      return <AccountingScreen store={store} initialTab="musteriler" />;
+      return <AccountingScreen key={page} store={store} initialTab="musteriler" />;
     case 'cashier':
-      return <AccountingScreen store={store} initialTab="kasa" />;
+      return <AccountingScreen key={page} store={store} initialTab="kasa" />;
     case 'settings':
-      return <SettingsScreen store={store} />;
+      return <SettingsScreen key={page} store={store} />;
     default:
-      return <DashboardScreen store={store} />;
+      return <DashboardScreen key="dashboard" store={store} />;
   }
 }
 
@@ -73,11 +81,7 @@ export function PosApp() {
 
   const allowedTabs = store.authSession.allowedTabs;
   const showCostProfitToggle = canRevealCostProfit(store.authSession);
-  const shellPage = page === 'transactions'
-    ? 'reports'
-    : page === 'cashier' || page === 'customers'
-      ? 'accounting'
-      : page;
+  const shellPage = resolveTopNavHighlight(page, allowedTabs);
 
   return (
     <AppShell

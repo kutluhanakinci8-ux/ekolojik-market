@@ -30,5 +30,32 @@ export const USER_PERMISSION_TABS: Array<{ id: AppPage; label: string }> = [
 
 export const ALL_APP_PAGES: AppPage[] = USER_PERMISSION_TABS.map((item) => item.id);
 
-/** Kasiyerin iade ve müşteri takibi için erişmesi gereken minimum sekmeler */
-export const DEFAULT_CASHIER_TABS: AppPage[] = ['sales', 'transactions', 'customers'];
+/** Kasiyerin iade, müşteri ve kasa için erişmesi gereken minimum sekmeler */
+export const DEFAULT_CASHIER_TABS: AppPage[] = ['sales', 'transactions', 'customers', 'cashier'];
+
+/** Üst menü — yetkiye göre (İşlemler-only kullanıcıda Raporlar yerine İşlemler) */
+export function buildVisibleNavItems(allowedTabs: AppPage[]): NavItem[] {
+  const items: NavItem[] = [];
+  for (const item of NAV_ITEMS) {
+    if (item.id === 'reports') {
+      if (allowedTabs.includes('reports')) {
+        items.push(item);
+      } else if (allowedTabs.includes('transactions')) {
+        items.push({ ...item, id: 'transactions', label: 'İşlemler', icon: '🧾' });
+      }
+      continue;
+    }
+    if (allowedTabs.includes(item.id)) {
+      items.push(item);
+    }
+  }
+  return items;
+}
+
+export function resolveTopNavHighlight(page: AppPage, allowedTabs: AppPage[]): AppPage {
+  if (page === 'cashier' || page === 'customers') return 'accounting';
+  if (page === 'transactions') {
+    return allowedTabs.includes('reports') ? 'reports' : 'transactions';
+  }
+  return page;
+}

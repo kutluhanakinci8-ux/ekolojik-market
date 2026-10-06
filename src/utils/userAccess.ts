@@ -2,6 +2,47 @@ import type { AppPage } from '../components/AppShell';
 import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS } from '../data/navigation';
 import type { AuthSession, PosUser } from '../types/user';
 
+export interface UserTabPermissions {
+  hasFullAccounting: boolean;
+  hasTransactions: boolean;
+  hasCashier: boolean;
+  hasCustomers: boolean;
+  hasReports: boolean;
+}
+
+/** Oturum menüsüne eklenen `accounting` nav bayrağını fiş yetkisine karıştırmamak için ham kullanıcı yetkileri */
+export function resolveUserTabPermissions(
+  user: PosUser | undefined,
+  session: AuthSession | null | undefined,
+): UserTabPermissions {
+  if (!user || !session) {
+    return {
+      hasFullAccounting: false,
+      hasTransactions: false,
+      hasCashier: false,
+      hasCustomers: false,
+      hasReports: false,
+    };
+  }
+  if (user.role === 'admin') {
+    return {
+      hasFullAccounting: true,
+      hasTransactions: true,
+      hasCashier: true,
+      hasCustomers: true,
+      hasReports: true,
+    };
+  }
+  const raw = user.allowedTabs.filter((tab) => ALL_APP_PAGES.includes(tab));
+  return {
+    hasFullAccounting: raw.includes('accounting'),
+    hasTransactions: raw.includes('transactions'),
+    hasCashier: raw.includes('cashier'),
+    hasCustomers: raw.includes('customers'),
+    hasReports: raw.includes('reports'),
+  };
+}
+
 export function resolveUserAllowedTabs(user: PosUser): AppPage[] {
   if (user.role === 'admin') {
     return ALL_APP_PAGES;
