@@ -52,6 +52,12 @@ EKOLOJIK_SKIP_E2E=1 EKOLOJIK_RUN_DNS=1 EKOLOJIK_ARCHIVE_FAILED=1 \
   bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-kabul-sira.sh
 ```
 
+Tam kabul (E2E atlanmış + ops adım 3–4):
+
+```bash
+EKOLOJIK_SKIP_E2E=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-kabul-sira.sh
+```
+
 Yalnızca Faz 5 otomatik kapı:
 
 ```bash

@@ -10,31 +10,34 @@ echo "Runtime: ${INSTALL_DIR}"
 echo ""
 
 if [[ "${EKOLOJIK_SKIP_E2E:-0}" != "1" ]]; then
-  echo "--- 1/3 Akış C (E2E tam) ---"
+  echo "--- 1/4 Akış C (E2E tam) ---"
   bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-e2e-tam.sh" "${INSTALL_DIR}"
 else
-  echo "--- 1/3 Akış C atlandı (EKOLOJIK_SKIP_E2E=1) ---"
+  echo "--- 1/4 Akış C atlandı (EKOLOJIK_SKIP_E2E=1) ---"
 fi
 echo ""
 
-echo "--- 2/3 Faz 5 prod otomatik ---"
+echo "--- 2/4 Faz 5 prod otomatik ---"
 export EKOLOJIK_RUN_E2E=0
 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-faz5-prod-dogrula.sh" "${INSTALL_DIR}"
+echo ""
+
+if [[ "${EKOLOJIK_SKIP_OPS:-0}" != "1" ]]; then
+  echo "--- 3/4 Faz 5 ops (yedek + cron + posta settings + DNS öneri) ---"
+  bash "${REPO_ROOT}/scripts/sunucu-ekolojik-faz5-ops-dogrula.sh" "${INSTALL_DIR}"
+else
+  echo "--- 3/4 Faz 5 ops atlandı (EKOLOJIK_SKIP_OPS=1) ---"
+  if [[ "${EKOLOJIK_RUN_DNS:-0}" == "1" ]]; then
+    bash "${REPO_ROOT}/scripts/sunucu-ekolojik-dns-mail-dogrula.sh"
+  fi
+fi
 echo ""
 
 if [[ "${EKOLOJIK_ARCHIVE_FAILED:-0}" == "1" ]]; then
   echo "--- Opsiyonel: failed outbox arşiv ---"
   bash "${REPO_ROOT}/scripts/sunucu-ekolojik-outbox-failed-arsivle.sh" "${INSTALL_DIR}"
-  echo ""
 fi
 
-if [[ "${EKOLOJIK_RUN_DNS:-0}" == "1" ]]; then
-  echo "--- 3/3 DNS mail TXT ---"
-  bash "${REPO_ROOT}/scripts/sunucu-ekolojik-dns-mail-dogrula.sh"
-else
-  echo "--- 3/3 DNS atlandı (EKOLOJIK_RUN_DNS=1 ile SPF/DMARC/DKIM) ---"
-fi
-
-echo ""
-echo "Manuel: docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md + docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md (~30 dk UI)"
+echo "--- 4/4 Özet ---"
+echo "Manuel: NB UI checklist + DNS panel (SPF/DKIM) — docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md"
 echo "✓ Kabul sırası otomatik adımlar tamam"
