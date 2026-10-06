@@ -3,7 +3,7 @@
 # Kullanım: bash scripts/deploy-vps.sh
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/harikaotoservisinfo-spec/ekolojik-market-pos.git}"
+REPO_URL="${REPO_URL:-https://github.com/kutluhanakinci8-ux/ekolojik-market.git}"
 BRANCH="${BRANCH:-main}"
 REPO_ROOT="${REPO_ROOT:-/var/www/ekolojik-market-pos}"
 PORT="${PORT:-5180}"
