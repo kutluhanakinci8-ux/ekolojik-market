@@ -36,12 +36,12 @@
 
 | # | İş | Çıktı |
 |---|-----|--------|
-| 1.1 | `EmailOutbox` benzeri modül (Node): `data/email-outbox/` veya SQLite | Kuyruk, durum: pending/sent/failed |
-| 1.2 | Gönderim: Ekolojik VPS **Postfix** (veya geçici Resend **sadece Ekolojik** API key) | `EKOLOJIK_SMTP_*` env |
-| 1.3 | DNS: SPF, DKIM, DMARC **ekolojikmarket.com.tr** | İsimtescil / Cloudflare |
-| 1.4 | `sendCrmEmail` → yalnızca Ekolojik outbox + SMTP | NB bridge **devre dışı** |
-| 1.5 | Şablonlar: CRM (`emailTemplates.ts`) + HTML/text wrapper | Marka: Ekolojik Market |
-| 1.6 | İdempotency + retry (3 deneme, exponential backoff) | NB F1 mantığı, ayrı kod |
+| 1.1 | `EmailOutbox` benzeri modül (Node): `data/email-outbox/` | ✅ `server/emailOutbox.mjs` |
+| 1.2 | Gönderim: Ekolojik VPS **Postfix** (SMTP env) | ✅ `server/ekolojikSmtp.mjs` + nodemailer |
+| 1.3 | DNS: SPF, DKIM, DMARC **ekolojikmarket.com.tr** | VPS / isimtescil (sizin) |
+| 1.4 | `sendCrmEmail` → yalnızca Ekolojik outbox + SMTP | ✅ |
+| 1.5 | Şablonlar: CRM (`emailTemplates.ts`) | Mevcut (HTML wrapper Faz 2) |
+| 1.6 | İdempotency + retry (3 deneme) | ✅ outbox processor |
 
 **Kabul:** CRM test maili Ekolojik From adresinden gider; NB admin outbox’unda **görünmez**.
 

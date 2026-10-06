@@ -11,6 +11,7 @@ import { UsersManagement } from './UsersManagement';
 import { CurrencyRatesSettings } from './CurrencyRatesSettings';
 import { CrmSettingsPanel } from './crm/CrmSettingsPanel';
 import { PosCheckoutSettingsPanel } from './pos/PosCheckoutSettingsPanel';
+import { EmailOutboxSettingsPanel } from './settings/EmailOutboxSettingsPanel';
 
 interface SettingsScreenProps {
   store: Store;
@@ -290,6 +291,7 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
 
         {activeTab === 'system' && isAdmin && (
           <div className="settings-system-grid">
+            <EmailOutboxSettingsPanel />
             <section className="settings-panel">
               <div className="settings-panel-head">
                 <div>

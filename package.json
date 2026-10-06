@@ -16,6 +16,7 @@
     "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs"
   },
   "dependencies": {
+    "nodemailer": "^6.9.16",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.6"

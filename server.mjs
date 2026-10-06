@@ -9,6 +9,14 @@ import { pollBillEmails, testBillEmailConnection } from './server/billEmailClien
 import { readTenantStore, writeTenantStore, registerTenant, saveContactMessage } from './server/tenantAuth.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
+import { getEkolojikMailConfig, isEkolojikSmtpConfigured } from './server/ekolojikMailConfig.mjs';
+import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
+import { getOutboxCounts, listRecentOutbox } from './server/emailOutbox.mjs';
+import {
+  deliverMessage,
+  processPendingOutbox,
+  sendEkolojikMail,
+} from './server/emailOutboxProcessor.mjs';
 import {
   isLertaPlatformConfigured,
   listMessagingThreads,
@@ -364,6 +372,108 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/email/health' && req.method === 'GET') {
+      const smtp = isEkolojikSmtpConfigured();
+      const verify = smtp ? await verifyEkolojikSmtp() : { ok: false, error: 'SMTP yapılandırılmadı' };
+      const counts = await getOutboxCounts(DATA_DIR);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          smtpConfigured: smtp,
+          smtpVerified: verify.ok,
+          smtpError: verify.error ?? null,
+          from: getEkolojikMailConfig().from || null,
+          counts,
+        }),
+      );
+      return;
+    }
+
+    if (pathname === '/api/email/outbox/recent' && req.method === 'GET') {
+      const limit = Number(url.searchParams.get('limit') || 30);
+      const recent = await listRecentOutbox(DATA_DIR, limit);
+      const counts = await getOutboxCounts(DATA_DIR);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, counts, ...recent }));
+      return;
+    }
+
+    if (pathname === '/api/email/test' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      const to = data?.to?.trim();
+      if (!to?.includes('@')) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Geçerli to e-posta gerekli' }));
+        return;
+      }
+      try {
+        const result = await sendEkolojikMail(DATA_DIR, {
+          to,
+          subject: data?.subject?.trim() || 'Ekolojik Market — SMTP test',
+          body:
+            data?.body?.trim()
+            || 'Bu mesaj Ekolojik Market bağımsız posta outbox (Faz 1) testidir.',
+          fromName: data?.fromName,
+          idempotencyKey: `test:${to}:${Date.now()}`,
+          source: 'test',
+        });
+        res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Test hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/email/outbox/process' && req.method === 'POST') {
+      try {
+        const run = await processPendingOutbox(DATA_DIR, deliverMessage, { limit: 30 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...run }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İşlem hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/lerta/messaging/threads' && req.method === 'GET') {
+      if (!isLertaPlatformConfigured()) {
+        res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Lerta messaging yapılandırılmadı' }));
+        return;
+      }
+      const limit = url.searchParams.get('limit') ?? '50';
+      const result = await listMessagingThreads({ limit: Number(limit) || 50 });
+      res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname.startsWith('/api/lerta/messaging/threads/') && req.method === 'POST') {
+      const parts = pathname.split('/').filter(Boolean);
+      const threadId = parts[4];
+      const action = parts[5];
+      if (action === 'messages' && threadId) {
+        if (!isLertaPlatformConfigured()) {
+          res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Lerta messaging yapılandırılmadı' }));
+          return;
+        }
+        const data = await readRequestBody(req);
+        const result = await sendMessagingMessage({
+          threadId,
+          bodyText: data?.bodyText ?? data?.body ?? '',
+          locale: data?.locale ?? 'tr',
+        });
+        res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+        return;
+      }
+    }
+
     if (pathname === '/api/contact' && req.method === 'POST') {
       const data = await readRequestBody(req);
       try {
@@ -449,6 +559,19 @@ const server = createServer(async (req, res) => {
   }
 });
 
+const OUTBOX_DRAIN_MS = 30_000;
+setInterval(() => {
+  if (!isEkolojikSmtpConfigured()) return;
+  processPendingOutbox(DATA_DIR, deliverMessage, { limit: 15 }).catch((error) => {
+    console.warn('email-outbox drain:', error instanceof Error ? error.message : error);
+  });
+}, OUTBOX_DRAIN_MS);
+
 server.listen(PORT, HOST, () => {
   console.log(`Market POS → http://${HOST}:${PORT}`);
+  if (isEkolojikSmtpConfigured()) {
+    console.log('Ekolojik mail outbox: SMTP aktif, kuyruk drain 30s');
+  } else {
+    console.log('Ekolojik mail outbox: SMTP yok — EKOLOJIK_SMTP_* tanımlayın');
+  }
 });
