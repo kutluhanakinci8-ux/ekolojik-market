@@ -109,6 +109,24 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
     });
   };
 
+  const handleWarehouseReset = () => {
+    setPendingApproval({
+      reason: 'warehouse_reset',
+      action: async () => {
+        try {
+          const result = await store.resetSalesAndIrsaliyeWarehouse();
+          setBackupMessage(
+            result.ok
+              ? `Tamam: tüm satışlar silindi. Depo irsaliye ile birebir (${result.totalStock.toLocaleString('tr-TR')} adet).`
+              : `Yerelde uygulandı (${result.totalStock.toLocaleString('tr-TR')} adet) — sunucuya yazılamadı; Sunucuya Yükle deneyin.`,
+          );
+        } catch (error) {
+          setBackupMessage(error instanceof Error ? error.message : 'Depo sıfırlama başarısız');
+        }
+      },
+    });
+  };
+
   const approvalTitle =
     pendingApproval?.reason === 'price_change'
       ? 'Fiyat Ayarı Onayı'
@@ -116,7 +134,9 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
         ? 'Yedek İçe Aktarma Onayı'
         : pendingApproval?.reason === 'backup_push'
           ? 'Sunucuya Yükleme Onayı'
-          : 'Yönetici Onayı';
+          : pendingApproval?.reason === 'warehouse_reset'
+            ? 'Depo + Satış Sıfırlama'
+            : 'Yönetici Onayı';
 
   const approvalDescription =
     pendingApproval?.reason === 'price_change'
@@ -125,7 +145,9 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
         ? 'Yedek dosyası sisteme yüklenecek. Bu işlem mevcut verileri değiştirebilir.'
         : pendingApproval?.reason === 'backup_push'
           ? 'Tüm veriler sunucuya yazılacak. Bu işlem için yönetici onayı gerekir.'
-          : 'Bu işlem için yönetici onayı gerekir.';
+          : pendingApproval?.reason === 'warehouse_reset'
+            ? 'Tüm satışlar, iadeler, stok hareketleri ve kasa günleri silinir. Stoklar LUY2026000000002 irsaliyesindeki adetlere yazılır (katalogdaki diğer ürünler 0).'
+            : 'Bu işlem için yönetici onayı gerekir.';
 
   return (
     <div className="module-screen settings-screen--premium">
@@ -332,6 +354,15 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
                   <span className="settings-backup-card-tag">Bulut</span>
                   <strong>Sunucuya Yükle</strong>
                   <small>Paylaşımlı veriyi güncelle</small>
+                </button>
+                <button
+                  type="button"
+                  className="settings-backup-card settings-backup-card--danger"
+                  onClick={handleWarehouseReset}
+                >
+                  <span className="settings-backup-card-tag">Depo</span>
+                  <strong>Satışları Sil + İrsaliye Stok</strong>
+                  <small>LUY irsaliye adetleri birebir; satış geçmişi sıfır</small>
                 </button>
               </div>
 

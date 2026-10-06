@@ -32,4 +32,5 @@ export type AdminApprovalReason =
   | 'price_change'
   | 'refund'
   | 'backup_import'
-  | 'backup_push';
+  | 'backup_push'
+  | 'warehouse_reset';

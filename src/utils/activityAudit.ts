@@ -28,6 +28,7 @@ export type ActivityAction =
   | 'backup_export'
   | 'backup_import'
   | 'backup_push'
+  | 'warehouse_reset'
   | 'password_change'
   | 'totp_enable'
   | 'totp_disable'
@@ -87,6 +88,7 @@ const ACTION_LABELS: Record<ActivityAction, string> = {
   backup_export: 'Yedek',
   backup_import: 'Yedek',
   backup_push: 'Yedek',
+  warehouse_reset: 'İrsaliye depo',
   password_change: 'Güvenlik',
   totp_enable: '2FA',
   totp_disable: '2FA',

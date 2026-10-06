@@ -18,6 +18,7 @@ const REASON_LABELS: Record<AdminApprovalReason, string> = {
   refund: 'İade işlemi',
   backup_import: 'Yedek içe aktarma',
   backup_push: 'Sunucuya veri yükleme',
+  warehouse_reset: 'Satış sil + irsaliye depo',
 };
 
 export function AdminApprovalModal({

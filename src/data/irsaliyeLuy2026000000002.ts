@@ -43,6 +43,7 @@ export const IRSALIYE_PURCHASE_BY_CODE: Record<string, number> = {
   ASB046: 100.33,
   ASB045: 90.67,
   ASB044: 179.17,
+  SBE089: 16038.33,
 };
 
 /** Stok kodu → EAN-13 (irsaliye PDF “Sonra Gönderilecek Miktar”) */

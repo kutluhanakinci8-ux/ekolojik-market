@@ -18,6 +18,7 @@ import { PRICE_BATCH_1_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
 import { IRSALIYE_STOCK_MIGRATION_KEY, irsaliyeEanForCode } from '../data/irsaliyeLuy2026000000002';
 import { applyCatalogPricing } from '../utils/productPricing';
 import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
+import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
 import {
@@ -2708,6 +2709,20 @@ export function useStore() {
     return saved;
   }, [applySnapshot, authSession, logActivity]);
 
+  const resetSalesAndIrsaliyeWarehouse = useCallback(async (): Promise<{ ok: boolean; totalStock: number }> => {
+    const catalogProducts = mergeWithSeed(null);
+    const snapshot = resetStoreToIrsaliyeWarehouse(buildCurrentSnapshot(), catalogProducts);
+    applySnapshot(snapshot);
+    saveHeldPosSales([]);
+    const saved = await saveStoreSnapshot(snapshot);
+    setSyncStatus(saved ? 'synced' : 'local-only');
+    const totalStock = snapshot.products.reduce((sum, p) => sum + p.stock, 0);
+    if (authSession) {
+      logActivity(authSession, 'warehouse_reset', `Satışlar silindi; irsaliye depo (${totalStock} adet)`);
+    }
+    return { ok: Boolean(saved), totalStock };
+  }, [applySnapshot, buildCurrentSnapshot, authSession, logActivity]);
+
   const pushStoreToServer = useCallback(async () => {
     const snapshot = buildCurrentSnapshot();
     const saved = await saveStoreSnapshot(snapshot);
@@ -4528,6 +4543,7 @@ export function useStore() {
     removePosNote,
     exportBackup,
     importBackup,
+    resetSalesAndIrsaliyeWarehouse,
     pushStoreToServer,
     persistStoreNow,
     syncStatus,
