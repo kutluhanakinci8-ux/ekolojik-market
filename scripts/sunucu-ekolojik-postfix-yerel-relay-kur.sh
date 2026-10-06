@@ -84,8 +84,10 @@ fi
 echo "OK   .env güncellendi (yedek alındı)"
 
 if command -v pm2 >/dev/null 2>&1; then
-  pm2 restart market-pos --update-env >/dev/null 2>&1 || pm2 restart market-pos
-  echo "OK   pm2 restart market-pos"
+  pm2 delete market-pos 2>/dev/null || true
+  (cd "${INSTALL_DIR}" && pm2 start ecosystem.config.cjs --update-env)
+  pm2 save >/dev/null 2>&1 || true
+  echo "OK   pm2 market-pos yeniden başlatıldı (.env yüklendi)"
 fi
 
 sleep 2

@@ -23,10 +23,9 @@ export function loadMarketPosEnv(appRoot = fileURLToPath(new URL('..', import.me
     ) {
       value = value.slice(1, -1);
     }
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
-      count += 1;
-    }
+    // .env dosyası kaynak — PM2/eski process env üzerine yazar (deploy sonrası SMTP güncellemesi)
+    process.env[key] = value;
+    count += 1;
   }
   return { loaded: true, path, count };
 }
