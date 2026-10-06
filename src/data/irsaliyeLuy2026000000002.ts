@@ -5,7 +5,7 @@
 export const IRSALIYE_LUY2026000000002_ID = 'LUY2026000000002';
 
 /** localStorage: irsaliye stok audit kaydı (sürüm artınca yeniden hareket yazılır) */
-export const IRSALIYE_STOCK_MIGRATION_KEY = `market-pos-irsaliye-stock-${IRSALIYE_LUY2026000000002_ID}-v3`;
+export const IRSALIYE_STOCK_MIGRATION_KEY = `market-pos-irsaliye-stock-${IRSALIYE_LUY2026000000002_ID}-v4-empty`;
 
 /** Stok kodu → birim alış fiyatı (TL) — irsaliye satırları 1–34 (ilk birim fiyat geçerli) */
 export const IRSALIYE_PURCHASE_BY_CODE: Record<string, number> = {

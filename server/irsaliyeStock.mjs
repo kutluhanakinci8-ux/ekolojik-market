@@ -1,7 +1,12 @@
 /**
  * LUY2026000000002 irsaliye stok kodu → adet (Node sunucu migrasyonu ile paylaşılır)
  * Kaynak: src/data/irsaliyeLuy2026000000002.ts — güncellerken senkron tutun
+ *
+ * `empty` = tüm stoklar 0; irsaliye girişi için `irsaliye-luy2026000000002` yapın
+ * (src/data/warehouseStockPolicy.ts ile aynı mantık).
  */
+export const WAREHOUSE_STOCK_POLICY = 'empty';
+
 export const IRSALIYE_STOCK_BY_CODE = {
   ASF066: 96,
   CAA039: 20,
@@ -94,6 +99,9 @@ export function resolveProductStockCode(productId, productCode, barcode) {
 }
 
 export function resolveWarehouseStock(productId, productCode, barcode) {
+  if (WAREHOUSE_STOCK_POLICY === 'empty') {
+    return 0;
+  }
   const code = resolveProductStockCode(productId, productCode, barcode);
   if (!code) return 0;
   const qty = IRSALIYE_STOCK_BY_CODE[code];

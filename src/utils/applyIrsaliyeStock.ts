@@ -3,12 +3,35 @@ import {
   IRSALIYE_STOCK_BY_CODE,
   IRSALIYE_STOCK_MIGRATION_KEY,
 } from '../data/irsaliyeLuy2026000000002';
+import { WAREHOUSE_STOCK_POLICY } from '../data/warehouseStockPolicy';
 import { PRICE_BATCH_1_CODE_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
 import type { Product, StockMovement, StockMovementType } from '../types/product';
 
 export { IRSALIYE_STOCK_MIGRATION_KEY };
 
-const NOTE = `e-İrsaliye ${IRSALIYE_LUY2026000000002_ID} depo stoku`;
+const NOTE =
+  WAREHOUSE_STOCK_POLICY === 'empty'
+    ? 'Depo stok sıfırlama'
+    : `e-İrsaliye ${IRSALIYE_LUY2026000000002_ID} depo stoku`;
+
+/**
+ * Aktif depo politikasına göre hedef stok adedi.
+ * `empty` → her zaman 0; irsaliye modunda kod eşleşmesi gerekir.
+ */
+export function resolveWarehouseStockForProduct(input: {
+  id: number;
+  productCode?: string;
+  barcode?: string;
+}): number {
+  if (WAREHOUSE_STOCK_POLICY === 'empty') {
+    return 0;
+  }
+  const code = resolveProductStockCode(input.id, input.productCode, input.barcode);
+  if (!code) return 0;
+  const qty = IRSALIYE_STOCK_BY_CODE[code];
+  if (qty == null) return 0;
+  return Math.max(0, Math.floor(qty));
+}
 
 export function normalizeStockCode(raw?: string | null): string | undefined {
   const code = raw?.trim().toUpperCase();
@@ -26,22 +49,6 @@ export function resolveProductStockCode(
     ?? normalizeStockCode(productCode)
     ?? normalizeStockCode(barcode)
   );
-}
-
-/**
- * Depo gerçeği: irsaliyede olan kod → irsaliye adedi; irsaliyede yok → 0.
- * Eski localStorage / sunucu stokları her yüklemede override edilir.
- */
-export function resolveWarehouseStockForProduct(input: {
-  id: number;
-  productCode?: string;
-  barcode?: string;
-}): number {
-  const code = resolveProductStockCode(input.id, input.productCode, input.barcode);
-  if (!code) return 0;
-  const qty = IRSALIYE_STOCK_BY_CODE[code];
-  if (qty == null) return 0;
-  return Math.max(0, Math.floor(qty));
 }
 
 function movementFor(
