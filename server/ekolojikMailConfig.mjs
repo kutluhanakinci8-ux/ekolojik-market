@@ -39,11 +39,11 @@ export function isEkolojikImapConfigured() {
 export function getEkolojikSmtpHostHint() {
   const host = process.env.EKOLOJIK_SMTP_HOST?.trim() || '';
   if (!host) return 'EKOLOJIK_SMTP_HOST tanımlayın (ör. mail.ekolojikmarket.com.tr)';
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
-    return 'SMTP host olarak VPS IP kullanılıyor — genelde mail.ekolojikmarket.com.tr veya relay gerekir';
-  }
   if (host === 'localhost' || host === '127.0.0.1') {
-    return 'localhost SMTP — üretimde mail.ekolojikmarket.com.tr önerilir';
+    return null;
+  }
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    return 'SMTP host olarak VPS IP kullanılıyor — genelde mail.ekolojikmarket.com.tr veya 127.0.0.1:25 relay';
   }
   return null;
 }
