@@ -26,6 +26,13 @@ curl -s http://127.0.0.1:5180/api/posta/inbox/sync -X POST
 
 POS: **Posta → Gelen → Senkronize et**
 
+Gelen teslim smoke:
+
+```bash
+bash scripts/sunucu-ekolojik-imap-vps-alias-fix.sh   # bir kez (Lerta myorigin ortamı)
+bash scripts/sunucu-ekolojik-posta-gelen-smoke.sh
+```
+
 ## Seçenek B — Harici IMAP (Gmail / kurumsal)
 
 `.env`:

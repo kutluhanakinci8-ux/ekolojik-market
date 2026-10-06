@@ -81,8 +81,15 @@ passdb {
 EOF
 systemctl reload dovecot
 
-echo 'info@ekolojikmarket.com.tr ekolojik-inbound-info' > /etc/postfix/ekolojik-inbound-virtual
-echo 'ekolojik-inbound-info: "|/usr/lib/dovecot/deliver -d info@ekolojikmarket.com.tr -m"' > /etc/postfix/ekolojik-inbound-aliases
+TOKEN="ekolojik-inbound-info-ekolojikmarket-com-tr"
+PIPE='|/usr/lib/dovecot/deliver -d info@ekolojikmarket.com.tr -m'
+MYORIGIN="$(postconf -h myorigin)"
+
+echo "info@ekolojikmarket.com.tr ${TOKEN}" > /etc/postfix/ekolojik-inbound-virtual
+{
+  echo "${TOKEN}: ${PIPE}"
+  echo "${TOKEN}@${MYORIGIN}: ${PIPE}"
+} > /etc/postfix/ekolojik-inbound-aliases
 postmap /etc/postfix/ekolojik-inbound-virtual
 postmap /etc/postfix/ekolojik-inbound-aliases
 

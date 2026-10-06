@@ -20,11 +20,13 @@ Ortam: canlı POS veya staging, SMTP + IMAP yapılandırılmış.
 ## Akış C — otomatik VPS
 
 ```bash
-bash /var/www/market-pos/scripts/sunucu-ekolojik-posta-parite-dogrula.sh
-bash /var/www/market-pos/scripts/sunucu-ekolojik-smtp-dogrula.sh
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-parite-dogrula.sh
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-smtp-dogrula.sh
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-imap-dogrula.sh
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-gelen-smoke.sh
 ```
 
-Beklenen: health `smtpVerified: true`, hub API 200, export uçları dosya döner.
+Beklenen: health `smtpVerified: true`, `imapVerified: true`, Gelen smoke test maili listede.
 
 ## Bilinen sınırlar (NB farkı)
 
