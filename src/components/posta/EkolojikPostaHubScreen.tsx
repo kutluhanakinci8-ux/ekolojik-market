@@ -21,6 +21,7 @@ import {
   createMessagingThread,
   fetchMessagingMessages,
   fetchMessagingThreads,
+  markMessagingThreadRead,
   postMessagingMessage,
   type MessagingMessage,
   type MessagingThread,
@@ -173,6 +174,7 @@ export function EkolojikPostaHubScreen({
       setThreadMessages([]);
       return;
     }
+    void markMessagingThreadRead(selectedThreadId);
     void fetchMessagingMessages(selectedThreadId, { limit: 200 }).then((r) => {
       if (r.ok && r.messages) setThreadMessages(r.messages);
     });
@@ -465,7 +467,9 @@ export function EkolojikPostaHubScreen({
                   <li key={t.id}>
                     <button
                       type="button"
-                      className={selectedThreadId === t.id ? 'is-active' : ''}
+                      className={`${selectedThreadId === t.id ? 'is-active' : ''}${
+                        t.lastMessageDirection === 'customer' ? ' is-unread' : ''
+                      }`}
                       onClick={() => setSelectedThreadId(t.id)}
                     >
                       <strong>{t.customerName}</strong>
