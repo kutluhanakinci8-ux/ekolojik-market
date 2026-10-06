@@ -27,6 +27,13 @@ else
 fi
 
 echo ""
+if bash "${REPO_ROOT}/scripts/sunucu-ekolojik-imap-dogrula.sh" "${INSTALL_DIR}"; then
+  echo "OK   IMAP (Faz 7 Gelen)"
+else
+  echo "UYARI: IMAP — docs/EKOLOJIK-FAZ7-IMAP-RUNBOOK.md"
+fi
+
+echo ""
 echo "Yedek (günlük cron önerisi):"
 echo "  bash ${REPO_ROOT}/scripts/sunucu-ekolojik-data-yedek.sh"
 echo "Rehber: docs/EKOLOJIK-POSTA-PROD-KAPATMA.md"

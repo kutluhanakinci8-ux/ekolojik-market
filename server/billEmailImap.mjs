@@ -11,13 +11,19 @@ export function buildImapClient(config) {
     throw new Error('IMAP host, kullanıcı ve şifre gerekli');
   }
 
-  return new ImapFlow({
+  const local = host === '127.0.0.1' || host === 'localhost';
+  const options = {
     host,
     port,
     secure,
     auth: { user, pass },
     logger: false,
-  });
+  };
+  if (local) {
+    options.tls = { rejectUnauthorized: false };
+  }
+
+  return new ImapFlow(options);
 }
 
 export async function verifyImapMailbox(config) {

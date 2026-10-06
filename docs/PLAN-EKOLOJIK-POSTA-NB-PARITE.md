@@ -70,7 +70,7 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 
 | # | İş | Çıktı |
 |---|-----|--------|
-| 7.1 | `info@` (veya tek kutu) **IMAP** — Posta hub “Gelen” ana kaynak | `billEmailClient` genişlet veya `server/mailboxImap.mjs` |
+| 7.1 | `info@` (veya tek kutu) **IMAP** — Posta hub “Gelen” ana kaynak | `billEmailImap.mjs` + `sunucu-ekolojik-imap-vps-kur.sh` |
 | 7.2 | İletişim formu + IMAP birleşik liste (tür etiketi, okundu) | `POST /api/posta/inbox/mark-read` |
 | 7.3 | Sağ panel: **HTML/text gövde**, ek indir — `JSON.stringify` kaldır | MIME parse (basit) |
 | 7.4 | Klasörler: Gelen, Gönderilen (IMAP), Fatura (filtre), Arşiv | Sol sidebar NB gibi |

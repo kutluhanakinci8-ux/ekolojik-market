@@ -21,9 +21,12 @@ import {
   getEkolojikMailConfig,
   getEkolojikOpsEmail,
   getEkolojikSmtpHostHint,
+  getEkolojikImapConfig,
   isEkolojikSmtpConfigured,
+  isEkolojikImapConfigured,
 } from './server/ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
+import { verifyImapMailbox } from './server/billEmailImap.mjs';
 import { getOutboxCounts, listRecentOutbox, listMergedRecentOutbox, requeueFailedOutboxMessage, findOutboxMessageById } from './server/emailOutbox.mjs';
 import {
   createDeliverMessage,
@@ -586,6 +589,44 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İpucu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/imap/health' && req.method === 'GET') {
+      if (!isEkolojikImapConfigured()) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, imapConfigured: false, imapVerified: false }));
+        return;
+      }
+      const cfg = getEkolojikImapConfig();
+      try {
+        const verify = await verifyImapMailbox(cfg);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            imapConfigured: true,
+            imapVerified: verify.ok,
+            imapHost: cfg.imapHost,
+            imapUser: cfg.imapUser,
+            mailboxCount: verify.mailboxCount ?? null,
+            unseenCount: verify.unseenCount ?? null,
+            message: verify.message ?? null,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            imapConfigured: true,
+            imapVerified: false,
+            imapHost: cfg.imapHost,
+            imapUser: cfg.imapUser,
+            error: error instanceof Error ? error.message : 'IMAP hatası',
+          }),
+        );
       }
       return;
     }
