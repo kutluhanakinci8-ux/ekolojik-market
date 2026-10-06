@@ -20,6 +20,7 @@ import { sendCrmEmail } from './server/crmOutreach.mjs';
 import {
   getEkolojikMailConfig,
   getEkolojikOpsEmail,
+  getEkolojikSmtpHostHint,
   isEkolojikSmtpConfigured,
 } from './server/ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
@@ -48,6 +49,13 @@ import {
   runEkolojikDataRetention,
   getRetentionPolicySummary,
 } from './server/dataRetention.mjs';
+import {
+  archivePostaInboxItem,
+  getPostaUnreadCounts,
+  listUnifiedPostaInbox,
+  markPostaInboxRead,
+  syncPostaInboxFromImap,
+} from './server/postaInbox.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -433,6 +441,7 @@ const server = createServer(async (req, res) => {
       const smtp = isEkolojikSmtpConfigured();
       const verify = smtp ? await verifyEkolojikSmtp() : { ok: false, error: 'SMTP yapılandırılmadı' };
       const counts = await getOutboxCounts(DATA_DIR);
+      const cfg = getEkolojikMailConfig();
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(
         JSON.stringify({
@@ -440,12 +449,83 @@ const server = createServer(async (req, res) => {
           smtpConfigured: smtp,
           smtpVerified: verify.ok,
           smtpError: verify.error ?? null,
-          from: getEkolojikMailConfig().from || null,
+          smtpHost: cfg.smtpHost || null,
+          smtpHostHint: getEkolojikSmtpHostHint(),
+          from: cfg.from || null,
           opsEmail: getEkolojikOpsEmail() || null,
           contactAutoreply: isContactAutoreplyEnabled(),
           counts,
         }),
       );
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const folder = url.searchParams.get('folder')?.trim() || 'gelen';
+      const limit = Number(url.searchParams.get('limit') || 60);
+      try {
+        const result = await listUnifiedPostaInbox(DATA_DIR, tenantId, { folder, limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Inbox hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/sync' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await syncPostaInboxFromImap(DATA_DIR, tenantId);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'IMAP sync hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/mark-read' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await markPostaInboxRead(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/archive' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await archivePostaInboxItem(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/unread-counts' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getPostaUnreadCounts(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Sayaç hatası' }));
+      }
       return;
     }
 

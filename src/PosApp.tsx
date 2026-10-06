@@ -15,6 +15,7 @@ import { useStore } from './store/useStore';
 import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './utils/userAccess';
 import { resolveTopNavHighlight } from './data/navigation';
 import type { AppPage } from './components/AppShell';
+import { fetchPostaUnreadCounts } from './services/postaInboxService';
 
 function renderPage(page: AppPage, store: ReturnType<typeof useStore>) {
   switch (page) {
@@ -53,6 +54,7 @@ function renderPage(page: AppPage, store: ReturnType<typeof useStore>) {
 export function PosApp() {
   const store = useStore();
   const [page, setPage] = useState<AppPage>('sales');
+  const [postaUnread, setPostaUnread] = useState(0);
 
   useIdleLogout(() => {
     store.logout('idle');
@@ -74,6 +76,25 @@ export function PosApp() {
     setCurrencyDisplaySettings(store.settings.currency);
   }, [store.settings.currency]);
 
+  useEffect(() => {
+    if (!store.authSession?.allowedTabs.includes('posta')) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await fetchPostaUnreadCounts();
+        if (!cancelled && r.ok) setPostaUnread(r.total ?? 0);
+      } catch {
+        /* ignore */
+      }
+    };
+    void tick();
+    const id = window.setInterval(tick, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [store.authSession]);
+
   if (!store.authSession) {
     return <Navigate to="/giris" replace />;
   }
@@ -94,6 +115,7 @@ export function PosApp() {
       onPageChange={setPage}
       onLogout={store.logout}
       onBrandSecretClick={showCostProfitToggle ? store.toggleCostProfitReveal : undefined}
+      navBadgeOverrides={postaUnread > 0 ? { posta: postaUnread } : undefined}
     >
       {renderPage(page, store)}
     </AppShell>

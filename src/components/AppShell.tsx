@@ -21,6 +21,7 @@ interface AppShellProps {
   onPageChange: (page: AppPage) => void;
   onLogout: () => void;
   onBrandSecretClick?: () => void;
+  navBadgeOverrides?: Partial<Record<AppPage, number>>;
   children: React.ReactNode;
 }
 
@@ -31,6 +32,7 @@ export function AppShell({
   onPageChange,
   onLogout,
   onBrandSecretClick,
+  navBadgeOverrides,
   children,
 }: AppShellProps) {
   const visibleNavItems = buildVisibleNavItems(allowedTabs);
@@ -57,7 +59,8 @@ export function AppShell({
 
         <nav className="app-topbar-tabs" aria-label="Ana menü">
           {visibleNavItems.map((item) => {
-            const badge = item.badge?.(store);
+            const override = navBadgeOverrides?.[item.id];
+            const badge = override != null && override > 0 ? override : item.badge?.(store);
             return (
               <button
                 key={item.id}

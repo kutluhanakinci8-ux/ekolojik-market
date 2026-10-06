@@ -251,3 +251,36 @@ export async function listContactMessages(dataDir, limit = 50) {
   const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
   return items.slice(0, max);
 }
+
+async function readContactItems(dataDir) {
+  const path = join(dataDir, 'contact-messages.json');
+  try {
+    const items = JSON.parse(await readFile(path, 'utf8'));
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeContactItems(dataDir, items) {
+  const path = join(dataDir, 'contact-messages.json');
+  await writeFile(path, JSON.stringify(items, null, 2), 'utf8');
+}
+
+export async function markContactMessageRead(dataDir, contactId) {
+  const items = await readContactItems(dataDir);
+  const idx = items.findIndex((r) => r.id === contactId);
+  if (idx < 0) return { ok: false, error: 'İletişim kaydı bulunamadı' };
+  items[idx].readAt = new Date().toISOString();
+  await writeContactItems(dataDir, items);
+  return { ok: true };
+}
+
+export async function archiveContactMessage(dataDir, contactId) {
+  const items = await readContactItems(dataDir);
+  const idx = items.findIndex((r) => r.id === contactId);
+  if (idx < 0) return { ok: false, error: 'İletişim kaydı bulunamadı' };
+  items[idx].archivedAt = new Date().toISOString();
+  await writeContactItems(dataDir, items);
+  return { ok: true };
+}

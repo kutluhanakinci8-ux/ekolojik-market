@@ -15368,6 +15368,13 @@ input {
   cursor: pointer;
 }
 .posta-hub-list li button.is-active { background: #eef8ef; }
+.posta-hub-list li button.is-unread { font-weight: 700; border-left: 3px solid var(--greenleaf-dark); }
+.posta-hub-sync { margin-top: 8px; width: 100%; }
+.posta-hub-detail-actions { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.posta-hub-detail-buttons { display: flex; gap: 8px; }
+.posta-hub-detail-body--html { white-space: normal; font-size: 13px; line-height: 1.5; }
+.posta-hub-thread-compose { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.posta-hub-sent-status { text-transform: uppercase; font-size: 10px; color: var(--text-muted); }
 .posta-hub-list strong { display: block; font-size: 13px; }
 .posta-hub-list span, .posta-hub-list em { display: block; font-size: 11px; color: var(--text-muted); }
 .posta-hub-empty { padding: 16px; color: var(--text-muted); }
