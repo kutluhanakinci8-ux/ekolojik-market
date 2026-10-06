@@ -3,7 +3,7 @@
 **Referans:** Nakliye Borsası `LERTA_MAIL_MESSAGING_PARITY_100_ROADMAP.md` (PM-1…PM-10)  
 **Kural:** Aynı **ürün hissi** (3 sütun, Yaz, Gelen, Mesajlar, Gönderilen) — **ayrı kod, ayrı veri, ayrı DNS**. NB API / `lerta-mail-*` **kullanılmaz**.
 
-**Bugün (2026-10-06):** Faz 1–5 (outbox, contact, messaging API, bill IMAP, retention) + **Posta hub iskeleti** var. Eksik: canlı SMTP, gerçek gelen kutu UX, hub’dan yazışma, badge/canlılık, kurumsal gönderen.
+**Bugün (2026-10-06):** Faz 1–5 + Posta hub iskeleti. **Faz 6 (kod):** SMTP doğrulama script + health hint. **Faz 7–10 (kısmi):** birleşik inbox API, okunabilir gövde, klasörler, yanıt, hub mesaj yazma, nav badge.
 
 ---
 

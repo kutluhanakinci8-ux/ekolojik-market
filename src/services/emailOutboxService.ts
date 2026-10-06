@@ -3,6 +3,8 @@ export async function fetchEmailHealth(): Promise<{
   smtpConfigured?: boolean;
   smtpVerified?: boolean;
   smtpError?: string | null;
+  smtpHost?: string | null;
+  smtpHostHint?: string | null;
   from?: string | null;
   opsEmail?: string | null;
   contactAutoreply?: boolean;
