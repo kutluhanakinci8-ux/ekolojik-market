@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Postfix alias pipe — vmail olarak lda (auth-master / stats-writer izinleri)
+# Yedek: manuel lda testi (prod teslim master.cf ekolojik-lda ile)
 SENDER="${SENDER:-${POSTFIX_SENDER:-}}"
-ARGS=(-d info@ekolojikmarket.com.tr -m INBOX)
+CMD=(/usr/lib/dovecot/deliver -d info@ekolojikmarket.com.tr -m INBOX)
 if [[ -n "${SENDER}" ]]; then
-  ARGS+=(-f "${SENDER}")
+  CMD+=(-f "${SENDER}")
 fi
-exec runuser -u vmail -- /usr/lib/dovecot/deliver "${ARGS[@]}"
+if [[ $(id -u) -eq 0 ]]; then
+  exec su vmail -s /bin/sh -c "$(printf '%q ' "${CMD[@]}")"
+fi
+exec "${CMD[@]}"
