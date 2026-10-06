@@ -101,6 +101,8 @@
 
 Detay: `docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md`
 
+**NB (Lerta Posta) tam arayüz paritesi:** `docs/PLAN-EKOLOJIK-POSTA-NB-PARITE.md` — Faz 6–12 (SMTP, gelen IMAP UX, yaz/yanıt, hub mesajlaşma, badge, export).
+
 ---
 
 ## Nakliye Borsası tarafı (dokunulmaz)
