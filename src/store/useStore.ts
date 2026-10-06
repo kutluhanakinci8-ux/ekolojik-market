@@ -15,9 +15,9 @@ import { DEFAULT_USERS } from '../data/defaultUsers';
 import { splitGrossAmount } from '../utils/vatAnalytics';
 import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS } from '../data/navigation';
 import { PRICE_BATCH_1_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
-import { IRSALIYE_STOCK_BY_CODE, IRSALIYE_STOCK_MIGRATION_KEY } from '../data/irsaliyeLuy2026000000002';
+import { IRSALIYE_STOCK_MIGRATION_KEY } from '../data/irsaliyeLuy2026000000002';
 import { applyCatalogPricing } from '../utils/productPricing';
-import { applyIrsaliyeStockToProducts } from '../utils/applyIrsaliyeStock';
+import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
 import {
@@ -228,21 +228,24 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
     const sampleDefaults = SAMPLE_PRODUCT_DEFAULTS[seed.id];
     const isSample = saved?.isSample ?? Boolean(sampleDefaults);
     const sampleStock = saved?.sampleStock ?? sampleDefaults?.sampleStock ?? 0;
-    const irsaliyeStock = catalogEntry ? IRSALIYE_STOCK_BY_CODE[catalogEntry.code] : undefined;
-    const defaultStock =
-      irsaliyeStock != null ? Math.max(0, Math.floor(irsaliyeStock)) : 0;
+    const productCode = catalogEntry ? priced.productCode : (saved?.productCode ?? priced.productCode);
+    const barcode =
+      catalogEntry?.code
+      ?? (saved?.barcode?.trim() || priced.barcode || priced.productCode);
 
     return {
       ...priced,
       category,
-      stock: saved?.stock ?? defaultStock,
+      stock: resolveWarehouseStockForProduct({
+        id: seed.id,
+        productCode,
+        barcode,
+      }),
       isSample,
       sampleStock: isSample ? sampleStock : 0,
       imageUrl,
-      productCode: catalogEntry ? priced.productCode : (saved?.productCode ?? priced.productCode),
-      barcode:
-        catalogEntry?.code
-        ?? (saved?.barcode?.trim() || priced.barcode || priced.productCode),
+      productCode,
+      barcode,
       wholesalePrices: resolveWholesalePrices(priced.fullSalePrice, saved?.wholesalePrices),
     };
   });

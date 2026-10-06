@@ -78,6 +78,9 @@ node --check "${INSTALL_DIR}/server.mjs"
 export PORT
 bash "${INSTALL_DIR}/kur.sh"
 
+echo "==> Sunucu verisi: irsaliye stokları..."
+node "${APP_SRC}/scripts/apply-irsaliye-stock.mjs" "${INSTALL_DIR}/data" || echo "    (veri migrasyonu atlandı — data/ henüz yok olabilir)"
+
 echo "==> Build doğrulama..."
 VERIFY_TMP="$(mktemp)"
 trap 'rm -f "${VERIFY_TMP}" "${VERIFY_TMP}.js"' EXIT

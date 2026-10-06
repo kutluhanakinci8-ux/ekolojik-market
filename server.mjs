@@ -7,6 +7,7 @@ import { createFaturaSession, queryFaturaDebt } from './server/faturaOdemelisinC
 import { prepareOdemeSession, queryOdemeDebt } from './server/odemeComTrClient.mjs';
 import { pollBillEmails, testBillEmailConnection } from './server/billEmailClient.mjs';
 import { readTenantStore, writeTenantStore, registerTenant, saveContactMessage } from './server/tenantAuth.mjs';
+import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
@@ -63,7 +64,13 @@ function resolveTenantId(url) {
 }
 
 async function readStoreData(tenantId = 'main') {
-  return readTenantStore(DATA_DIR, tenantId);
+  const data = await readTenantStore(DATA_DIR, tenantId);
+  if (!data?.products?.length) return data;
+  const { snapshot, changed } = applyIrsaliyeStockToStoreSnapshot(data);
+  if (changed) {
+    await writeStoreData(snapshot, tenantId);
+  }
+  return snapshot;
 }
 
 async function writeStoreData(data, tenantId = 'main') {

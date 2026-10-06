@@ -76,7 +76,6 @@ const batch1: PriceCatalogEntry[] = [
   priced('LGI019', 'Greenleaf 1,25kg Zencefilli Deterjan', 1),
 ];
 
-/** Sistem ürün ID → fiyat listesi kaydı */
 export const PRICE_BATCH_1_BY_PRODUCT_ID: Record<number, PriceCatalogEntry> = {
   1: batch1.find((e) => e.code === 'ASF066')!,
   2: batch1.find((e) => e.code === 'CCC001')!,
@@ -115,6 +114,11 @@ export const PRICE_BATCH_1_BY_PRODUCT_ID: Record<number, PriceCatalogEntry> = {
   35: batch1.find((e) => e.code === 'CCA016')!,
   36: batch1.find((e) => e.code === 'CBA052')!,
 };
+
+/** Sistem ürün ID → stok kodu (barkod) */
+export const PRICE_BATCH_1_CODE_BY_PRODUCT_ID: Record<number, string> = Object.fromEntries(
+  Object.entries(PRICE_BATCH_1_BY_PRODUCT_ID).map(([id, entry]) => [Number(id), entry.code]),
+) as Record<number, string>;
 
 export const PRICE_CATALOG_BATCH_1 = batch1;
 
