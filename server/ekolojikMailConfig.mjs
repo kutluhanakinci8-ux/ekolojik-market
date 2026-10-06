@@ -19,6 +19,15 @@ export function isEkolojikSmtpConfigured() {
   return Boolean(c.smtpHost && c.from && c.from.includes('@'));
 }
 
+/** Operasyon / iletişim formu bildirimleri (Faz 2) */
+export function getEkolojikOpsEmail() {
+  const explicit = process.env.EKOLOJIK_OPS_EMAIL?.trim();
+  if (explicit?.includes('@')) return explicit;
+  const c = getEkolojikMailConfig();
+  if (c.replyTo?.includes('@')) return c.replyTo;
+  return c.from?.includes('@') ? c.from : '';
+}
+
 export function buildFromHeader(fromName, fromEmail) {
   if (fromName && fromEmail) {
     return `"${fromName.replace(/"/g, '\\"')}" <${fromEmail}>`;

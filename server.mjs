@@ -6,12 +6,23 @@ import { fetchAsatDebt, probeAsatConnectivity } from './server/asatClient.mjs';
 import { createFaturaSession, queryFaturaDebt } from './server/faturaOdemelisinClient.mjs';
 import { prepareOdemeSession, queryOdemeDebt } from './server/odemeComTrClient.mjs';
 import { pollBillEmails, testBillEmailConnection } from './server/billEmailClient.mjs';
-import { readTenantStore, writeTenantStore, registerTenant, saveContactMessage } from './server/tenantAuth.mjs';
+import {
+  readTenantStore,
+  writeTenantStore,
+  registerTenant,
+  saveContactMessage,
+  listContactMessages,
+} from './server/tenantAuth.mjs';
+import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
-import { getEkolojikMailConfig, isEkolojikSmtpConfigured } from './server/ekolojikMailConfig.mjs';
+import {
+  getEkolojikMailConfig,
+  getEkolojikOpsEmail,
+  isEkolojikSmtpConfigured,
+} from './server/ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
-import { getOutboxCounts, listRecentOutbox } from './server/emailOutbox.mjs';
+import { getOutboxCounts, listRecentOutbox, listMergedRecentOutbox } from './server/emailOutbox.mjs';
 import {
   deliverMessage,
   processPendingOutbox,
@@ -384,6 +395,8 @@ const server = createServer(async (req, res) => {
           smtpVerified: verify.ok,
           smtpError: verify.error ?? null,
           from: getEkolojikMailConfig().from || null,
+          opsEmail: getEkolojikOpsEmail() || null,
+          contactAutoreply: isContactAutoreplyEnabled(),
           counts,
         }),
       );
@@ -393,9 +406,10 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/email/outbox/recent' && req.method === 'GET') {
       const limit = Number(url.searchParams.get('limit') || 30);
       const recent = await listRecentOutbox(DATA_DIR, limit);
+      const items = await listMergedRecentOutbox(DATA_DIR, limit);
       const counts = await getOutboxCounts(DATA_DIR);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ ok: true, counts, ...recent }));
+      res.end(JSON.stringify({ ok: true, counts, items, ...recent }));
       return;
     }
 
@@ -474,10 +488,34 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (pathname === '/api/contact/messages' && req.method === 'GET') {
+      const limit = Number(url.searchParams.get('limit') || 50);
+      try {
+        const messages = await listContactMessages(DATA_DIR, limit);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, messages }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste alınamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/contact' && req.method === 'POST') {
       const data = await readRequestBody(req);
       try {
         const result = await saveContactMessage(DATA_DIR, data ?? {});
+        if (result.ok && result.contact) {
+          try {
+            result.notifications = await sendContactNotifications(DATA_DIR, result.contact);
+          } catch (mailError) {
+            result.notifications = {
+              ok: false,
+              error: mailError instanceof Error ? mailError.message : 'Posta kuyruğu hatası',
+            };
+          }
+          delete result.contact;
+        }
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {

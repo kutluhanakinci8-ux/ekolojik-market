@@ -123,6 +123,22 @@ export async function listRecentOutbox(dataDir, limit = 50) {
   return { pending, sent, failed };
 }
 
+export async function listMergedRecentOutbox(dataDir, limit = 50) {
+  const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const { pending, sent, failed } = await listRecentOutbox(dataDir, max);
+  const rows = [
+    ...pending.map((m) => ({ ...m, folder: 'pending' })),
+    ...sent.map((m) => ({ ...m, folder: 'sent' })),
+    ...failed.map((m) => ({ ...m, folder: 'failed' })),
+  ];
+  rows.sort((a, b) => {
+    const ta = Date.parse(a.sentAt || a.createdAt || 0);
+    const tb = Date.parse(b.sentAt || b.createdAt || 0);
+    return tb - ta;
+  });
+  return rows.slice(0, max);
+}
+
 export async function getOutboxCounts(dataDir) {
   const root = outboxRoot(dataDir);
   async function count(sub) {

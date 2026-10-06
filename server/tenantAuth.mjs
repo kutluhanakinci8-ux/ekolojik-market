@@ -225,7 +225,7 @@ export async function saveContactMessage(dataDir, payload) {
   } catch {
     items = [];
   }
-  items.unshift({
+  const item = {
     id: `C${Date.now()}`,
     name,
     email,
@@ -233,7 +233,21 @@ export async function saveContactMessage(dataDir, payload) {
     subject,
     message,
     createdAt: new Date().toISOString(),
-  });
+  };
+  items.unshift(item);
   await writeFile(path, JSON.stringify(items, null, 2), 'utf8');
-  return { ok: true, message: 'Mesajınız alındı. En kısa sürede dönüş yapacağız.' };
+  return { ok: true, message: 'Mesajınız alındı. En kısa sürede dönüş yapacağız.', contact: item };
+}
+
+export async function listContactMessages(dataDir, limit = 50) {
+  const path = join(dataDir, 'contact-messages.json');
+  let items = [];
+  try {
+    items = JSON.parse(await readFile(path, 'utf8'));
+  } catch {
+    items = [];
+  }
+  if (!Array.isArray(items)) items = [];
+  const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  return items.slice(0, max);
 }

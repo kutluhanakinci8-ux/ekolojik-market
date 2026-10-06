@@ -53,10 +53,11 @@
 
 | # | İş |
 |---|-----|
-| 2.1 | `/api/contact` → outbox’a “iç bildirim” + isteğe bağlı otomatik yanıt müşteriye |
-| 2.2 | Operatör adresi: `EKOLOJIK_OPS_EMAIL` |
-| 2.3 | Ayarlar → “Mail testi” butonu (SMTP health) |
-| 2.4 | Gönderim günlüğü UI (son 50 outbox satırı, POS admin) |
+| 2.1 | `/api/contact` → outbox’a “iç bildirim” + isteğe bağlı otomatik yanıt müşteriye | ✅ `server/contactMail.mjs` |
+| 2.2 | Operatör adresi: `EKOLOJIK_OPS_EMAIL` | ✅ |
+| 2.3 | Ayarlar → “Mail testi” butonu (SMTP health) | ✅ (Faz 1 panel) |
+| 2.4 | Gönderim günlüğü UI (son 50 outbox satırı, POS admin) | ✅ `EmailOutboxSettingsPanel` |
+| 2.5 | `GET /api/contact/messages` — JSON iletişim kayıtları | ✅ |
 
 ---
 
