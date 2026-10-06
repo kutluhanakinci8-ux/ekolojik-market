@@ -24,7 +24,7 @@ import {
   isEkolojikSmtpConfigured,
 } from './server/ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
-import { getOutboxCounts, listRecentOutbox, listMergedRecentOutbox } from './server/emailOutbox.mjs';
+import { getOutboxCounts, listRecentOutbox, listMergedRecentOutbox, requeueFailedOutboxMessage, findOutboxMessageById } from './server/emailOutbox.mjs';
 import {
   deliverMessage,
   processPendingOutbox,
@@ -55,7 +55,9 @@ import {
   listUnifiedPostaInbox,
   markPostaInboxRead,
   syncPostaInboxFromImap,
+  getComposeRecipientHints,
 } from './server/postaInbox.mjs';
+import { listMailTemplates } from './server/mailTemplates.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -527,6 +529,66 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Sayaç hatası' }));
       }
       return;
+    }
+
+    if (pathname === '/api/posta/templates' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, templates: listMailTemplates() }));
+      return;
+    }
+
+    if (pathname === '/api/posta/compose-hints' && req.method === 'GET') {
+      const limit = Number(url.searchParams.get('limit') || 40);
+      try {
+        const hints = await getComposeRecipientHints(DATA_DIR, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hints));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İpucu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/email/outbox/retry' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      const id = data?.id?.trim();
+      if (!id) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Outbox id gerekli' }));
+        return;
+      }
+      try {
+        const requeued = await requeueFailedOutboxMessage(DATA_DIR, id);
+        if (!requeued.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(requeued);
+          return;
+        }
+        const run = await processPendingOutbox(DATA_DIR, deliverMessage, { limit: 10 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, requeued: true, processed: run }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Retry hatası' }));
+      }
+      return;
+    }
+
+    if (pathname.startsWith('/api/email/outbox/') && req.method === 'GET') {
+      const parts = pathname.split('/').filter(Boolean);
+      const outboxId = parts[3];
+      if (outboxId && outboxId !== 'recent' && outboxId !== 'process' && outboxId !== 'retry') {
+        const hit = await findOutboxMessageById(DATA_DIR, decodeURIComponent(outboxId));
+        if (!hit) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Kayıt bulunamadı' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, folder: hit.folder, message: hit.message }));
+        return;
+      }
     }
 
     if (pathname === '/api/email/outbox/recent' && req.method === 'GET') {

@@ -227,6 +227,20 @@ export async function archivePostaInboxItem(dataDir, tenantId, { id, kind, sourc
   });
 }
 
+export async function getComposeRecipientHints(dataDir, { limit = 40 } = {}) {
+  const max = Math.min(Math.max(Number(limit) || 40, 1), 100);
+  const emails = new Set();
+  for (const c of await listContactMessages(dataDir, 100)) {
+    const e = String(c.email ?? '').trim().toLowerCase();
+    if (e.includes('@')) emails.add(e);
+  }
+  for (const row of await listPostaImapMessages(dataDir, 'main', { limit: 80 })) {
+    const match = String(row.from ?? '').match(/[\w.+-]+@[\w.-]+\.\w+/i);
+    if (match) emails.add(match[0].toLowerCase());
+  }
+  return { ok: true, emails: [...emails].slice(0, max) };
+}
+
 export async function getPostaUnreadCounts(dataDir, tenantId = 'main') {
   const inbox = await listUnifiedPostaInbox(dataDir, tenantId, { folder: 'gelen', limit: 200 });
   const fatura = await listUnifiedPostaInbox(dataDir, tenantId, { folder: 'fatura', limit: 200 });

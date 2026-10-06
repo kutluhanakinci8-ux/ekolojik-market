@@ -15382,6 +15382,7 @@ input {
 .posta-hub-detail-body { white-space: pre-wrap; font-size: 12px; background: #f8faf8; padding: 12px; border-radius: 8px; }
 .posta-hub-sent-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .posta-hub-compose-form { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+.posta-compose-toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
 .cart-crm-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .cart-crm-input {
   flex: 1;

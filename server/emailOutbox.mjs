@@ -209,3 +209,45 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
 
   return results;
 }
+
+export async function findOutboxMessageById(dataDir, id) {
+  if (!id?.trim()) return null;
+  const root = outboxRoot(dataDir);
+  for (const sub of ['pending', 'sent', 'failed']) {
+    const dir = join(root, sub);
+    try {
+      const files = await readdir(dir);
+      for (const f of files) {
+        if (!f.endsWith('.json')) continue;
+        const raw = await readFile(join(dir, f), 'utf8');
+        const msg = JSON.parse(raw);
+        if (msg.id === id) {
+          return { message: msg, folder: sub, file: f };
+        }
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  return null;
+}
+
+/** failed → pending (hub “tekrar dene”) */
+export async function requeueFailedOutboxMessage(dataDir, id) {
+  const hit = await findOutboxMessageById(dataDir, id);
+  if (!hit) return { ok: false, error: 'Outbox kaydı bulunamadı' };
+  if (hit.folder !== 'failed') {
+    return { ok: false, error: 'Yalnızca başarısız kayıtlar yeniden kuyruğa alınır' };
+  }
+  const root = outboxRoot(dataDir);
+  const message = hit.message;
+  message.status = 'pending';
+  message.attempts = 0;
+  message.lastError = null;
+  message.nextAttemptAt = new Date().toISOString();
+  const dest = join(dirPending(root), hit.file);
+  await writeFile(dest, JSON.stringify(message, null, 2), 'utf8');
+  const { unlink } = await import('node:fs/promises');
+  await unlink(join(dirFailed(root), hit.file));
+  return { ok: true, message };
+}

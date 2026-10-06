@@ -41,6 +41,29 @@ export async function fetchRecentOutbox(limit = 20): Promise<{
   return res.json();
 }
 
+export async function fetchOutboxMessage(id: string): Promise<{
+  ok: boolean;
+  folder?: string;
+  message?: Record<string, unknown>;
+  error?: string;
+}> {
+  const res = await fetch(`/api/email/outbox/${encodeURIComponent(id)}`);
+  return res.json();
+}
+
+export async function retryOutboxMessage(id: string): Promise<{
+  ok: boolean;
+  error?: string;
+  processed?: { sent?: number; failed?: number };
+}> {
+  const res = await fetch('/api/email/outbox/retry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  return res.json();
+}
+
 export async function fetchEkolojikIsolationReport(): Promise<{
   ok: boolean;
   checks?: Array<{ id: string; label: string; ok: boolean; detail: string }>;

@@ -2,14 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Store } from '../../store/useStore';
 import {
   fetchEmailHealth,
+  fetchOutboxMessage,
   fetchRecentOutbox,
+  retryOutboxMessage,
   sendEmailTest,
 } from '../../services/emailOutboxService';
 import {
   archivePostaInboxItem,
+  fetchComposeRecipientHints,
   fetchPostaInbox,
+  fetchPostaTemplates,
   markPostaInboxRead,
   syncPostaInboxImap,
+  type MailTemplate,
   type PostaInboxItem,
 } from '../../services/postaInboxService';
 import {
@@ -48,6 +53,10 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
   const [syncBusy, setSyncBusy] = useState(false);
   const [msgDraft, setMsgDraft] = useState('');
   const [msgBusy, setMsgBusy] = useState(false);
+  const [templates, setTemplates] = useState<MailTemplate[]>([]);
+  const [recipientHints, setRecipientHints] = useState<string[]>([]);
+  const [selectedSentId, setSelectedSentId] = useState<string | null>(null);
+  const [sentDetail, setSentDetail] = useState<Record<string, unknown> | null>(null);
 
   const selectedInbox = useMemo(
     () => inboxRows.find((r) => r.id === selectedInboxId) ?? null,
@@ -85,6 +94,12 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
 
   useEffect(() => {
     void refreshHealth();
+    void fetchPostaTemplates().then((r) => {
+      if (r.ok && r.templates) setTemplates(r.templates);
+    });
+    void fetchComposeRecipientHints().then((r) => {
+      if (r.ok && r.emails) setRecipientHints(r.emails);
+    });
   }, [refreshHealth]);
 
   useEffect(() => {
@@ -96,6 +111,16 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
     if (folder === 'mesajlar') void refreshThreads();
     if (folder === 'gonderilen') void refreshSent();
   }, [folder, refreshInbox, refreshThreads, refreshSent]);
+
+  useEffect(() => {
+    if (!selectedSentId || folder !== 'gonderilen') {
+      setSentDetail(null);
+      return;
+    }
+    void fetchOutboxMessage(selectedSentId).then((r) => {
+      if (r.ok && r.message) setSentDetail(r.message);
+    });
+  }, [selectedSentId, folder]);
 
   useEffect(() => {
     if (!selectedThreadId || folder !== 'mesajlar') {
@@ -170,6 +195,35 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
     if (result.ok) {
       setSelectedInboxId(null);
       await refreshInbox(inboxFolder);
+    }
+  };
+
+  const applyTemplate = (templateId: string) => {
+    const t = templates.find((x) => x.id === templateId);
+    if (!t) return;
+    setComposeSubject(t.subject);
+    setComposeBody(t.body);
+  };
+
+  const wrapComposeSelection = (before: string, after: string) => {
+    const el = document.getElementById('posta-compose-body') as HTMLTextAreaElement | null;
+    if (!el) return;
+    const start = el.selectionStart ?? composeBody.length;
+    const end = el.selectionEnd ?? composeBody.length;
+    const next = composeBody.slice(0, start) + before + composeBody.slice(start, end) + after + composeBody.slice(end);
+    setComposeBody(next);
+  };
+
+  const retrySent = async () => {
+    if (!selectedSentId) return;
+    setLoading(true);
+    try {
+      const result = await retryOutboxMessage(selectedSentId);
+      setFlash(result.ok ? 'Yeniden kuyruğa alındı' : result.error ?? 'Retry başarısız');
+      await refreshSent();
+      await refreshHealth();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -332,16 +386,20 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
               {folder === 'gonderilen' &&
                 sentRows.map((row) => (
                   <li key={String(row.id)}>
-                    <div className="posta-hub-sent-row">
+                    <button
+                      type="button"
+                      className={selectedSentId === String(row.id) ? 'is-active' : ''}
+                      onClick={() => setSelectedSentId(String(row.id))}
+                    >
                       <strong>{String(row.to ?? '')}</strong>
                       <span>{String(row.subject ?? '')}</span>
-                      <span className="posta-hub-sent-status">{String(row.status ?? '')}</span>
+                      <span className="posta-hub-sent-status">{String(row.status ?? row.folder ?? '')}</span>
                       <time>
                         {row.sentAt || row.createdAt
                           ? new Date(String(row.sentAt || row.createdAt)).toLocaleString('tr-TR')
                           : '—'}
                       </time>
-                    </div>
+                    </button>
                   </li>
                 ))}
             </ul>
@@ -352,17 +410,48 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
           {folder === 'yaz' && (
             <div className="posta-hub-compose-form">
               <h2>Yeni e-posta</h2>
+              {templates.length > 0 && (
+                <label className="settings-field settings-field--full">
+                  <span>Şablon</span>
+                  <select defaultValue="" onChange={(e) => e.target.value && applyTemplate(e.target.value)}>
+                    <option value="">— Seçin —</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="settings-field settings-field--full">
                 <span>Alıcı</span>
-                <input value={composeTo} onChange={(e) => setComposeTo(e.target.value)} />
+                <input list="posta-recipient-hints" value={composeTo} onChange={(e) => setComposeTo(e.target.value)} />
+                <datalist id="posta-recipient-hints">
+                  {recipientHints.map((email) => (
+                    <option key={email} value={email} />
+                  ))}
+                </datalist>
               </label>
               <label className="settings-field settings-field--full">
                 <span>Konu</span>
                 <input value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} />
               </label>
+              <div className="posta-compose-toolbar">
+                <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('**', '**')}>
+                  Kalın
+                </button>
+                <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('\n- ', '')}>
+                  Liste
+                </button>
+              </div>
               <label className="settings-field settings-field--full">
                 <span>Metin</span>
-                <textarea rows={8} value={composeBody} onChange={(e) => setComposeBody(e.target.value)} />
+                <textarea
+                  id="posta-compose-body"
+                  rows={8}
+                  value={composeBody}
+                  onChange={(e) => setComposeBody(e.target.value)}
+                />
               </label>
               <button
                 type="button"
@@ -443,10 +532,24 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
             </>
           )}
 
-          {folder === 'gonderilen' && (
-            <p className="module-hint">
-              Outbox kayıtları. Başarısız gönderim için Ayarlar → E-posta → kuyruk işle.
-            </p>
+          {folder === 'gonderilen' && sentDetail && (
+            <>
+              <h2>{String(sentDetail.subject ?? 'Gönderilen')}</h2>
+              <p className="posta-hub-detail-meta">
+                {String(sentDetail.to ?? '')} · {String(sentDetail.status ?? sentDetail.folder ?? '')} ·{' '}
+                {sentDetail.lastError ? `Hata: ${String(sentDetail.lastError)}` : '—'}
+              </p>
+              <pre className="posta-hub-detail-body">{String(sentDetail.text ?? '')}</pre>
+              {(sentDetail.status === 'failed' || sentDetail.folder === 'failed') && (
+                <button type="button" className="btn btn-primary btn-sm" disabled={loading} onClick={() => void retrySent()}>
+                  Tekrar dene
+                </button>
+              )}
+            </>
+          )}
+
+          {folder === 'gonderilen' && !sentDetail && (
+            <p className="module-hint">Listeden bir gönderim seçin — detay ve başarısız kayıtlar için tekrar dene.</p>
           )}
         </section>
       </div>

@@ -17,7 +17,17 @@
 | AI compose | — | LLM yanıt önerisi (v2) |
 | ESP open/click | Outbox sent/failed + CSV export | Pixel tracking |
 
-**Kabul “tam uyarlandı”:** Üst menü **Posta** ekranında NB ile aynı akış: klasör → liste → okuma → **Yaz** → yanıt; müşteri mesajları aynı hub’da; nav’da okunmamış sayı; SMTP prod’da yeşil.
+## Çalışma düzeni (her faz sonrası)
+
+```bash
+# 1) Faz branch’inde geliştirme biter bitmez:
+bash scripts/ekolojik-posta-faz-kapat.sh "Faz N" cursor/posta-fazN-94bd
+
+# 2) SSH yoksa VPS’te (root):
+cd /var/www/ekolojik-market-pos && git pull origin main && bash scripts/sunucu-market-pos-otomatik-deploy.sh
+```
+
+Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_KEY_B64`** secret tanımlayın (`scripts/agent-deploy.sh`).
 
 ---
 
