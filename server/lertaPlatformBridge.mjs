@@ -17,6 +17,9 @@ function apiKey() {
 }
 
 export function isLertaPlatformConfigured() {
+  if (process.env.LERTA_PLATFORM_BRIDGE === '0' || process.env.LERTA_PLATFORM_BRIDGE === 'false') {
+    return false;
+  }
   return Boolean(baseUrl() && apiKey());
 }
 

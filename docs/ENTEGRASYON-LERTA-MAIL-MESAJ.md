@@ -1,10 +1,14 @@
 # Ekolojik Market ↔ Nakliye Borsası (Lerta) mail & mesaj entegrasyonu
 
-## Amaç
+> **Güncel ürün kararı (2026-10-06):** Nakliye Borsası ve Ekolojik Market **tamamen ayrı** sistemler olacak; ortak mail/mesaj API **hedef değil**.  
+> **Geçerli plan:** [PLAN-EKOLOJIK-MAIL-MESAJ-BAGIMSIZ.md](./PLAN-EKOLOJIK-MAIL-MESAJ-BAGIMSIZ.md)  
+> Aşağıdaki “paylaşımlı API” metni yalnızca arşiv / alternatif senaryo içindir.
 
-- **Nakliye Borsası** (`nakliyeborsasi`): ana platform — PostgreSQL outbox, Postfix MTA, `/admin/bildirimler`, firma mesajlaşması.
-- **Ekolojik Market POS** (`ekolojik-market`): aynı **Lerta mail + messaging altyapısını kullanır**; kendi basit Resend/outbox dosyası ikinci bir posta sistemi olmamalı.
-- İki ürün **ayrı kalır** (ayrı domain, ayrı şirket kaydı, ayrı API anahtarı); kod **kopyalanmaz**, **HTTP API ile bağlanır**.
+## ~~Amaç~~ (Arşiv — paylaşımlı entegrasyon)
+
+~~- **Nakliye Borsası** … **Ekolojik** aynı Lerta mail + messaging altyapısını kullanır~~
+
+**Yeni amaç:** Bu belgedeki `lertaPlatformBridge` **üretimde kullanılmaz** (`LERTA_PLATFORM_BRIDGE=0` varsayılan).
 
 ## Nakliye Borsası — kaynak modüller
 
