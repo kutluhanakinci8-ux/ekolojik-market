@@ -41,7 +41,16 @@ Ayarlar → Sistem → **Faz 5 ayrım kontrolü** veya:
 ## VPS yedek örneği
 
 ```bash
-tar czf ekolojik-data-$(date +%F).tar.gz \
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-data-yedek.sh
+```
+
+Cron (günlük 03:00):
+
+```bash
+0 3 * * * root bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-data-yedek.sh >> /var/log/ekolojik-backup.log 2>&1
+```
+
+Manuel tar (alternatif):
   /var/www/market-pos/data/email-outbox \
   /var/www/market-pos/data/messaging \
   /var/www/market-pos/data/bill-email-inbox \

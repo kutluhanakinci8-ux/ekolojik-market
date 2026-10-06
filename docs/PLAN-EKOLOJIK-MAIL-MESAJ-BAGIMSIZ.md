@@ -20,10 +20,10 @@
 
 | Parça | Durum |
 |-------|--------|
-| CRM e-posta | `server/crmOutreach.mjs` — Resend veya `data/crm-outbox/` |
-| İletişim formu | `POST /api/contact` → JSON dosya |
-| Mesaj / sohbet | **Yok** |
-| Fatura e-posta (IMAP) | Stub |
+| CRM e-posta | `server/crmOutreach.mjs` — Ekolojik outbox + SMTP |
+| İletişim formu | `POST /api/contact` → JSON + outbox bildirimi |
+| Mesaj / sohbet | `data/messaging/` + CRM Mesajlar paneli |
+| Fatura e-posta (IMAP) | `imapflow` + `data/bill-email-inbox/` |
 | Müşteri CRM | İstemci tarafı kuyruk + şablonlar |
 
 **Domain hedefi (örnek):** `bildirim@ekolojikmarket.com.tr` veya ayrı subdomain `mail.ekolojikmarket.com.tr` — NB `notifications@mail.lerta.tr` ile **karışmayacak**.

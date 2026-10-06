@@ -73,6 +73,12 @@ for required in asatClient.mjs tenantAuth.mjs crmOutreach.mjs; do
 done
 cp scripts/sunucu-kur.sh "${INSTALL_DIR}/kur.sh"
 chmod +x "${INSTALL_DIR}/kur.sh"
+if [[ -f .env.example ]] && [[ ! -f "${INSTALL_DIR}/.env" ]]; then
+  cp .env.example "${INSTALL_DIR}/.env"
+  chmod 600 "${INSTALL_DIR}/.env"
+  grep -q '^LERTA_PLATFORM_BRIDGE=' "${INSTALL_DIR}/.env" 2>/dev/null || echo 'LERTA_PLATFORM_BRIDGE=0' >> "${INSTALL_DIR}/.env"
+  echo "    .env oluşturuldu — EKOLOJIK_* değerlerini düzenleyin"
+fi
 if [[ -d extension ]]; then
   mkdir -p "${INSTALL_DIR}/extension"
   cp -a extension/. "${INSTALL_DIR}/extension/"

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { loadMarketPosEnv } from './server/loadEnv.mjs';
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +54,10 @@ try {
 }
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const envBootstrap = loadMarketPosEnv(__dirname);
+if (envBootstrap.loaded) {
+  console.log(`Ekolojik env: ${envBootstrap.count} değişken yüklendi (${envBootstrap.path})`);
+}
 const DIST = join(__dirname, 'dist');
 const DATA_DIR = join(__dirname, 'data');
 const PORT = Number(process.env.PORT || 5180);
