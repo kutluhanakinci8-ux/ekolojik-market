@@ -74,6 +74,7 @@ const batch1: PriceCatalogEntry[] = [
   priced('FPA151', 'PINK POINT inci nude ton-up krem', 3),
   priced('SBC053', 'SEALUXE Aloe Nemlendirici Maske', 2),
   priced('LGI019', 'Greenleaf 1,25kg Zencefilli Deterjan', 1),
+  priced('SBE089', 'SEALUXE Bifida Mayası Cilt Bakım Koleksiyonu', 2),
 ];
 
 export const PRICE_BATCH_1_BY_PRODUCT_ID: Record<number, PriceCatalogEntry> = {
@@ -113,6 +114,7 @@ export const PRICE_BATCH_1_BY_PRODUCT_ID: Record<number, PriceCatalogEntry> = {
   34: batch1.find((e) => e.code === 'EBB018')!,
   35: batch1.find((e) => e.code === 'CCA016')!,
   36: batch1.find((e) => e.code === 'CBA052')!,
+  137: batch1.find((e) => e.code === 'SBE089')!,
 };
 
 /** Sistem ürün ID → stok kodu (barkod) */

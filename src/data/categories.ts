@@ -52,6 +52,7 @@ export const PRODUCT_CATEGORIES: Record<number, string> = {
   34: 'cocuk',
   35: 'kisisel-bakim',
   36: 'kisisel-bakim',
+  137: 'cilt-bakimi',
 };
 
 export function getCategoryLabel(categoryId: string): string {

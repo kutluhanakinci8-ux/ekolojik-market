@@ -128,6 +128,7 @@ export const PRICE_BATCH_1_CODE_BY_PRODUCT_ID = {
   34: 'EBB018',
   35: 'CCA016',
   36: 'CBA052',
+  137: 'SBE089',
 };
 
 function normalizeCode(raw) {
