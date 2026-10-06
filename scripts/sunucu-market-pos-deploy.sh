@@ -7,6 +7,7 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-/var/www/ekolojik-market-pos}"
 BRANCH="${BRANCH:-main}"
+GIT_REMOTE="${GIT_REMOTE:-origin}"
 APP_SRC="${REPO_ROOT}"
 INSTALL_DIR="${MARKET_POS_DIR:-/var/www/market-pos}"
 PORT="${PORT:-5180}"
@@ -19,7 +20,7 @@ echo "    Hedef  : ${INSTALL_DIR}"
 if [[ ! -d "${REPO_ROOT}/.git" ]]; then
   echo "HATA: ${REPO_ROOT}/.git bulunamadı."
   echo "Repo yoksa önce klonlayın:"
-  echo "  git clone --branch ${BRANCH} https://github.com/harikaotoservisinfo-spec/ekolojik-market-pos.git ${REPO_ROOT}"
+  echo "  git clone --branch ${BRANCH} https://github.com/kutluhanakinci8-ux/ekolojik-market.git ${REPO_ROOT}"
   echo "Veya paket kurulumu:"
   echo "  scp market-pos-kurulum.tar.gz root@SUNUCU:/root/"
   echo "  mkdir -p ${INSTALL_DIR} && tar xzf /root/market-pos-kurulum.tar.gz -C ${INSTALL_DIR}"
@@ -28,14 +29,14 @@ if [[ ! -d "${REPO_ROOT}/.git" ]]; then
 fi
 
 cd "${REPO_ROOT}"
-echo "==> Git güncelleniyor..."
-git fetch origin "${BRANCH}"
-git checkout "${BRANCH}" 2>/dev/null || git checkout -B "${BRANCH}" "origin/${BRANCH}"
+echo "==> Git güncelleniyor (${GIT_REMOTE}/${BRANCH})..."
+git fetch "${GIT_REMOTE}" "${BRANCH}"
+git checkout "${BRANCH}" 2>/dev/null || git checkout -B "${BRANCH}" "${GIT_REMOTE}/${BRANCH}"
 # npm build tsbuildinfo dosyası pull'u bloklamasın
 git checkout -- tsconfig.tsbuildinfo 2>/dev/null || true
-git pull --ff-only origin "${BRANCH}" || {
+git pull --ff-only "${GIT_REMOTE}" "${BRANCH}" || {
   echo "    pull ff-only başarısız — yerel build artığı temizleniyor..."
-  git reset --hard "origin/${BRANCH}"
+  git reset --hard "${GIT_REMOTE}/${BRANCH}"
 }
 echo "    Commit : $(git -C "${REPO_ROOT}" rev-parse --short HEAD) ($(git -C "${REPO_ROOT}" log -1 --format=%s))"
 
@@ -76,6 +77,17 @@ if [[ -d extension ]]; then
   mkdir -p "${INSTALL_DIR}/extension"
   cp -a extension/. "${INSTALL_DIR}/extension/"
 fi
+
+echo "==> Production bağımlılıkları (${INSTALL_DIR})..."
+cp package.json package-lock.json "${INSTALL_DIR}/"
+cd "${INSTALL_DIR}"
+if [[ -f package-lock.json ]]; then
+  npm ci --omit=dev --no-audit --no-fund
+else
+  npm install --omit=dev --no-audit --no-fund
+fi
+node -e "import('nodemailer').then(() => console.log('    nodemailer OK'))"
+node -e "import('imapflow').then(() => console.log('    imapflow OK'))"
 
 echo "==> Sunucu modül kontrolü..."
 node --check "${INSTALL_DIR}/server.mjs"
