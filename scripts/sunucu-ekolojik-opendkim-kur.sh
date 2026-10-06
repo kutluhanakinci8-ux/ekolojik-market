@@ -28,7 +28,7 @@ fi
 show_txt() {
   if [[ -f "${TXT_FILE}" ]]; then
     echo "DNS TXT (panelde ${SELECTOR}._domainkey.${DOMAIN}):"
-    grep -E '^[^;]' "${TXT_FILE}" | tr -d '\n\t ' | sed 's/(.*//' || cat "${TXT_FILE}"
+    awk -F'"' '/TXT/ { for (i=2; i<NF; i+=2) printf "%s", $i; print "" }' "${TXT_FILE}" || cat "${TXT_FILE}"
     echo ""
   else
     echo "UYARI: ${TXT_FILE} yok — --apply ile anahtar üretin"
