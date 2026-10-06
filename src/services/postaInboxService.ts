@@ -55,3 +55,15 @@ export async function fetchPostaUnreadCounts() {
   const res = await fetch('/api/posta/unread-counts');
   return res.json() as Promise<{ ok: boolean; total?: number; gelen?: number; fatura?: number }>;
 }
+
+export type MailTemplate = { id: string; label: string; subject: string; body: string };
+
+export async function fetchPostaTemplates() {
+  const res = await fetch('/api/posta/templates');
+  return res.json() as Promise<{ ok: boolean; templates?: MailTemplate[] }>;
+}
+
+export async function fetchComposeRecipientHints() {
+  const res = await fetch('/api/posta/compose-hints?limit=50');
+  return res.json() as Promise<{ ok: boolean; emails?: string[] }>;
+}
