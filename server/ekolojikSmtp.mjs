@@ -43,13 +43,14 @@ export async function verifyEkolojikSmtp() {
   }
 }
 
-export async function sendViaEkolojikSmtp({ to, subject, text, html, fromName }) {
+export async function sendViaEkolojikSmtp({ to, subject, text, html, fromName, replyTo }) {
   const c = getEkolojikMailConfig();
   const from = buildFromHeader(fromName || c.fromName, c.from);
+  const reply = replyTo?.includes('@') ? replyTo : c.replyTo || undefined;
   const info = await getTransporter().sendMail({
     from,
     to,
-    replyTo: c.replyTo || undefined,
+    replyTo: reply,
     subject,
     text: text || subject,
     html: html || undefined,

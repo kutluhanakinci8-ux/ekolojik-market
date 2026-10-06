@@ -8,6 +8,14 @@ import {
   processEmailOutbox,
   sendEmailTest,
 } from '../../services/emailOutboxService';
+import {
+  fetchPostaMailSettings,
+  savePostaMailSettings,
+  downloadPostaOutboxCsv,
+  downloadPostaContactCsv,
+  downloadMessagingExportZip,
+  type PostaMailSettings,
+} from '../../services/postaSettingsService';
 
 type OutboxRow = {
   id: string;
@@ -45,17 +53,22 @@ export function EmailOutboxSettingsPanel() {
   const [testTo, setTestTo] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [postaSettings, setPostaSettings] = useState<PostaMailSettings | null>(null);
+  const [exportFrom, setExportFrom] = useState('');
+  const [exportTo, setExportTo] = useState('');
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret] = await Promise.all([
+    const [h, recent, iso, ret, posta] = await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
       fetchRetentionPolicy(),
+      fetchPostaMailSettings(),
     ]);
     setHealth(h);
     setIsolation(iso);
     if (ret.ok && ret.policy) setRetention(ret.policy);
+    if (posta.ok && posta.settings) setPostaSettings(posta.settings);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
     }
@@ -121,7 +134,10 @@ export function EmailOutboxSettingsPanel() {
         </article>
         <article className="settings-stat-card">
           <span className="settings-stat-label">Gönderen</span>
-          <strong>{health?.from ?? '—'}</strong>
+          <strong>{health?.fromName ?? health?.from ?? '—'}</strong>
+          {health?.replyTo && health.replyTo !== health.from && (
+            <span className="settings-hint">Yanıt: {health.replyTo}</span>
+          )}
         </article>
         <article className="settings-stat-card">
           <span className="settings-stat-label">Operasyon</span>
@@ -178,6 +194,219 @@ export function EmailOutboxSettingsPanel() {
           onClick={() => runTest()}
         >
           Test maili gönder
+        </button>
+      </div>
+
+      <div className="settings-panel-head" style={{ marginTop: '1.25rem' }}>
+        <div>
+          <h3>Posta Faz 11 — gönderen & bildirimler</h3>
+          <p>Panel ayarları `.env` üzerine yazar; boş alanlar env değerini kullanır</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          disabled={loading || !postaSettings}
+          onClick={async () => {
+            if (!postaSettings) return;
+            setLoading(true);
+            setFlash(null);
+            try {
+              const result = await savePostaMailSettings({
+                fromName: postaSettings.fromName,
+                replyTo: postaSettings.replyTo,
+                opsEmail: postaSettings.opsEmail,
+                signatureHtml: postaSettings.signatureHtml,
+                notifications: postaSettings.notifications,
+              });
+              if (result.ok) {
+                setPostaSettings(result.settings ?? postaSettings);
+                setFlash('Posta ayarları kaydedildi');
+                await refresh();
+              } else {
+                setFlash(result.error ?? 'Kayıt başarısız');
+              }
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          Posta ayarlarını kaydet
+        </button>
+      </div>
+
+      {postaSettings && (
+        <div className="settings-form-grid">
+          <label className="settings-field">
+            <span>Gönderen adı (From)</span>
+            <input
+              type="text"
+              value={postaSettings.fromName ?? ''}
+              onChange={(e) =>
+                setPostaSettings({ ...postaSettings, fromName: e.target.value || null })
+              }
+              placeholder="Boş = EKOLOJIK_MAIL_FROM_NAME"
+            />
+          </label>
+          <label className="settings-field">
+            <span>Yanıt adresi (Reply-To)</span>
+            <input
+              type="email"
+              value={postaSettings.replyTo ?? ''}
+              onChange={(e) =>
+                setPostaSettings({ ...postaSettings, replyTo: e.target.value || null })
+              }
+              placeholder="info@…"
+            />
+          </label>
+          <label className="settings-field">
+            <span>Operasyon e-postası</span>
+            <input
+              type="email"
+              value={postaSettings.opsEmail ?? ''}
+              onChange={(e) =>
+                setPostaSettings({ ...postaSettings, opsEmail: e.target.value || null })
+              }
+              placeholder="EKOLOJIK_OPS_EMAIL"
+            />
+          </label>
+          <label className="settings-field settings-field--full">
+            <span>İmza (HTML)</span>
+            <textarea
+              rows={4}
+              value={postaSettings.signatureHtml}
+              onChange={(e) =>
+                setPostaSettings({ ...postaSettings, signatureHtml: e.target.value })
+              }
+              placeholder="<p>Ekolojik Market</p>"
+            />
+          </label>
+          <fieldset className="settings-field settings-field--full">
+            <legend>Ops e-posta bildirimleri</legend>
+            <label>
+              <input
+                type="checkbox"
+                checked={postaSettings.notifications.contactOpsEmail !== false}
+                onChange={(e) =>
+                  setPostaSettings({
+                    ...postaSettings,
+                    notifications: {
+                      ...postaSettings.notifications,
+                      contactOpsEmail: e.target.checked,
+                    },
+                  })
+                }
+              />{' '}
+              İletişim formu
+            </label>
+            <label style={{ marginLeft: '1rem' }}>
+              <input
+                type="checkbox"
+                checked={postaSettings.notifications.messagingOpsEmail !== false}
+                onChange={(e) =>
+                  setPostaSettings({
+                    ...postaSettings,
+                    notifications: {
+                      ...postaSettings.notifications,
+                      messagingOpsEmail: e.target.checked,
+                    },
+                  })
+                }
+              />{' '}
+              Müşteri mesajları
+            </label>
+            <label style={{ marginLeft: '1rem' }}>
+              <input
+                type="checkbox"
+                checked={postaSettings.notifications.billEmailOpsEmail !== false}
+                onChange={(e) =>
+                  setPostaSettings({
+                    ...postaSettings,
+                    notifications: {
+                      ...postaSettings.notifications,
+                      billEmailOpsEmail: e.target.checked,
+                    },
+                  })
+                }
+              />{' '}
+              Fatura e-postası (ileride)
+            </label>
+          </fieldset>
+        </div>
+      )}
+
+      <div className="settings-panel-head" style={{ marginTop: '1.25rem' }}>
+        <div>
+          <h3>Rapor indir (CSV / ZIP)</h3>
+          <p>Tarih aralığı opsiyonel — boş bırakırsanız son kayıtlar</p>
+        </div>
+      </div>
+      <div className="settings-form-grid">
+        <label className="settings-field">
+          <span>Başlangıç (YYYY-MM-DD)</span>
+          <input type="date" value={exportFrom} onChange={(e) => setExportFrom(e.target.value)} />
+        </label>
+        <label className="settings-field">
+          <span>Bitiş</span>
+          <input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} />
+        </label>
+      </div>
+      <div className="settings-panel-actions">
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={loading}
+          onClick={async () => {
+            setLoading(true);
+            setFlash(null);
+            try {
+              await downloadPostaOutboxCsv(exportFrom, exportTo);
+              setFlash('Outbox CSV indirildi');
+            } catch (e) {
+              setFlash(e instanceof Error ? e.message : 'Export hatası');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          Outbox CSV
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={loading}
+          onClick={async () => {
+            setLoading(true);
+            setFlash(null);
+            try {
+              await downloadPostaContactCsv(exportFrom, exportTo);
+              setFlash('İletişim CSV indirildi');
+            } catch (e) {
+              setFlash(e instanceof Error ? e.message : 'Export hatası');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          İletişim CSV
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={loading}
+          onClick={async () => {
+            setLoading(true);
+            setFlash(null);
+            try {
+              await downloadMessagingExportZip();
+              setFlash('Mesajlaşma arşivi indirildi');
+            } catch (e) {
+              setFlash(e instanceof Error ? e.message : 'Export hatası');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          Mesaj ZIP (KVKK)
         </button>
       </div>
 

@@ -38,6 +38,19 @@ Ayarlar → Sistem → **Faz 5 ayrım kontrolü** veya:
 - [ ] Günlük yedek: `data/email-outbox`, `data/messaging`, `data/bill-email-inbox`
 - [ ] Mail/mesaj saklama süresi işletme politikasına göre
 
+### Posta admin (Faz 11 — NB PM-3 / PM-10 lite)
+
+- [ ] Ayarlar → E-posta: **Gönderen adı**, Reply-To, ops e-postası, imza kaydediliyor
+- [ ] Bildirim tercihleri: iletişim / mesaj ops mail açık-kapalı
+- [ ] Outbox + iletişim CSV indir; mesajlaşma ZIP (`GET /api/messaging/export`)
+- [ ] `data/posta-mail-settings.json` yedek listesinde
+
+### Cron & env audit
+
+- [ ] Günlük yedek cron aktif (`sunucu-ekolojik-data-yedek.sh`)
+- [ ] `.env` audit: yalnızca `EKOLOJIK_*`, SMTP host = mail subdomain (VPS IP değil)
+- [ ] `bash scripts/sunucu-ekolojik-smtp-dogrula.sh` yeşil (Faz 6)
+
 ## VPS yedek örneği
 
 ```bash
@@ -54,5 +67,6 @@ Manuel tar (alternatif):
   /var/www/market-pos/data/email-outbox \
   /var/www/market-pos/data/messaging \
   /var/www/market-pos/data/bill-email-inbox \
-  /var/www/market-pos/data/contact-messages.json
+  /var/www/market-pos/data/contact-messages.json \
+  /var/www/market-pos/data/posta-mail-settings.json
 ```
