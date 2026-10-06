@@ -7,6 +7,15 @@ import type { Product, WholesalePrices } from '../types/product';
 import { formatCurrency, formatDateTime } from '../utils/format';
 import { exportStockCsv, getStockHealthPercent, getStockInventoryValue } from '../utils/stockExport';
 import {
+  countIrsaliyeWarehouseProducts,
+  IRSALIYE_CODES_WITHOUT_PRODUCT,
+  IRSALIYE_LUY2026000000002_ID,
+  IRSALIYE_PDF_LINE_COUNT,
+  IRSALIYE_WAREHOUSE_CODE_COUNT,
+  IRSALIYE_WAREHOUSE_UNIT_TOTAL,
+  isIrsaliyeWarehouseProduct,
+} from '../utils/irsaliyeWarehouse';
+import {
   WHOLESALE_BASE_LABELS,
   WHOLESALE_QUANTITIES,
   type WholesalePriceBase,
@@ -19,7 +28,7 @@ interface StockScreenProps {
   store: Store;
 }
 
-type StockFilter = 'all' | 'low' | 'out';
+type StockFilter = 'irsaliye' | 'all' | 'low' | 'out';
 type SortKey = 'id' | 'name' | 'stock' | 'category' | 'value';
 type SortDir = 'asc' | 'desc';
 type WholesaleDisplayTier = typeof WHOLESALE_QUANTITIES[number];
@@ -81,7 +90,7 @@ function getStockStatusLabel(status: 'ok' | 'low' | 'out'): string {
 export function StockScreen({ store }: StockScreenProps) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
-  const [filter, setFilter] = useState<StockFilter>('all');
+  const [filter, setFilter] = useState<StockFilter>('irsaliye');
   const [toast, setToast] = useState<string | null>(null);
   const [editingImages, setEditingImages] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('id');
@@ -108,21 +117,34 @@ export function StockScreen({ store }: StockScreenProps) {
     return counts;
   }, [store.products]);
 
-  const inventoryValue = useMemo(
-    () => getStockInventoryValue(store.products),
+  const irsaliyeProductCount = useMemo(
+    () => countIrsaliyeWarehouseProducts(store.products),
     [store.products],
+  );
+
+  const scopedProducts = useMemo(() => {
+    if (filter === 'irsaliye') {
+      return store.products.filter(isIrsaliyeWarehouseProduct);
+    }
+    return store.products;
+  }, [store.products, filter]);
+
+  const inventoryValue = useMemo(
+    () => getStockInventoryValue(scopedProducts),
+    [scopedProducts],
   );
 
   const healthPercent = useMemo(
-    () => getStockHealthPercent(store.products),
-    [store.products],
+    () => getStockHealthPercent(scopedProducts),
+    [scopedProducts],
   );
 
-  const inStockCount = store.products.length - store.outOfStockCount;
+  const inStockCount = scopedProducts.filter((p) => p.stock > 0).length;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = store.products.filter((p) => {
+      if (filter === 'irsaliye' && !isIrsaliyeWarehouseProduct(p)) return false;
       if (category !== 'all' && p.category !== category) return false;
       if (filter === 'low' && (p.stock <= 0 || p.stock > store.lowStockThreshold)) return false;
       if (filter === 'out' && p.stock > 0) return false;
@@ -313,8 +335,16 @@ export function StockScreen({ store }: StockScreenProps) {
           </div>
 
           <div className="stock-status-tabs">
+            <button
+              type="button"
+              className={filter === 'irsaliye' ? 'active' : ''}
+              onClick={() => applyFilter('irsaliye')}
+              title={`e-İrsaliye ${IRSALIYE_LUY2026000000002_ID}: ${IRSALIYE_PDF_LINE_COUNT} satır, ${IRSALIYE_WAREHOUSE_CODE_COUNT} stok kodu`}
+            >
+              İrsaliye ({irsaliyeProductCount})
+            </button>
             <button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => applyFilter('all')}>
-              Tümü
+              Tüm katalog ({store.products.length})
             </button>
             <button type="button" className={filter === 'low' ? 'active' : ''} onClick={() => applyFilter('low')}>
               Az Stok
@@ -328,11 +358,25 @@ export function StockScreen({ store }: StockScreenProps) {
 
       <div className="stock-summary-strip" role="region" aria-label="Stok özeti">
         <div className="stock-summary-strip-main">
-          <button type="button" className="stock-summary-chip" onClick={() => applyFilter('all')}>
-            <span className="stock-summary-chip-label">Ürün</span>
+          <button
+            type="button"
+            className={`stock-summary-chip ${filter === 'irsaliye' ? 'active' : ''}`}
+            onClick={() => applyFilter('irsaliye')}
+            title={`${IRSALIYE_PDF_LINE_COUNT} PDF satırı → ${IRSALIYE_WAREHOUSE_CODE_COUNT} kod; POS’ta ${irsaliyeProductCount} ürün kartı`}
+          >
+            <span className="stock-summary-chip-label">İrsaliye</span>
+            <strong>{irsaliyeProductCount}</strong>
+          </button>
+          <button
+            type="button"
+            className={`stock-summary-chip ${filter === 'all' ? 'active' : ''}`}
+            onClick={() => applyFilter('all')}
+            title="Greenleaf satış kataloğundaki tüm ürün kartları"
+          >
+            <span className="stock-summary-chip-label">Katalog</span>
             <strong>{store.products.length}</strong>
           </button>
-          <button type="button" className="stock-summary-chip stock-summary-chip--green" onClick={() => applyFilter('all')}>
+          <button type="button" className="stock-summary-chip stock-summary-chip--green" onClick={() => applyFilter('irsaliye')}>
             <span className="stock-summary-chip-label">Toplam stok</span>
             <strong>{store.totalStockUnits.toLocaleString('tr-TR')}</strong>
           </button>
@@ -381,13 +425,21 @@ export function StockScreen({ store }: StockScreenProps) {
         {summaryOpen && (
           <div className="stock-summary-strip-detail">
             <span className="stock-summary-meta">
-              Toplam <strong>{store.totalStockUnits.toLocaleString('tr-TR')}</strong> adet depo stoğu (
-              {inStockCount} stoklu kart / {store.products.length} katalog) · Envanter{' '}
-              {formatCurrency(inventoryValue)}
+              e-İrsaliye <strong>{IRSALIYE_LUY2026000000002_ID}</strong>: {IRSALIYE_PDF_LINE_COUNT} satır ·{' '}
+              {IRSALIYE_WAREHOUSE_CODE_COUNT} stok kodu ·{' '}
+              <strong>{IRSALIYE_WAREHOUSE_UNIT_TOTAL.toLocaleString('tr-TR')}</strong> adet (depoda{' '}
+              {store.totalStockUnits.toLocaleString('tr-TR')}) · Envanter {formatCurrency(inventoryValue)}
+              {store.totalStockUnits < IRSALIYE_WAREHOUSE_UNIT_TOTAL && IRSALIYE_CODES_WITHOUT_PRODUCT.length > 0 && (
+                <>
+                  {' '}
+                  — kartı olmayan: {IRSALIYE_CODES_WITHOUT_PRODUCT.join(', ')}
+                </>
+              )}
             </span>
             <span className="stock-summary-meta stock-summary-meta--hint">
-              Bu ekran stokları otomatik değiştirmez; irsaliye miktarları ayarlarda uygulanır. Stok 0 olan{' '}
-              {store.outOfStockCount} kart çoğunlukla bu irsaliyede olmayan ürünlerdir.
+              136 sayısı irsaliye değil, <strong>tüm satış kataloğu</strong>. Varsayılan liste sadece irsaliyedeki{' '}
+              {irsaliyeProductCount} kart. Kalan {store.products.length - irsaliyeProductCount} ürün bu irsaliyede yok
+              (stok 0).
             </span>
             <span className="stock-version">Katalog {APP_CATALOG_VERSION}</span>
             {store.products.length < EXPECTED_PRODUCT_COUNT && (
@@ -400,7 +452,18 @@ export function StockScreen({ store }: StockScreenProps) {
       <div className="stock-body">
         <div className="stock-table-panel">
           <div className="stock-table-bar">
-            <span><strong>{filtered.length}</strong> ürün listeleniyor</span>
+            <span>
+              {filter === 'irsaliye' ? (
+                <>
+                  <strong>{filtered.length}</strong> irsaliye ürünü listeleniyor · PDF {IRSALIYE_PDF_LINE_COUNT} satır /{' '}
+                  {IRSALIYE_WAREHOUSE_CODE_COUNT} kod
+                </>
+              ) : (
+                <>
+                  <strong>{filtered.length}</strong> ürün listeleniyor · katalog {store.products.length}
+                </>
+              )}
+            </span>
             {totalPages > 1 && (
               <div className="pagination">
                 <button type="button" disabled={safePage === 0} onClick={() => setPage((p) => p - 1)}>‹</button>
