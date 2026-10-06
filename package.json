@@ -1,0 +1,31 @@
+{
+  "name": "ekolojik-market-pos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5180",
+    "build": "npm run images:sync && tsc -b && vite build",
+    "images:sync": "node scripts/download-product-images.mjs",
+    "preview": "vite preview --host 0.0.0.0 --port 5180",
+    "start": "vite preview --host 0.0.0.0 --port ${PORT:-5180}",
+    "deploy:vps": "bash scripts/deploy-vps.sh",
+    "scrape:greenleaf": "node scripts/scrape-greenleaf.mjs",
+    "scrape:greenleaf-shop": "node scripts/scrape-greenleaf-shop.mjs",
+    "translate:greenleaf-shop": "node scripts/translate-greenleaf-shop.mjs",
+    "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.6"
+  },
+  "devDependencies": {
+    "@iamtraction/google-translate": "^2.0.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.4.3"
+  }
+}

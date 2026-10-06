@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASAT Köprüsü Kurulumu</title>
+  <style>
+    :root {
+      font-family: Inter, system-ui, sans-serif;
+      color: #1f2937;
+      --blue: #1e5af0;
+      --border: #d8e2d8;
+      --muted: #6b7280;
+      --warn-bg: #fffbeb;
+      --warn-border: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: #f8fbff; line-height: 1.5; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    .lead { color: var(--muted); margin: 0 0 20px; }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .warn { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 14px; }
+    ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button, a.btn { display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-outline { background: #fff; color: #1f2937; border: 1px solid var(--border); }
+    .status { margin-top: 14px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; display: none; }
+    .status.show { display: block; }
+    .status.ok { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+  </style>
+</head>
+<body>
+  <h1>ASAT Köprüsü Kurulumu</h1>
+  <p class="lead">online.asat.gov.tr girişinden sonra ödenmemiş borçların otomatik takvime aktarılması için bir kez kurulur.</p>
+
+  <div class="warn">
+    <strong>Kod ekranı açıldıysa:</strong> Tarayıcıda Tampermonkey yüklü değildir. Önce eklentiyi kurun, sonra köprüyü yükleyin.
+  </div>
+
+  <div class="card">
+    <ol>
+      <li>
+        <strong>1) Tampermonkey kurun</strong>
+        <div class="btn-row">
+          <a class="btn btn-outline" href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener noreferrer">Tampermonkey İndir</a>
+        </div>
+      </li>
+      <li>
+        <strong>2) ASAT köprüsünü yükleyin</strong>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="/asat-userscript.user.js" id="installLink">Köprüyü Yükle</a>
+          <button type="button" class="btn btn-outline" id="copyBtn">Kodu Kopyala</button>
+        </div>
+      </li>
+      <li>
+        <strong>3) Market POS&apos;a dönün</strong>
+        Portalda giriş yapın, sonra <em>Ödenmemiş Borçları Getir</em> butonuna basın.
+      </li>
+    </ol>
+  </div>
+
+  <button type="button" class="btn btn-outline" id="closeBtn">Pencereyi Kapat</button>
+  <div class="status" id="status"></div>
+
+  <script>
+    document.getElementById('copyBtn').addEventListener('click', async function () {
+      var statusEl = document.getElementById('status');
+      try {
+        var res = await fetch('/asat-userscript.user.js', { cache: 'no-store' });
+        var text = await res.text();
+        await navigator.clipboard.writeText(text);
+        statusEl.textContent = 'Kod kopyalandı. Tampermonkey → Yeni betik → yapıştır → kaydet.';
+        statusEl.className = 'status show ok';
+      } catch (e) {
+        statusEl.textContent = 'Kopyalama başarısız.';
+        statusEl.className = 'status show';
+      }
+    });
+    document.getElementById('closeBtn').addEventListener('click', function () { window.close(); });
+  </script>
+</body>
+</html>

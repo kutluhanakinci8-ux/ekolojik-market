@@ -1,0 +1,75 @@
+name: Ekolojik Market POS VPS Deploy
+
+on:
+  push:
+    branches: [main, 'cursor/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: vars.VPS_DEPLOY_ENABLED != 'false'
+    steps:
+      - name: VPS secrets kontrolü
+        run: |
+          missing=0
+          for key in VPS_SSH_HOST VPS_SSH_USER; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::GitHub secret eksik: $key"
+              missing=1
+            fi
+          done
+          if [ -z "${VPS_SSH_KEY:-}" ] && [ -z "${VPS_SSH_KEY_B64:-}" ]; then
+            echo "::error::GitHub secret eksik: VPS_SSH_KEY veya VPS_SSH_KEY_B64"
+            missing=1
+          fi
+          [ "$missing" -eq 0 ] || exit 1
+        env:
+          VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
+
+      - name: SSH anahtarı hazırla
+        id: ssh_key
+        run: |
+          set -euo pipefail
+          KEY_FILE="$RUNNER_TEMP/vps_deploy_key"
+          if [ -n "${VPS_SSH_KEY_B64:-}" ]; then
+            printf '%s' "$VPS_SSH_KEY_B64" | tr -d '[:space:]' | base64 -d > "$KEY_FILE"
+          else
+            printf '%b\n' "${VPS_SSH_KEY:-}" | sed 's/\r$//' > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+          if ! ssh-keygen -y -f "$KEY_FILE" >/dev/null 2>&1; then
+            echo "::error::VPS_SSH_KEY geçersiz"
+            exit 1
+          fi
+          echo "key_file=$KEY_FILE" >> "$GITHUB_OUTPUT"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
+
+      - name: Deploy Ekolojik Market POS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key_path: ${{ steps.ssh_key.outputs.key_file }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            REPO_ROOT=/var/www/ekolojik-market-pos
+            BRANCH="${{ github.ref_name }}"
+            REPO_URL="https://github.com/harikaotoservisinfo-spec/ekolojik-market-pos.git"
+            if [ ! -d "$REPO_ROOT/.git" ]; then
+              git clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$REPO_ROOT"
+            fi
+            export REPO_ROOT
+            export BRANCH
+            bash "$REPO_ROOT/scripts/sunucu-market-pos-deploy.sh"
+            echo "=== Doğrulama ==="
+            curl -fsS http://127.0.0.1:5180/ | grep -o 'assets/index-[^"]*\.js' | head -1
+            JS=$(curl -fsS http://127.0.0.1:5180/ | grep -o 'assets/index-[^"]*\.js' | head -1)
+            curl -fsS "http://127.0.0.1:5180/${JS}" | wc -c

@@ -1,0 +1,91 @@
+import type { PriceCatalogEntry } from '../utils/productPricing';
+import { derivePurchasePrice } from '../utils/productPricing';
+
+/** Greenleaf Price First BATCH-1 (2988) — ürün kodu ve TL fiyatları */
+export const PRICE_CATALOG_BATCH_ID = 'Price_First_BATCH-1_2988';
+
+const batch1: PriceCatalogEntry[] = [
+  { code: 'DAA062', name: 'iLiFE doğal deniz yosunu diş macunu', pv: 0.5, purchasePrice: 120.4, partnerPrice: 145, couponPrice: 145, retailPrice: 290 },
+  { code: 'EAA022', name: 'YIBEILE çocuk diş macunu (80g)', pv: 0.2, purchasePrice: 85.5, partnerPrice: 103, couponPrice: 103, retailPrice: 206 },
+  { code: 'CCC001', name: 'CARICH Diş Fırçası (Çiftli)', pv: 0.2, purchasePrice: 69.8, partnerPrice: 84, couponPrice: 84, retailPrice: 168 },
+  { code: 'CCC029', name: 'CARICH Diş Fırçası', pv: 0.5, purchasePrice: 197.6, partnerPrice: 238, couponPrice: 238, retailPrice: 476 },
+  { code: 'CBB017', name: 'CARICH el yapımı kömürlü esansiyel yağ sabunu', pv: 0.2, purchasePrice: 80.6, partnerPrice: 97, couponPrice: 97, retailPrice: 194 },
+  { code: 'ASF055', name: 'iLiFE deterjan', pv: 0.5, purchasePrice: 152.8, partnerPrice: 184, couponPrice: 184, retailPrice: 368 },
+  { code: 'ASA086', name: 'iLiFE Bambu Özlü Bulaşık Sıvısı', pv: 0.5, purchasePrice: 239.1, partnerPrice: 288, couponPrice: 288, retailPrice: 576 },
+  { code: 'DAC056', name: 'iLiFE Mutfak Yağ Temizleyici', pv: 0.2, purchasePrice: 169.4, partnerPrice: 204, couponPrice: 204, retailPrice: 408 },
+  { code: 'ASF053', name: 'iLiFE çamaşır deterjanı (1KG)', pv: 0.5, purchasePrice: 183.5, partnerPrice: 221, couponPrice: 221, retailPrice: 442 },
+  { code: 'ASA017', name: 'iLiFE Çamaşır Deterjanı', pv: 0.5, purchasePrice: 183.5, partnerPrice: 221, couponPrice: 221, retailPrice: 442 },
+  { code: 'ASF054', name: 'iLiFE Çamaşır Deterjanı (2KG)', pv: 1, purchasePrice: 361.9, partnerPrice: 436, couponPrice: 436, retailPrice: 872 },
+  { code: 'ASF066', name: 'iLiFE Bakteriyostatik Çamaşır Sabunu', pv: 0.2, purchasePrice: 61.5, partnerPrice: 74, couponPrice: 74, retailPrice: 148 },
+  { code: 'KLA128', name: 'CARICH Bambu Yüz Mendili', pv: 0.2, purchasePrice: 319.6, partnerPrice: 385, couponPrice: 385, retailPrice: 770 },
+  { code: 'CEA069', name: 'CARICH Bambu Cep Mendili', pv: 0.2, purchasePrice: 156.1, partnerPrice: 188, couponPrice: 188, retailPrice: 376 },
+  { code: 'CAA038', name: 'CARICH Zencefil Hacim Şampuanı', pv: 0.5, purchasePrice: 245.7, partnerPrice: 296, couponPrice: 296, retailPrice: 592 },
+  { code: 'CAB040', name: 'CARICH Zencefil Hacim Saç Kremi', pv: 0.5, purchasePrice: 245.7, partnerPrice: 296, couponPrice: 296, retailPrice: 592 },
+  { code: 'DAA109', name: 'iLiFE Canlandırıcı Nemlendirici Duş Jeli', pv: 0.5, purchasePrice: 182.6, partnerPrice: 220, couponPrice: 220, retailPrice: 440 },
+  { code: 'YBA045', name: "YIBEILE Çocuk 2'si 1 Arada Yıkama & Şampuan", pv: 0.5, purchasePrice: 239.1, partnerPrice: 288, couponPrice: 288, retailPrice: 576 },
+  { code: 'DAB087', name: 'iLiFE Pembe Aloe Vera Jeli', pv: 0.7, purchasePrice: 215, partnerPrice: 259, couponPrice: 259, retailPrice: 518 },
+  { code: 'ASB044', name: 'iLiFE Nemlendirici Aloe Vera Jeli', pv: 0.7, purchasePrice: 215, partnerPrice: 259, couponPrice: 259, retailPrice: 518 },
+  { code: 'ASB045', name: 'iLiFE Aloe Vera Jeli', pv: 0.5, purchasePrice: 108.8, partnerPrice: 131, couponPrice: 131, retailPrice: 262 },
+  { code: 'CBE034', name: 'CARICH vitamin E Emülsiyonu', pv: 0.5, purchasePrice: 141.1, partnerPrice: 170, couponPrice: 170, retailPrice: 340 },
+  { code: 'ASB046', name: 'iLiFE SOD ipek losyonu', pv: 0.7, purchasePrice: 120.4, partnerPrice: 145, couponPrice: 145, retailPrice: 290 },
+  { code: 'SAA069', name: 'SEALUXE Yeşil Çay Nemlendirici Peeling', pv: 0.2, purchasePrice: 107.9, partnerPrice: 130, couponPrice: 130, retailPrice: 260 },
+  { code: 'CBF015', name: 'CARICH Shea Yağı Nemlendirici El Kremi', pv: 0.2, purchasePrice: 61.5, partnerPrice: 74, couponPrice: 74, retailPrice: 148 },
+  { code: 'CBF014', name: 'CARICH Aloe Nemlendirici El Kremi', pv: 0.2, purchasePrice: 61.5, partnerPrice: 74, couponPrice: 74, retailPrice: 148 },
+  { code: 'ASB047', name: 'iLiFE Papatya Köpüren El Yıkama', pv: 0.5, purchasePrice: 200.1, partnerPrice: 241, couponPrice: 241, retailPrice: 482 },
+  { code: 'DAA108', name: 'iLiFE Aloe Vera Köpüren El Yıkama', pv: 0.5, purchasePrice: 200.1, partnerPrice: 241, couponPrice: 241, retailPrice: 482 },
+  { code: 'CCA016', name: 'CARICH soğuk alg alüminyum içermeyen diş macunu', pv: 1, purchasePrice: derivePurchasePrice(185), partnerPrice: 185, couponPrice: 185, retailPrice: 370 },
+  { code: 'CAA039', name: 'CARICH çiçek kokulu şampuan', pv: 1, purchasePrice: derivePurchasePrice(345), partnerPrice: 345, couponPrice: 345, retailPrice: 690 },
+  { code: 'CBA052', name: 'CARICH Aroma Duş Jeli', pv: 0.5, purchasePrice: derivePurchasePrice(211), partnerPrice: 211, couponPrice: 211, retailPrice: 422 },
+  { code: 'DAB089', name: 'Cilt bakım gliserini', pv: 0.5, purchasePrice: derivePurchasePrice(99), partnerPrice: 99, couponPrice: 99, retailPrice: 198 },
+  { code: 'SBJ064', name: 'SEALUXE Aydınlatıcı Temizleme Jeli', pv: 2, purchasePrice: derivePurchasePrice(268), partnerPrice: 268, couponPrice: 268, retailPrice: 536 },
+  { code: 'EBB018', name: 'YIBEILE çocuk yulaf özlü vücut sütü', pv: 2, purchasePrice: derivePurchasePrice(314), partnerPrice: 314, couponPrice: 314, retailPrice: 628 },
+  { code: 'FPA151', name: 'PINK POINT inci nude ton-up krem', pv: 3, purchasePrice: derivePurchasePrice(436), partnerPrice: 436, couponPrice: 436, retailPrice: 872 },
+  { code: 'SBC053', name: 'SEALUXE Aloe Nemlendirici Maske', pv: 2, purchasePrice: derivePurchasePrice(407), partnerPrice: 407, couponPrice: 407, retailPrice: 814 },
+  { code: 'LGI019', name: 'Greenleaf 1,25kg Zencefilli Deterjan', pv: 1, purchasePrice: derivePurchasePrice(248), partnerPrice: 248, couponPrice: 248, retailPrice: 496 },
+];
+
+/** Sistem ürün ID → fiyat listesi kaydı */
+export const PRICE_BATCH_1_BY_PRODUCT_ID: Record<number, PriceCatalogEntry> = {
+  1: batch1.find((e) => e.code === 'ASF066')!,
+  2: batch1.find((e) => e.code === 'CCC001')!,
+  3: batch1.find((e) => e.code === 'CCC029')!,
+  4: batch1.find((e) => e.code === 'YBA045')!,
+  5: batch1.find((e) => e.code === 'EAA022')!,
+  6: batch1.find((e) => e.code === 'CAB040')!,
+  7: batch1.find((e) => e.code === 'CAA038')!,
+  8: batch1.find((e) => e.code === 'KLA128')!,
+  9: batch1.find((e) => e.code === 'CEA069')!,
+  10: batch1.find((e) => e.code === 'SAA069')!,
+  11: batch1.find((e) => e.code === 'ASA086')!,
+  12: batch1.find((e) => e.code === 'ASF053')!,
+  13: batch1.find((e) => e.code === 'DAA109')!,
+  14: batch1.find((e) => e.code === 'CBF015')!,
+  15: batch1.find((e) => e.code === 'CBF014')!,
+  16: batch1.find((e) => e.code === 'DAB087')!,
+  17: batch1.find((e) => e.code === 'DAA108')!,
+  18: batch1.find((e) => e.code === 'DAC056')!,
+  19: batch1.find((e) => e.code === 'DAA062')!,
+  20: batch1.find((e) => e.code === 'CBE034')!,
+  21: batch1.find((e) => e.code === 'ASF055')!,
+  22: batch1.find((e) => e.code === 'ASF054')!,
+  23: batch1.find((e) => e.code === 'ASA017')!,
+  24: batch1.find((e) => e.code === 'ASB047')!,
+  25: batch1.find((e) => e.code === 'ASB045')!,
+  26: batch1.find((e) => e.code === 'ASB044')!,
+  27: batch1.find((e) => e.code === 'ASB046')!,
+  28: batch1.find((e) => e.code === 'CAA039')!,
+  29: batch1.find((e) => e.code === 'FPA151')!,
+  30: batch1.find((e) => e.code === 'DAB089')!,
+  31: batch1.find((e) => e.code === 'LGI019')!,
+  32: batch1.find((e) => e.code === 'SBJ064')!,
+  33: batch1.find((e) => e.code === 'SBC053')!,
+  34: batch1.find((e) => e.code === 'EBB018')!,
+  35: batch1.find((e) => e.code === 'CCA016')!,
+  36: batch1.find((e) => e.code === 'CBA052')!,
+};
+
+export const PRICE_CATALOG_BATCH_1 = batch1;
+
+export const PRICE_CATALOG_BY_CODE = Object.fromEntries(
+  batch1.map((entry) => [entry.code, entry]),
+) as Record<string, PriceCatalogEntry>;

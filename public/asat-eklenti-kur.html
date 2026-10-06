@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASAT Otomatik Aktarım Kurulumu</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 0; padding: 24px; background: #f8fbff; color: #1f2937; line-height: 1.5; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    .lead { color: #6b7280; margin-bottom: 20px; }
+    .card { background: #fff; border: 1px solid #d8e2d8; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+    .ok { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 10px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>ASAT Otomatik Aktarım (bir kez)</h1>
+  <p class="lead">Girişten sonra borçların otomatik taranması için Chrome eklentisini bir kez yükleyin.</p>
+
+  <div class="card">
+    <ol>
+      <li>Chrome adres çubuğuna <code>chrome://extensions</code> yazın</li>
+      <li>Sağ üstte <strong>Geliştirici modu</strong> açık olsun</li>
+      <li><strong>Paketlenmemiş öğe yükle</strong> → sunucudaki <code>market-pos/extension</code> klasörünü seçin</li>
+      <li>Market POS sayfasını yenileyin, ASAT&apos;a giriş yapın — sistem otomatik devam eder</li>
+    </ol>
+  </div>
+
+  <p class="ok">Eklenti yüklüyse bu sayfayı kapatabilirsiniz. Giriş yaptıktan sonra ödenmemiş borçlar otomatik taranır.</p>
+</body>
+</html>
