@@ -14,7 +14,7 @@ Bu script:
 
 - `info@ekolojikmarket.com.tr` maildir oluşturur (`/var/mail/vhosts/…`)
 - Dovecot passdb ekler (**Lerta** `lerta-imap-passwd` dosyasına dokunmaz)
-- Postfix alias ekler (**Lerta** `lerta-inbound-virtual` satırlarına dokunmaz)
+- Postfix **virtual + transport** (`ekolojik-lda` → Dovecot deliver, **Lerta** haritasına dokunmaz)
 - `.env` → `EKOLOJIK_IMAP_HOST=127.0.0.1`, port **143**, kullanıcı `info@…`
 
 Doğrulama:
@@ -29,7 +29,7 @@ POS: **Posta → Gelen → Senkronize et**
 Gelen teslim smoke:
 
 ```bash
-bash scripts/sunucu-ekolojik-imap-vps-alias-fix.sh   # bir kez (Lerta myorigin ortamı)
+bash scripts/sunucu-ekolojik-imap-vps-alias-fix.sh   # virtual + transport + master.cf ekolojik-lda
 bash scripts/sunucu-ekolojik-posta-gelen-smoke.sh
 ```
 
