@@ -1,5 +1,5 @@
 import { isLertaPlatformConfigured } from './lertaPlatformBridge.mjs';
-import { isEkolojikSmtpConfigured, getEkolojikOpsEmail, getEkolojikSmtpHostHint } from './ekolojikMailConfig.mjs';
+import { isEkolojikSmtpConfigured, getEkolojikOpsEmail, getEkolojikSmtpHostHint, isEkolojikImapConfigured } from './ekolojikMailConfig.mjs';
 import { getOutboxCounts } from './emailOutbox.mjs';
 
 /** Faz 5 — Ekolojik / NB ayrımı ve operasyon özeti (salt okunur) */
@@ -29,6 +29,12 @@ export async function getEkolojikIsolationReport(dataDir) {
       detail: getEkolojikOpsEmail() || 'EKOLOJIK_OPS_EMAIL',
     },
     {
+      id: 'ekolojik_imap',
+      label: 'Posta Gelen IMAP (Faz 7)',
+      ok: isEkolojikImapConfigured(),
+      detail: isEkolojikImapConfigured() ? 'EKOLOJIK_IMAP_* yapılandırıldı' : 'Hub Gelen sync için IMAP gerekli',
+    },
+    {
       id: 'smtp_host_sane',
       label: 'SMTP host (Faz 6)',
       ok: !getEkolojikSmtpHostHint()?.includes('VPS IP'),
@@ -49,7 +55,7 @@ export async function getEkolojikIsolationReport(dataDir) {
   ];
 
   return {
-    ok: checks.every((c) => c.ok || c.id === 'ekolojik_smtp'),
+    ok: checks.every((c) => c.ok || c.id === 'ekolojik_smtp' || c.id === 'ekolojik_imap'),
     checks,
     dataPaths: [
       'data/email-outbox/',
@@ -58,6 +64,7 @@ export async function getEkolojikIsolationReport(dataDir) {
       'data/messaging-attachments/',
       'data/contact-messages.json',
       'data/posta-mail-settings.json',
+      'data/posta-inbox/',
     ],
     envHints: [
       'EKOLOJIK_* — giden posta, ops, IMAP',

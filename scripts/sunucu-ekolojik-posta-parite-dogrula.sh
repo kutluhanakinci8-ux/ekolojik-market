@@ -50,6 +50,19 @@ if (!j.smtpVerified) process.exit(3);
   }
 fi
 
+if curl -fsS "${BASE_URL}/api/posta/imap/health" -o /tmp/ek-imap-health.json 2>/dev/null; then
+  node -e "
+const j=require('/tmp/ek-imap-health.json');
+if (j.imapConfigured && j.imapVerified) process.exit(0);
+if (!j.imapConfigured) process.exit(2);
+process.exit(3);
+" && ok "IMAP health" || {
+    code=$?
+    if [[ $code -eq 2 ]]; then warn "IMAP yapılandırılmadı (Faz 7 opsiyonel)"; fi
+    if [[ $code -eq 3 ]]; then warn "IMAP bağlantısı yok — sunucu-ekolojik-imap-dogrula.sh"; FAIL=1; fi
+  }
+fi
+
 for path in \
   "/api/posta/unread-counts" \
   "/api/posta/inbox?folder=gelen&limit=5" \
