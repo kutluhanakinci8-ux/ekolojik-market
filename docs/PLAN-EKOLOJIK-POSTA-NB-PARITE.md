@@ -135,12 +135,12 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 
 ## Faz 12 — Entegrasyon kapısı (canlı “tam uyarlandı”)
 
-| # | İş |
-|---|-----|
-| 12.1 | `scripts/sunucu-ekolojik-posta-parite-dogrula.sh` (SMTP, IMAP, hub API, badge) |
-| 12.2 | E2E smoke: contact → Gelen → yanıt → Gönderilen |
-| 12.3 | NB karşılaştırma checklist (manuel 30 dk) |
-| 12.4 | Müşteri eğitim: 1 sayfa “Posta sekmesi nasıl kullanılır” |
+| # | İş | Çıktı |
+|---|-----|--------|
+| 12.1 | `scripts/sunucu-ekolojik-posta-parite-dogrula.sh` | SMTP, hub API, export, SSE smoke |
+| 12.2 | E2E smoke: contact → Gelen → yanıt → Gönderilen | `docs/EKOLOJIK-POSTA-E2E-SMOKE.md` |
+| 12.3 | NB karşılaştırma checklist (manuel 30 dk) | `docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md` |
+| 12.4 | Müşteri eğitim: 1 sayfa “Posta sekmesi nasıl kullanılır” | `docs/EKOLOJIK-POSTA-KULLANIM.md` |
 
 ---
 
