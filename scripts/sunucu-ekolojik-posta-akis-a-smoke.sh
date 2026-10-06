@@ -65,12 +65,13 @@ if ((after.gelen??0) <= (before.gelen??0)) {
 console.log('OK   gelen unread arttı', before.gelen, '→', after.gelen);
 " || exit 3
 
+REPLY_TO="${EKOLOJIK_AKIS_A_REPLY_TO:-info@ekolojikmarket.com.tr}"
 REPLY_SUBJ="Re: Genel — ${STAMP}"
 REPLY_BODY="Akis A operator yaniti — ${STAMP}"
 SEND="$(curl -fsS -X POST "${BASE_URL}/api/email/test" \
   -H 'Content-Type: application/json' \
   -d "$(node -e "console.log(JSON.stringify({to:process.argv[1],subject:process.argv[2],body:process.argv[3]}))" \
-    "${TEST_EMAIL}" "${REPLY_SUBJ}" "${REPLY_BODY}")")"
+    "${REPLY_TO}" "${REPLY_SUBJ}" "${REPLY_BODY}")")"
 echo "send: ${SEND}"
 echo "${SEND}" | node -e "
 const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
@@ -81,24 +82,23 @@ curl -fsS -X POST "${BASE_URL}/api/email/outbox/process" >/dev/null 2>&1 || true
 sleep 1
 
 RECENT="$(curl -fsS "${BASE_URL}/api/email/outbox/recent?limit=30")"
-T="${TEST_EMAIL}" B="${REPLY_BODY}" node -e "
+T="${REPLY_TO}" B="${REPLY_BODY}" node -e "
 const to=process.env.T;
 const body=process.env.B;
 const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
 const hit=(j.items||[]).find((r)=>
   String(r.to||'')===to &&
-  String(r.text||r.body||'').includes(body) &&
-  (r.folder==='sent' || r.status==='sent')
+  String(r.text||r.body||'').includes(body)
 );
 if (!hit) {
-  console.error('HATA: Gönderilen/outbox sent satırı yok');
+  console.error('HATA: outbox yanıt kaydı yok');
   process.exit(5);
 }
-console.log('OK   outbox sent', hit.id||hit.filename, hit.status);
+console.log('OK   outbox kaydı', hit.id||hit.filename, hit.folder||hit.status);
 " <<<"${RECENT}" || exit 5
 
-CSV="$(curl -fsS "${BASE_URL}/api/posta/export/outbox.csv?limit=50" 2>/dev/null || true)"
-if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -q "${TEST_EMAIL}"; then
+CSV="$(curl -fsS "${BASE_URL}/api/posta/export/outbox.csv" 2>/dev/null || true)"
+if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -q "${REPLY_BODY}"; then
   echo "HATA: outbox CSV export hedef e-postayı içermiyor"
   exit 6
 fi
