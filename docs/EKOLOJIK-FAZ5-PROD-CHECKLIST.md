@@ -1,0 +1,49 @@
+# Ekolojik Market — Faz 5 üretim kontrol listesi
+
+Plan: `docs/PLAN-EKOLOJIK-MAIL-MESAJ-BAGIMSIZ.md`
+
+## Otomatik özet (POS)
+
+Ayarlar → Sistem → **Faz 5 ayrım kontrolü** veya:
+
+`GET /api/system/ekolojik-isolation`
+
+## Manuel checklist
+
+### Altyapı
+
+- [ ] `market-pos` ayrı process / port (NB PM2 ile karışmıyor)
+- [ ] `.env` yalnızca `EKOLOJIK_*`; `LERTA_PLATFORM_BRIDGE=0`
+- [ ] NB `MAIL_PLATFORM_*` env bu VPS’te yok veya farklı dosyada
+
+### Giden posta (Faz 1–2)
+
+- [ ] SPF / DKIM / DMARC — `ekolojikmarket.com.tr`
+- [ ] `EKOLOJIK_SMTP_*`, `EKOLOJIK_MAIL_FROM`, `EKOLOJIK_OPS_EMAIL`
+- [ ] Outbox `failed` = 0 (Ayarlar paneli)
+
+### Mesajlaşma (Faz 3)
+
+- [ ] `data/messaging/` yedekleniyor
+- [ ] NB `public/lerta-messaging` çağrılmıyor (köprü kapalı)
+
+### Gelen fatura postası (Faz 4)
+
+- [ ] Gmail uygulama şifresi veya kurumsal IMAP
+- [ ] `data/bill-email-inbox/` yedekleniyor
+- [ ] NB inbound MX kullanılmıyor
+
+### İzleme & KVKK
+
+- [ ] Günlük yedek: `data/email-outbox`, `data/messaging`, `data/bill-email-inbox`
+- [ ] Mail/mesaj saklama süresi işletme politikasına göre
+
+## VPS yedek örneği
+
+```bash
+tar czf ekolojik-data-$(date +%F).tar.gz \
+  /var/www/market-pos/data/email-outbox \
+  /var/www/market-pos/data/messaging \
+  /var/www/market-pos/data/bill-email-inbox \
+  /var/www/market-pos/data/contact-messages.json
+```

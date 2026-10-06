@@ -38,3 +38,13 @@ export async function fetchRecentOutbox(limit = 20): Promise<{
   const res = await fetch(`/api/email/outbox/recent?limit=${limit}`);
   return res.json();
 }
+
+export async function fetchEkolojikIsolationReport(): Promise<{
+  ok: boolean;
+  checks?: Array<{ id: string; label: string; ok: boolean; detail: string }>;
+  dataPaths?: string[];
+  envHints?: string[];
+}> {
+  const res = await fetch('/api/system/ekolojik-isolation');
+  return res.json();
+}

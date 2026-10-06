@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchAsatDebt, probeAsatConnectivity } from './server/asatClient.mjs';
 import { createFaturaSession, queryFaturaDebt } from './server/faturaOdemelisinClient.mjs';
 import { prepareOdemeSession, queryOdemeDebt } from './server/odemeComTrClient.mjs';
-import { pollBillEmails, testBillEmailConnection } from './server/billEmailClient.mjs';
+import { pollBillEmails, testBillEmailConnection, listBillEmailInbox } from './server/billEmailClient.mjs';
 import {
   readTenantStore,
   writeTenantStore,
@@ -41,6 +41,7 @@ import {
   appendMessagingMessage,
 } from './server/messaging/store.mjs';
 import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
+import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -333,7 +334,7 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/bill-email/poll' && req.method === 'POST') {
       const data = await readRequestBody(req);
       try {
-        const result = await pollBillEmails(data ?? {});
+        const result = await pollBillEmails(DATA_DIR, data ?? {}, resolveTenantId(url));
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -344,6 +345,33 @@ const server = createServer(async (req, res) => {
           processed: 0,
           items: [],
         }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/bill-email/inbox' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 50);
+      const sourceId = url.searchParams.get('sourceId')?.trim() || undefined;
+      try {
+        const result = await listBillEmailInbox(DATA_DIR, tenantId, { limit, sourceId });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Inbox listesi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/system/ekolojik-isolation' && req.method === 'GET') {
+      try {
+        const report = await getEkolojikIsolationReport(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...report }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Rapor alınamadı' }));
       }
       return;
     }

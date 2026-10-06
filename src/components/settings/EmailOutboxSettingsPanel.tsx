@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   fetchEmailHealth,
   fetchRecentOutbox,
+  fetchEkolojikIsolationReport,
   processEmailOutbox,
   sendEmailTest,
 } from '../../services/emailOutboxService';
@@ -37,13 +38,19 @@ function statusLabel(row: OutboxRow) {
 export function EmailOutboxSettingsPanel() {
   const [health, setHealth] = useState<Awaited<ReturnType<typeof fetchEmailHealth>> | null>(null);
   const [outboxRows, setOutboxRows] = useState<OutboxRow[]>([]);
+  const [isolation, setIsolation] = useState<Awaited<ReturnType<typeof fetchEkolojikIsolationReport>> | null>(null);
   const [testTo, setTestTo] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [h, recent] = await Promise.all([fetchEmailHealth(), fetchRecentOutbox(50)]);
+    const [h, recent, iso] = await Promise.all([
+      fetchEmailHealth(),
+      fetchRecentOutbox(50),
+      fetchEkolojikIsolationReport(),
+    ]);
     setHealth(h);
+    setIsolation(iso);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
     }
@@ -168,6 +175,24 @@ export function EmailOutboxSettingsPanel() {
           Test maili gönder
         </button>
       </div>
+
+      {isolation?.checks && isolation.checks.length > 0 && (
+        <>
+          <div className="settings-panel-head" style={{ marginTop: '1.25rem' }}>
+            <div>
+              <h3>Faz 5 — ayrım kontrolü</h3>
+              <p>Ekolojik VPS / NB karışmıyor mu?</p>
+            </div>
+          </div>
+          <ul className="settings-hint" style={{ listStyle: 'none', padding: 0 }}>
+            {isolation.checks.map((c) => (
+              <li key={c.id} style={{ marginBottom: 6 }}>
+                {c.ok ? '✓' : '○'} {c.label} — <span>{c.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <div className="settings-panel-head" style={{ marginTop: '1.5rem' }}>
         <div>

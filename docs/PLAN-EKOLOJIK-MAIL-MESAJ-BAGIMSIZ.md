@@ -83,19 +83,22 @@
 
 | # | İş |
 |---|-----|
-| 4.1 | IMAP veya forwarding → `billEmailClient.mjs` gerçek implementasyon |
-| 4.2 | Fatura / sipariş e-postalarını ayrı klasör; POS’tan eşleme |
-| 4.3 | NB inbound MX **kullanılmaz** |
+| 4.1 | IMAP veya forwarding → `billEmailClient.mjs` gerçek implementasyon | ✅ `imapflow` + `billEmailImap.mjs` |
+| 4.2 | Fatura / sipariş e-postalarını ayrı klasör; POS’tan eşleme | ✅ `data/bill-email-inbox/`, `GET /api/bill-email/inbox` |
+| 4.3 | NB inbound MX **kullanılmaz** | ✅ (Ekolojik-only IMAP) |
 
 ---
 
 ## Faz 5 — Sertleştirme & ayrım kontrol listesi
 
+- [x] API özeti: `GET /api/system/ekolojik-isolation` + Ayarlar paneli
 - [ ] VPS: Ekolojik `market-pos` ayrı process; NB ayrı PM2 / port
 - [ ] Env dosyaları karışmıyor (`EKOLOJIK_*` vs `MAIL_PLATFORM_*`)
-- [ ] Monitoring: Ekolojik outbox failed sayacı
-- [ ] Yedek: `data/email-outbox` + `data/messaging` günlük backup
+- [x] Monitoring: Ekolojik outbox failed sayacı (email health)
+- [ ] Yedek: `data/email-outbox` + `data/messaging` + `data/bill-email-inbox` günlük backup
 - [ ] KVKK: mesaj/mail retention politikası (Ekolojik ayarlardan)
+
+Detay: `docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md`
 
 ---
 

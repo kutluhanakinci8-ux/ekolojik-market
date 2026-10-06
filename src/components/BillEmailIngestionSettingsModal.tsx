@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Store } from '../store/useStore';
-import { pollBillEmails, testBillEmailConnection } from '../services/billEmailService';
+import { pollBillEmails, testBillEmailConnection, fetchBillEmailInbox, type BillEmailInboxMessage } from '../services/billEmailService';
 import {
   BILL_EMAIL_INBOX_MODE_LABELS,
   BILL_EMAIL_PROVIDER_LABELS,
@@ -53,6 +53,7 @@ export function BillEmailIngestionSettingsModal({
   const [taxDraft, setTaxDraft] = useState(taxSaved);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [inboxPreview, setInboxPreview] = useState<BillEmailInboxMessage[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -142,6 +143,10 @@ export function BillEmailIngestionSettingsModal({
         lastPollMessage: result.message,
       }));
       if (result.ok) onMessage(result.message);
+      if (result.ok) {
+        const inbox = await fetchBillEmailInbox(15);
+        if (inbox.ok && inbox.messages) setInboxPreview(inbox.messages);
+      }
     } finally {
       setBusy(false);
     }
@@ -497,6 +502,24 @@ export function BillEmailIngestionSettingsModal({
             {preview.lastPollError ? ` · Hata: ${preview.lastPollError}` : ''}
           </p>
         </section>
+
+        {inboxPreview.length > 0 && (
+          <section className="bill-email-settings-section">
+            <h3>Son alınan fatura e-postaları (sunucu)</h3>
+            <ul className="bill-email-inbox-preview">
+              {inboxPreview.map((row) => (
+                <li key={row.id}>
+                  <strong>{row.subject}</strong>
+                  <span>
+                    {row.sourceLabel || (row.matched ? row.sourceId : 'Eşleşmedi')}
+                    {' · '}
+                    {new Date(row.receivedAt).toLocaleString('tr-TR')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {status && <p className="settings-flash" role="status">{status}</p>}
 
