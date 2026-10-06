@@ -15383,6 +15383,27 @@ input {
 .posta-hub-sent-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .posta-hub-compose-form { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
 .posta-compose-toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+.posta-hub-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 12px 0; flex-wrap: wrap; }
+.posta-hub-list-head .posta-hub-list-title { margin: 0; }
+.posta-hub-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+}
+.posta-hub-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+.posta-hub-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .cart-crm-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .cart-crm-input {
   flex: 1;

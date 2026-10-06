@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { setCurrencyDisplaySettings } from './utils/format';
 import { AppShell } from './components/AppShell';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
@@ -17,7 +17,11 @@ import { resolveTopNavHighlight } from './data/navigation';
 import type { AppPage } from './components/AppShell';
 import { fetchPostaUnreadCounts } from './services/postaInboxService';
 
-function renderPage(page: AppPage, store: ReturnType<typeof useStore>) {
+function renderPage(
+  page: AppPage,
+  store: ReturnType<typeof useStore>,
+  postaDeepLink?: { customerId: string | null; onConsumed: () => void },
+) {
   switch (page) {
     case 'dashboard':
       return <DashboardScreen key={page} store={store} />;
@@ -43,7 +47,14 @@ function renderPage(page: AppPage, store: ReturnType<typeof useStore>) {
     case 'cashier':
       return <AccountingScreen key={page} store={store} initialTab="kasa" />;
     case 'posta':
-      return <EkolojikPostaHubScreen key={page} store={store} />;
+      return (
+        <EkolojikPostaHubScreen
+          key={`${page}-${postaDeepLink?.customerId ?? ''}`}
+          store={store}
+          deepLinkCustomerId={postaDeepLink?.customerId ?? null}
+          onDeepLinkConsumed={postaDeepLink?.onConsumed}
+        />
+      );
     case 'settings':
       return <SettingsScreen key={page} store={store} />;
     default:
@@ -53,8 +64,26 @@ function renderPage(page: AppPage, store: ReturnType<typeof useStore>) {
 
 export function PosApp() {
   const store = useStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState<AppPage>('sales');
   const [postaUnread, setPostaUnread] = useState(0);
+  const deepLinkCustomerId = searchParams.get('customerId')?.trim() || null;
+  const viewPosta = searchParams.get('view') === 'posta' || Boolean(deepLinkCustomerId);
+
+  const clearPostaDeepLink = () => {
+    if (!searchParams.get('customerId') && searchParams.get('view') !== 'posta') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('customerId');
+    next.delete('view');
+    setSearchParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if (!store.authSession || !viewPosta) return;
+    if (store.authSession.allowedTabs.includes('posta')) {
+      setPage('posta');
+    }
+  }, [store.authSession, viewPosta]);
 
   useIdleLogout(() => {
     store.logout('idle');
@@ -117,7 +146,10 @@ export function PosApp() {
       onBrandSecretClick={showCostProfitToggle ? store.toggleCostProfitReveal : undefined}
       navBadgeOverrides={postaUnread > 0 ? { posta: postaUnread } : undefined}
     >
-      {renderPage(page, store)}
+      {renderPage(page, store, {
+        customerId: page === 'posta' ? deepLinkCustomerId : null,
+        onConsumed: clearPostaDeepLink,
+      })}
     </AppShell>
   );
 }
