@@ -36,4 +36,42 @@ export function countIrsaliyeWarehouseProducts(products: Product[]): number {
   return products.filter(isIrsaliyeWarehouseProduct).length;
 }
 
+/** Stok ekranı / depo: yalnızca irsaliyede stok kodu olan kartlar */
+export function getIrsaliyeWarehouseProducts(products: Product[]): Product[] {
+  return products.filter(isIrsaliyeWarehouseProduct);
+}
+
+export function getIrsaliyeWarehouseStockMetrics(
+  products: Product[],
+  lowStockThreshold: number,
+): {
+  products: Product[];
+  totalStockUnits: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  inStockCount: number;
+  healthPercent: number;
+} {
+  const warehouseProducts = getIrsaliyeWarehouseProducts(products);
+  const totalStockUnits = warehouseProducts.reduce((sum, p) => sum + p.stock, 0);
+  const lowStockCount = warehouseProducts.filter(
+    (p) => p.stock > 0 && p.stock <= lowStockThreshold,
+  ).length;
+  const outOfStockCount = warehouseProducts.filter((p) => p.stock <= 0).length;
+  const inStockCount = warehouseProducts.length - outOfStockCount;
+  const healthPercent =
+    warehouseProducts.length === 0
+      ? 0
+      : Math.round((inStockCount / warehouseProducts.length) * 100);
+
+  return {
+    products: warehouseProducts,
+    totalStockUnits,
+    lowStockCount,
+    outOfStockCount,
+    inStockCount,
+    healthPercent,
+  };
+}
+
 export { IRSALIYE_LUY2026000000002_ID };
