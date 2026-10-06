@@ -42,4 +42,5 @@ NB **Lerta Posta** ile aynı **düzen** (Yaz · Gelen · Müşteri mesajları ·
 - `.env`: `EKOLOJIK_SMTP_HOST=mail.ekolojikmarket.com.tr` (VPS IP değil).
 - `LERTA_PLATFORM_BRIDGE=0` — NB posta API kullanılmaz.
 
-VPS doğrulama: `bash scripts/sunucu-ekolojik-posta-parite-dogrula.sh`
+VPS doğrulama: `bash scripts/sunucu-ekolojik-posta-parite-dogrula.sh`  
+Prod kapatma: `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh`

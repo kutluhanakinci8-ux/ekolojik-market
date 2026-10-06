@@ -1,5 +1,5 @@
 import { isLertaPlatformConfigured } from './lertaPlatformBridge.mjs';
-import { isEkolojikSmtpConfigured, getEkolojikOpsEmail } from './ekolojikMailConfig.mjs';
+import { isEkolojikSmtpConfigured, getEkolojikOpsEmail, getEkolojikSmtpHostHint } from './ekolojikMailConfig.mjs';
 import { getOutboxCounts } from './emailOutbox.mjs';
 
 /** Faz 5 — Ekolojik / NB ayrımı ve operasyon özeti (salt okunur) */
@@ -29,6 +29,12 @@ export async function getEkolojikIsolationReport(dataDir) {
       detail: getEkolojikOpsEmail() || 'EKOLOJIK_OPS_EMAIL',
     },
     {
+      id: 'smtp_host_sane',
+      label: 'SMTP host (Faz 6)',
+      ok: !getEkolojikSmtpHostHint()?.includes('VPS IP'),
+      detail: getEkolojikSmtpHostHint() || 'mail.ekolojikmarket.com.tr veya relay',
+    },
+    {
       id: 'nb_inbound_mx',
       label: 'NB inbound MX kullanılmıyor',
       ok: true,
@@ -51,6 +57,7 @@ export async function getEkolojikIsolationReport(dataDir) {
       'data/bill-email-inbox/',
       'data/messaging-attachments/',
       'data/contact-messages.json',
+      'data/posta-mail-settings.json',
     ],
     envHints: [
       'EKOLOJIK_* — giden posta, ops, IMAP',

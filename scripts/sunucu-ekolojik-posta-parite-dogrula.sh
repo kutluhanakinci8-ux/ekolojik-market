@@ -4,6 +4,7 @@
 set -euo pipefail
 
 ROOT="${1:-/var/www/market-pos}"
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
 ENV_FILE="${ROOT}/.env"
 BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT:-5180}}"
 
@@ -84,8 +85,9 @@ else
   warn "SSE kısa test — bağlantı veya proxy SSE'yi kesiyor olabilir"
 fi
 
-if [[ -f "${ROOT}/scripts/sunucu-ekolojik-smtp-dogrula.sh" ]]; then
-  if bash "${ROOT}/scripts/sunucu-ekolojik-smtp-dogrula.sh" "${ROOT}"; then
+SMTP_SCRIPT="${REPO_ROOT}/scripts/sunucu-ekolojik-smtp-dogrula.sh"
+if [[ -f "${SMTP_SCRIPT}" ]]; then
+  if bash "${SMTP_SCRIPT}" "${ROOT}"; then
     ok "SMTP alt script"
   else
     warn "SMTP alt script başarısız (exit $?)"

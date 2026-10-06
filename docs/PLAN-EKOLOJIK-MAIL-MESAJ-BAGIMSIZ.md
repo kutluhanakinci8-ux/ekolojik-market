@@ -94,14 +94,15 @@
 - [x] API özeti: `GET /api/system/ekolojik-isolation` + Ayarlar paneli
 - [x] `.env` yükleme: `server/loadEnv.mjs` + `sunucu-ekolojik-env-kur.sh`
 - [x] Yedek script: `scripts/sunucu-ekolojik-data-yedek.sh` (cron sizin)
-- [ ] VPS: Ekolojik `market-pos` ayrı process; NB ayrı PM2 / port (✓ pratikte ayrı; dokümante)
+- [x] VPS: Ekolojik `market-pos` ayrı process; NB ayrı PM2 / port (5180)
+- [x] Env denetimi: `scripts/sunucu-ekolojik-env-audit.sh`
 - [ ] Env dosyaları karışmıyor (`EKOLOJIK_*` vs `MAIL_PLATFORM_*`) — `.env` doldurulmalı
 - [x] Monitoring: Ekolojik outbox failed sayacı (email health)
 - [x] KVKK: saklama süresi + otomatik temizlik (`dataRetention.mjs`, Ayarlar paneli)
 
 Detay: `docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md`
 
-**NB (Lerta Posta) tam arayüz paritesi:** `docs/PLAN-EKOLOJIK-POSTA-NB-PARITE.md` — Faz 6–12 (SMTP, gelen IMAP UX, yaz/yanıt, hub mesajlaşma, badge, export).
+**NB (Lerta Posta) tam arayüz paritesi:** `docs/PLAN-EKOLOJIK-POSTA-NB-PARITE.md` — Faz 6–12 ✅ · prod kapatma: `docs/EKOLOJIK-POSTA-PROD-KAPATMA.md`
 
 ---
 
