@@ -388,10 +388,27 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ ok: false, message: 'Geçersiz veri' }));
         return;
       }
+      const existing = await readTenantStore(DATA_DIR, tenantId);
+      if (existing && typeof existing === 'object') {
+        if (!Array.isArray(data.products) && Array.isArray(existing.products)) {
+          data.products = existing.products;
+        }
+        if (!Array.isArray(data.sales) && Array.isArray(existing.sales)) {
+          data.sales = existing.sales;
+        }
+        if (!Array.isArray(data.customers) && Array.isArray(existing.customers)) {
+          data.customers = existing.customers;
+        }
+        if (data.settings == null && existing.settings) {
+          data.settings = existing.settings;
+        }
+      }
       data.updatedAt = data.updatedAt || new Date().toISOString();
-      await writeStoreData(data, tenantId);
+      const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(data);
+      const toSave = changed ? stockFixed : data;
+      await writeStoreData(toSave, tenantId);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ ok: true, updatedAt: data.updatedAt }));
+      res.end(JSON.stringify({ ok: true, updatedAt: toSave.updatedAt }));
       return;
     }
 
