@@ -22,7 +22,7 @@ type PendingApproval = {
   action: () => void;
 };
 
-type SettingsTab = 'general' | 'currency' | 'crm' | 'notes' | 'users' | 'security' | 'system';
+type SettingsTab = 'general' | 'currency' | 'crm' | 'notes' | 'users' | 'security' | 'email' | 'system';
 
 const TABS: Array<{ id: SettingsTab; label: string; adminOnly?: boolean }> = [
   { id: 'general', label: 'İşletme' },
@@ -31,6 +31,7 @@ const TABS: Array<{ id: SettingsTab; label: string; adminOnly?: boolean }> = [
   { id: 'notes', label: 'Notlar' },
   { id: 'users', label: 'Kullanıcılar', adminOnly: true },
   { id: 'security', label: 'Güvenlik', adminOnly: true },
+  { id: 'email', label: 'E-posta', adminOnly: true },
   { id: 'system', label: 'Sistem', adminOnly: true },
 ];
 
@@ -289,9 +290,12 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
           <SecuritySettings store={store} />
         )}
 
+        {activeTab === 'email' && isAdmin && (
+          <EmailOutboxSettingsPanel />
+        )}
+
         {activeTab === 'system' && isAdmin && (
           <div className="settings-system-grid">
-            <EmailOutboxSettingsPanel />
             <section className="settings-panel">
               <div className="settings-panel-head">
                 <div>

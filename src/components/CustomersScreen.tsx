@@ -61,6 +61,7 @@ import {
 import type { CustomerLedgerEntry } from '../types/accounting';
 import { ProductImage } from './ProductImage';
 import { CustomerCrmSection } from './crm/CustomerCrmSection';
+import { MessagingPanel } from './crm/MessagingPanel';
 import { CrmCenterPanel } from './crm/CrmCenterPanel';
 
 interface CustomersScreenProps {
@@ -204,6 +205,7 @@ function CustomerDetailPanel({
   onClose: () => void;
   onReturnSale: (sale: Sale) => void;
 }) {
+  const [detailTab, setDetailTab] = useState<'overview' | 'crm' | 'messages'>('overview');
   const balanceDisplay = formatLedgerBalanceDisplay(ledgerBalance);
   const ledgerTotals = useMemo(
     () => getCustomerLedgerTotals(customerLedger.filter((entry) => entry.customerId === customer.id)),
@@ -248,6 +250,46 @@ function CustomerDetailPanel({
         </div>
       </div>
 
+      <div className="customer-detail-tabs" role="tablist" aria-label="Müşteri detay">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={detailTab === 'overview'}
+          className={detailTab === 'overview' ? 'active' : ''}
+          onClick={() => setDetailTab('overview')}
+        >
+          Özet
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={detailTab === 'crm'}
+          className={detailTab === 'crm' ? 'active' : ''}
+          onClick={() => setDetailTab('crm')}
+        >
+          CRM
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={detailTab === 'messages'}
+          className={detailTab === 'messages' ? 'active' : ''}
+          onClick={() => setDetailTab('messages')}
+        >
+          Mesajlar
+        </button>
+      </div>
+
+      {detailTab === 'messages' && (
+        <MessagingPanel customer={customer} authorName={store.settings.businessName} />
+      )}
+
+      {detailTab === 'crm' && (
+        <CustomerCrmSection store={store} customer={customer} />
+      )}
+
+      {detailTab === 'overview' && (
+      <>
       <div className="customer-detail-hero">
         <div className="customer-detail-kpis">
           <div className="customer-detail-kpi">
@@ -393,8 +435,6 @@ function CustomerDetailPanel({
         )}
       </div>
 
-      <CustomerCrmSection store={store} customer={customer} />
-
       <div className="customer-detail-grid">
         <div className="customer-detail-block customer-detail-block--products">
           <div className="customer-detail-block-head">
@@ -490,6 +530,8 @@ function CustomerDetailPanel({
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

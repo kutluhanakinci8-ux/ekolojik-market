@@ -9,7 +9,6 @@ import type { CustomerCrmStatus } from '../../types/crm';
 import { SponsorTreePanel } from './SponsorTreePanel';
 import { CustomerTagPicker } from './CustomerTagPicker';
 import { CrmDocumentAttachments } from './CrmDocumentAttachments';
-import { MessagingPanel } from './MessagingPanel';
 import { buildSmsContext, phoneToSmsHref, renderSmsTemplate } from '../../utils/crm/smsTemplates';
 import { getCustomerBalance } from '../../utils/accountingAnalytics';
 
@@ -86,8 +85,6 @@ export function CustomerCrmSection({ store, customer }: CustomerCrmSectionProps)
       </div>
 
       <CustomerTagPicker store={store} customerId={customer.id} />
-
-      <MessagingPanel customer={customer} authorName={store.settings.businessName} />
 
       <div className="settings-form-grid customer-crm-form">
         <label className="settings-field">

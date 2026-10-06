@@ -9167,6 +9167,30 @@ input {
   color: #fff;
 }
 
+.customer-detail-tabs {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  margin: 0 0 16px;
+}
+
+.customer-detail-tabs button {
+  border: none;
+  background: transparent;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.customer-detail-tabs button.active {
+  background: var(--greenleaf);
+  color: #fff;
+}
+
 .customer-browser {
   display: grid;
   grid-template-columns: 1fr;
