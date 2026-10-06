@@ -51,6 +51,7 @@ Ayarlar → Sistem → **Faz 5 ayrım kontrolü** veya:
 - [ ] `.env` audit: yalnızca `EKOLOJIK_*`, SMTP host = mail subdomain (VPS IP değil)
 - [ ] `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh` exit 0 (env + parite)
 - [ ] `bash scripts/sunucu-ekolojik-smtp-dogrula.sh` yeşil (Faz 6)
+- [ ] Otomatik özet: `bash scripts/sunucu-ekolojik-faz5-prod-dogrula.sh` (E2E için `EKOLOJIK_RUN_E2E=1`)
 
 ## VPS yedek örneği
 
@@ -70,4 +71,3 @@ Manuel tar (alternatif):
   /var/www/market-pos/data/bill-email-inbox \
   /var/www/market-pos/data/contact-messages.json \
   /var/www/market-pos/data/posta-mail-settings.json
-```

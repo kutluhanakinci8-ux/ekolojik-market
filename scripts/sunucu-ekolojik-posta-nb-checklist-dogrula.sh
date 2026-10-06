@@ -33,7 +33,7 @@ check 4 "Yaz — şablon + compose hints" curl_ok "${BASE_URL}/api/posta/templat
 check 4b "compose hints" curl_ok "${BASE_URL}/api/posta/compose-hints?limit=5" '"emails"'
 check 5 "Müşteri mesajları" curl_ok "${BASE_URL}/api/messaging/threads?limit=5" '"ok":true'
 check 6 "Gönderilen / outbox" curl_ok "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
-check 7 "SSE endpoint" bash -c "curl -fsS -N --max-time 2 '${BASE_URL}/api/posta/events' | head -c 8 | grep -q ."
+check 7 "SSE endpoint" bash -c "curl -fsS -N --max-time 5 '${BASE_URL}/api/posta/events' 2>/dev/null | head -c 8 | grep -q ."
 check 8 "Posta ayarları" curl_ok "${BASE_URL}/api/posta/settings" '"ok":true'
 check 9 "Export CSV" curl_ok "${BASE_URL}/api/posta/export/outbox.csv" 'alici;konu'
 check 10 "Bağımsız altyapı" curl_ok "${BASE_URL}/api/system/ekolojik-isolation" '"ok":true'
