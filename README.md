@@ -59,3 +59,54 @@ http://localhost:5180
 ## U88’den taşıma
 
 Eski yol: `U88` repo → `market-pos/` klasörü. Yeni yol: yalnızca bu repo. Detay: [docs/MIGRATION-FROM-U88.md](docs/MIGRATION-FROM-U88.md).
+
+## GitHub kimlik doğrulama (private repo)
+
+GitHub artık şifre ile HTTPS clone kabul etmez. **Personal Access Token (PAT)** gerekir.
+
+1. GitHub → Settings → Developer settings → Personal access tokens
+2. Repo erişimi olan token oluşturun (`repo` scope)
+3. Sunucuda (token’ı kimseye göstermeyin):
+
+```bash
+# Önce boş repo oluşturun: github.com → New → ekolojik-market-pos
+
+export GITHUB_TOKEN='ghp_xxxxxxxx'   # kendi tokenınız
+
+git clone --branch cursor/ekolojikmarket-standalone-94bd \
+  "https://x-access-token:${GITHUB_TOKEN}@github.com/harikaotoservisinfo-spec/U88.git" \
+  /tmp/ekolojik-export
+
+cd /tmp/ekolojik-export
+bash scripts/mirror-to-new-github-repo.sh harikaotoservisinfo-spec/ekolojik-market-pos
+```
+
+**SSH** kullanıyorsanız (`~/.ssh` anahtarı GitHub’da kayıtlı):
+
+```bash
+git clone --branch cursor/ekolojikmarket-standalone-94bd \
+  git@github.com:harikaotoservisinfo-spec/U88.git /tmp/ekolojik-export
+```
+
+Klon sırasında `Username for 'https://github.com':` çıkarsa: **Ctrl+C**, yukarıdaki token’lı URL veya SSH kullanın.
+
+### VPS — sadece uygulama çalıştırma (mirror şart değil)
+
+Bağımsız repo hazırsa:
+
+```bash
+export GITHUB_TOKEN='ghp_...'
+git clone --branch main \
+  "https://x-access-token:${GITHUB_TOKEN}@github.com/harikaotoservisinfo-spec/ekolojik-market-pos.git" \
+  /var/www/ekolojik-market-pos
+bash /var/www/ekolojik-market-pos/scripts/sunucu-market-pos-deploy.sh
+```
+
+Mirror yapmadan geçici olarak U88 branch’inden de deploy edebilirsiniz (repo hâlâ U88 adıyla klonlanır, içerik standalone branch’tir):
+
+```bash
+git clone --branch cursor/ekolojikmarket-standalone-94bd \
+  "https://x-access-token:${GITHUB_TOKEN}@github.com/harikaotoservisinfo-spec/U88.git" \
+  /var/www/ekolojik-market-pos
+bash /var/www/ekolojik-market-pos/scripts/sunucu-market-pos-deploy.sh
+```
