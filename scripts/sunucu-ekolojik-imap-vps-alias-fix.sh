@@ -2,6 +2,7 @@
 # Postfix virtual → doveadm pipe (Lerta alias_maps zinciri gerekmez)
 set -euo pipefail
 
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
 PIPE='|/usr/local/bin/ekolojik-postfix-deliver-info.sh'
 INSTALL_PIPE="/usr/local/bin/ekolojik-postfix-deliver-info.sh"
 SCRIPT_PIPE="${REPO_ROOT}/scripts/ekolojik-postfix-deliver-info.sh"
