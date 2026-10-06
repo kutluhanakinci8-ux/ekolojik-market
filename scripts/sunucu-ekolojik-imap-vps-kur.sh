@@ -81,7 +81,13 @@ passdb {
 EOF
 systemctl reload dovecot
 
-PIPE='|/usr/lib/dovecot/deliver -d info@ekolojikmarket.com.tr -m'
+PIPE='|/usr/local/bin/ekolojik-postfix-deliver-info.sh'
+INSTALL_PIPE="/usr/local/bin/ekolojik-postfix-deliver-info.sh"
+SCRIPT_PIPE="${REPO_ROOT}/scripts/ekolojik-postfix-deliver-info.sh"
+
+if [[ -f "${SCRIPT_PIPE}" ]]; then
+  install -m 755 "${SCRIPT_PIPE}" "${INSTALL_PIPE}"
+fi
 
 echo "info@ekolojikmarket.com.tr ${PIPE}" > /etc/postfix/ekolojik-inbound-virtual
 postmap /etc/postfix/ekolojik-inbound-virtual

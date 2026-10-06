@@ -2,7 +2,14 @@
 # Postfix virtual → doveadm pipe (Lerta alias_maps zinciri gerekmez)
 set -euo pipefail
 
-PIPE='|/usr/lib/dovecot/deliver -d info@ekolojikmarket.com.tr -m'
+PIPE='|/usr/local/bin/ekolojik-postfix-deliver-info.sh'
+INSTALL_PIPE="/usr/local/bin/ekolojik-postfix-deliver-info.sh"
+SCRIPT_PIPE="${REPO_ROOT}/scripts/ekolojik-postfix-deliver-info.sh"
+
+if [[ -f "${SCRIPT_PIPE}" ]]; then
+  install -m 755 "${SCRIPT_PIPE}" "${INSTALL_PIPE}"
+  echo "OK   ${INSTALL_PIPE}"
+fi
 
 echo "=== Ekolojik Postfix inbound virtual fix ==="
 
