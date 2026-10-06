@@ -235,7 +235,9 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
       sampleStock: isSample ? sampleStock : 0,
       imageUrl,
       productCode: catalogEntry ? priced.productCode : (saved?.productCode ?? priced.productCode),
-      barcode: saved?.barcode?.trim() || undefined,
+      barcode:
+        catalogEntry?.code
+        ?? (saved?.barcode?.trim() || priced.barcode || priced.productCode),
       wholesalePrices: resolveWholesalePrices(priced.fullSalePrice, saved?.wholesalePrices),
     };
   });

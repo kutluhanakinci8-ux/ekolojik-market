@@ -25,6 +25,7 @@ export function applyCatalogPricing<T extends Omit<Product, 'stock'>>(product: T
   return {
     ...product,
     productCode: entry.code,
+    barcode: entry.code,
     pv: entry.pv,
     purchasePrice: entry.purchasePrice,
     partnerPrice: entry.partnerPrice,
@@ -35,4 +36,25 @@ export function applyCatalogPricing<T extends Omit<Product, 'stock'>>(product: T
 
 export function derivePurchasePrice(partnerPrice: number): number {
   return Math.round(partnerPrice * 0.82 * 100) / 100;
+}
+
+/** İrsaliye / tedarik birim alış fiyatından partner (%82) ve perakende (2× partner) türetir */
+export function entryFromPurchasePrice(
+  code: string,
+  name: string,
+  pv: number,
+  purchasePrice: number,
+): PriceCatalogEntry {
+  const purchase = Math.round(purchasePrice * 100) / 100;
+  const partnerPrice = Math.round((purchase / 0.82) * 100) / 100;
+  const retailPrice = Math.round(partnerPrice * 2 * 100) / 100;
+  return {
+    code,
+    name,
+    pv,
+    purchasePrice: purchase,
+    partnerPrice,
+    couponPrice: partnerPrice,
+    retailPrice,
+  };
 }
