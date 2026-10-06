@@ -31,7 +31,12 @@ cd "${REPO_ROOT}"
 echo "==> Git güncelleniyor..."
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}" 2>/dev/null || git checkout -B "${BRANCH}" "origin/${BRANCH}"
-git pull --ff-only origin "${BRANCH}" || true
+# npm build tsbuildinfo dosyası pull'u bloklamasın
+git checkout -- tsconfig.tsbuildinfo 2>/dev/null || true
+git pull --ff-only origin "${BRANCH}" || {
+  echo "    pull ff-only başarısız — yerel build artığı temizleniyor..."
+  git reset --hard "origin/${BRANCH}"
+}
 echo "    Commit : $(git -C "${REPO_ROOT}" rev-parse --short HEAD) ($(git -C "${REPO_ROOT}" log -1 --format=%s))"
 
 if [[ ! -f "${APP_SRC}/package.json" ]]; then
