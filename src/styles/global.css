@@ -3901,7 +3901,40 @@ input {
   font-size: 11px;
   font-weight: 600;
   color: var(--greenleaf-dark);
-  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.stock-product-code-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.25;
+  min-width: 4.5rem;
+}
+
+.stock-product-code-main {
+  font-weight: 700;
+  color: var(--greenleaf-dark);
+  letter-spacing: 0.02em;
+}
+
+.stock-product-code-barcode {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  word-break: break-all;
+  max-width: 88px;
+}
+
+.stock-product-code-barcode-label {
+  display: block;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
 }
 
 .stock-sale-price {

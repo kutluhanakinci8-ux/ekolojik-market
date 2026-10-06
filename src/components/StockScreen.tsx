@@ -464,7 +464,17 @@ export function StockScreen({ store }: StockScreenProps) {
                           onRemove={store.removeProductImage}
                         />
                       </td>
-                      <td className="stock-product-code">{p.productCode ?? '—'}</td>
+                      <td className="stock-product-code">
+                        <div className="stock-product-code-stack">
+                          <span className="stock-product-code-main">{p.productCode?.trim() || '—'}</span>
+                          {(p.barcode?.trim() || p.productCode?.trim()) && (
+                            <span className="stock-product-code-barcode" title="Barkod">
+                              <span className="stock-product-code-barcode-label">Barkod</span>
+                              {p.barcode?.trim() || p.productCode?.trim()}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <span className="stock-cat-pill">{getCategoryLabel(p.category)}</span>
                       </td>
