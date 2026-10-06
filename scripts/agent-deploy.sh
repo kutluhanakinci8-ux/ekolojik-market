@@ -35,10 +35,29 @@ deploy_via_ssh() {
     "export REPO_ROOT=${VPS_REPO} BRANCH=${BRANCH} && bash ${VPS_REPO}/scripts/sunucu-market-pos-deploy.sh"
 }
 
+deploy_via_password() {
+  if [[ -z "${VPS_SSH_PASS:-}" ]]; then
+    return 1
+  fi
+  if ! command -v sshpass >/dev/null 2>&1; then
+    echo "sshpass yüklü değil — VPS_SSH_PASS kullanılamıyor"
+    return 1
+  fi
+  SSHPASS="${VPS_SSH_PASS}" sshpass -e ssh -p "$PORT" -o StrictHostKeyChecking=accept-new \
+    -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+    "${USER}@${HOST}" \
+    "export REPO_ROOT=${VPS_REPO} BRANCH=${BRANCH} GIT_REMOTE=origin && bash ${VPS_REPO}/scripts/sunucu-market-pos-deploy.sh"
+}
+
 if deploy_via_ssh; then
-  echo "✓ SSH deploy tamam"
+  echo "✓ SSH deploy tamam (key)"
   exit 0
 fi
 
-echo "SSH deploy yapılandırılmadı (VPS_SSH_KEY / VPS_SSH_KEY_B64). GitHub Actions workflow_dispatch kullanın."
+if deploy_via_password; then
+  echo "✓ SSH deploy tamam (password env)"
+  exit 0
+fi
+
+echo "SSH deploy yapılandırılmadı (VPS_SSH_KEY / VPS_SSH_KEY_B64 / VPS_SSH_PASS)."
 exit 1
