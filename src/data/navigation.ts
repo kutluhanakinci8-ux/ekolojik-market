@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'stock', label: 'Stok', icon: '📦', badge: (s) => s.lowStockCount || undefined },
   { id: 'reports', label: 'Raporlar', icon: '📈' },
   { id: 'accounting', label: 'Muhasebe', icon: '📒' },
+  { id: 'posta', label: 'Posta', icon: '✉️' },
   { id: 'settings', label: 'Ayarlar', icon: '⚙️' },
 ];
 

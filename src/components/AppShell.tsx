@@ -11,6 +11,7 @@ export type AppPage =
   | 'transactions'
   | 'customers'
   | 'cashier'
+  | 'posta'
   | 'settings';
 
 interface AppShellProps {

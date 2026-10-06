@@ -9,6 +9,7 @@ import { ReportsScreen } from './components/ReportsScreen';
 import { SalesScreen } from './components/SalesScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { StockScreen } from './components/StockScreen';
+import { EkolojikPostaHubScreen } from './components/posta/EkolojikPostaHubScreen';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useStore } from './store/useStore';
 import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './utils/userAccess';
@@ -40,6 +41,8 @@ function renderPage(page: AppPage, store: ReturnType<typeof useStore>) {
       return <AccountingScreen key={page} store={store} initialTab="musteriler" />;
     case 'cashier':
       return <AccountingScreen key={page} store={store} initialTab="kasa" />;
+    case 'posta':
+      return <EkolojikPostaHubScreen key={page} store={store} />;
     case 'settings':
       return <SettingsScreen key={page} store={store} />;
     default:
