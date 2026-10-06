@@ -7,7 +7,7 @@ BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT:-5180}}"
 STAMP="$(date +%s)"
 MARKER="Ekolojik Akis A smoke ${STAMP}"
 TEST_EMAIL="akis-a-smoke+${STAMP}@ekolojikmarket.com.tr"
-TEST_NAME="Akış A Smoke"
+TEST_NAME="Akis A Smoke"
 
 echo "=== Ekolojik Posta Akış A smoke ==="
 echo "API: ${BASE_URL}"
@@ -30,10 +30,12 @@ if (!j.ok) { console.error('HATA: iletişim kaydı', j.message||j); process.exit
 
 sleep 1
 
-INBOX="$(curl -fsS "${BASE_URL}/api/posta/inbox?folder=gelen&limit=50")"
-echo "${INBOX}" | node -e "
+INBOX_FILE="$(mktemp)"
+trap 'rm -f "${INBOX_FILE}"' EXIT
+curl -fsS "${BASE_URL}/api/posta/inbox?folder=gelen&limit=80" > "${INBOX_FILE}"
+M="${MARKER}" node -e "
 const marker=process.env.M;
-const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
 const hit=(j.items||[]).find((i)=>
   i.kind==='contact' &&
   String(i.preview||'').includes(marker) &&
@@ -46,7 +48,7 @@ if (!hit) {
   process.exit(2);
 }
 console.log('OK   Gelen iletişim', hit.id, hit.subject);
-" M="${MARKER}" || exit 2
+" "${INBOX_FILE}" || exit 2
 
 UNREAD_AFTER="$(curl -fsS "${BASE_URL}/api/posta/unread-counts")"
 echo "unread (sonra): ${UNREAD_AFTER}"
@@ -64,7 +66,7 @@ console.log('OK   gelen unread arttı', before.gelen, '→', after.gelen);
 " B="${UNREAD_BEFORE}" || exit 3
 
 REPLY_SUBJ="Re: Genel — ${STAMP}"
-REPLY_BODY="Akış A operatör yanıtı — ${STAMP}"
+REPLY_BODY="Akis A operator yaniti — ${STAMP}"
 SEND="$(curl -fsS -X POST "${BASE_URL}/api/email/test" \
   -H 'Content-Type: application/json' \
   -d "$(node -e "console.log(JSON.stringify({to:process.argv[1],subject:process.argv[2],body:process.argv[3]}))" \
