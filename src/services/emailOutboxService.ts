@@ -20,6 +20,9 @@ export async function sendEmailTest(payload: {
   to: string;
   subject?: string;
   body?: string;
+  html?: string;
+  inReplyTo?: string;
+  references?: string;
 }): Promise<{ ok: boolean; error?: string; provider?: string; message?: string }> {
   const res = await fetch('/api/email/test', {
     method: 'POST',

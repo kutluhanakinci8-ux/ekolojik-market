@@ -70,8 +70,10 @@ import {
   markPostaInboxRead,
   syncPostaInboxFromImap,
   getComposeRecipientHints,
+  loadPostaInboxAttachment,
 } from './server/postaInbox.mjs';
 import { listMailTemplates } from './server/mailTemplates.mjs';
+import { formatPostaComposeBody } from './server/postaComposeFormat.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -495,6 +497,30 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const inboxAttachMatch = pathname.match(/^\/api\/posta\/inbox\/([^/]+)\/attachment\/([^/]+)$/);
+    if (inboxAttachMatch && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const inboxId = decodeURIComponent(inboxAttachMatch[1]);
+      const attachmentId = decodeURIComponent(inboxAttachMatch[2]);
+      try {
+        const result = await loadPostaInboxAttachment(DATA_DIR, tenantId, inboxId, attachmentId);
+        if (!result.ok || !result.data) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.meta.mimeType || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(result.meta.fileName || 'ek')}"`,
+        });
+        res.end(result.data);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ek indirme hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/inbox/sync' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       try {
@@ -761,15 +787,18 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
+        const bodyRaw = data?.body?.trim() || 'Bu mesaj Ekolojik Market bağımsız posta outbox (Faz 1) testidir.';
+        const formatted = data?.html ? { text: bodyRaw, html: data.html } : formatPostaComposeBody(bodyRaw);
         const result = await sendEkolojikMail(DATA_DIR, {
           to,
           subject: data?.subject?.trim() || 'Ekolojik Market — SMTP test',
-          body:
-            data?.body?.trim()
-            || 'Bu mesaj Ekolojik Market bağımsız posta outbox (Faz 1) testidir.',
+          body: formatted.text,
+          html: formatted.html,
           fromName: data?.fromName,
           idempotencyKey: `test:${to}:${Date.now()}`,
           source: 'test',
+          inReplyTo: data?.inReplyTo?.trim() || undefined,
+          references: data?.references?.trim() || undefined,
         });
         res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));

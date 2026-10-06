@@ -61,6 +61,8 @@ export async function enqueueEkolojikMail(
     fromName,
     idempotencyKey,
     source = 'crm',
+    inReplyTo,
+    references,
   },
 ) {
   await ensureDirs(dataDir);
@@ -81,6 +83,8 @@ export async function enqueueEkolojikMail(
     html: html ?? null,
     fromName: fromName ?? null,
     source,
+    inReplyTo: inReplyTo ?? null,
+    references: references ?? null,
     status: 'pending',
     attempts: 0,
     maxAttempts: MAX_ATTEMPTS,

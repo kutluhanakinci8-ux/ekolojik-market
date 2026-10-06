@@ -49,6 +49,15 @@ const KIND_LABEL: Record<string, string> = {
   bill: 'Fatura',
 };
 
+function billDueToIso(due?: string | null): string {
+  if (!due?.trim()) return new Date().toISOString().slice(0, 10);
+  const m = due.trim().match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+  if (!m) return new Date().toISOString().slice(0, 10);
+  let y = m[3];
+  if (y.length === 2) y = `20${y}`;
+  return `${y.padStart(4, '0')}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
 export function EkolojikPostaHubScreen({
   store,
   deepLinkCustomerId = null,
@@ -71,6 +80,9 @@ export function EkolojikPostaHubScreen({
   const [composeTo, setComposeTo] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeReply, setComposeReply] = useState<{ inReplyTo?: string; references?: string } | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [imapConfigured, setImapConfigured] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
@@ -88,6 +100,15 @@ export function EkolojikPostaHubScreen({
   >([]);
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
+
+  const composeAllHints = useMemo(() => {
+    const emails = new Set(recipientHints.map((e) => e.toLowerCase()));
+    for (const c of store.customers) {
+      const e = c.email?.trim().toLowerCase();
+      if (e?.includes('@')) emails.add(e);
+    }
+    return [...emails].slice(0, 200);
+  }, [recipientHints, store.customers]);
 
   const selectedInbox = useMemo(
     () => inboxRows.find((r) => r.id === selectedInboxId) ?? null,
@@ -160,6 +181,27 @@ export function EkolojikPostaHubScreen({
   }, [folder, refreshInbox, refreshThreads, refreshSent]);
 
   useEffect(() => {
+    if (folder === 'yaz') return undefined;
+    let es: EventSource | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const refreshLive = () => {
+      if (folder === 'gelen' || folder === 'fatura' || folder === 'arsiv') void refreshInbox(inboxFolder);
+      if (folder === 'mesajlar') void refreshThreads();
+      if (folder === 'gonderilen') void refreshSent();
+    };
+    try {
+      es = new EventSource('/api/posta/events');
+      es.onmessage = () => refreshLive();
+    } catch {
+      timer = setInterval(refreshLive, 15000);
+    }
+    return () => {
+      es?.close();
+      if (timer) clearInterval(timer);
+    };
+  }, [folder, inboxFolder, refreshInbox, refreshThreads, refreshSent]);
+
+  useEffect(() => {
     if (!selectedSentId || folder !== 'gonderilen') {
       setSentDetail(null);
       return;
@@ -210,6 +252,11 @@ export function EkolojikPostaHubScreen({
     const subj = row.subject?.startsWith('Re:') ? row.subject : `Re: ${row.subject}`;
     setComposeSubject(subj);
     setComposeBody('');
+    if (row.kind === 'imap' && row.messageId) {
+      setComposeReply({ inReplyTo: row.messageId, references: row.messageId });
+    } else {
+      setComposeReply(null);
+    }
     setFolder('yaz');
   };
 
@@ -220,10 +267,13 @@ export function EkolojikPostaHubScreen({
         to: composeTo.trim(),
         subject: composeSubject.trim() || 'Ekolojik Market',
         body: composeBody.trim(),
+        inReplyTo: composeReply?.inReplyTo,
+        references: composeReply?.references,
       });
       setFlash(result.ok ? 'Gönderildi / kuyruğa alındı' : result.error ?? 'Gönderilemedi');
       if (result.ok) {
         setComposeBody('');
+        setComposeReply(null);
         await refreshSent();
       }
       await refreshHealth();
@@ -251,6 +301,26 @@ export function EkolojikPostaHubScreen({
     if (!t) return;
     setComposeSubject(t.subject);
     setComposeBody(t.body);
+    setComposeReply(null);
+  };
+
+  const addBillToPaymentCalendar = () => {
+    if (!selectedInbox || selectedInbox.kind !== 'bill') return;
+    const amount = selectedInbox.amount ?? 0;
+    if (amount <= 0) {
+      setFlash('Tutar bulunamadı — manuel ekleyin');
+      return;
+    }
+    store.addPaymentReminder({
+      title: selectedInbox.subject || 'Fatura ödemesi',
+      amount,
+      dueDate: billDueToIso(selectedInbox.dueDate),
+      scope: 'company',
+      category: 'other',
+      recurrence: 'once',
+      notes: `Posta fatura · ${selectedInbox.id}`,
+    });
+    setFlash('Ödeme takvimine eklendi');
   };
 
   const wrapComposeSelection = (before: string, after: string) => {
@@ -524,7 +594,7 @@ export function EkolojikPostaHubScreen({
                 <span>Alıcı</span>
                 <input list="posta-recipient-hints" value={composeTo} onChange={(e) => setComposeTo(e.target.value)} />
                 <datalist id="posta-recipient-hints">
-                  {recipientHints.map((email) => (
+                  {composeAllHints.map((email) => (
                     <option key={email} value={email} />
                   ))}
                 </datalist>
@@ -539,6 +609,13 @@ export function EkolojikPostaHubScreen({
                 </button>
                 <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('\n- ', '')}>
                   Liste
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => wrapComposeSelection('[', '](https://)')}
+                >
+                  Link
                 </button>
               </div>
               <label className="settings-field settings-field--full">
@@ -569,6 +646,11 @@ export function EkolojikPostaHubScreen({
                   <button type="button" className="btn btn-sm btn-outline" onClick={() => startReply(selectedInbox)}>
                     Yanıt
                   </button>
+                  {selectedInbox.kind === 'bill' && (
+                    <button type="button" className="btn btn-sm btn-primary" onClick={addBillToPaymentCalendar}>
+                      Ödeme takvimine işle
+                    </button>
+                  )}
                   {folder !== 'arsiv' && (
                     <button type="button" className="btn btn-sm btn-outline" onClick={() => void archiveSelected()}>
                       Arşivle
@@ -585,6 +667,22 @@ export function EkolojikPostaHubScreen({
                   Tutar: {selectedInbox.amount} · Vade: {selectedInbox.dueDate ?? '—'}
                 </p>
               )}
+              {selectedInbox.attachments?.length ? (
+                <ul className="crm-msg-attachments">
+                  {selectedInbox.attachments.map((a) => (
+                    <li key={a.id}>
+                      <a
+                        href={`/api/posta/inbox/${encodeURIComponent(selectedInbox.id)}/attachment/${encodeURIComponent(a.id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {a.fileName}
+                        {a.size ? ` (${Math.round(a.size / 1024)} KB)` : ''}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {selectedInbox.bodyHtml ? (
                 <div
                   className="posta-hub-detail-body posta-hub-detail-body--html"

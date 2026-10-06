@@ -61,10 +61,22 @@ export async function verifyEkolojikSmtp() {
   }
 }
 
-export async function sendViaEkolojikSmtp({ to, subject, text, html, fromName, replyTo }) {
+export async function sendViaEkolojikSmtp({
+  to,
+  subject,
+  text,
+  html,
+  fromName,
+  replyTo,
+  inReplyTo,
+  references,
+}) {
   const c = getEkolojikMailConfig();
   const from = buildFromHeader(fromName || c.fromName, c.from);
   const reply = replyTo?.includes('@') ? replyTo : c.replyTo || undefined;
+  const headers = {};
+  if (inReplyTo?.includes('@') || inReplyTo?.startsWith('<')) headers['In-Reply-To'] = inReplyTo;
+  if (references?.trim()) headers.References = references.trim();
   const info = await getTransporter().sendMail({
     from,
     to,
@@ -72,6 +84,7 @@ export async function sendViaEkolojikSmtp({ to, subject, text, html, fromName, r
     subject,
     text: text || subject,
     html: html || undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
   });
   return {
     messageId: info.messageId,

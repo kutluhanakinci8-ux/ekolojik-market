@@ -12,6 +12,8 @@ export type PostaInboxItem = {
   archived: boolean;
   bodyText: string;
   bodyHtml?: string;
+  messageId?: string | null;
+  attachments?: Array<{ id: string; fileName: string; mimeType?: string; size?: number }>;
   amount?: number | null;
   dueDate?: string | null;
   matched?: boolean;

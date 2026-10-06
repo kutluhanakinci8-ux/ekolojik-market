@@ -31,19 +31,22 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 
 ---
 
-## Durum özeti (2026-10-06 — kod tamam)
+## Durum özeti (2026-10-06 — kod)
 
 | Bölüm | Ekolojik |
 |-------|----------|
 | Nav + 3 sütun hub | ✅ |
 | Gelen (IMAP + iletişim) | ✅ |
-| Yaz / yanıt / şablon | ✅ |
+| Gelen ek indir + yanıt In-Reply-To | ✅ (Faz 7.3 / 8.2) |
+| Fatura → ödeme takvimi | ✅ (Faz 7.5) |
+| Yaz / yanıt / şablon + markdown | ✅ (8 adet şablon) |
 | Müşteri mesajları hub | ✅ |
 | Gönderilen + retry | ✅ |
-| Badge + SSE | ✅ |
+| Badge + SSE hub yenileme | ✅ |
 | Admin / export (Faz 11) | ✅ |
 | Doğrulama script (Faz 12) | ✅ |
-| **SMTP/DNS canlı (Faz 6)** | **Sizin VPS** — `posta-prod-kapat.sh` |
+| Kod statik kapı | `scripts/sunucu-ekolojik-kod-parite-dogrula.sh` |
+| **SMTP/DNS canlı (Faz 6)** | **VPS ayarı** — deploy sonrası |
 
 ---
 
