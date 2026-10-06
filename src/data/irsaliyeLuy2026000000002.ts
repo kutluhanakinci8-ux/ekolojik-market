@@ -4,6 +4,9 @@
  */
 export const IRSALIYE_LUY2026000000002_ID = 'LUY2026000000002';
 
+/** localStorage: bu irsaliye stok girişi bir kez uygulandı mı */
+export const IRSALIYE_STOCK_MIGRATION_KEY = `market-pos-irsaliye-stock-${IRSALIYE_LUY2026000000002_ID}`;
+
 /** Stok kodu → birim alış fiyatı (TL) — irsaliye satırları 1–34 (ilk birim fiyat geçerli) */
 export const IRSALIYE_PURCHASE_BY_CODE: Record<string, number> = {
   ASF066: 51.25,
@@ -40,4 +43,46 @@ export const IRSALIYE_PURCHASE_BY_CODE: Record<string, number> = {
   ASB046: 100.33,
   ASB045: 90.67,
   ASB044: 179.17,
+};
+
+/**
+ * Stok kodu → toplam adet (39 satır; tekrarlayan kodlar toplandı)
+ * Kaynak: LUY2026000000002 PDF
+ */
+export const IRSALIYE_STOCK_BY_CODE: Record<string, number> = {
+  ASF066: 96,
+  CAA039: 20,
+  FPA151: 40,
+  DAB089: 75,
+  LGI019: 12,
+  YBA045: 20,
+  EAA022: 24,
+  CAB040: 20,
+  CAA038: 20,
+  KLA128: 27,
+  CEA069: 30,
+  SAA069: 24,
+  ASA086: 20,
+  ASA017: 20,
+  SBJ064: 48,
+  SBC053: 30,
+  EBB018: 20,
+  CCA016: 96,
+  CBA052: 20,
+  DAA109: 20,
+  CBF015: 36,
+  CBF014: 36,
+  DAC056: 16,
+  DAB087: 60,
+  DAA108: 40,
+  DAA062: 61,
+  CBE034: 48,
+  ASF055: 47,
+  ASF054: 8,
+  ASF053: 27,
+  ASB047: 40,
+  ASB046: 75,
+  ASB045: 120,
+  ASB044: 30,
+  SBE089: 6,
 };

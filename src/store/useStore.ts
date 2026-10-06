@@ -15,7 +15,9 @@ import { DEFAULT_USERS } from '../data/defaultUsers';
 import { splitGrossAmount } from '../utils/vatAnalytics';
 import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS } from '../data/navigation';
 import { PRICE_BATCH_1_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
+import { IRSALIYE_STOCK_BY_CODE, IRSALIYE_STOCK_MIGRATION_KEY } from '../data/irsaliyeLuy2026000000002';
 import { applyCatalogPricing } from '../utils/productPricing';
+import { applyIrsaliyeStockToProducts } from '../utils/applyIrsaliyeStock';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
 import {
@@ -226,11 +228,14 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
     const sampleDefaults = SAMPLE_PRODUCT_DEFAULTS[seed.id];
     const isSample = saved?.isSample ?? Boolean(sampleDefaults);
     const sampleStock = saved?.sampleStock ?? sampleDefaults?.sampleStock ?? 0;
+    const irsaliyeStock = catalogEntry ? IRSALIYE_STOCK_BY_CODE[catalogEntry.code] : undefined;
+    const defaultStock =
+      irsaliyeStock != null ? Math.max(0, Math.floor(irsaliyeStock)) : 0;
 
     return {
       ...priced,
       category,
-      stock: saved?.stock ?? 0,
+      stock: saved?.stock ?? defaultStock,
       isSample,
       sampleStock: isSample ? sampleStock : 0,
       imageUrl,
@@ -796,6 +801,7 @@ export function useStore() {
   const [saleLoyaltyPointsToRedeem, setSaleLoyaltyPointsToRedeem] = useState(0);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const saveTimerRef = useRef<number | null>(null);
+  const irsaliyeStockMigrationRef = useRef(false);
 
   const crmSettings = getCrmSettings(settings);
 
@@ -1996,6 +2002,33 @@ export function useStore() {
     if (purchaseInvoices.some((invoice) => isDemoSupplierPurchaseInvoice(invoice))) return;
     seedDemoSupplierData();
   }, [syncReady, suppliers, purchaseInvoices, seedDemoSupplierData]);
+
+  useEffect(() => {
+    if (!syncReady || irsaliyeStockMigrationRef.current) return;
+    if (localStorage.getItem(IRSALIYE_STOCK_MIGRATION_KEY)) {
+      irsaliyeStockMigrationRef.current = true;
+      return;
+    }
+    if (products.length === 0) return;
+
+    const { products: nextProducts, movements } = applyIrsaliyeStockToProducts(products);
+    irsaliyeStockMigrationRef.current = true;
+    localStorage.setItem(IRSALIYE_STOCK_MIGRATION_KEY, '1');
+
+    if (movements.length === 0) return;
+
+    setProducts(nextProducts);
+    setStockMovements((prev) => [...movements, ...prev]);
+    localStorage.setItem(STORAGE_KEYS.stockInitialized, '1');
+    if (authSession) {
+      logActivity(
+        authSession,
+        'stock_adjust',
+        `e-İrsaliye stok girişi uygulandı (${movements.length} ürün)`,
+        { irsaliye: 'LUY2026000000002' },
+      );
+    }
+  }, [syncReady, products, authSession, logActivity]);
 
   const refreshExchangeRatesFromTcmb = useCallback(async () => {
     const tcmb = await fetchTcmbRates();
