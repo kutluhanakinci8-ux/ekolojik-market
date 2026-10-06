@@ -18,10 +18,13 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-env-load.sh
+source "${SCRIPT_DIR}/lib/ekolojik-env-load.sh"
+
 # shellcheck disable=SC1090
 set -a
-# shellcheck source=/dev/null
-source "${ENV_FILE}"
+ekolojik_load_env "${ENV_FILE}"
 set +a
 
 if [[ "${LERTA_PLATFORM_BRIDGE:-0}" == "0" ]]; then

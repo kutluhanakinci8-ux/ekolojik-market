@@ -20,10 +20,11 @@ echo "API:  ${BASE_URL}"
 if [[ ! -f "${ENV_FILE}" ]]; then
   bad "${ENV_FILE} yok"
 else
-  # shellcheck disable=SC1090
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  # shellcheck source=scripts/lib/ekolojik-env-load.sh
+  source "${SCRIPT_DIR}/lib/ekolojik-env-load.sh"
   set -a
-  # shellcheck source=/dev/null
-  source "${ENV_FILE}"
+  ekolojik_load_env "${ENV_FILE}"
   set +a
   if [[ "${LERTA_PLATFORM_BRIDGE:-0}" != "0" ]]; then
     warn "LERTA_PLATFORM_BRIDGE=${LERTA_PLATFORM_BRIDGE:-} — Ekolojik bağımsızlık için 0 olmalı"
