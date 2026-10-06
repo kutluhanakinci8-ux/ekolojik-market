@@ -24,6 +24,8 @@ bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-parite-dogrula.s
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-smtp-dogrula.sh
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-imap-dogrula.sh
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-gelen-smoke.sh
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-akis-a-smoke.sh
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-checklist-dogrula.sh
 ```
 
 Beklenen: health `smtpVerified: true`, `imapVerified: true`, Gelen smoke test maili listede.
