@@ -30,9 +30,17 @@ import {
 } from './server/emailOutboxProcessor.mjs';
 import {
   isLertaPlatformConfigured,
-  listMessagingThreads,
-  sendMessagingMessage,
+  listMessagingThreads as listLertaMessagingThreads,
+  sendMessagingMessage as sendLertaMessagingMessage,
 } from './server/lertaPlatformBridge.mjs';
+import {
+  listMessagingThreads,
+  getMessagingThread,
+  createMessagingThread,
+  listMessagingMessages,
+  appendMessagingMessage,
+} from './server/messaging/store.mjs';
+import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -453,6 +461,106 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/messaging/threads' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const customerId = url.searchParams.get('customerId')?.trim() || undefined;
+      const limit = Number(url.searchParams.get('limit') || 50);
+      try {
+        const result = await listMessagingThreads(DATA_DIR, tenantId, { limit, customerId });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/threads' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await createMessagingThread(DATA_DIR, tenantId, data ?? {});
+        if (result.ok && result.message) {
+          try {
+            result.notifications = await notifyOnMessagingMessage(DATA_DIR, {
+              thread: result.thread,
+              message: result.message,
+            });
+          } catch (notifyError) {
+            result.notifications = {
+              ok: false,
+              error: notifyError instanceof Error ? notifyError.message : 'Bildirim hatası',
+            };
+          }
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Oluşturma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname.startsWith('/api/messaging/threads/')) {
+      const parts = pathname.split('/').filter(Boolean);
+      const threadId = parts[3];
+      const sub = parts[4];
+      const tenantId = resolveTenantId(url);
+
+      if (sub === 'messages' && threadId && req.method === 'GET') {
+        const limit = Number(url.searchParams.get('limit') || 100);
+        try {
+          const result = await listMessagingMessages(DATA_DIR, tenantId, threadId, { limit });
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj listesi hatası' }));
+        }
+        return;
+      }
+
+      if (sub === 'messages' && threadId && req.method === 'POST') {
+        const data = await readRequestBody(req);
+        try {
+          const result = await appendMessagingMessage(DATA_DIR, tenantId, threadId, data ?? {});
+          if (result.ok && result.message) {
+            try {
+              result.notifications = await notifyOnMessagingMessage(DATA_DIR, {
+                thread: result.thread,
+                message: result.message,
+              });
+            } catch (notifyError) {
+              result.notifications = {
+                ok: false,
+                error: notifyError instanceof Error ? notifyError.message : 'Bildirim hatası',
+              };
+            }
+          }
+          res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Gönderim hatası' }));
+        }
+        return;
+      }
+
+      if (!sub && threadId && req.method === 'GET') {
+        try {
+          const result = await getMessagingThread(DATA_DIR, tenantId, threadId);
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Thread hatası' }));
+        }
+        return;
+      }
+    }
+
     if (pathname === '/api/lerta/messaging/threads' && req.method === 'GET') {
       if (!isLertaPlatformConfigured()) {
         res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -460,7 +568,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const limit = url.searchParams.get('limit') ?? '50';
-      const result = await listMessagingThreads({ limit: Number(limit) || 50 });
+      const result = await listLertaMessagingThreads({ limit: Number(limit) || 50 });
       res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(result));
       return;
@@ -477,7 +585,7 @@ const server = createServer(async (req, res) => {
           return;
         }
         const data = await readRequestBody(req);
-        const result = await sendMessagingMessage({
+        const result = await sendLertaMessagingMessage({
           threadId,
           bodyText: data?.bodyText ?? data?.body ?? '',
           locale: data?.locale ?? 'tr',

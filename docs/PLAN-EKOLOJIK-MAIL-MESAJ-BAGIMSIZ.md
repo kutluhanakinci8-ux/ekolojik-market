@@ -67,11 +67,11 @@
 
 | # | İş |
 |---|-----|
-| 3.1 | Veri modeli: `MessagingThread`, `Message` → `data/messaging/` veya SQLite |
-| 3.2 | API: `GET/POST /api/messaging/threads`, `…/messages` (Ekolojik `server.mjs`) |
-| 3.3 | POS: CRM müşteri kartında “Mesajlar” sekmesi |
-| 3.4 | Bildirim: yeni mesaj → Faz 1 outbox (e-posta özeti) veya ileride push |
-| 3.5 | Dosya eki (opsiyonel Faz 3b): `data/messaging-attachments/` |
+| 3.1 | Veri modeli: `MessagingThread`, `Message` → `data/messaging/` veya SQLite | ✅ `data/messaging/{tenant}/` |
+| 3.2 | API: `GET/POST /api/messaging/threads`, `…/messages` (Ekolojik `server.mjs`) | ✅ |
+| 3.3 | POS: CRM müşteri kartında “Mesajlar” sekmesi | ✅ `MessagingPanel` |
+| 3.4 | Bildirim: yeni mesaj → Faz 1 outbox (e-posta özeti) veya ileride push | ✅ `messaging/notify.mjs` |
+| 3.5 | Dosya eki (opsiyonel Faz 3b): `data/messaging-attachments/` | (sonra) |
 
 **Kabul:** NB `public/lerta-messaging/v1` **çağrılmaz**; thread id’ler Ekolojik namespace’inde.
 

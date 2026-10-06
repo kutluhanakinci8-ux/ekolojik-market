@@ -15234,6 +15234,62 @@ input {
 .crm-timeline time { display: block; font-size: 11px; color: var(--text-muted); }
 .crm-note-form, .crm-comm-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .crm-note-form input, .crm-comm-form input { flex: 1; min-width: 160px; }
+.crm-messaging-panel {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.crm-messaging-head h3 { margin: 0 0 4px; font-size: 15px; }
+.crm-messaging-head p { margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
+.crm-messaging-layout { display: grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 12px; }
+@media (max-width: 720px) {
+  .crm-messaging-layout { grid-template-columns: 1fr; }
+}
+.crm-messaging-threads ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 220px; overflow: auto; }
+.crm-messaging-threads button {
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #f8faf8;
+  cursor: pointer;
+}
+.crm-messaging-threads button.is-active { border-color: var(--greenleaf); background: #eef8ef; }
+.crm-messaging-threads strong { display: block; font-size: 12px; }
+.crm-messaging-threads span { display: block; font-size: 11px; color: var(--text-muted); }
+.crm-messaging-threads time { display: block; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.crm-messaging-messages {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.crm-msg {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.crm-msg--staff { background: #f0f7ff; margin-left: 12px; }
+.crm-msg--customer { background: #f8faf8; margin-right: 12px; }
+.crm-msg header { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; margin-bottom: 4px; }
+.crm-messaging-compose { display: flex; flex-direction: column; gap: 8px; }
+.crm-messaging-compose textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 8px;
+  font: inherit;
+}
+.crm-messaging-empty { font-size: 13px; color: var(--text-muted); margin: 8px 0; }
 .cart-crm-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .cart-crm-input {
   flex: 1;
