@@ -1,16 +1,35 @@
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { isLertaPlatformConfigured, sendMailViaLertaPlatform } from './lertaPlatformBridge.mjs';
 
 /**
- * E-posta: CRM_RESEND_API_KEY varsa Resend API; yoksa outbox dosyasına yaz.
+ * E-posta önceliği:
+ * 1) LERTA_PLATFORM_API_URL + LERTA_MAIL_API_KEY → Nakliye Borsası outbox
+ * 2) CRM_RESEND_API_KEY → Resend
+ * 3) data/crm-outbox/pending.jsonl
  */
-export async function sendCrmEmail(dataDir, { to, subject, body, fromName }) {
-  const apiKey = process.env.CRM_RESEND_API_KEY?.trim();
-  const from = process.env.CRM_EMAIL_FROM?.trim() || 'onboarding@resend.dev';
-
+export async function sendCrmEmail(dataDir, { to, subject, body, fromName, idempotencyKey }) {
   if (!to?.includes('@')) {
     return { ok: false, error: 'Geçersiz e-posta adresi' };
   }
+
+  if (isLertaPlatformConfigured()) {
+    const lerta = await sendMailViaLertaPlatform({
+      to,
+      subject,
+      text: body,
+      idempotencyKey: idempotencyKey || `ekolojik-crm:${to}:${subject}:${Date.now()}`,
+    });
+    if (lerta.ok) {
+      return { ok: true, provider: lerta.provider, messageId: lerta.messageId };
+    }
+    if (!lerta.skipped) {
+      return { ok: false, error: lerta.error ?? 'Lerta mail API hatası' };
+    }
+  }
+
+  const apiKey = process.env.CRM_RESEND_API_KEY?.trim();
+  const from = process.env.CRM_EMAIL_FROM?.trim() || 'onboarding@resend.dev';
 
   if (apiKey) {
     const res = await fetch('https://api.resend.com/emails', {

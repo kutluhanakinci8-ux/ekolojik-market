@@ -9,6 +9,11 @@ import { pollBillEmails, testBillEmailConnection } from './server/billEmailClien
 import { readTenantStore, writeTenantStore, registerTenant, saveContactMessage } from './server/tenantAuth.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
+import {
+  isLertaPlatformConfigured,
+  listMessagingThreads,
+  sendMessagingMessage,
+} from './server/lertaPlatformBridge.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
