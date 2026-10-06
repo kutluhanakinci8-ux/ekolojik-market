@@ -37,6 +37,8 @@ export function createDeliverMessage(dataDir) {
       html: html ?? undefined,
       fromName: message.fromName || pres.fromName,
       replyTo: pres.replyTo,
+      inReplyTo: message.inReplyTo,
+      references: message.references,
     });
   };
 }
@@ -46,7 +48,7 @@ export function createDeliverMessage(dataDir) {
  * SMTP yoksa kuyruğa yazar; SMTP varsa hemen göndermeyi dener.
  */
 export async function sendEkolojikMail(dataDir, payload) {
-  const { to, subject, body, fromName, idempotencyKey, html, source } = payload;
+  const { to, subject, body, fromName, idempotencyKey, html, source, inReplyTo, references } = payload;
   if (!to?.includes('@')) {
     return { ok: false, error: 'Geçersiz e-posta adresi' };
   }
@@ -81,6 +83,8 @@ export async function sendEkolojikMail(dataDir, payload) {
     fromName: effectiveFromName,
     idempotencyKey: key,
     source: source ?? 'crm',
+    inReplyTo,
+    references,
   });
 
   if (!isEkolojikSmtpConfigured()) {

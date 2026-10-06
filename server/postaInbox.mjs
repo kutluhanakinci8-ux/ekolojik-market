@@ -5,10 +5,12 @@ import {
   listPostaImapMessages,
   savePostaImapBatch,
   updatePostaImapMessage,
+  findPostaImapMessage,
 } from './postaInboxStore.mjs';
 import { listContactMessages, markContactMessageRead, archiveContactMessage } from './tenantAuth.mjs';
 import { getEkolojikImapConfig, isEkolojikImapConfigured } from './ekolojikMailConfig.mjs';
 import { countStaffUnreadMessagingThreads } from './messaging/store.mjs';
+import { persistImapAttachments, readPostaInboxAttachment } from './postaInboxAttachments.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -72,6 +74,8 @@ function toUnifiedImap(row) {
     archived: Boolean(row.archivedAt),
     bodyText: row.bodyText ?? '',
     bodyHtml: row.bodyHtml ?? '',
+    messageId: row.messageId ?? null,
+    attachments: row.attachments ?? [],
     raw: row,
   };
 }
@@ -89,8 +93,8 @@ function toUnifiedBill(row) {
     preview: row.snippet || '',
     unread: isUnread(row),
     archived: Boolean(row.archivedAt),
-    bodyText: row.snippet || '',
-    bodyHtml: '',
+    bodyText: row.bodyText || row.snippet || '',
+    bodyHtml: row.bodyHtml ?? '',
     amount: row.amount,
     dueDate: row.dueDate,
     matched: row.matched,
@@ -135,9 +139,12 @@ export async function syncPostaInboxFromImap(dataDir, tenantId = 'main', { maxMe
     return { ok: false, error: error instanceof Error ? error.message : 'IMAP tarama hatası' };
   }
 
-  const entries = fetched.map((msg) => {
-    const parsed = parseMailBody(msg.text);
-    return {
+  const entries = [];
+  for (const msg of fetched) {
+    const raw = msg.rawSource || msg.text || '';
+    const parsed = parseMailBody(raw);
+    const attachments = await persistImapAttachments(dataDir, tenantId, raw);
+    entries.push({
       imapUid: msg.imapUid,
       messageId: msg.messageId,
       from: msg.from,
@@ -147,8 +154,9 @@ export async function syncPostaInboxFromImap(dataDir, tenantId = 'main', { maxMe
       snippet: parsed.snippet || msg.snippet,
       bodyText: parsed.text,
       bodyHtml: parsed.html,
-    };
-  });
+      attachments,
+    });
+  }
 
   const saved = await savePostaImapBatch(dataDir, tenantId, entries);
   return {
@@ -255,4 +263,16 @@ export async function getPostaUnreadCounts(dataDir, tenantId = 'main') {
     messaging: messagingUnread,
     total: gelenUnread + faturaUnread + messagingUnread,
   };
+}
+
+export async function loadPostaInboxAttachment(dataDir, tenantId, inboxId, attachmentId) {
+  const row = await findPostaImapMessage(dataDir, tenantId, inboxId);
+  const meta = row?.attachments?.find((a) => a.id === attachmentId);
+  if (!meta) return { ok: false, error: 'Ek bulunamadı' };
+  try {
+    const data = await readPostaInboxAttachment(dataDir, tenantId, attachmentId);
+    return { ok: true, meta, data };
+  } catch {
+    return { ok: false, error: 'Ek dosyası okunamadı' };
+  }
 }

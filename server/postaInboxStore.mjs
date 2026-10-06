@@ -53,6 +53,7 @@ export async function savePostaImapBatch(dataDir, tenantId, entries) {
       snippet: entry.snippet ?? '',
       bodyText: entry.bodyText ?? '',
       bodyHtml: entry.bodyHtml ?? '',
+      attachments: entry.attachments ?? [],
       readAt: null,
       archivedAt: null,
       ingestedAt: new Date().toISOString(),
@@ -71,6 +72,12 @@ export async function listPostaImapMessages(dataDir, tenantId, { limit = 50, arc
   rows = rows.filter((r) => (archived ? Boolean(r.archivedAt) : !r.archivedAt));
   const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
   return rows.slice(0, max);
+}
+
+export async function findPostaImapMessage(dataDir, tenantId, id) {
+  const root = await ensureDir(dataDir, tenantId);
+  const rows = await readIndex(root);
+  return rows.find((r) => r.id === id) ?? null;
 }
 
 export async function updatePostaImapMessage(dataDir, tenantId, id, patch) {

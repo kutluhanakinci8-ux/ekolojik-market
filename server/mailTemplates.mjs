@@ -26,10 +26,22 @@ const TEMPLATES = [
     body: 'Sayın ilgili,\n\nKişisel verilerin korunması kapsamındaki talebiniz tarafımıza ulaşmıştır. Yasal süre içinde dönüş yapılacaktır.\n\nEkolojik Market',
   },
   {
-    id: 'randevu',
-    label: 'Randevu / görüşme',
-    subject: 'Görüşme talebi',
-    body: 'Merhaba,\n\nUygun olduğunuz bir zamanı paylaşırsanız sizi arayabilir veya mağazamızda ağırlayabiliriz.\n\nEkolojik Market',
+    id: 'iade',
+    label: 'İade / değişim',
+    subject: 'İade veya değişim talebiniz',
+    body: 'Merhaba,\n\nİade/değişim talebiniz incelenmektedir. Kısa süre içinde dönüş yapacağız.\n\nEkolojik Market',
+  },
+  {
+    id: 'gecikme',
+    label: 'Gecikme özür',
+    subject: 'Gecikme hakkında',
+    body: 'Merhaba,\n\nYaşanan gecikme için özür dileriz. Siparişinizin durumu hakkında sizi bilgilendirmeye devam edeceğiz.\n\nEkolojik Market',
+  },
+  {
+    id: 'genel-yanit',
+    label: 'Genel yanıt',
+    subject: 'Ekolojik Market — mesajınız',
+    body: 'Merhaba,\n\nMesajınız için teşekkürler. Talebinizle ilgileniyoruz.\n\nSaygılarımızla,\nEkolojik Market',
   },
 ];
 

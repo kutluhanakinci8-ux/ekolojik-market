@@ -52,6 +52,7 @@ fi
 echo ""
 
 echo "--- 6/6 Özet ---"
+echo "Kod statik: bash ${REPO_ROOT}/scripts/sunucu-ekolojik-kod-parite-dogrula.sh"
 echo "DNS panel: SPF/DMARC/DKIM TXT yayınlandıktan sonra EKOLOJIK_DNS_STRICT=1 dns-mail-dogrula"
 echo "Manuel UI: docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md"
 echo "Bakım: /var/run/reboot-required varsa reboot"

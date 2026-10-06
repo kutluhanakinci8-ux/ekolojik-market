@@ -76,10 +76,11 @@ export async function fetchRecentInboxMessages(config, { sinceDate, maxMessages 
       const subject = msg.envelope?.subject ?? '';
       const messageId = msg.envelope?.messageId ?? '';
       const receivedAt = (msg.internalDate ?? new Date()).toISOString();
-      let text = '';
+      let rawSource = '';
       if (msg.source) {
-        text = msg.source.toString('utf8').slice(0, 12000);
+        rawSource = msg.source.toString('utf8');
       }
+      const text = rawSource.slice(0, 12000);
       const deliveredMatch = text.match(/^Delivered-To:\s*(.+)$/im);
       const deliveredTo = deliveredMatch?.[1]?.trim() ?? '';
 
@@ -92,6 +93,7 @@ export async function fetchRecentInboxMessages(config, { sinceDate, maxMessages 
         subject,
         receivedAt,
         text,
+        rawSource,
         snippet: text.replace(/\s+/g, ' ').trim().slice(0, 240),
       });
     }
