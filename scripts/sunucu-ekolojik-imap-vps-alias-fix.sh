@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
-# Postfix alias düzeltmesi (myorigin=mail.lerta.com.tr ortamında pipe teslimi)
+# Postfix virtual → doveadm pipe (Lerta alias_maps zinciri gerekmez)
 set -euo pipefail
 
-TOKEN="ekolojik-inbound-info-ekolojikmarket-com-tr"
 PIPE='|/usr/lib/dovecot/deliver -d info@ekolojikmarket.com.tr -m'
-MYORIGIN="$(postconf -h myorigin)"
 
-echo "=== Ekolojik Postfix inbound alias fix ==="
-echo "myorigin: ${MYORIGIN}"
+echo "=== Ekolojik Postfix inbound virtual fix ==="
 
-echo "info@ekolojikmarket.com.tr ${TOKEN}" > /etc/postfix/ekolojik-inbound-virtual
-{
-  echo "${TOKEN}: ${PIPE}"
-  echo "${TOKEN}@${MYORIGIN}: ${PIPE}"
-} > /etc/postfix/ekolojik-inbound-aliases
-
+echo "info@ekolojikmarket.com.tr ${PIPE}" > /etc/postfix/ekolojik-inbound-virtual
 postmap /etc/postfix/ekolojik-inbound-virtual
-postmap /etc/postfix/ekolojik-inbound-aliases
+
+VA="$(postconf -h virtual_alias_maps)"
+if [[ "${VA}" != *ekolojik-inbound-virtual* ]]; then
+  postconf -e "virtual_alias_maps = ${VA}, hash:/etc/postfix/ekolojik-inbound-virtual"
+fi
 systemctl reload postfix
 
-echo "OK   virtual + alias güncellendi"
+echo "OK   info@ → doveadm deliver (virtual_alias_maps)"
 postmap -q "info@ekolojikmarket.com.tr" hash:/etc/postfix/ekolojik-inbound-virtual
-postmap -q "${TOKEN}@${MYORIGIN}" hash:/etc/postfix/ekolojik-inbound-aliases
