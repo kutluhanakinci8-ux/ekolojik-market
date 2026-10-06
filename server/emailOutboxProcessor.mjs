@@ -4,15 +4,41 @@ import {
   processPendingOutbox,
   findOutboxByIdempotency,
 } from './emailOutbox.mjs';
+import { getEffectiveMailPresentation } from './postaSettings.mjs';
 
-async function deliverMessage(message) {
-  return sendViaEkolojikSmtp({
-    to: message.to,
-    subject: message.subject,
-    text: message.text,
-    html: message.html ?? undefined,
-    fromName: message.fromName ?? undefined,
-  });
+function appendSignature(text, html, signatureHtml) {
+  const sig = String(signatureHtml ?? '').trim();
+  if (!sig) return { text, html };
+  const plainSig = sig.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const nextText = text?.trim() ? `${text}\n\n--\n${plainSig}` : plainSig;
+  if (html?.trim()) {
+    return { text: nextText, html: `${html}<hr/>${sig}` };
+  }
+  return {
+    text: nextText,
+    html: `<div>${String(text ?? '').replace(/\n/g, '<br/>')}</div><hr/>${sig}`,
+  };
+}
+
+export function createDeliverMessage(dataDir) {
+  return async function deliverMessage(message) {
+    const pres = await getEffectiveMailPresentation(dataDir);
+    let text = message.text;
+    let html = message.html;
+    if (pres.signatureHtml?.trim()) {
+      const merged = appendSignature(text, html, pres.signatureHtml);
+      text = merged.text;
+      html = merged.html;
+    }
+    return sendViaEkolojikSmtp({
+      to: message.to,
+      subject: message.subject,
+      text,
+      html: html ?? undefined,
+      fromName: message.fromName || pres.fromName,
+      replyTo: pres.replyTo,
+    });
+  };
 }
 
 /**
@@ -23,6 +49,16 @@ export async function sendEkolojikMail(dataDir, payload) {
   const { to, subject, body, fromName, idempotencyKey, html, source } = payload;
   if (!to?.includes('@')) {
     return { ok: false, error: 'Geçersiz e-posta adresi' };
+  }
+
+  const pres = await getEffectiveMailPresentation(dataDir);
+  const effectiveFromName = fromName ?? pres.fromName;
+  let textBody = body ?? '';
+  let htmlBody = html;
+  if (pres.signatureHtml?.trim()) {
+    const merged = appendSignature(textBody, htmlBody, pres.signatureHtml);
+    textBody = merged.text;
+    htmlBody = merged.html;
   }
 
   const key = idempotencyKey || `ekolojik:${source ?? 'crm'}:${to}:${subject}`;
@@ -40,9 +76,9 @@ export async function sendEkolojikMail(dataDir, payload) {
   const enqueued = await enqueueEkolojikMail(dataDir, {
     to,
     subject,
-    text: body,
-    html,
-    fromName,
+    text: textBody,
+    html: htmlBody,
+    fromName: effectiveFromName,
     idempotencyKey: key,
     source: source ?? 'crm',
   });
@@ -80,4 +116,4 @@ export async function sendEkolojikMail(dataDir, payload) {
   };
 }
 
-export { processPendingOutbox, deliverMessage, isEkolojikSmtpConfigured };
+export { processPendingOutbox, isEkolojikSmtpConfigured };

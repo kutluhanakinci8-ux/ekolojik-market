@@ -26,10 +26,20 @@ import {
 import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
 import { getOutboxCounts, listRecentOutbox, listMergedRecentOutbox, requeueFailedOutboxMessage, findOutboxMessageById } from './server/emailOutbox.mjs';
 import {
-  deliverMessage,
+  createDeliverMessage,
   processPendingOutbox,
   sendEkolojikMail,
 } from './server/emailOutboxProcessor.mjs';
+import {
+  getPostaMailSettings,
+  savePostaMailSettings,
+  getEffectiveMailPresentation,
+} from './server/postaSettings.mjs';
+import {
+  buildOutboxCsv,
+  buildContactCsv,
+  buildMessagingExportZip,
+} from './server/postaExport.mjs';
 import {
   isLertaPlatformConfigured,
   listMessagingThreads as listLertaMessagingThreads,
@@ -76,6 +86,7 @@ if (envBootstrap.loaded) {
 }
 const DIST = join(__dirname, 'dist');
 const DATA_DIR = join(__dirname, 'data');
+const deliverMessage = createDeliverMessage(DATA_DIR);
 const PORT = Number(process.env.PORT || 5180);
 const HOST = process.env.HOST || '0.0.0.0';
 
@@ -445,6 +456,7 @@ const server = createServer(async (req, res) => {
       const verify = smtp ? await verifyEkolojikSmtp() : { ok: false, error: 'SMTP yapılandırılmadı' };
       const counts = await getOutboxCounts(DATA_DIR);
       const cfg = getEkolojikMailConfig();
+      const effective = await getEffectiveMailPresentation(DATA_DIR);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(
         JSON.stringify({
@@ -455,7 +467,9 @@ const server = createServer(async (req, res) => {
           smtpHost: cfg.smtpHost || null,
           smtpHostHint: getEkolojikSmtpHostHint(),
           from: cfg.from || null,
-          opsEmail: getEkolojikOpsEmail() || null,
+          fromName: effective.fromName || null,
+          replyTo: effective.replyTo || null,
+          opsEmail: effective.opsEmail || null,
           contactAutoreply: isContactAutoreplyEnabled(),
           counts,
         }),
@@ -576,6 +590,76 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/settings' && req.method === 'GET') {
+      try {
+        const settings = await getPostaMailSettings(DATA_DIR);
+        const effective = await getEffectiveMailPresentation(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, settings, effective }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ayar hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/settings' && req.method === 'PUT') {
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaMailSettings(DATA_DIR, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/export/outbox.csv' && req.method === 'GET') {
+      const from = url.searchParams.get('from')?.trim() || undefined;
+      const to = url.searchParams.get('to')?.trim() || undefined;
+      try {
+        const result = await buildOutboxCsv(DATA_DIR, { from, to });
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-outbox.csv"',
+        });
+        res.end(`\ufeff${result.csv}`);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Export hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/export/contact.csv' && req.method === 'GET') {
+      const from = url.searchParams.get('from')?.trim() || undefined;
+      const to = url.searchParams.get('to')?.trim() || undefined;
+      try {
+        const result = await buildContactCsv(DATA_DIR, { from, to });
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-contact.csv"',
+        });
+        res.end(`\ufeff${result.csv}`);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Export hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/email/outbox/retry' && req.method === 'POST') {
       const data = await readRequestBody(req);
       const id = data?.id?.trim();
@@ -663,6 +747,28 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İşlem hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/export' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await buildMessagingExportZip(DATA_DIR, tenantId);
+        if (!result.ok) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        const contentType = result.fallback ? 'application/json; charset=utf-8' : 'application/zip';
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Content-Disposition': `attachment; filename="${result.filename}"`,
+        });
+        res.end(result.buffer);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Export hatası' }));
       }
       return;
     }

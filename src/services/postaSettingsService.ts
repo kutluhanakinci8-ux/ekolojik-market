@@ -1,0 +1,100 @@
+export type PostaNotificationPrefs = {
+  contactOpsEmail: boolean;
+  messagingOpsEmail: boolean;
+  billEmailOpsEmail: boolean;
+};
+
+export type PostaMailSettings = {
+  fromName: string | null;
+  replyTo: string | null;
+  opsEmail: string | null;
+  signatureHtml: string;
+  notifications: PostaNotificationPrefs;
+  updatedAt: string | null;
+};
+
+export type PostaEffectiveMail = {
+  smtpHost: string;
+  from: string;
+  fromName: string;
+  replyTo: string;
+  opsEmail: string;
+  signatureHtml: string;
+  notifications: PostaNotificationPrefs;
+  envFromName: string;
+  envReplyTo: string;
+  envOpsEmail: string;
+};
+
+export async function fetchPostaMailSettings(): Promise<{
+  ok: boolean;
+  settings?: PostaMailSettings;
+  effective?: PostaEffectiveMail;
+  error?: string;
+}> {
+  const res = await fetch('/api/posta/settings');
+  return res.json();
+}
+
+export async function savePostaMailSettings(patch: Partial<PostaMailSettings> & { notifications?: Partial<PostaNotificationPrefs> }): Promise<{
+  ok: boolean;
+  settings?: PostaMailSettings;
+  error?: string;
+}> {
+  const res = await fetch('/api/posta/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return res.json();
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadPostaOutboxCsv(from?: string, to?: string) {
+  const params = new URLSearchParams();
+  if (from?.trim()) params.set('from', from.trim());
+  if (to?.trim()) params.set('to', to.trim());
+  const qs = params.toString();
+  const res = await fetch(`/api/posta/export/outbox.csv${qs ? `?${qs}` : ''}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? 'Outbox export başarısız');
+  }
+  const blob = await res.blob();
+  downloadBlob(blob, 'ekolojik-outbox.csv');
+}
+
+export async function downloadPostaContactCsv(from?: string, to?: string) {
+  const params = new URLSearchParams();
+  if (from?.trim()) params.set('from', from.trim());
+  if (to?.trim()) params.set('to', to.trim());
+  const qs = params.toString();
+  const res = await fetch(`/api/posta/export/contact.csv${qs ? `?${qs}` : ''}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? 'İletişim export başarısız');
+  }
+  const blob = await res.blob();
+  downloadBlob(blob, 'ekolojik-contact.csv');
+}
+
+export async function downloadMessagingExportZip() {
+  const res = await fetch('/api/messaging/export');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? 'Mesaj export başarısız');
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match?.[1] ?? 'ekolojik-messaging-export.zip';
+  const blob = await res.blob();
+  downloadBlob(blob, filename);
+}

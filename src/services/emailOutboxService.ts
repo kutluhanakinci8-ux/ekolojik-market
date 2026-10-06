@@ -6,6 +6,8 @@ export async function fetchEmailHealth(): Promise<{
   smtpHost?: string | null;
   smtpHostHint?: string | null;
   from?: string | null;
+  fromName?: string | null;
+  replyTo?: string | null;
   opsEmail?: string | null;
   contactAutoreply?: boolean;
   counts?: { pending: number; sent: number; failed: number };

@@ -1,5 +1,6 @@
-import { getEkolojikMailConfig, getEkolojikOpsEmail } from './ekolojikMailConfig.mjs';
+import { getEkolojikMailConfig } from './ekolojikMailConfig.mjs';
 import { sendEkolojikMail } from './emailOutboxProcessor.mjs';
+import { getEffectiveMailPresentation, shouldSendPostaNotification } from './postaSettings.mjs';
 
 const SUBJECT_LABELS = {
   genel: 'Genel',
@@ -57,10 +58,11 @@ export async function sendContactNotifications(dataDir, record) {
     return { ok: false, error: 'Geçersiz iletişim kaydı' };
   }
 
-  const opsEmail = getEkolojikOpsEmail();
+  const pres = await getEffectiveMailPresentation(dataDir);
+  const opsEmail = pres.opsEmail;
   const summary = { ops: null, autoreply: null, opsSkipped: false, autoreplySkipped: false };
 
-  if (opsEmail?.includes('@')) {
+  if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'contact'))) {
     summary.ops = await sendEkolojikMail(dataDir, {
       to: opsEmail,
       subject: `[İletişim] ${subjectLabel(record.subject)} — ${record.name}`,

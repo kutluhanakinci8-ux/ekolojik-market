@@ -1,5 +1,5 @@
-import { getEkolojikOpsEmail } from '../ekolojikMailConfig.mjs';
 import { sendEkolojikMail } from '../emailOutboxProcessor.mjs';
+import { getEffectiveMailPresentation, shouldSendPostaNotification } from '../postaSettings.mjs';
 
 export function isMessagingCustomerEmailEnabled() {
   return process.env.EKOLOJIK_MESSAGING_CUSTOMER_EMAIL === '1';
@@ -9,8 +9,9 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message }) {
   const summary = { ops: null, customer: null, opsSkipped: false, customerSkipped: false };
 
   if (message.direction === 'customer') {
-    const opsEmail = getEkolojikOpsEmail();
-    if (opsEmail?.includes('@')) {
+    const pres = await getEffectiveMailPresentation(dataDir);
+    const opsEmail = pres.opsEmail;
+    if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'messaging'))) {
       summary.ops = await sendEkolojikMail(dataDir, {
         to: opsEmail,
         subject: `[Mesaj] ${thread.customerName} — ${thread.subject}`,
