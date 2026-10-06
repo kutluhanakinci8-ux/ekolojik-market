@@ -32,8 +32,12 @@ if [[ -z "${HOST}" || -z "${FROM}" ]]; then
 fi
 
 if [[ "${HOST}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "UYARI: SMTP host VPS IP (${HOST}) — Postfix 587 dinlemiyorsa ECONNREFUSED alırsınız."
-  echo "       Öneri: EKOLOJIK_SMTP_HOST=mail.ekolojikmarket.com.tr veya harici relay"
+  if [[ "${HOST}" == "127.0.0.1" ]]; then
+    echo "OK: SMTP yerel relay (${HOST}:${EKOLOJIK_SMTP_PORT:-25})"
+  else
+    echo "UYARI: SMTP host VPS IP (${HOST}) — Postfix 587 dinlemiyorsa ECONNREFUSED alırsınız."
+    echo "       Öneri: EKOLOJIK_SMTP_HOST=127.0.0.1:25 veya mail.ekolojikmarket.com.tr relay"
+  fi
 fi
 
 HEALTH="$(curl -fsS "${BASE_URL}/api/email/health" 2>/dev/null || true)"
