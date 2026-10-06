@@ -588,7 +588,7 @@ const server = createServer(async (req, res) => {
         const requeued = await requeueFailedOutboxMessage(DATA_DIR, id);
         if (!requeued.ok) {
           res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify(requeued);
+          res.end(JSON.stringify(requeued));
           return;
         }
         const run = await processPendingOutbox(DATA_DIR, deliverMessage, { limit: 10 });
