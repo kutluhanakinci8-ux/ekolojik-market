@@ -52,9 +52,9 @@ console.log('OK   Gelen iletişim', hit.id, hit.subject);
 
 UNREAD_AFTER="$(curl -fsS "${BASE_URL}/api/posta/unread-counts")"
 echo "unread (sonra): ${UNREAD_AFTER}"
-echo "${UNREAD_AFTER}" | node -e "
-const before=JSON.parse(process.env.B);
-const after=JSON.parse(require('fs').readFileSync(0,'utf8'));
+BEFORE="${UNREAD_BEFORE}" AFTER="${UNREAD_AFTER}" node -e "
+const before=JSON.parse(process.env.BEFORE);
+const after=JSON.parse(process.env.AFTER);
 if ((after.gelen??0) < (before.gelen??0)) {
   console.error('UYARI: gelen unread düştü — beklenmeyen');
 }
@@ -63,7 +63,7 @@ if ((after.gelen??0) <= (before.gelen??0)) {
   process.exit(3);
 }
 console.log('OK   gelen unread arttı', before.gelen, '→', after.gelen);
-" B="${UNREAD_BEFORE}" || exit 3
+" || exit 3
 
 REPLY_SUBJ="Re: Genel — ${STAMP}"
 REPLY_BODY="Akis A operator yaniti — ${STAMP}"
@@ -81,14 +81,13 @@ curl -fsS -X POST "${BASE_URL}/api/email/outbox/process" >/dev/null 2>&1 || true
 sleep 1
 
 RECENT="$(curl -fsS "${BASE_URL}/api/email/outbox/recent?limit=30")"
-echo "${RECENT}" | node -e "
-const subj=process.env.S;
+T="${TEST_EMAIL}" B="${REPLY_BODY}" node -e "
 const to=process.env.T;
 const body=process.env.B;
 const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
 const hit=(j.items||[]).find((r)=>
   String(r.to||'')===to &&
-  String(r.text||r.body||'').includes(process.env.B) &&
+  String(r.text||r.body||'').includes(body) &&
   (r.folder==='sent' || r.status==='sent')
 );
 if (!hit) {
@@ -96,7 +95,7 @@ if (!hit) {
   process.exit(5);
 }
 console.log('OK   outbox sent', hit.id||hit.filename, hit.status);
-" S="${REPLY_SUBJ}" T="${TEST_EMAIL}" B="${REPLY_BODY}" || exit 5
+" <<<"${RECENT}" || exit 5
 
 CSV="$(curl -fsS "${BASE_URL}/api/posta/export/outbox.csv?limit=50" 2>/dev/null || true)"
 if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -q "${TEST_EMAIL}"; then
