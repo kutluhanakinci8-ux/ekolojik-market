@@ -4,13 +4,13 @@ export interface NavItem {
   id: AppPage;
   label: string;
   icon: string;
-  badge?: (store: { outOfStockCount: number; cartItemCount: number }) => number | undefined;
+  badge?: (store: { outOfStockCount: number; lowStockCount: number; cartItemCount: number }) => number | undefined;
 }
 
 export const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Panel', icon: '📊' },
   { id: 'sales', label: 'Satış', icon: '🛒', badge: (s) => s.cartItemCount || undefined },
-  { id: 'stock', label: 'Stok', icon: '📦', badge: (s) => s.outOfStockCount || undefined },
+  { id: 'stock', label: 'Stok', icon: '📦', badge: (s) => s.lowStockCount || undefined },
   { id: 'reports', label: 'Raporlar', icon: '📈' },
   { id: 'accounting', label: 'Muhasebe', icon: '📒' },
   { id: 'settings', label: 'Ayarlar', icon: '⚙️' },

@@ -320,7 +320,7 @@ export function StockScreen({ store }: StockScreenProps) {
               Az Stok
             </button>
             <button type="button" className={filter === 'out' ? 'active' : ''} onClick={() => applyFilter('out')}>
-              Tükenen
+              Stok 0
             </button>
           </div>
         </div>
@@ -346,14 +346,27 @@ export function StockScreen({ store }: StockScreenProps) {
           </button>
           <button
             type="button"
+            className={`stock-summary-chip stock-summary-chip--ok ${filter === 'all' ? '' : ''}`}
+            onClick={() => applyFilter('all')}
+            title="Stok adedi 0'dan büyük ürün kartları (irsaliyede stok girilenler)"
+          >
+            <span className="stock-summary-chip-label">Stoklu</span>
+            <strong>{inStockCount}</strong>
+          </button>
+          <button
+            type="button"
             className={`stock-summary-chip stock-summary-chip--danger ${filter === 'out' ? 'active' : ''}`}
             onClick={() => applyFilter('out')}
+            title="Stok adedi 0 olan kartlar; irsaliyede olmayan katalog ürünleri de burada görünür — depo stoğu silinmiş sayılmaz"
           >
-            <span className="stock-summary-chip-label">Tükenen</span>
+            <span className="stock-summary-chip-label">Stok 0</span>
             <strong>{store.outOfStockCount}</strong>
           </button>
-          <span className="stock-summary-chip stock-summary-chip--static" title="Stok sağlığı">
-            <span className="stock-summary-chip-label">Sağlık</span>
+          <span
+            className="stock-summary-chip stock-summary-chip--static"
+            title="Stokta en az 1 adet olan ürün kartı oranı (136 kartın tamamı depoda dolu değil)"
+          >
+            <span className="stock-summary-chip-label">Doluluk</span>
             <strong>{healthPercent}%</strong>
           </span>
           <button
@@ -368,7 +381,13 @@ export function StockScreen({ store }: StockScreenProps) {
         {summaryOpen && (
           <div className="stock-summary-strip-detail">
             <span className="stock-summary-meta">
-              {inStockCount} / {store.products.length} ürün stokta · Envanter {formatCurrency(inventoryValue)}
+              Toplam <strong>{store.totalStockUnits.toLocaleString('tr-TR')}</strong> adet depo stoğu (
+              {inStockCount} stoklu kart / {store.products.length} katalog) · Envanter{' '}
+              {formatCurrency(inventoryValue)}
+            </span>
+            <span className="stock-summary-meta stock-summary-meta--hint">
+              Bu ekran stokları otomatik değiştirmez; irsaliye miktarları ayarlarda uygulanır. Stok 0 olan{' '}
+              {store.outOfStockCount} kart çoğunlukla bu irsaliyede olmayan ürünlerdir.
             </span>
             <span className="stock-version">Katalog {APP_CATALOG_VERSION}</span>
             {store.products.length < EXPECTED_PRODUCT_COUNT && (

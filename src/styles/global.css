@@ -3349,6 +3349,18 @@ input {
   color: #c0392b;
 }
 
+.stock-summary-chip--ok strong {
+  color: var(--success);
+}
+
+.stock-summary-meta--hint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 52rem;
+  line-height: 1.45;
+}
+
 .stock-summary-chip-label {
   font-size: 9px;
   font-weight: 700;
