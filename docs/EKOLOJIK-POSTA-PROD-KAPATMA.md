@@ -23,7 +23,20 @@ Alt adımlar:
 - `scripts/sunucu-ekolojik-env-audit.sh`
 - `scripts/sunucu-ekolojik-posta-parite-dogrula.sh`
 
-Deploy sonrası (uyarı modu, deploy’u düşürmez):
+Deploy sonrası tam E2E (isteğe bağlı, ~1 dk):
+
+```bash
+EKOLOJIK_E2E_SMOKE=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-prod-kapat.sh
+# veya
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-e2e-tam.sh
+```
+
+Faz 5 otomatik kapı + isteğe bağlı E2E:
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-faz5-prod-dogrula.sh
+EKOLOJIK_RUN_E2E=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-faz5-prod-dogrula.sh
+```
 
 ```bash
 # Deploy script otomatik çağırır; atlamak için:

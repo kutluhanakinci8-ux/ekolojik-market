@@ -39,6 +39,17 @@ echo "  bash ${REPO_ROOT}/scripts/sunucu-ekolojik-data-yedek.sh"
 echo "Rehber: docs/EKOLOJIK-POSTA-PROD-KAPATMA.md"
 echo ""
 
+if [[ "${EKOLOJIK_E2E_SMOKE:-0}" == "1" ]]; then
+  echo ""
+  echo "=== E2E smoke (EKOLOJIK_E2E_SMOKE=1) ==="
+  if bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-e2e-tam.sh" "${INSTALL_DIR}"; then
+    echo "OK   E2E Akış C"
+  else
+    FAIL=1
+  fi
+  echo ""
+fi
+
 if [[ $FAIL -eq 0 ]]; then
   echo "✓ Prod kapatma kapısı — posta/mesaj canlıya hazır (SMTP/IMAP sizin altyapınız)"
   exit 0

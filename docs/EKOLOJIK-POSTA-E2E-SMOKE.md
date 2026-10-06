@@ -19,7 +19,13 @@ Ortam: canlı POS veya staging, SMTP + IMAP yapılandırılmış.
 
 ## Akış C — otomatik VPS
 
+Tek komut:
+
 ```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-e2e-tam.sh
+```
+
+Veya adım adım:
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-parite-dogrula.sh
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-smtp-dogrula.sh
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-imap-dogrula.sh
