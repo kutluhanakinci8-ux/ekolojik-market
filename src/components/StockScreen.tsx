@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 import { CATEGORIES, getCategoryLabel } from '../data/categories';
 import { APP_CATALOG_VERSION, EXPECTED_PRODUCT_COUNT } from '../data/appVersion';
 import type { Store } from '../store/useStore';
@@ -87,6 +87,7 @@ export function StockScreen({ store }: StockScreenProps) {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [page, setPage] = useState(0);
   const [movementsOpen, setMovementsOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const [setModalOpen, setSetModalOpen] = useState(false);
   const [stockOpsOpen, setStockOpsOpen] = useState(false);
@@ -324,6 +325,58 @@ export function StockScreen({ store }: StockScreenProps) {
         </div>
       </div>
 
+      <div className="stock-summary-strip" role="region" aria-label="Stok özeti">
+        <div className="stock-summary-strip-main">
+          <button type="button" className="stock-summary-chip" onClick={() => applyFilter('all')}>
+            <span className="stock-summary-chip-label">Ürün</span>
+            <strong>{store.products.length}</strong>
+          </button>
+          <button type="button" className="stock-summary-chip stock-summary-chip--green" onClick={() => applyFilter('all')}>
+            <span className="stock-summary-chip-label">Toplam stok</span>
+            <strong>{store.totalStockUnits.toLocaleString('tr-TR')}</strong>
+          </button>
+          <button
+            type="button"
+            className={`stock-summary-chip stock-summary-chip--warn ${filter === 'low' ? 'active' : ''}`}
+            onClick={() => applyFilter('low')}
+          >
+            <span className="stock-summary-chip-label">Az ≤{store.lowStockThreshold}</span>
+            <strong>{store.lowStockCount}</strong>
+          </button>
+          <button
+            type="button"
+            className={`stock-summary-chip stock-summary-chip--danger ${filter === 'out' ? 'active' : ''}`}
+            onClick={() => applyFilter('out')}
+          >
+            <span className="stock-summary-chip-label">Tükenen</span>
+            <strong>{store.outOfStockCount}</strong>
+          </button>
+          <span className="stock-summary-chip stock-summary-chip--static" title="Stok sağlığı">
+            <span className="stock-summary-chip-label">Sağlık</span>
+            <strong>{healthPercent}%</strong>
+          </span>
+          <button
+            type="button"
+            className="stock-summary-toggle"
+            aria-expanded={summaryOpen}
+            onClick={() => setSummaryOpen((open) => !open)}
+          >
+            {summaryOpen ? 'Özet gizle ▴' : 'Detaylı özet ▾'}
+          </button>
+        </div>
+        {summaryOpen && (
+          <div className="stock-summary-strip-detail">
+            <span className="stock-summary-meta">
+              {inStockCount} / {store.products.length} ürün stokta · Envanter {formatCurrency(inventoryValue)}
+            </span>
+            <span className="stock-version">Katalog {APP_CATALOG_VERSION}</span>
+            {store.products.length < EXPECTED_PRODUCT_COUNT && (
+              <span className="stock-warn">Güncelleme önerilir: {EXPECTED_PRODUCT_COUNT} ürün</span>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="stock-body">
         <div className="stock-table-panel">
           <div className="stock-table-bar">
@@ -554,77 +607,6 @@ export function StockScreen({ store }: StockScreenProps) {
         </aside>
       </div>
       </div>
-
-      <footer className="stock-hero stock-hero--dock">
-        <div className="stock-hero-card">
-          <div className="stock-hero-layout">
-            <section className="stock-hero-intro">
-              <h1>Stok Yönetimi</h1>
-              <p>
-                {store.products.length} ürün · gerçek zamanlı stok takibi
-                {store.products.length < EXPECTED_PRODUCT_COUNT && (
-                  <span className="stock-warn"> (güncelleme gerekli: {EXPECTED_PRODUCT_COUNT})</span>
-                )}
-              </p>
-              <span className="stock-version">Katalog {APP_CATALOG_VERSION}</span>
-            </section>
-
-            <section className="stock-hero-kpis" aria-label="Stok özet metrikleri">
-              <button type="button" className="stock-kpi" onClick={() => applyFilter('all')}>
-                <span className="stock-kpi-icon">📦</span>
-                <div>
-                  <span className="stock-kpi-label">Toplam Ürün</span>
-                  <strong>{store.products.length}</strong>
-                </div>
-              </button>
-              <button type="button" className="stock-kpi stock-kpi--green" onClick={() => applyFilter('all')}>
-                <span className="stock-kpi-icon">📊</span>
-                <div>
-                  <span className="stock-kpi-label">Toplam Stok</span>
-                  <strong>{store.totalStockUnits.toLocaleString('tr-TR')}</strong>
-                </div>
-              </button>
-              <button
-                type="button"
-                className={`stock-kpi stock-kpi--warn ${filter === 'low' ? 'active' : ''}`}
-                onClick={() => applyFilter('low')}
-              >
-                <span className="stock-kpi-icon">⚠️</span>
-                <div>
-                  <span className="stock-kpi-label">Az Stok ≤{store.lowStockThreshold}</span>
-                  <strong>{store.lowStockCount}</strong>
-                </div>
-              </button>
-              <button
-                type="button"
-                className={`stock-kpi stock-kpi--danger ${filter === 'out' ? 'active' : ''}`}
-                onClick={() => applyFilter('out')}
-              >
-                <span className="stock-kpi-icon">🚫</span>
-                <div>
-                  <span className="stock-kpi-label">Tükenen</span>
-                  <strong>{store.outOfStockCount}</strong>
-                </div>
-              </button>
-            </section>
-
-            <section className="stock-hero-health">
-              <div
-                className="stock-health-ring"
-                style={{ '--health-pct': healthPercent } as CSSProperties}
-                title="Stokta olan ürün oranı"
-              >
-                <span>{healthPercent}%</span>
-              </div>
-              <div className="stock-health-meta">
-                <strong>Stok Sağlığı</strong>
-                <span>{inStockCount} / {store.products.length} ürün stokta</span>
-                <span className="stock-health-value">Envanter: {formatCurrency(inventoryValue)}</span>
-              </div>
-            </section>
-          </div>
-        </div>
-      </footer>
 
       <ProductSetModal
         open={setModalOpen}

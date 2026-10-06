@@ -3287,6 +3287,118 @@ input {
   overflow: hidden;
 }
 
+.stock-summary-strip {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 4px rgba(45, 107, 40, 0.06);
+}
+
+.stock-summary-strip-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.stock-summary-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.stock-summary-chip:hover {
+  border-color: var(--greenleaf-light);
+  background: #f6fbf5;
+}
+
+.stock-summary-chip.active {
+  border-color: var(--greenleaf);
+  background: #e8f5e6;
+}
+
+.stock-summary-chip--static {
+  cursor: default;
+}
+
+.stock-summary-chip--static:hover {
+  border-color: var(--border);
+  background: var(--bg-card);
+}
+
+.stock-summary-chip--green strong {
+  color: var(--greenleaf);
+}
+
+.stock-summary-chip--warn strong {
+  color: #c77700;
+}
+
+.stock-summary-chip--danger strong {
+  color: #c0392b;
+}
+
+.stock-summary-chip-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.stock-summary-chip strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.stock-summary-toggle {
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stock-summary-toggle:hover {
+  color: var(--greenleaf);
+  border-color: var(--greenleaf-light);
+}
+
+.stock-summary-strip-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.stock-summary-meta strong {
+  color: var(--text);
+}
+
 .stock-hero {
   flex-shrink: 0;
 }
@@ -4388,6 +4500,12 @@ input {
 
   .stock-status-tabs {
     justify-content: flex-start;
+  }
+
+  .stock-summary-toggle {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
   }
 }
 
