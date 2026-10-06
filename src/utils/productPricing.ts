@@ -1,4 +1,5 @@
 import type { Product } from '../types/product';
+import { irsaliyeEanForCode } from '../data/irsaliyeLuy2026000000002';
 
 export interface PriceCatalogEntry {
   code: string;
@@ -25,7 +26,7 @@ export function applyCatalogPricing<T extends Omit<Product, 'stock'>>(product: T
   return {
     ...product,
     productCode: entry.code,
-    barcode: entry.code,
+    barcode: irsaliyeEanForCode(entry.code) ?? entry.code,
     pv: entry.pv,
     purchasePrice: entry.purchasePrice,
     partnerPrice: entry.partnerPrice,

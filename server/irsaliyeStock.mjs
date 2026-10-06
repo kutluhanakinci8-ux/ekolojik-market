@@ -45,6 +45,51 @@ export const IRSALIYE_STOCK_BY_CODE = {
   SBE089: 6,
 };
 
+/** Stok kodu → EAN-13 (irsaliye “Sonra Gönderilecek Miktar”) — src/data ile senkron */
+export const IRSALIYE_EAN_BY_CODE = {
+  ASF066: '6955470956859',
+  CAA039: '6955470954275',
+  FPA151: '6955470957498',
+  DAB089: '6955470954459',
+  LGI019: '6955470954312',
+  YBA045: '6955470957115',
+  EAA022: '6955470954220',
+  CAB040: '6955470954398',
+  CAA038: '6955470954237',
+  KLA128: '6955470959966',
+  CEA069: '6955470940223',
+  SAA069: '6955470954466',
+  ASA086: '6955470956880',
+  ASA017: '6955470956170',
+  SBJ064: '6955470951489',
+  SBC053: '6955470950215',
+  EBB018: '6955470948496',
+  CCA016: '6955470951649',
+  CBA052: '6955470951779',
+  DAA109: '6955470951564',
+  CBF015: '6955470951588',
+  CBF014: '6955470951571',
+  DAC056: '6955470950734',
+  DAB087: '6955470951724',
+  DAA108: '6955470951526',
+  DAA062: '6955470951656',
+  CBE034: '6955470951519',
+  ASF055: '6955470951618',
+  ASF054: '6955470951601',
+  ASF053: '6955470951595',
+  ASB047: '6955470951533',
+  ASB046: '6955470951472',
+  ASB045: '6955470951502',
+  ASB044: '6955470951496',
+  SBE089: '6955470954480',
+};
+
+export function irsaliyeEanForCode(code) {
+  const key = String(code ?? '').trim().toUpperCase();
+  if (!key) return undefined;
+  return IRSALIYE_EAN_BY_CODE[key];
+}
+
 /** Batch-1 ürün ID → stok kodu */
 export const PRICE_BATCH_1_CODE_BY_PRODUCT_ID = {
   1: 'ASF066',
@@ -90,11 +135,10 @@ function normalizeCode(raw) {
   return code || undefined;
 }
 
-export function resolveProductStockCode(productId, productCode, barcode) {
+export function resolveProductStockCode(productId, productCode) {
   return (
     normalizeCode(PRICE_BATCH_1_CODE_BY_PRODUCT_ID[productId])
     ?? normalizeCode(productCode)
-    ?? normalizeCode(barcode)
   );
 }
 
@@ -116,13 +160,14 @@ export function applyIrsaliyeStockToStoreSnapshot(snapshot) {
 
   let changed = false;
   const products = snapshot.products.map((product) => {
-    const code = resolveProductStockCode(product.id, product.productCode, product.barcode);
+    const code = resolveProductStockCode(product.id, product.productCode);
     const stock = resolveWarehouseStock(product.id, code, code);
+    const ean = code ? irsaliyeEanForCode(code) : undefined;
     const next = {
       ...product,
       stock,
-      productCode: product.productCode || code,
-      barcode: product.barcode || code,
+      productCode: code ?? product.productCode,
+      barcode: ean ?? product.barcode ?? code,
     };
     if (next.stock !== product.stock || next.productCode !== product.productCode || next.barcode !== product.barcode) {
       changed = true;

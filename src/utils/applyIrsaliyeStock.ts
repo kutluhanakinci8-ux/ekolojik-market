@@ -2,6 +2,7 @@ import {
   IRSALIYE_LUY2026000000002_ID,
   IRSALIYE_STOCK_BY_CODE,
   IRSALIYE_STOCK_MIGRATION_KEY,
+  irsaliyeEanForCode,
 } from '../data/irsaliyeLuy2026000000002';
 import { WAREHOUSE_STOCK_POLICY } from '../data/warehouseStockPolicy';
 import { PRICE_BATCH_1_CODE_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
@@ -26,7 +27,7 @@ export function resolveWarehouseStockForProduct(input: {
   if (WAREHOUSE_STOCK_POLICY === 'empty') {
     return 0;
   }
-  const code = resolveProductStockCode(input.id, input.productCode, input.barcode);
+  const code = resolveProductStockCode(input.id, input.productCode);
   if (!code) return 0;
   const qty = IRSALIYE_STOCK_BY_CODE[code];
   if (qty == null) return 0;
@@ -38,16 +39,14 @@ export function normalizeStockCode(raw?: string | null): string | undefined {
   return code || undefined;
 }
 
-/** Ürün kartından irsaliye stok kodunu çöz (önce batch-1 ID eşlemesi, sonra kayıtlı barkod) */
+/** Ürün kartından irsaliye stok kodunu çöz (EAN barkod alanı stok kodu sayılmaz) */
 export function resolveProductStockCode(
   productId: number,
   productCode?: string,
-  barcode?: string,
 ): string | undefined {
   return (
     normalizeStockCode(PRICE_BATCH_1_CODE_BY_PRODUCT_ID[productId])
     ?? normalizeStockCode(productCode)
-    ?? normalizeStockCode(barcode)
   );
 }
 
@@ -77,25 +76,34 @@ export function applyIrsaliyeStockToProducts(products: Product[]): {
 } {
   const movements: StockMovement[] = [];
   const next = products.map((product) => {
-    const code = resolveProductStockCode(product.id, product.productCode, product.barcode);
+    const code = resolveProductStockCode(product.id, product.productCode);
+    const ean = code ? irsaliyeEanForCode(code) : undefined;
     const safeTarget = resolveWarehouseStockForProduct({
       id: product.id,
       productCode: code,
       barcode: code,
     });
 
-    const withCodes =
-      code && !product.productCode
-        ? { ...product, productCode: code, barcode: product.barcode || code }
-        : product;
+    const updated: Product = {
+      ...product,
+      productCode: code ?? product.productCode,
+      barcode: ean ?? product.barcode ?? code,
+      stock: safeTarget,
+    };
 
-    if (withCodes.stock === safeTarget) return withCodes;
+    if (updated.stock !== product.stock) {
+      movements.push(movementFor(product, product.stock, updated.stock));
+    }
 
-    movements.push(movementFor(withCodes, withCodes.stock, safeTarget));
-    return { ...withCodes, stock: safeTarget };
+    return updated;
   });
 
   return { products: next, movements };
+}
+
+/** Sunucu store.json — stok + EAN barkod eşlemesi */
+export function syncIrsaliyeProductFields(products: Product[]): Product[] {
+  return applyIrsaliyeStockToProducts(products).products;
 }
 
 /** Sunucu store.json — products dizisini irsaliyeye göre düzeltir */
@@ -107,7 +115,13 @@ export function applyIrsaliyeStockToStoreSnapshot(snapshot: {
     return { snapshot, changed: false };
   }
   const { products, movements } = applyIrsaliyeStockToProducts(snapshot.products);
-  if (movements.length === 0) {
+  const prevById = new Map(snapshot.products.map((p) => [p.id, p]));
+  const fieldsChanged = products.some((p) => {
+    const prev = prevById.get(p.id);
+    if (!prev) return true;
+    return prev.stock !== p.stock || prev.barcode !== p.barcode || prev.productCode !== p.productCode;
+  });
+  if (movements.length === 0 && !fieldsChanged) {
     return { snapshot, changed: false };
   }
   return {

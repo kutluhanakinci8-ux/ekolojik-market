@@ -15,7 +15,7 @@ import { DEFAULT_USERS } from '../data/defaultUsers';
 import { splitGrossAmount } from '../utils/vatAnalytics';
 import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS } from '../data/navigation';
 import { PRICE_BATCH_1_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
-import { IRSALIYE_STOCK_MIGRATION_KEY } from '../data/irsaliyeLuy2026000000002';
+import { IRSALIYE_STOCK_MIGRATION_KEY, irsaliyeEanForCode } from '../data/irsaliyeLuy2026000000002';
 import { applyCatalogPricing } from '../utils/productPricing';
 import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
@@ -229,9 +229,10 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
     const isSample = saved?.isSample ?? Boolean(sampleDefaults);
     const sampleStock = saved?.sampleStock ?? sampleDefaults?.sampleStock ?? 0;
     const productCode = catalogEntry ? priced.productCode : (saved?.productCode ?? priced.productCode);
+    const irsaliyeEan = catalogEntry ? irsaliyeEanForCode(catalogEntry.code) : irsaliyeEanForCode(productCode);
     const barcode =
-      catalogEntry?.code
-      ?? (saved?.barcode?.trim() || priced.barcode || priced.productCode);
+      irsaliyeEan
+      ?? (saved?.barcode?.trim() || priced.barcode || productCode);
 
     return {
       ...priced,

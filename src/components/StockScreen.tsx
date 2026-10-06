@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CATEGORIES, getCategoryLabel } from '../data/categories';
 import { APP_CATALOG_VERSION, EXPECTED_PRODUCT_COUNT } from '../data/appVersion';
+import { irsaliyeEanForCode } from '../data/irsaliyeLuy2026000000002';
 import type { Store } from '../store/useStore';
 import type { Product, WholesalePrices } from '../types/product';
 import { formatCurrency, formatDateTime } from '../utils/format';
@@ -467,10 +468,10 @@ export function StockScreen({ store }: StockScreenProps) {
                       <td className="stock-product-code">
                         <div className="stock-product-code-stack">
                           <span className="stock-product-code-main">{p.productCode?.trim() || '—'}</span>
-                          {(p.barcode?.trim() || p.productCode?.trim()) && (
-                            <span className="stock-product-code-barcode" title="Barkod">
+                          {(p.barcode?.trim() || irsaliyeEanForCode(p.productCode)) && (
+                            <span className="stock-product-code-barcode" title="Barkod (EAN)">
                               <span className="stock-product-code-barcode-label">Barkod</span>
-                              {p.barcode?.trim() || p.productCode?.trim()}
+                              {p.barcode?.trim() || irsaliyeEanForCode(p.productCode)}
                             </span>
                           )}
                         </div>
