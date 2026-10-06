@@ -48,7 +48,8 @@ else
 fi
 
 DKIM_FOUND=0
-for sel in default mail dkim selector1 selector2; do
+SELECTORS=(default mail dkim selector1 selector2 "${EKOLOJIK_DKIM_SELECTOR:-ekolojik}")
+for sel in "${SELECTORS[@]}"; do
   D="$(txt_records "${sel}._domainkey.${DOMAIN}")"
   if echo "${D}" | grep -qi 'v=DKIM1'; then
     ok "DKIM ${sel}._domainkey.${DOMAIN}"

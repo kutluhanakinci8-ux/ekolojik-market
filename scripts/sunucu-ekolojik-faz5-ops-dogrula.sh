@@ -46,22 +46,8 @@ else
 fi
 echo ""
 
-echo "--- DNS TXT ---"
-bash "${REPO_ROOT}/scripts/sunucu-ekolojik-dns-mail-dogrula.sh" || {
-  [[ "${EKOLOJIK_DNS_STRICT:-0}" == "1" ]] && FAIL=1
-}
-if [[ "${EKOLOJIK_DNS_SPF_ONERI:-1}" == "1" ]]; then
-  VPS_IP="${EKOLOJIK_VPS_PUBLIC_IP:-168.231.109.27}"
-  echo ""
-  echo "Önerilen SPF (yerel Postfix relay, DNS paneline ekleyin):"
-  echo "  @ TXT  v=spf1 ip4:${VPS_IP} a mx ~all"
-  echo "  _dmarc TXT  v=DMARC1; p=none; rua=mailto:info@${EKOLOJIK_MAIL_DOMAIN:-ekolojikmarket.com.tr}"
-fi
 echo ""
-
-echo "--- NB UI ---"
-echo "Manuel ~30 dk: docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md"
-echo "API kapısı: bash ${REPO_ROOT}/scripts/sunucu-ekolojik-posta-nb-checklist-dogrula.sh"
+echo "DNS/DKIM (sıra 5): bash ${REPO_ROOT}/scripts/sunucu-ekolojik-dns-kabul-dogrula.sh"
 echo ""
 
 if [[ $FAIL -eq 0 ]]; then
