@@ -18,12 +18,26 @@ import {
   type PostaInboxItem,
 } from '../../services/postaInboxService';
 import {
+  createMessagingThread,
   fetchMessagingMessages,
   fetchMessagingThreads,
   postMessagingMessage,
   type MessagingMessage,
   type MessagingThread,
 } from '../../services/messagingService';
+
+function readFileAsAttachment(file: File) {
+  return new Promise<{ fileName: string; mimeType: string; dataBase64: string }>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve({ fileName: file.name, mimeType: file.type || 'application/octet-stream', dataBase64: base64 });
+    };
+    reader.onerror = () => reject(new Error('Dosya okunamadı'));
+    reader.readAsDataURL(file);
+  });
+}
 
 type PostaFolder = 'gelen' | 'fatura' | 'arsiv' | 'mesajlar' | 'gonderilen' | 'yaz';
 type InboxFolder = 'gelen' | 'fatura' | 'arsiv';
@@ -34,7 +48,15 @@ const KIND_LABEL: Record<string, string> = {
   bill: 'Fatura',
 };
 
-export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
+export function EkolojikPostaHubScreen({
+  store,
+  deepLinkCustomerId = null,
+  onDeepLinkConsumed,
+}: {
+  store: Store;
+  deepLinkCustomerId?: string | null;
+  onDeepLinkConsumed?: () => void;
+}) {
   const [folder, setFolder] = useState<PostaFolder>('gelen');
   const [inboxFolder, setInboxFolder] = useState<InboxFolder>('gelen');
   const [inboxRows, setInboxRows] = useState<PostaInboxItem[]>([]);
@@ -57,6 +79,14 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
   const [recipientHints, setRecipientHints] = useState<string[]>([]);
   const [selectedSentId, setSelectedSentId] = useState<string | null>(null);
   const [sentDetail, setSentDetail] = useState<Record<string, unknown> | null>(null);
+  const [showNewThreadModal, setShowNewThreadModal] = useState(false);
+  const [newThreadCustomerId, setNewThreadCustomerId] = useState('');
+  const [newThreadDraft, setNewThreadDraft] = useState('');
+  const [pendingMsgFiles, setPendingMsgFiles] = useState<
+    Array<{ fileName: string; mimeType: string; dataBase64: string }>
+  >([]);
+
+  const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
 
   const selectedInbox = useMemo(
     () => inboxRows.find((r) => r.id === selectedInboxId) ?? null,
@@ -91,6 +121,22 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
   const refreshHealth = useCallback(async () => {
     setHealth(await fetchEmailHealth());
   }, []);
+
+  useEffect(() => {
+    if (!deepLinkCustomerId) return;
+    setFolder('mesajlar');
+    void (async () => {
+      const result = await fetchMessagingThreads({ customerId: deepLinkCustomerId, limit: 20 });
+      if (result.ok && result.threads?.length) {
+        setThreads(result.threads);
+        setSelectedThreadId(result.threads[0].id);
+      } else {
+        setNewThreadCustomerId(deepLinkCustomerId);
+        setShowNewThreadModal(true);
+      }
+      onDeepLinkConsumed?.();
+    })();
+  }, [deepLinkCustomerId, onDeepLinkConsumed]);
 
   useEffect(() => {
     void refreshHealth();
@@ -228,22 +274,55 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
   };
 
   const sendThreadMessage = async () => {
-    if (!selectedThreadId || !msgDraft.trim()) return;
+    if (!selectedThreadId || (!msgDraft.trim() && pendingMsgFiles.length === 0)) return;
     setMsgBusy(true);
     try {
       const result = await postMessagingMessage(selectedThreadId, {
         bodyText: msgDraft.trim(),
         direction: 'staff',
-        authorName: _store.authSession?.displayName ?? 'Mağaza',
+        authorName: store.authSession?.displayName ?? 'Mağaza',
+        attachments: pendingMsgFiles.length ? pendingMsgFiles : undefined,
       });
       setFlash(result.ok ? 'Mesaj gönderildi' : result.error ?? 'Gönderilemedi');
       if (result.ok) {
         setMsgDraft('');
+        setPendingMsgFiles([]);
         await fetchMessagingMessages(selectedThreadId, { limit: 200 }).then((r) => {
           if (r.ok && r.messages) setThreadMessages(r.messages);
         });
         await refreshThreads();
       }
+    } finally {
+      setMsgBusy(false);
+    }
+  };
+
+  const createHubThread = async () => {
+    const customer = customersForMessaging.find((c) => c.id === newThreadCustomerId);
+    if (!customer) {
+      setFlash('Müşteri seçin');
+      return;
+    }
+    setMsgBusy(true);
+    try {
+      const result = await createMessagingThread({
+        customerId: customer.id,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        subject: `${customer.name} — yazışma`,
+        initialMessage: newThreadDraft.trim() || undefined,
+        initialDirection: 'staff',
+        authorName: store.authSession?.displayName ?? 'Mağaza',
+      });
+      if (!result.ok) {
+        setFlash(result.error ?? 'Thread oluşturulamadı');
+        return;
+      }
+      setShowNewThreadModal(false);
+      setNewThreadDraft('');
+      await refreshThreads();
+      if (result.thread?.id) setSelectedThreadId(result.thread.id);
+      setFlash('Yeni yazışma başlatıldı');
     } finally {
       setMsgBusy(false);
     }
@@ -345,7 +424,21 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
 
         {folder !== 'yaz' && (
           <section className="posta-hub-list">
-            <h2 className="posta-hub-list-title">{listTitle}</h2>
+            <div className="posta-hub-list-head">
+              <h2 className="posta-hub-list-title">{listTitle}</h2>
+              {folder === 'mesajlar' && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => {
+                    setNewThreadCustomerId(customersForMessaging[0]?.id ?? '');
+                    setShowNewThreadModal(true);
+                  }}
+                >
+                  Yeni yazışma
+                </button>
+              )}
+            </div>
             <ul>
               {(folder === 'gelen' || folder === 'fatura' || folder === 'arsiv') && inboxRows.length === 0 && (
                 <li className="posta-hub-empty">Kayıt yok — iletişim formu veya IMAP sync deneyin</li>
@@ -510,6 +603,17 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
                       <time>{new Date(m.createdAt).toLocaleString('tr-TR')}</time>
                     </header>
                     <p>{m.bodyText}</p>
+                    {m.attachments?.length ? (
+                      <ul className="crm-msg-attachments">
+                        {m.attachments.map((a) => (
+                          <li key={a.id}>
+                            <a href={a.url} target="_blank" rel="noreferrer">
+                              {a.fileName}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -520,16 +624,58 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
                   value={msgDraft}
                   onChange={(e) => setMsgDraft(e.target.value)}
                 />
+                <label className="settings-field settings-field--full">
+                  <span>Ek (max 5 MB)</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,text/plain"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      if (file.size > 5 * 1024 * 1024) {
+                        setFlash('Dosya 5 MB sınırını aşıyor');
+                        return;
+                      }
+                      try {
+                        const att = await readFileAsAttachment(file);
+                        setPendingMsgFiles((prev) => [...prev, att].slice(0, 3));
+                      } catch {
+                        setFlash('Ek okunamadı');
+                      }
+                    }}
+                  />
+                </label>
+                {pendingMsgFiles.length > 0 && (
+                  <ul className="crm-msg-attachments">
+                    {pendingMsgFiles.map((f, i) => (
+                      <li key={`${f.fileName}-${i}`}>
+                        {f.fileName}
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline"
+                          onClick={() => setPendingMsgFiles((p) => p.filter((_, j) => j !== i))}
+                        >
+                          Kaldır
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  disabled={msgBusy || !msgDraft.trim()}
+                  disabled={msgBusy || (!msgDraft.trim() && pendingMsgFiles.length === 0)}
                   onClick={() => void sendThreadMessage()}
                 >
                   Gönder
                 </button>
               </div>
             </>
+          )}
+
+          {folder === 'mesajlar' && !selectedThreadId && (
+            <p className="module-hint">Yazışma seçin veya yeni başlatın.</p>
           )}
 
           {folder === 'gonderilen' && sentDetail && (
@@ -553,6 +699,48 @@ export function EkolojikPostaHubScreen({ store: _store }: { store: Store }) {
           )}
         </section>
       </div>
+
+      {showNewThreadModal && (
+        <div className="posta-hub-modal-backdrop" role="presentation" onClick={() => setShowNewThreadModal(false)}>
+          <div
+            className="posta-hub-modal"
+            role="dialog"
+            aria-labelledby="posta-new-thread-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="posta-new-thread-title">Yeni müşteri yazışması</h2>
+            <label className="settings-field settings-field--full">
+              <span>Müşteri</span>
+              <select value={newThreadCustomerId} onChange={(e) => setNewThreadCustomerId(e.target.value)}>
+                <option value="">— Seçin —</option>
+                {customersForMessaging.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.email ? ` (${c.email})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="settings-field settings-field--full">
+              <span>İlk mesaj (isteğe bağlı)</span>
+              <textarea rows={4} value={newThreadDraft} onChange={(e) => setNewThreadDraft(e.target.value)} />
+            </label>
+            <div className="posta-hub-modal-actions">
+              <button type="button" className="btn btn-outline" onClick={() => setShowNewThreadModal(false)}>
+                İptal
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={msgBusy || !newThreadCustomerId}
+                onClick={() => void createHubThread()}
+              >
+                Başlat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

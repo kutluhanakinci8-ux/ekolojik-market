@@ -281,7 +281,12 @@ function CustomerDetailPanel({
       </div>
 
       {detailTab === 'messages' && (
-        <MessagingPanel customer={customer} authorName={store.settings.businessName} />
+        <>
+          <p className="module-hint">
+            <a href={`/app?customerId=${encodeURIComponent(customer.id)}&view=posta`}>Posta sekmesinde aç</a>
+          </p>
+          <MessagingPanel customer={customer} authorName={store.settings.businessName} />
+        </>
       )}
 
       {detailTab === 'crm' && (
