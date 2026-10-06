@@ -3,7 +3,7 @@
 **Referans:** Nakliye Borsası `LERTA_MAIL_MESSAGING_PARITY_100_ROADMAP.md` (PM-1…PM-10)  
 **Kural:** Aynı **ürün hissi** (3 sütun, Yaz, Gelen, Mesajlar, Gönderilen) — **ayrı kod, ayrı veri, ayrı DNS**. NB API / `lerta-mail-*` **kullanılmaz**.
 
-**Bugün (2026-10-06):** Faz 1–5 + Posta hub iskeleti. **Faz 6 (kod):** SMTP doğrulama script + health hint. **Faz 7–10 (kısmi):** birleşik inbox API, okunabilir gövde, klasörler, yanıt, hub mesaj yazma, nav badge.
+**Bugün (2026-10-06):** Faz 1–5 + Posta hub. **Faz 6–12 (kod):** SMTP doğrulama, birleşik inbox, yaz/yanıt, hub mesaj, badge/SSE, admin/export, parite script + rehberler. **Prod kapatma:** `docs/EKOLOJIK-POSTA-PROD-KAPATMA.md` + `sunucu-ekolojik-posta-prod-kapat.sh`.
 
 ---
 
@@ -31,18 +31,19 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 
 ---
 
-## Durum özeti
+## Durum özeti (2026-10-06 — kod tamam)
 
-| Bölüm | NB seviyesi | Ekolojik şimdi | Gap |
-|-------|-------------|----------------|-----|
-| Nav + 3 sütun | ✅ | ✅ iskelet | İçerik zayıf |
-| Gelen kutusu | IMAP tam | İletişim JSON + bill IMAP | Birleşik **info@** IMAP + okunabilir gövde |
-| Yaz | RTE + şablon | Basit form | Yanıt/ilet, şablon, müşteri From |
-| Müşteri mesajları | `/messaging` tam | Hub’da salt okunur | Hub’dan **yaz** + ek |
-| Gönderilen | Maildir sent | Outbox listesi | Detay + yeniden dene |
-| SMTP / gönderen | S-A4 hub | `.env` + hata (587 refused) | **Postfix veya relay** + DNS |
-| Badge / canlı | PM-1, PM-6 | Yok | Okunmamış sayacı + polling |
-| Bildirim matrisi | PM-8 | Outbox özeti only | Basit tercihler (mail açık/kapalı) |
+| Bölüm | Ekolojik |
+|-------|----------|
+| Nav + 3 sütun hub | ✅ |
+| Gelen (IMAP + iletişim) | ✅ |
+| Yaz / yanıt / şablon | ✅ |
+| Müşteri mesajları hub | ✅ |
+| Gönderilen + retry | ✅ |
+| Badge + SSE | ✅ |
+| Admin / export (Faz 11) | ✅ |
+| Doğrulama script (Faz 12) | ✅ |
+| **SMTP/DNS canlı (Faz 6)** | **Sizin VPS** — `posta-prod-kapat.sh` |
 
 ---
 
@@ -141,6 +142,8 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 | 12.2 | E2E smoke: contact → Gelen → yanıt → Gönderilen | `docs/EKOLOJIK-POSTA-E2E-SMOKE.md` |
 | 12.3 | NB karşılaştırma checklist (manuel 30 dk) | `docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md` |
 | 12.4 | Müşteri eğitim: 1 sayfa “Posta sekmesi nasıl kullanılır” | `docs/EKOLOJIK-POSTA-KULLANIM.md` |
+
+**Prod kapatma (Faz 12 sonrası):** `scripts/sunucu-ekolojik-posta-prod-kapat.sh` · `docs/EKOLOJIK-POSTA-PROD-KAPATMA.md`
 
 ---
 

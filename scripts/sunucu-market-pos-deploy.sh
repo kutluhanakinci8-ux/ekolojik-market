@@ -153,7 +153,21 @@ else
   exit 1
 fi
 
-echo ""
 echo "Not: Mali yazıcı köprüsü (inpos-bridge) VPS'te çalışmaz."
 echo "     Kasa bilgisayarında (Windows): ${APP_SRC}/inpos-bridge"
 echo "     cd inpos-bridge && npm install && npm start"
+
+if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
+  echo ""
+  echo "==> Posta prod doğrulama (uyarı modu)..."
+  export EKOLOJIK_REPO_ROOT="${REPO_ROOT}"
+  export EKOLOJIK_VERIFY_BASE_URL="http://127.0.0.1:${PORT}"
+  if bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-prod-kapat.sh" "${INSTALL_DIR}"; then
+    echo "✓ Posta prod kapatma doğrulaması geçti"
+  else
+    echo "UYARI: Posta prod doğrulama eksik — Faz 6 SMTP/DNS ve docs/EKOLOJIK-POSTA-PROD-KAPATMA.md"
+    if [[ "${EKOLOJIK_POST_DEPLOY_VERIFY_STRICT:-0}" == "1" ]]; then
+      exit 1
+    fi
+  fi
+fi
