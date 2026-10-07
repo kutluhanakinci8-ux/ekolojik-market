@@ -13,6 +13,8 @@ echo "=== Ekolojik Posta kod paritesi (statik) ==="
 
 REQUIRED=(
   server/postaInbox.mjs
+  server/postaInboxFlags.mjs
+  server/postaComposeDrafts.mjs
   server/postaComposeFormat.mjs
   server/postaInboxAttachments.mjs
   server/mailBodyParse.mjs
