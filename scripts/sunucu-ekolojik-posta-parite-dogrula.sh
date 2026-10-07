@@ -110,11 +110,24 @@ else
   bad "GET /api/messaging/export"
 fi
 
-# SSE: ilk satır okunabiliyor mu (3 sn)
-if timeout 3 curl -fsS -N "${BASE_URL}/api/posta/events" 2>/dev/null | head -n 1 | grep -q event:; then
+# SSE: retry + unread veya ping (5 sn)
+SSE_HEAD="$(timeout 5 curl -fsS -N "${BASE_URL}/api/posta/events" 2>/dev/null | head -n 8 || true)"
+if echo "$SSE_HEAD" | grep -q '^retry:' && echo "$SSE_HEAD" | grep -qE '^event:( unread| ping)'; then
+  ok "SSE /api/posta/events (retry + event)"
+elif echo "$SSE_HEAD" | grep -q '^event:'; then
   ok "SSE /api/posta/events"
 else
   warn "SSE kısa test — bağlantı veya proxy SSE'yi kesiyor olabilir"
+fi
+
+if curl -fsS "${BASE_URL}/api/posta/live/capabilities" -o /tmp/ek-posta-live-cap.json 2>/dev/null; then
+  if node -e "const d=require('/tmp/ek-posta-live-cap.json'); process.exit(d.ok&&d.events?.includes('ping')?0:1)"; then
+    ok "GET /api/posta/live/capabilities"
+  else
+    bad "live capabilities içerik hatası"
+  fi
+else
+  bad "GET /api/posta/live/capabilities"
 fi
 
 if curl -fsS "${BASE_URL}/posta-offline-sw.js" -o /tmp/ek-posta-sw.js 2>/dev/null; then

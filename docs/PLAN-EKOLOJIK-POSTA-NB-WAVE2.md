@@ -17,7 +17,7 @@ Faz 1–24: hub, IMAP, compose, sohbet, depolama, kurallar, AI/track lite, PWA l
 | **29** | PM-10 (engagement) | Tıklama + bounce CSV, webhook lite | ✅ |
 | **30** | PM-4 (PWA push) | Web push VAPID (POS PWA) | ✅ |
 | **31** | PM-9 (kurallar G5+) | Nested OR, gönderen+ek boyutu kuralları | ✅ |
-| **32** | PM-6 (canlılık) | SSE iyileştirme / mesaj gecikme metrik | plan |
+| **32** | PM-6 (canlılık) | SSE iyileştirme / mesaj gecikme metrik | ✅ |
 | **33** | Sohbet: okundu/typing (NB envanter #34) | Thread read receipt lite | plan |
 | **34** | Parite kapanış wave 2 | `sunucu-ekolojik-posta-nb-wave2-kapat.sh` | plan |
 
