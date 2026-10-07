@@ -100,6 +100,8 @@ import {
   createCalendarEventFromMail,
   syncPaymentRemindersSnapshot,
 } from './server/postaCalendar.mjs';
+import { getPostaStorageSummary } from './server/postaStorage.mjs';
+import { batchPostaInboxAction, markAllPostaInboxReadInFolder } from './server/postaInboxBatch.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -614,6 +616,52 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/storage' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getPostaStorageSummary(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Depolama hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/batch' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await batchPostaInboxAction(DATA_DIR, tenantId, {
+          action: data?.action,
+          items: data?.items,
+          actor: data?.actor ?? 'pos',
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Toplu işlem hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/mark-all-read' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const folder = String(data?.folder ?? 'gelen');
+      try {
+        const result = await markAllPostaInboxReadInFolder(DATA_DIR, tenantId, folder, data?.actor ?? 'pos');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu hatası' }));
       }
       return;
     }

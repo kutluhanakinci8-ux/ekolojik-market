@@ -180,6 +180,42 @@ export async function deletePostaComposeDraft(id: string) {
   return res.json() as Promise<{ ok: boolean; error?: string }>;
 }
 
+export type PostaStorageSummary = {
+  usedBytes: number;
+  quotaBytes: number;
+  percent: number;
+  maxAttachmentBytes: number;
+  breakdown?: Record<string, number>;
+};
+
+export async function fetchPostaStorage() {
+  const res = await fetch('/api/posta/storage');
+  return res.json() as Promise<{ ok: boolean; error?: string } & Partial<PostaStorageSummary>>;
+}
+
+export type PostaInboxBatchItem = { id: string; kind: string; sourceId?: string };
+
+export async function batchPostaInboxAction(
+  action: 'read' | 'archive' | 'spam' | 'trash',
+  items: PostaInboxBatchItem[],
+) {
+  const res = await fetch('/api/posta/inbox/batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, items }),
+  });
+  return res.json() as Promise<{ ok: boolean; processed?: number; failed?: number; error?: string }>;
+}
+
+export async function markAllPostaInboxRead(folder: PostaInboxFolder = 'gelen') {
+  const res = await fetch('/api/posta/inbox/mark-all-read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder }),
+  });
+  return res.json() as Promise<{ ok: boolean; processed?: number; error?: string }>;
+}
+
 export async function fetchPostaSent(limit = 80) {
   const res = await fetch(`/api/posta/sent?limit=${limit}`);
   return res.json() as Promise<{ ok: boolean; items?: PostaInboxItem[]; imapConfigured?: boolean; error?: string }>;
