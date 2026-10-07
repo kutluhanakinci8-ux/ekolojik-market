@@ -231,4 +231,16 @@ Faz 14 (IMAP klasör) ──► Faz 15 (konuşma/arama)
 
 ---
 
+## Faz 24 — DNS & tam kabul otomasyonu ✅ (2026-10-07)
+
+| # | İş | Çıktı |
+|---|-----|--------|
+| 24.1 | Haftalık doğrulamaya DNS (uyarı modu) + cron kontrolü | `sunucu-ekolojik-posta-haftalik-dogrula.sh` |
+| 24.2 | Tek komut tam kabul (E2E atlanmış) | `sunucu-ekolojik-posta-tam-kabul.sh` |
+| 24.3 | Faz 24 smoke | `sunucu-ekolojik-posta-faz24-dogrula.sh` |
+
+**Kabul:** `posta-tam-kabul.sh` exit 0; haftalık log’da Faz 22 yeşil.
+
+---
+
 *Ana plan: `PLAN-EKOLOJIK-POSTA-NB-PARITE.md` · Bağımsızlık: `PLAN-EKOLOJIK-MAIL-MESAJ-BAGIMSIZ.md` · Özet: `EKOLOJIK-POSTA-PARITE-TAMAMLANDI.md`*

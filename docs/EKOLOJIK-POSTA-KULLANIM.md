@@ -68,10 +68,16 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh /var/www/market-pos
 ```
 
-Kabul sırası (E2E atlanabilir):
+Tam kabul (önerilen, E2E atlanmış):
 
 ```bash
-EKOLOJIK_SKIP_E2E=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-kabul-sira.sh /var/www/market-pos
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-tam-kabul.sh /var/www/market-pos
+```
+
+DNS panel kayıtları yayınlandıktan sonra:
+
+```bash
+EKOLOJIK_DNS_STRICT=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-dns-mail-dogrula.sh
 ```
 
 Prod kapatma: `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh`  
