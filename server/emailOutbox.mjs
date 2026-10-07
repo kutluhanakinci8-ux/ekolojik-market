@@ -212,6 +212,12 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
         const { unlink } = await import('node:fs/promises');
         await unlink(full);
         results.failed += 1;
+        try {
+          const { maybeNotifyOutboxFailure } = await import('./postaOutboxNotify.mjs');
+          await maybeNotifyOutboxFailure(dataDir, message);
+        } catch {
+          /* bildirim opsiyonel */
+        }
       } else {
         const delaySec = RETRY_SECONDS[Math.min(message.attempts - 1, RETRY_SECONDS.length - 1)];
         message.nextAttemptAt = new Date(Date.now() + delaySec * 1000).toISOString();

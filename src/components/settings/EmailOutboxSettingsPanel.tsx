@@ -15,12 +15,15 @@ import {
   downloadPostaContactCsv,
   downloadMessagingExportZip,
   fetchPostaDeliverability,
+  fetchPostaNotificationsMatrix,
   fetchPostaOutboxAnalytics,
   fetchPostaRules,
   savePostaInboxRules,
   type PostaDeliverabilityHub,
   type PostaInboxRule,
   type PostaMailSettings,
+  type PostaNotificationMatrix,
+  type PostaNotificationMatrixHub,
   type PostaOutboxAnalytics,
 } from '../../services/postaSettingsService';
 
@@ -66,9 +69,10 @@ export function EmailOutboxSettingsPanel() {
   const [outboxAnalytics, setOutboxAnalytics] = useState<PostaOutboxAnalytics | null>(null);
   const [postaRules, setPostaRules] = useState<PostaInboxRule[]>([]);
   const [deliverability, setDeliverability] = useState<PostaDeliverabilityHub | null>(null);
+  const [notifyMatrixHub, setNotifyMatrixHub] = useState<PostaNotificationMatrixHub | null>(null);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, rules, deliv] = await Promise.all([
+    const [h, recent, iso, ret, posta, analytics, rules, deliv, notifyHub] = await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
@@ -77,14 +81,22 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaOutboxAnalytics(14),
       fetchPostaRules(),
       fetchPostaDeliverability(),
+      fetchPostaNotificationsMatrix(),
     ]);
     setHealth(h);
     setIsolation(iso);
     if (ret.ok && ret.policy) setRetention(ret.policy);
-    if (posta.ok && posta.settings) setPostaSettings(posta.settings);
+    if (posta.ok && posta.settings) {
+      setPostaSettings({
+        ...posta.settings,
+        notificationMatrix:
+          posta.settings.notificationMatrix ?? (notifyHub.ok ? notifyHub.matrix : undefined),
+      });
+    }
     if (analytics.ok) setOutboxAnalytics(analytics);
     if (rules.ok && rules.rules) setPostaRules(rules.rules);
     if (deliv.ok) setDeliverability(deliv);
+    if (notifyHub.ok) setNotifyMatrixHub(notifyHub);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
     }
@@ -287,6 +299,7 @@ export function EmailOutboxSettingsPanel() {
                 opsEmail: postaSettings.opsEmail,
                 signatureHtml: postaSettings.signatureHtml,
                 notifications: postaSettings.notifications,
+                notificationMatrix: postaSettings.notificationMatrix,
               });
               if (result.ok) {
                 setPostaSettings(result.settings ?? postaSettings);
@@ -350,57 +363,73 @@ export function EmailOutboxSettingsPanel() {
               placeholder="<p>Ekolojik Market</p>"
             />
           </label>
-          <fieldset className="settings-field settings-field--full">
-            <legend>Ops e-posta bildirimleri</legend>
-            <label>
-              <input
-                type="checkbox"
-                checked={postaSettings.notifications.contactOpsEmail !== false}
-                onChange={(e) =>
-                  setPostaSettings({
-                    ...postaSettings,
-                    notifications: {
-                      ...postaSettings.notifications,
-                      contactOpsEmail: e.target.checked,
-                    },
-                  })
-                }
-              />{' '}
-              İletişim formu
-            </label>
-            <label style={{ marginLeft: '1rem' }}>
-              <input
-                type="checkbox"
-                checked={postaSettings.notifications.messagingOpsEmail !== false}
-                onChange={(e) =>
-                  setPostaSettings({
-                    ...postaSettings,
-                    notifications: {
-                      ...postaSettings.notifications,
-                      messagingOpsEmail: e.target.checked,
-                    },
-                  })
-                }
-              />{' '}
-              Müşteri mesajları
-            </label>
-            <label style={{ marginLeft: '1rem' }}>
-              <input
-                type="checkbox"
-                checked={postaSettings.notifications.billEmailOpsEmail !== false}
-                onChange={(e) =>
-                  setPostaSettings({
-                    ...postaSettings,
-                    notifications: {
-                      ...postaSettings.notifications,
-                      billEmailOpsEmail: e.target.checked,
-                    },
-                  })
-                }
-              />{' '}
-              Fatura e-postası (ileride)
-            </label>
-          </fieldset>
+          <div className="settings-field settings-field--full">
+            <h4 style={{ margin: '0 0 0.5rem' }}>NB PM-8 — bildirim matrisi (olay × kanal)</h4>
+            <p className="settings-hint">
+              Operasyon e-posta, hub uyarı günlüğü ve iletişim otomatik yanıtı buradan yönetilir.{' '}
+              <code>EKOLOJIK_CONTACT_AUTOREPLY=1</code> env ile birlikte çalışır.
+            </p>
+            {notifyMatrixHub?.catalog && postaSettings.notificationMatrix && (
+              <table className="settings-table" style={{ width: '100%', marginTop: '0.5rem' }}>
+                <thead>
+                  <tr>
+                    <th>Olay</th>
+                    {notifyMatrixHub.catalog.channels.map((ch) => (
+                      <th key={ch.id}>{ch.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {notifyMatrixHub.catalog.events.map((ev) => (
+                    <tr key={ev.id}>
+                      <td>{ev.label}</td>
+                      {notifyMatrixHub.catalog!.channels.map((ch) => {
+                        const allowed = !ch.eventIds || ch.eventIds.includes(ev.id);
+                        const checked =
+                          postaSettings.notificationMatrix?.[ev.id]?.[ch.id] !== false && allowed;
+                        return (
+                          <td key={ch.id}>
+                            {allowed ? (
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const matrix: PostaNotificationMatrix = {
+                                    ...(postaSettings.notificationMatrix ?? notifyMatrixHub.matrix ?? {}),
+                                  } as PostaNotificationMatrix;
+                                  const row = { ...(matrix[ev.id] ?? {}) };
+                                  row[ch.id] = e.target.checked;
+                                  matrix[ev.id] = row;
+                                  setPostaSettings({
+                                    ...postaSettings,
+                                    notificationMatrix: matrix,
+                                    notifications: {
+                                      ...postaSettings.notifications,
+                                      ...(ev.id === 'contact'
+                                        ? { contactOpsEmail: row.opsEmail !== false }
+                                        : {}),
+                                      ...(ev.id === 'messaging'
+                                        ? { messagingOpsEmail: row.opsEmail !== false }
+                                        : {}),
+                                      ...(ev.id === 'bill'
+                                        ? { billEmailOpsEmail: row.opsEmail !== false }
+                                        : {}),
+                                    },
+                                  });
+                                }}
+                              />
+                            ) : (
+                              <span className="settings-hint">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 

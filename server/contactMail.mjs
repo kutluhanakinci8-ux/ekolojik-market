@@ -74,7 +74,9 @@ export async function sendContactNotifications(dataDir, record) {
     summary.opsSkipped = true;
   }
 
-  if (isContactAutoreplyEnabled() && record.email?.includes('@')) {
+  const autoreplyMatrix =
+    await shouldSendPostaNotification(dataDir, 'contact', 'customerAutoreply');
+  if ((isContactAutoreplyEnabled() || autoreplyMatrix) && record.email?.includes('@')) {
     summary.autoreply = await sendEkolojikMail(dataDir, {
       to: record.email,
       subject: 'Ekolojik Market — talebiniz alındı',

@@ -1,5 +1,6 @@
 import { sendEkolojikMail } from '../emailOutboxProcessor.mjs';
 import { getEffectiveMailPresentation, shouldSendPostaNotification } from '../postaSettings.mjs';
+import { recordPostaHubAlert } from '../postaHubAlerts.mjs';
 import { buildMessagingCustomerSummaryEmail } from '../mailTemplates.mjs';
 
 export function isMessagingCustomerEmailEnabled() {
@@ -32,6 +33,17 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message }) {
       });
     } else {
       summary.opsSkipped = true;
+    }
+
+    if (await shouldSendPostaNotification(dataDir, 'messaging', 'inAppHub')) {
+      await recordPostaHubAlert(dataDir, {
+        event: 'messaging',
+        threadId: thread.id,
+        messageId: message.id,
+        customerName: thread.customerName,
+        subject: thread.subject,
+        preview: String(message.bodyText ?? '').slice(0, 240),
+      });
     }
   }
 

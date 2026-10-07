@@ -4,12 +4,31 @@ export type PostaNotificationPrefs = {
   billEmailOpsEmail: boolean;
 };
 
+export type PostaNotificationChannelId = 'opsEmail' | 'inAppHub' | 'customerAutoreply';
+export type PostaNotificationEventId = 'contact' | 'messaging' | 'bill' | 'outbox_failed';
+
+export type PostaNotificationMatrix = Record<
+  PostaNotificationEventId,
+  Partial<Record<PostaNotificationChannelId, boolean>>
+>;
+
+export type PostaNotificationMatrixHub = {
+  ok: boolean;
+  catalog?: {
+    events: { id: PostaNotificationEventId; label: string }[];
+    channels: { id: PostaNotificationChannelId; label: string; eventIds: string[] | null }[];
+  };
+  matrix?: PostaNotificationMatrix;
+  error?: string;
+};
+
 export type PostaMailSettings = {
   fromName: string | null;
   replyTo: string | null;
   opsEmail: string | null;
   signatureHtml: string;
   notifications: PostaNotificationPrefs;
+  notificationMatrix?: PostaNotificationMatrix;
   updatedAt: string | null;
 };
 
@@ -21,6 +40,7 @@ export type PostaEffectiveMail = {
   opsEmail: string;
   signatureHtml: string;
   notifications: PostaNotificationPrefs;
+  notificationMatrix?: PostaNotificationMatrix;
   envFromName: string;
   envReplyTo: string;
   envOpsEmail: string;
@@ -36,7 +56,12 @@ export async function fetchPostaMailSettings(): Promise<{
   return res.json();
 }
 
-export async function savePostaMailSettings(patch: Partial<PostaMailSettings> & { notifications?: Partial<PostaNotificationPrefs> }): Promise<{
+export async function savePostaMailSettings(
+  patch: Partial<PostaMailSettings> & {
+    notifications?: Partial<PostaNotificationPrefs>;
+    notificationMatrix?: PostaNotificationMatrix;
+  },
+): Promise<{
   ok: boolean;
   settings?: PostaMailSettings;
   error?: string;
@@ -133,6 +158,11 @@ export type PostaDeliverabilityHub = {
 
 export async function fetchPostaDeliverability(): Promise<PostaDeliverabilityHub> {
   const res = await fetch('/api/posta/deliverability');
+  return res.json();
+}
+
+export async function fetchPostaNotificationsMatrix(): Promise<PostaNotificationMatrixHub> {
+  const res = await fetch('/api/posta/notifications/matrix');
   return res.json();
 }
 
