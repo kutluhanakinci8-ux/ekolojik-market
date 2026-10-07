@@ -52,6 +52,8 @@ export async function savePostaImapBatch(dataDir, tenantId, entries) {
       imapFolder: entry.imapFolder ?? 'inbox',
       imapMailboxPath: entry.imapMailboxPath ?? 'INBOX',
       messageId: entry.messageId ?? null,
+      inReplyTo: entry.inReplyTo ?? null,
+      references: entry.references ?? null,
       from: entry.from ?? '',
       to: entry.to ?? '',
       subject: entry.subject ?? '',
