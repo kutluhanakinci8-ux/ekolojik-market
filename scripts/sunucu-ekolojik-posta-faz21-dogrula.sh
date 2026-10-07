@@ -11,7 +11,7 @@ echo "=== Ekolojik Posta Faz 21 doğrulama ==="
 test -f "${ROOT}/public/posta-offline-sw.js" || exit 1
 test -f "${ROOT}/docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md" || exit 1
 
-curl -fsS "${BASE}/posta-offline-sw.js" | head -1 | grep -q 'Faz 21' || {
+curl -fsS "${BASE}/posta-offline-sw.js" | head -1 | grep -qE 'Faz 21' || {
   echo "FAIL SW static"
   exit 1
 }
