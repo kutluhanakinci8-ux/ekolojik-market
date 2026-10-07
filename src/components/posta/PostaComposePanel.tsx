@@ -30,6 +30,8 @@ export type PostaComposePanelProps = {
   onSaveDraft: () => void;
   autosaveDraft: () => void;
   signaturePreviewHtml?: string | null;
+  onAiSuggest?: () => void;
+  aiBusy?: boolean;
 };
 
 export function PostaComposePanel({
@@ -48,6 +50,8 @@ export function PostaComposePanel({
   onSaveDraft,
   autosaveDraft,
   signaturePreviewHtml,
+  onAiSuggest,
+  aiBusy,
 }: PostaComposePanelProps) {
   const [showCcBcc, setShowCcBcc] = useState(Boolean(composeCc || composeBcc));
   const [showPreview, setShowPreview] = useState(false);
@@ -154,6 +158,11 @@ export function PostaComposePanel({
         <button type="button" className="btn btn-sm btn-outline" onClick={() => setShowPreview((v) => !v)}>
           {showPreview ? 'Düzenle' : 'Önizleme'}
         </button>
+        {onAiSuggest && (
+          <button type="button" className="btn btn-sm btn-outline" disabled={loading || aiBusy} onClick={onAiSuggest}>
+            {aiBusy ? 'AI…' : 'AI öneri'}
+          </button>
+        )}
       </div>
       {!showPreview ? (
         <label className="settings-field settings-field--full">

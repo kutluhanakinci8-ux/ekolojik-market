@@ -14,7 +14,12 @@ import {
   downloadPostaOutboxCsv,
   downloadPostaContactCsv,
   downloadMessagingExportZip,
+  fetchPostaOutboxAnalytics,
+  fetchPostaRules,
+  savePostaInboxRules,
+  type PostaInboxRule,
   type PostaMailSettings,
+  type PostaOutboxAnalytics,
 } from '../../services/postaSettingsService';
 
 type OutboxRow = {
@@ -56,19 +61,25 @@ export function EmailOutboxSettingsPanel() {
   const [postaSettings, setPostaSettings] = useState<PostaMailSettings | null>(null);
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
+  const [outboxAnalytics, setOutboxAnalytics] = useState<PostaOutboxAnalytics | null>(null);
+  const [postaRules, setPostaRules] = useState<PostaInboxRule[]>([]);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta] = await Promise.all([
+    const [h, recent, iso, ret, posta, analytics, rules] = await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
       fetchRetentionPolicy(),
       fetchPostaMailSettings(),
+      fetchPostaOutboxAnalytics(14),
+      fetchPostaRules(),
     ]);
     setHealth(h);
     setIsolation(iso);
     if (ret.ok && ret.policy) setRetention(ret.policy);
     if (posta.ok && posta.settings) setPostaSettings(posta.settings);
+    if (analytics.ok) setOutboxAnalytics(analytics);
+    if (rules.ok && rules.rules) setPostaRules(rules.rules);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
     }
@@ -454,6 +465,119 @@ export function EmailOutboxSettingsPanel() {
             Saklama temizliği çalıştır
           </button>
         </div>
+      )}
+
+      <div className="settings-panel-head" style={{ marginTop: '1.25rem' }}>
+        <div>
+          <h3>Posta Faz 20 — outbox analitik</h3>
+          <p>Son {outboxAnalytics?.windowDays ?? 14} gün gönderim / hata oranı</p>
+        </div>
+      </div>
+      {outboxAnalytics?.ok && (
+        <div className="settings-stat-grid">
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Dönem gönderilen</span>
+            <strong>{outboxAnalytics.window?.sent ?? 0}</strong>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Dönem hatalı</span>
+            <strong className={(outboxAnalytics.window?.failed ?? 0) > 0 ? 'is-warn' : ''}>
+              {outboxAnalytics.window?.failed ?? 0}
+            </strong>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Başarı oranı</span>
+            <strong>
+              {outboxAnalytics.window?.successRatePercent != null
+                ? `${outboxAnalytics.window.successRatePercent}%`
+                : '—'}
+            </strong>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Açılma pikseli</span>
+            <strong>{outboxAnalytics.mailTrackEnabled ? 'Açık' : 'Kapalı'}</strong>
+          </article>
+        </div>
+      )}
+      <p className="settings-hint">
+        İsteğe bağlı: <code>EKOLOJIK_MAIL_TRACK=1</code> (giden HTML), <code>EKOLOJIK_POSTA_AI=1</code> (compose
+        öneri)
+      </p>
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>Posta kuralları (Fatura yönlendirme)</h3>
+          <p>Konu/from eşleşmesi → Fatura klasörü; IMAP sync sonrası uygulanır</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          disabled={loading || !postaRules.length}
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const result = await savePostaInboxRules(postaRules);
+              if (result.ok) {
+                setPostaRules(result.rules ?? postaRules);
+                setFlash('Posta kuralları kaydedildi');
+              } else {
+                setFlash(result.error ?? 'Kural kaydı başarısız');
+              }
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          Kuralları kaydet
+        </button>
+      </div>
+      {postaRules.length > 0 && (
+        <ul className="settings-hint" style={{ listStyle: 'none', padding: 0 }}>
+          {postaRules.map((rule) => (
+            <li key={rule.id} style={{ marginBottom: 12, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8 }}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={rule.enabled}
+                  onChange={(e) =>
+                    setPostaRules((prev) =>
+                      prev.map((r) => (r.id === rule.id ? { ...r, enabled: e.target.checked } : r)),
+                    )
+                  }
+                />{' '}
+                <strong>{rule.name}</strong>
+              </label>
+              <div className="settings-form-grid" style={{ marginTop: 6 }}>
+                <label className="settings-field settings-field--full">
+                  <span>Konu içerir (| ile ayır)</span>
+                  <input
+                    value={rule.subjectContains}
+                    onChange={(e) =>
+                      setPostaRules((prev) =>
+                        prev.map((r) => (r.id === rule.id ? { ...r, subjectContains: e.target.value } : r)),
+                      )
+                    }
+                  />
+                </label>
+                <label className="settings-field settings-field--full">
+                  <span>Gönderen içerir</span>
+                  <input
+                    value={rule.fromContains}
+                    onChange={(e) =>
+                      setPostaRules((prev) =>
+                        prev.map((r) => (r.id === rule.id ? { ...r, fromContains: e.target.value } : r)),
+                      )
+                    }
+                  />
+                </label>
+              </div>
+              <p className="settings-hint">
+                Fatura klasörü: {rule.routeToFatura ? 'evet' : 'hayır'}
+                {rule.label ? ` · etiket: ${rule.label}` : ''}
+              </p>
+            </li>
+          ))}
+        </ul>
       )}
 
       <div className="settings-panel-head" style={{ marginTop: '1.5rem' }}>

@@ -34,8 +34,8 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 | Depolama göstergesi | ✅ | ✅ Faz 19 | — |
 | Toplu işlem | Seç + işlem | ✅ Faz 19 | — |
 | Bildirim matrisi | Olay×kanal | JSON settings (Faz 11) | **18–19** |
-| Açılma / tıklama | ESP | Yok (bilinçli lite) | **20** |
-| AI compose | Opsiyonel | Yok | **20** (env) |
+| Açılma / tıklama | ESP | ✅ Faz 20 (env kapalı) | — |
+| AI compose | Opsiyonel | ✅ Faz 20 (env) | — |
 | PWA offline posta | NB | POS PWA kısıtlı | **21** (lite) |
 
 ---
@@ -138,7 +138,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 20 — Otomasyon, kurallar, analitik lite
+## Faz 20 — Otomasyon, kurallar, analitik lite ✅ (2026-10-07)
 
 | # | İş | Çıktı |
 |---|-----|--------|
