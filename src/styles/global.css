@@ -15558,6 +15558,36 @@ input {
   color: var(--text-muted, #64748b);
 }
 .posta-compose-html-preview blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid #cbd5e1; }
+.posta-hub-push-compact {
+  margin: 0 20px 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+.posta-hub-push-compact-btn {
+  border: 1px solid var(--posta-border-soft);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(27, 61, 26, 0.05);
+}
+.posta-hub-push-compact-btn:hover {
+  color: var(--greenleaf-dark);
+  border-color: rgba(81, 184, 72, 0.35);
+}
+.posta-hub-screen--sohbet-focus .posta-hub-hero {
+  margin-bottom: 10px;
+  padding: 16px 20px;
+}
+.posta-hub-screen--sohbet-focus .posta-hub-shell {
+  min-height: min(72vh, 680px);
+}
+.posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet .posta-hub-sohbet-messages {
+  max-height: min(68vh, 620px);
+}
 .posta-hub-push-bar {
   display: flex;
   flex-direction: column;
@@ -15712,18 +15742,417 @@ input {
   border-color: var(--greenleaf);
   color: var(--greenleaf-dark);
 }
+.posta-hub-screen--premium .posta-hub-detail--sohbet {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  min-height: 0;
+  background: linear-gradient(180deg, #f9fcf8 0%, #fff 42%);
+}
+.posta-hub-screen--premium .posta-hub-list--sohbet .posta-hub-list ul {
+  padding: 10px 12px 16px;
+}
+.posta-hub-thread-btn {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+}
+.posta-hub-thread-avatar,
+.posta-hub-sohbet-avatar,
+.posta-sohbet-msg-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--greenleaf-dark);
+  background: linear-gradient(145deg, #eef9ec 0%, #fff 100%);
+  border: 1px solid var(--posta-border-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.posta-hub-thread-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.posta-hub-thread-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.posta-hub-thread-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.posta-hub-thread-top strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.posta-hub-thread-top time {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-style: normal;
+}
+.posta-hub-thread-subject {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--greenleaf-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.posta-hub-thread-preview {
+  display: block;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+.posta-hub-thread-pin,
+.posta-hub-thread-mute {
+  margin-right: 4px;
+}
+.posta-hub-list--sohbet li button.is-unread .posta-hub-thread-avatar {
+  box-shadow: 0 0 0 2px rgba(81, 184, 72, 0.35);
+}
+.posta-hub-sohbet-panel {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px 20px;
+  gap: 12px;
+}
+.posta-hub-sohbet-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--posta-border-soft);
+}
+.posta-hub-sohbet-header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+.posta-hub-sohbet-back {
+  border-radius: 10px;
+  padding: 6px 10px;
+  line-height: 1;
+  display: none;
+}
+.posta-hub-sohbet-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+.posta-hub-sohbet-title-block {
+  min-width: 0;
+}
+.posta-hub-sohbet-title-block h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.posta-hub-sohbet-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: min(520px, 100%);
+}
+.posta-hub-sohbet-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.posta-hub-sohbet-search-wrap {
+  padding: 0 2px;
+}
+.posta-hub-screen--premium .posta-hub-sohbet-messages {
+  flex: 1;
+  min-height: 200px;
+  max-height: none;
+  margin: 0;
+  padding: 8px 4px 12px;
+  gap: 14px;
+  scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+}
+.posta-hub-screen--premium .posta-sohbet-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 88%;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+.posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+  margin-left: auto;
+}
+.posta-hub-screen--premium .crm-msg--customer.posta-sohbet-msg {
+  align-self: flex-start;
+  margin-right: auto;
+}
+.posta-sohbet-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+.posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg .posta-sohbet-msg-avatar {
+  background: linear-gradient(145deg, #e8f4ff 0%, #f5faff 100%);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.2);
+}
+.posta-sohbet-msg-body {
+  min-width: 0;
+  flex: 1;
+}
+.posta-sohbet-msg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+.posta-sohbet-msg-meta strong {
+  font-weight: 700;
+  color: var(--text);
+}
+.posta-sohbet-msg-meta time {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.posta-msg-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.posta-msg-chip--read {
+  background: #ecfdf3;
+  color: #166534;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+.posta-msg-chip--sent {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+.posta-msg-chip--new {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid rgba(251, 146, 60, 0.35);
+}
+.posta-hub-screen--premium .posta-sohbet-msg-text {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  border-radius: 16px;
+  border: 1px solid var(--posta-border-soft);
+  box-shadow: 0 6px 18px rgba(27, 61, 26, 0.06);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.posta-hub-screen--premium .crm-msg--customer .posta-sohbet-msg-text {
+  background: linear-gradient(145deg, #f3faf2 0%, #fff 100%);
+  border-bottom-left-radius: 4px;
+}
+.posta-hub-screen--premium .crm-msg--staff .posta-sohbet-msg-text {
+  background: linear-gradient(145deg, #eef6ff 0%, #f8fbff 100%);
+  border-color: rgba(59, 130, 246, 0.18);
+  border-bottom-right-radius: 4px;
+}
+.posta-sohbet-msg-attachments {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px dashed var(--posta-border-soft);
+}
+.posta-hub-sohbet-typing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.posta-hub-sohbet-typing-dots {
+  width: 28px;
+  height: 8px;
+  background: radial-gradient(circle, var(--greenleaf) 2px, transparent 2.5px) 0 50% / 8px 8px repeat-x;
+  opacity: 0.7;
+  animation: posta-sohbet-typing 1.1s ease-in-out infinite;
+}
+@keyframes posta-sohbet-typing {
+  0%, 100% { opacity: 0.35; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(2px); }
+}
+.posta-hub-screen--premium .posta-hub-sohbet-compose {
+  margin-top: auto;
+  max-width: none;
+  padding-top: 8px;
+  border-top: 1px solid var(--posta-border-soft);
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.92) 24%);
+  position: sticky;
+  bottom: 0;
+}
+.posta-sohbet-compose-box {
+  border: 1px solid var(--posta-border-soft);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(27, 61, 26, 0.08);
+  overflow: hidden;
+}
+.posta-sohbet-compose-box textarea {
+  width: 100%;
+  border: none;
+  padding: 14px 16px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 72px;
+  background: transparent;
+}
+.posta-sohbet-compose-box textarea:focus {
+  outline: none;
+}
+.posta-sohbet-pending-attachments {
+  margin: 0;
+  padding: 0 14px 8px;
+}
+.posta-sohbet-compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--posta-border-soft);
+  background: var(--posta-surface-muted);
+}
+.posta-sohbet-attach {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--greenleaf-dark);
+  font-weight: 600;
+}
+.posta-sohbet-attach input[type='file'] {
+  font-size: 11px;
+  max-width: 200px;
+}
+.posta-sohbet-attach-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.posta-sohbet-send {
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 20px rgba(45, 145, 41, 0.25);
+}
+.posta-hub-sohbet-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  margin: 20px;
+  border-radius: 16px;
+  border: 1px dashed var(--posta-border-soft);
+  background: linear-gradient(180deg, #fafdfb 0%, #fff 100%);
+}
+.posta-hub-sohbet-empty-title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.posta-hub-sohbet-empty-hint {
+  margin: 0;
+  max-width: 360px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.posta-hub-shell--sohbet .posta-hub-sohbet-messages {
+  max-height: min(62vh, 560px);
+}
+@media (max-width: 900px) {
+  .posta-hub-sohbet-back {
+    display: inline-flex;
+  }
+  .posta-hub-screen--premium .posta-sohbet-msg {
+    max-width: 96%;
+  }
+}
 .posta-hub-screen--premium .crm-msg {
   border-radius: 14px;
   padding: 12px 14px;
   border: 1px solid var(--posta-border-soft);
   box-shadow: 0 4px 14px rgba(27, 61, 26, 0.05);
 }
-.posta-hub-screen--premium .crm-msg--staff {
+.posta-hub-screen--premium .crm-msg.posta-sohbet-msg {
+  border-radius: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+.posta-hub-screen--premium .crm-msg--staff:not(.posta-sohbet-msg) {
   background: linear-gradient(135deg, #eef8ff 0%, #f8fbff 100%);
   margin-left: 16px;
   border-color: rgba(59, 130, 246, 0.15);
 }
-.posta-hub-screen--premium .crm-msg--customer {
+.posta-hub-screen--premium .crm-msg--customer:not(.posta-sohbet-msg) {
   background: linear-gradient(135deg, #f3faf2 0%, #fff 100%);
   margin-right: 16px;
 }

@@ -130,6 +130,30 @@ function messagingReadLabel(m: MessagingMessage) {
   return m.readByStaffAt ? 'Okundu' : 'Yeni';
 }
 
+function messagingReadChipClass(m: MessagingMessage) {
+  const label = messagingReadLabel(m);
+  if (label === 'Okundu') return 'posta-msg-chip posta-msg-chip--read';
+  if (label === 'Gönderildi') return 'posta-msg-chip posta-msg-chip--sent';
+  return 'posta-msg-chip posta-msg-chip--new';
+}
+
+function messagingInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase();
+}
+
+function formatMessagingTime(iso: string) {
+  return new Date(iso).toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function playHubMessagePing() {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -232,6 +256,7 @@ export function EkolojikPostaHubScreen({
   const [pushConfig, setPushConfig] = useState<PostaPushConfig | null>(null);
   const [pushSubscribers, setPushSubscribers] = useState(0);
   const [pushBusy, setPushBusy] = useState(false);
+  const [pushBarExpanded, setPushBarExpanded] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
@@ -1048,7 +1073,11 @@ export function EkolojikPostaHubScreen({
   ]);
 
   return (
-    <div className="module-screen posta-hub-screen posta-hub-screen--premium">
+    <div
+      className={`module-screen posta-hub-screen posta-hub-screen--premium${
+        hubLayout === 'sohbet' ? ' posta-hub-screen--sohbet-focus' : ''
+      }`}
+    >
       <header className="module-header posta-hub-header posta-hub-hero">
         <div className="posta-hub-hero-text">
           <p className="posta-hub-eyebrow">Ekolojik Market</p>
@@ -1102,7 +1131,18 @@ export function EkolojikPostaHubScreen({
           Çevrimdışı — son kaydedilen gelen kutusu listesi gösteriliyor (salt okuma).
         </p>
       )}
-      {pushConfig && (
+      {pushConfig && hubLayout === 'sohbet' && !pushBarExpanded ? (
+        <div className="posta-hub-push-compact">
+          <button
+            type="button"
+            className="posta-hub-push-compact-btn"
+            onClick={() => setPushBarExpanded(true)}
+          >
+            Bildirimler · {pushConfig.configured ? 'Hazır' : 'Kurulum'} · {pushSubscribers} cihaz
+          </button>
+        </div>
+      ) : null}
+      {pushConfig && (hubLayout !== 'sohbet' || pushBarExpanded) ? (
         <div className="posta-hub-push-bar">
           <span className="posta-hub-push-title">
             Masaüstü bildirimleri · {pushConfig.configured ? 'Hazır' : 'Kurulum gerekli'} ·{' '}
@@ -1168,12 +1208,21 @@ export function EkolojikPostaHubScreen({
             >
               Test push
             </button>
+            {hubLayout === 'sohbet' && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => setPushBarExpanded(false)}
+              >
+                Gizle
+              </button>
+            )}
           </div>
           {!pushConfig.configured && pushConfig.hint && (
             <p className="posta-hub-push-hint">{pushConfig.hint}</p>
           )}
         </div>
-      )}
+      ) : null}
 
       {postaStorage && hubLayout !== 'sohbet' && (
         <div className="posta-hub-meta-strip">
@@ -1252,7 +1301,7 @@ export function EkolojikPostaHubScreen({
         </aside>
 
         {folder !== 'yaz' && (
-          <section className="posta-hub-list">
+          <section className={`posta-hub-list${folder === 'mesajlar' ? ' posta-hub-list--sohbet' : ''}`}>
             <div className="posta-hub-list-head">
               <h2 className="posta-hub-list-title">{listTitle}</h2>
               {isInboxMailFolder(folder) && folder !== 'taslaklar' && (
@@ -1516,21 +1565,29 @@ export function EkolojikPostaHubScreen({
               {folder === 'mesajlar' && threads.length === 0 && <li className="posta-hub-empty">Thread yok</li>}
               {folder === 'mesajlar' &&
                 threads.map((t) => (
-                  <li key={t.id}>
+                  <li key={t.id} className="posta-hub-thread-item">
                     <button
                       type="button"
-                      className={`${selectedThreadId === t.id ? 'is-active' : ''}${
+                      className={`posta-hub-thread-btn${selectedThreadId === t.id ? ' is-active' : ''}${
                         t.lastMessageDirection === 'customer' ? ' is-unread' : ''
                       }`}
                       onClick={() => setSelectedThreadId(t.id)}
                     >
-                      <strong>
-                        {t.pinned ? '📌 ' : ''}
-                        {t.muted ? '🔕 ' : ''}
-                        {t.customerName}
-                      </strong>
-                      <span>{t.subject}</span>
-                      <em>{t.lastMessagePreview}</em>
+                      <span className="posta-hub-thread-avatar" aria-hidden="true">
+                        {messagingInitials(t.customerName)}
+                      </span>
+                      <span className="posta-hub-thread-body">
+                        <span className="posta-hub-thread-top">
+                          <strong>
+                            {t.pinned ? <span className="posta-hub-thread-pin" title="Sabit">📌</span> : null}
+                            {t.muted ? <span className="posta-hub-thread-mute" title="Sessiz">🔕</span> : null}
+                            {t.customerName}
+                          </strong>
+                          <time dateTime={t.lastMessageAt}>{formatMessagingTime(t.lastMessageAt)}</time>
+                        </span>
+                        <span className="posta-hub-thread-subject">{t.subject}</span>
+                        <em className="posta-hub-thread-preview">{t.lastMessagePreview}</em>
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -1555,7 +1612,7 @@ export function EkolojikPostaHubScreen({
           </section>
         )}
 
-        <section className="posta-hub-detail">
+        <section className={`posta-hub-detail${folder === 'mesajlar' ? ' posta-hub-detail--sohbet' : ''}`}>
           {folder === 'yaz' && (
             <PostaComposePanel
               ourEmails={ourMailAddresses}
@@ -1739,13 +1796,30 @@ export function EkolojikPostaHubScreen({
 
           {folder === 'mesajlar' && selectedThreadId && (
             <div className="posta-hub-sohbet-panel">
-              <div className="posta-hub-detail-actions">
-                <h2>{selectedThread?.subject ?? 'Mesajlar'}</h2>
-                <p className="posta-hub-detail-meta">
-                  {selectedThread?.customerName}
-                  {selectedThread?.customerEmail ? ` · ${selectedThread.customerEmail}` : ''}
-                </p>
-                <div className="posta-hub-detail-buttons">
+              <header className="posta-hub-sohbet-header">
+                <div className="posta-hub-sohbet-header-main">
+                  {hubLayout === 'sohbet' && (
+                    <button
+                      type="button"
+                      className="posta-hub-sohbet-back btn btn-sm btn-outline"
+                      aria-label="Yazışma listesine dön"
+                      onClick={() => setSelectedThreadId(null)}
+                    >
+                      ←
+                    </button>
+                  )}
+                  <span className="posta-hub-sohbet-avatar" aria-hidden="true">
+                    {messagingInitials(selectedThread?.customerName ?? '?')}
+                  </span>
+                  <div className="posta-hub-sohbet-title-block">
+                    <h2>{selectedThread?.subject ?? 'Mesajlar'}</h2>
+                    <p className="posta-hub-sohbet-subtitle">
+                      {selectedThread?.customerName}
+                      {selectedThread?.customerEmail ? ` · ${selectedThread.customerEmail}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="posta-hub-sohbet-toolbar posta-hub-detail-buttons">
                   <button
                     type="button"
                     className="btn btn-sm btn-outline"
@@ -1781,109 +1855,127 @@ export function EkolojikPostaHubScreen({
                     </button>
                   )}
                 </div>
+              </header>
+              <div className="posta-hub-sohbet-search-wrap">
+                <input
+                  className="posta-hub-search posta-hub-msg-search"
+                  type="search"
+                  placeholder="Thread içinde ara…"
+                  value={msgSearchQ}
+                  onChange={(e) => setMsgSearchQ(e.target.value)}
+                />
               </div>
-              <input
-                className="posta-hub-search posta-hub-msg-search"
-                type="search"
-                placeholder="Thread içinde ara…"
-                value={msgSearchQ}
-                onChange={(e) => setMsgSearchQ(e.target.value)}
-              />
               {threadTyping.customer && (
-                <p className="posta-hub-typing-hint" aria-live="polite">Müşteri yazıyor…</p>
+                <p className="posta-hub-typing-hint posta-hub-sohbet-typing" aria-live="polite">
+                  <span className="posta-hub-sohbet-typing-dots" aria-hidden="true" />
+                  Müşteri yazıyor…
+                </p>
               )}
               <ul className="crm-messaging-messages posta-hub-sohbet-messages">
                 {threadMessages.map((m) => (
-                  <li key={m.id} className={`crm-msg crm-msg--${m.direction}`}>
-                    <header>
-                      <strong>{m.authorName}</strong>
-                      <time>{new Date(m.createdAt).toLocaleString('tr-TR')}</time>
-                      <span className="posta-msg-read" title="Okundu bilgisi (NB Faz 33)">
-                        {messagingReadLabel(m)}
-                      </span>
-                    </header>
-                    <p>{m.bodyText}</p>
-                    {m.attachments?.length ? (
-                      <ul className="crm-msg-attachments">
-                        {m.attachments.map((a) => (
-                          <li key={a.id}>
-                            <a href={a.url} target="_blank" rel="noreferrer">
-                              {a.fileName}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
+                  <li key={m.id} className={`crm-msg crm-msg--${m.direction} posta-sohbet-msg`}>
+                    <span className="posta-sohbet-msg-avatar" aria-hidden="true">
+                      {messagingInitials(m.authorName)}
+                    </span>
+                    <div className="posta-sohbet-msg-body">
+                      <div className="posta-sohbet-msg-meta">
+                        <strong>{m.authorName}</strong>
+                        <time dateTime={m.createdAt}>{formatMessagingTime(m.createdAt)}</time>
+                        <span className={messagingReadChipClass(m)} title="Okundu bilgisi">
+                          {messagingReadLabel(m)}
+                        </span>
+                      </div>
+                      <p className="posta-sohbet-msg-text">{m.bodyText}</p>
+                      {m.attachments?.length ? (
+                        <ul className="crm-msg-attachments posta-sohbet-msg-attachments">
+                          {m.attachments.map((a) => (
+                            <li key={a.id}>
+                              <a href={a.url} target="_blank" rel="noreferrer">
+                                {a.fileName}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
-              <div className="posta-hub-thread-compose">
-                <textarea
-                  rows={3}
-                  placeholder="Mesaj yazın…"
-                  value={msgDraft}
-                  onChange={(e) => {
-                    setMsgDraft(e.target.value);
-                    if (!selectedThreadId) return;
-                    if (typingPulseRef.current) clearTimeout(typingPulseRef.current);
-                    void postMessagingTyping(selectedThreadId, true, 'staff');
-                    typingPulseRef.current = setTimeout(() => {
-                      if (selectedThreadId) void postMessagingTyping(selectedThreadId, false, 'staff');
-                    }, 2200);
-                  }}
-                />
-                <label className="settings-field settings-field--full">
-                  <span>Ek (max 10 MB)</span>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf,text/plain"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = '';
-                      if (!file) return;
-                      if (file.size > 10 * 1024 * 1024) {
-                        setFlash('Dosya 10 MB sınırını aşıyor');
-                        return;
-                      }
-                      try {
-                        const att = await readFileAsAttachment(file);
-                        setPendingMsgFiles((prev) => [...prev, att].slice(0, 3));
-                      } catch {
-                        setFlash('Ek okunamadı');
-                      }
+              <div className="posta-hub-thread-compose posta-hub-sohbet-compose">
+                <div className="posta-sohbet-compose-box">
+                  <textarea
+                    rows={3}
+                    placeholder="Mesaj yazın…"
+                    value={msgDraft}
+                    onChange={(e) => {
+                      setMsgDraft(e.target.value);
+                      if (!selectedThreadId) return;
+                      if (typingPulseRef.current) clearTimeout(typingPulseRef.current);
+                      void postMessagingTyping(selectedThreadId, true, 'staff');
+                      typingPulseRef.current = setTimeout(() => {
+                        if (selectedThreadId) void postMessagingTyping(selectedThreadId, false, 'staff');
+                      }, 2200);
                     }}
                   />
-                </label>
-                {pendingMsgFiles.length > 0 && (
-                  <ul className="crm-msg-attachments">
-                    {pendingMsgFiles.map((f, i) => (
-                      <li key={`${f.fileName}-${i}`}>
-                        {f.fileName}
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline"
-                          onClick={() => setPendingMsgFiles((p) => p.filter((_, j) => j !== i))}
-                        >
-                          Kaldır
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={msgBusy || (!msgDraft.trim() && pendingMsgFiles.length === 0)}
-                  onClick={() => void sendThreadMessage()}
-                >
-                  Gönder
-                </button>
+                  {pendingMsgFiles.length > 0 && (
+                    <ul className="crm-msg-attachments posta-sohbet-pending-attachments">
+                      {pendingMsgFiles.map((f, i) => (
+                        <li key={`${f.fileName}-${i}`}>
+                          {f.fileName}
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            onClick={() => setPendingMsgFiles((p) => p.filter((_, j) => j !== i))}
+                          >
+                            Kaldır
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="posta-sohbet-compose-footer">
+                    <label className="posta-sohbet-attach">
+                      <span className="posta-sohbet-attach-label">Ek</span>
+                      <span className="posta-sohbet-attach-hint">max 10 MB</span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf,text/plain"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!file) return;
+                          if (file.size > 10 * 1024 * 1024) {
+                            setFlash('Dosya 10 MB sınırını aşıyor');
+                            return;
+                          }
+                          try {
+                            const att = await readFileAsAttachment(file);
+                            setPendingMsgFiles((prev) => [...prev, att].slice(0, 3));
+                          } catch {
+                            setFlash('Ek okunamadı');
+                          }
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-primary posta-sohbet-send"
+                      disabled={msgBusy || (!msgDraft.trim() && pendingMsgFiles.length === 0)}
+                      onClick={() => void sendThreadMessage()}
+                    >
+                      Gönder
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {folder === 'mesajlar' && !selectedThreadId && (
-            <p className="module-hint">Yazışma seçin veya yeni başlatın.</p>
+            <div className="posta-hub-sohbet-empty">
+              <p className="posta-hub-sohbet-empty-title">Sohbet başlatın</p>
+              <p className="posta-hub-sohbet-empty-hint">Soldan bir yazışma seçin veya listeden yeni müşteri yazışması oluşturun.</p>
+            </div>
           )}
 
           {folder === 'gonderilen' && sentDetail && (
