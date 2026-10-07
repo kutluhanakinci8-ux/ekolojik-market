@@ -15317,74 +15317,192 @@ input {
 .crm-msg-attachments { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; }
 .crm-msg-attachments a { color: var(--greenleaf-dark); }
 
-.posta-hub-screen { padding-bottom: 24px; }
+.posta-hub-screen { padding-bottom: 32px; }
+.posta-hub-screen--premium {
+  --posta-surface: #ffffff;
+  --posta-surface-muted: #f6faf5;
+  --posta-border-soft: rgba(45, 107, 40, 0.14);
+  --posta-shadow: 0 20px 50px rgba(27, 61, 26, 0.08), 0 4px 14px rgba(27, 61, 26, 0.04);
+  max-width: 1480px;
+  margin: 0 auto;
+}
+.posta-hub-hero {
+  align-items: center;
+  gap: 20px;
+  margin: 0 20px 16px;
+  padding: 20px 24px;
+  background: var(--posta-surface);
+  border: 1px solid var(--posta-border-soft);
+  border-radius: 16px;
+  box-shadow: var(--posta-shadow);
+  position: relative;
+  overflow: hidden;
+}
+.posta-hub-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--greenleaf) 0%, var(--greenleaf-dark) 100%);
+}
+.posta-hub-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--greenleaf-dark);
+  margin-bottom: 4px;
+}
+.posta-hub-hero-text h1 {
+  font-size: clamp(1.35rem, 2vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
 .posta-hub-header { align-items: flex-start; gap: 12px; }
 .posta-live-pill {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   font-weight: 600;
   vertical-align: middle;
-  margin-left: 8px;
-  padding: 2px 8px;
+  margin-left: 10px;
+  padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--posta-border-soft);
   color: var(--text-muted);
+  background: var(--posta-surface-muted);
 }
-.posta-live-pill--open { border-color: #2d8a4e; color: #1d6b3a; background: #e8f5ec; }
-.posta-live-pill--connecting { border-color: #c9a227; color: #7a5d00; background: #fff8e6; }
-.posta-live-pill--closed { border-color: var(--border); color: var(--text-muted); background: #f6f6f6; }
+.posta-live-pill--open {
+  border-color: rgba(45, 138, 78, 0.35);
+  color: #14532d;
+  background: linear-gradient(180deg, #ecfdf3 0%, #dcfce7 100%);
+}
+.posta-live-pill--open::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+}
+.posta-live-pill--connecting { border-color: #e8d48a; color: #7a5d00; background: #fffbeb; }
+.posta-live-pill--closed { border-color: var(--posta-border-soft); color: var(--text-muted); background: #f4f6f4; }
 .posta-hub-typing-hint { margin: 0 0 8px; font-size: 12px; color: var(--text-muted); font-style: italic; }
 .posta-msg-read { margin-left: 8px; font-size: 11px; color: var(--text-muted); font-weight: 500; }
-.posta-hub-smtp-warn { margin: 0 16px 12px; max-width: 960px; }
+.posta-hub-smtp-warn,
+.posta-hub-screen--premium .settings-flash {
+  margin: 0 20px 12px;
+  max-width: none;
+  border-radius: 12px;
+}
+.posta-hub-meta-strip {
+  margin: 0 20px 14px;
+  padding: 12px 16px;
+  background: var(--posta-surface);
+  border: 1px solid var(--posta-border-soft);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(27, 61, 26, 0.04);
+}
 .posta-hub-shell {
   display: grid;
-  grid-template-columns: 200px minmax(240px, 320px) 1fr;
+  grid-template-columns: 212px minmax(260px, 340px) 1fr;
   gap: 0;
-  min-height: 520px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  min-height: 560px;
+  border: 1px solid var(--posta-border-soft);
+  border-radius: 16px;
   overflow: hidden;
-  background: #fff;
-  margin: 0 16px;
+  background: var(--posta-surface);
+  margin: 0 20px;
+  box-shadow: var(--posta-shadow);
 }
 @media (max-width: 960px) {
   .posta-hub-shell { grid-template-columns: 1fr; }
 }
 .posta-hub-folders {
-  background: #f4f8f4;
-  border-right: 1px solid var(--border);
-  padding: 12px;
+  background: linear-gradient(180deg, #f9fcf8 0%, #f1f8ef 100%);
+  border-right: 1px solid var(--posta-border-soft);
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .posta-hub-folders button {
   text-align: left;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
+  font-size: 13px;
   color: var(--text-muted);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.posta-hub-folders button.active { background: #fff; color: var(--greenleaf-dark); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.posta-hub-compose { margin-bottom: 8px; width: 100%; }
-.posta-hub-folder-meta { margin-top: auto; padding: 8px; font-size: 12px; }
-.posta-hub-list { border-right: 1px solid var(--border); overflow: auto; }
-.posta-hub-list-title { font-size: 14px; margin: 12px; }
-.posta-hub-list ul { list-style: none; margin: 0; padding: 0; }
+.posta-hub-folders button:hover {
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--greenleaf-dark);
+}
+.posta-hub-folders button.active {
+  background: #fff;
+  color: var(--greenleaf-dark);
+  border-color: var(--posta-border-soft);
+  box-shadow: 0 4px 12px rgba(45, 107, 40, 0.08);
+}
+.posta-hub-compose {
+  margin-bottom: 12px;
+  width: 100%;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 20px rgba(45, 145, 41, 0.22);
+}
+.posta-hub-folder-meta {
+  margin-top: auto;
+  padding: 12px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+  border: 1px solid var(--posta-border-soft);
+}
+.posta-hub-list {
+  border-right: 1px solid var(--posta-border-soft);
+  overflow: auto;
+  background: #fcfefb;
+}
+.posta-hub-list-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 12px;
+  color: var(--text);
+}
+.posta-hub-list ul { list-style: none; margin: 0; padding: 8px; }
 .posta-hub-list li button {
   width: 100%;
   text-align: left;
-  border: none;
-  border-bottom: 1px solid var(--border);
+  border: 1px solid transparent;
+  border-radius: 12px;
   background: #fff;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  margin-bottom: 6px;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(27, 61, 26, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
 }
-.posta-hub-list li button.is-active { background: #eef8ef; }
-.posta-hub-list li button.is-unread { font-weight: 700; border-left: 3px solid var(--greenleaf-dark); }
+.posta-hub-list li button:hover {
+  border-color: var(--posta-border-soft);
+  box-shadow: 0 6px 16px rgba(27, 61, 26, 0.06);
+}
+.posta-hub-list li button.is-active {
+  background: linear-gradient(90deg, #eef9ec 0%, #fff 100%);
+  border-color: rgba(45, 107, 40, 0.22);
+  box-shadow: 0 8px 20px rgba(45, 107, 40, 0.1);
+}
+.posta-hub-list li button.is-unread {
+  font-weight: 700;
+  border-left: 3px solid var(--greenleaf);
+}
 .posta-hub-sync { margin-top: 8px; width: 100%; }
 .posta-hub-detail-actions { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .posta-hub-detail-buttons { display: flex; gap: 8px; }
@@ -15393,9 +15511,28 @@ input {
 .posta-hub-sent-status { text-transform: uppercase; font-size: 10px; color: var(--text-muted); }
 .posta-hub-list strong { display: block; font-size: 13px; }
 .posta-hub-list span, .posta-hub-list em { display: block; font-size: 11px; color: var(--text-muted); }
-.posta-hub-empty { padding: 16px; color: var(--text-muted); }
-.posta-hub-detail { padding: 16px; overflow: auto; }
-.posta-hub-detail-body { white-space: pre-wrap; font-size: 12px; background: #f8faf8; padding: 12px; border-radius: 8px; }
+.posta-hub-empty { padding: 24px 16px; color: var(--text-muted); text-align: center; }
+.posta-hub-detail {
+  padding: 20px 24px;
+  overflow: auto;
+  background: var(--posta-surface);
+}
+.posta-hub-detail h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.posta-hub-detail-body {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--posta-surface-muted);
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--posta-border-soft);
+}
 .posta-hub-sent-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .posta-hub-compose-form { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
 .posta-compose-toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -15424,12 +15561,24 @@ input {
 .posta-hub-push-bar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 8px 12px;
-  padding: 10px 12px;
-  border: 1px dashed var(--border, #e2e8f0);
-  border-radius: 8px;
-  background: #f8fafc;
+  gap: 10px;
+  margin: 0 20px 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--posta-border-soft);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fafdfb 0%, #f3faf2 100%);
+  box-shadow: 0 6px 20px rgba(27, 61, 26, 0.04);
+}
+.posta-hub-push-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.posta-hub-push-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: ui-monospace, monospace;
+  opacity: 0.85;
 }
 .posta-hub-calendar-sync {
   margin-bottom: 16px;
@@ -15459,23 +15608,39 @@ input {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 .posta-hub-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-.posta-hub-view-switch { display: flex; gap: 6px; flex-wrap: wrap; }
-.posta-hub-view-switch button {
-  border: 1px solid var(--border);
-  background: #fff;
+.posta-hub-view-switch {
+  display: inline-flex;
+  gap: 0;
+  flex-wrap: wrap;
+  padding: 4px;
+  background: var(--posta-surface-muted);
+  border: 1px solid var(--posta-border-soft);
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
 }
-.posta-hub-view-switch button.active { background: var(--greenleaf-dark); color: #fff; border-color: var(--greenleaf-dark); }
-.posta-hub-folder-group {
-  margin: 10px 0 4px;
-  padding: 0 8px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.posta-hub-view-switch button {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   color: var(--text-muted);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.posta-hub-view-switch button.active {
+  background: #fff;
+  color: var(--greenleaf-dark);
+  box-shadow: 0 4px 12px rgba(27, 61, 26, 0.1);
+}
+.posta-hub-folder-group {
+  margin: 14px 0 6px;
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(45, 107, 40, 0.65);
 }
 .posta-hub-shell--tam {
   grid-template-columns: 176px minmax(240px, 0.75fr) minmax(480px, 2.25fr);
@@ -15501,10 +15666,17 @@ input {
 }
 .posta-hub-search {
   width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--posta-border-soft);
+  font-size: 13px;
+  background: #fff;
+  box-shadow: inset 0 1px 2px rgba(27, 61, 26, 0.04);
+}
+.posta-hub-search:focus {
+  outline: none;
+  border-color: rgba(81, 184, 72, 0.55);
+  box-shadow: 0 0 0 3px rgba(81, 184, 72, 0.15);
 }
 .posta-hub-list-mode,
 .posta-hub-filter-chips {
@@ -15514,18 +15686,46 @@ input {
 }
 .posta-hub-list-mode button,
 .posta-hub-filter-chips button {
-  border: 1px solid var(--border);
+  border: 1px solid var(--posta-border-soft);
   background: #fff;
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
+  color: var(--text-muted);
 }
 .posta-hub-list-mode button.active,
 .posta-hub-filter-chips button.active {
-  background: var(--greenleaf-dark);
+  background: linear-gradient(180deg, var(--greenleaf) 0%, var(--greenleaf-dark) 100%);
   color: #fff;
-  border-color: var(--greenleaf-dark);
+  border-color: transparent;
+  box-shadow: 0 4px 10px rgba(45, 107, 40, 0.2);
+}
+.posta-hub-screen--premium .posta-hub-detail-buttons .btn-outline {
+  border-color: var(--posta-border-soft);
+  background: #fff;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.posta-hub-screen--premium .posta-hub-detail-buttons .btn-outline:hover {
+  border-color: var(--greenleaf);
+  color: var(--greenleaf-dark);
+}
+.posta-hub-screen--premium .crm-msg {
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--posta-border-soft);
+  box-shadow: 0 4px 14px rgba(27, 61, 26, 0.05);
+}
+.posta-hub-screen--premium .crm-msg--staff {
+  background: linear-gradient(135deg, #eef8ff 0%, #f8fbff 100%);
+  margin-left: 16px;
+  border-color: rgba(59, 130, 246, 0.15);
+}
+.posta-hub-screen--premium .crm-msg--customer {
+  background: linear-gradient(135deg, #f3faf2 0%, #fff 100%);
+  margin-right: 16px;
 }
 .posta-hub-conv-count { font-weight: 500; color: var(--text-muted); font-size: 12px; }
 .posta-hub-conversation-thread {
@@ -15585,10 +15785,14 @@ input {
   margin-bottom: 0.5rem;
 }
 
-.posta-hub-storage { margin: 0 0 10px; padding: 0 4px; }
-.posta-hub-storage-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-.posta-hub-storage-track { height: 6px; background: #e8efe8; border-radius: 999px; overflow: hidden; }
-.posta-hub-storage-fill { height: 100%; background: var(--greenleaf-dark, #2d6a4f); transition: width 0.2s; }
+.posta-hub-storage { margin: 0; padding: 0; }
+.posta-hub-storage-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+.posta-hub-storage-track { height: 8px; background: #e8f0e7; border-radius: 999px; overflow: hidden; }
+.posta-hub-storage-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--greenleaf) 0%, var(--greenleaf-dark) 100%);
+  transition: width 0.25s ease;
+}
 .posta-hub-storage-fill.is-warn { background: #c2410c; }
 .posta-hub-bulk-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .posta-hub-bulk-count { font-size: 11px; color: var(--text-muted); }
