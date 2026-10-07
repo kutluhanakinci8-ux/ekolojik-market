@@ -44,6 +44,22 @@ import {
   mergeReferences,
   type OutboundAttachment,
 } from '../../utils/postaComposeClient';
+import {
+  deletePostaContact,
+  fetchPostaContacts,
+  importPostaContacts,
+  postaContactsExportVcfUrl,
+  savePostaContact,
+  type PostaContact,
+} from '../../services/postaContactsService';
+import {
+  addMailToPostaCalendar,
+  deletePostaCalendarEvent,
+  fetchPostaCalendar,
+  savePostaCalendarEvent,
+  syncPostaPaymentReminders,
+  type PostaCalendarEvent,
+} from '../../services/postaCalendarService';
 
 function readFileAsAttachment(file: File) {
   return new Promise<{ fileName: string; mimeType: string; dataBase64: string }>((resolve, reject) => {
@@ -147,6 +163,16 @@ export function EkolojikPostaHubScreen({
   const [drafts, setDrafts] = useState<PostaComposeDraft[]>([]);
   const [composeDraftId, setComposeDraftId] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState('');
+  const [postaContacts, setPostaContacts] = useState<PostaContact[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<PostaCalendarEvent[]>([]);
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newCalTitle, setNewCalTitle] = useState('');
+  const [newCalDate, setNewCalDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newCalNotes, setNewCalNotes] = useState('');
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
 
@@ -231,6 +257,23 @@ export function EkolojikPostaHubScreen({
     const result = await fetchPostaComposeDrafts();
     if (result.ok && result.drafts) setDrafts(result.drafts);
   }, []);
+
+  const refreshContacts = useCallback(async () => {
+    const result = await fetchPostaContacts(contactSearch, 120);
+    if (result.ok && result.contacts) {
+      setPostaContacts(result.contacts);
+      setSelectedContactId((cur) => cur ?? result.contacts![0]?.id ?? null);
+    }
+  }, [contactSearch]);
+
+  const refreshCalendar = useCallback(async () => {
+    await syncPostaPaymentReminders(store.settings.paymentReminders ?? []);
+    const result = await fetchPostaCalendar(160);
+    if (result.ok && result.events) {
+      setCalendarEvents(result.events);
+      setSelectedCalendarId((cur) => cur ?? result.events![0]?.id ?? null);
+    }
+  }, [store.settings.paymentReminders]);
 
   useEffect(() => {
     if (!deepLinkCustomerId) return;
@@ -557,18 +600,44 @@ export function EkolojikPostaHubScreen({
     [composeDraftId, composeTo, composeCc, composeBcc, composeSubject, composeBody, composeReply, refreshDrafts],
   );
 
-  const filteredContacts = useMemo(() => {
-    const q = contactSearch.trim().toLowerCase();
-    return customersForMessaging
-      .filter((c) => c.email?.includes('@'))
-      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q))
-      .slice(0, 120);
-  }, [customersForMessaging, contactSearch]);
-
-  const paymentReminders = useMemo(
-    () => (store.settings.paymentReminders ?? []).slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
-    [store.settings.paymentReminders],
+  const selectedContact = useMemo(
+    () => postaContacts.find((c) => c.id === selectedContactId) ?? null,
+    [postaContacts, selectedContactId],
   );
+
+  const selectedCalendarEvent = useMemo(
+    () => calendarEvents.find((e) => e.id === selectedCalendarId) ?? null,
+    [calendarEvents, selectedCalendarId],
+  );
+
+  useEffect(() => {
+    if (folder === 'kisiler') void refreshContacts();
+  }, [folder, refreshContacts]);
+
+  useEffect(() => {
+    if (folder === 'takvim') void refreshCalendar();
+  }, [folder, refreshCalendar]);
+
+  const openComposeForContact = (contact: PostaContact) => {
+    setComposeTo(contact.email);
+    setComposeCc('');
+    setComposeBcc('');
+    setComposeSubject(`${contact.name} — Ekolojik Market`);
+    setComposeBody('');
+    setComposeReply(null);
+    setComposeDraftId(null);
+    setFolder('yaz');
+  };
+
+  const addInboxToCalendar = async (row: PostaInboxItem) => {
+    const result = await addMailToPostaCalendar({
+      mailId: row.id,
+      subject: row.subject,
+      notes: row.preview?.slice(0, 200) ?? undefined,
+    });
+    setFlash(result.ok ? 'Takvime eklendi' : result.error ?? 'Takvime eklenemedi');
+    if (result.ok) await refreshCalendar();
+  };
 
   const createHubThread = async () => {
     const customer = customersForMessaging.find((c) => c.id === newThreadCustomerId);
@@ -872,40 +941,54 @@ export function EkolojikPostaHubScreen({
                   />
                 </li>
               )}
-              {folder === 'kisiler' && filteredContacts.length === 0 && (
-                <li className="posta-hub-empty">E-postalı müşteri bulunamadı</li>
+              {folder === 'kisiler' && postaContacts.length === 0 && (
+                <li className="posta-hub-empty">Kişi bulunamadı — manuel ekleyin veya içe aktarın</li>
               )}
               {folder === 'kisiler' &&
-                filteredContacts.map((c) => (
+                postaContacts.map((c) => (
                   <li key={c.id}>
                     <button
                       type="button"
-                      onClick={() => {
-                        setComposeTo(c.email ?? '');
-                        setComposeSubject(`${c.name} — Ekolojik Market`);
-                        setComposeBody('');
-                        setComposeReply(null);
-                        setComposeDraftId(null);
-                        pickFolder('yaz');
-                      }}
+                      className={selectedContactId === c.id ? 'is-active' : ''}
+                      onClick={() => setSelectedContactId(c.id)}
                     >
                       <strong>{c.name}</strong>
                       <span>{c.email}</span>
+                      <em>
+                        {c.source === 'manual' ? 'Manuel' : c.source === 'suggested' ? 'Öneri' : 'Müşteri'}
+                        {c.lastCorrespondenceAt
+                          ? ` · ${new Date(c.lastCorrespondenceAt).toLocaleDateString('tr-TR')}`
+                          : ''}
+                      </em>
                     </button>
                   </li>
                 ))}
 
-              {folder === 'takvim' && paymentReminders.length === 0 && (
-                <li className="posta-hub-empty">Ödeme hatırlatması yok — fatura satırından ekleyebilirsiniz</li>
+              {folder === 'takvim' && calendarEvents.length === 0 && (
+                <li className="posta-hub-empty">Takvim boş — etkinlik veya ödeme hatırlatması ekleyin</li>
               )}
               {folder === 'takvim' &&
-                paymentReminders.map((r) => (
-                  <li key={r.id}>
-                    <div className="posta-hub-calendar-row">
-                      <strong>{r.title}</strong>
-                      <span>{r.dueDate}</span>
-                      <em>{r.amount}</em>
-                    </div>
+                calendarEvents.map((ev) => (
+                  <li key={ev.id}>
+                    <button
+                      type="button"
+                      className={selectedCalendarId === ev.id ? 'is-active' : ''}
+                      onClick={() => setSelectedCalendarId(ev.id)}
+                    >
+                      <div className="posta-hub-calendar-row">
+                        <strong>{ev.title}</strong>
+                        <span>{ev.date}</span>
+                        <em>
+                          {ev.kind === 'snooze'
+                            ? 'E-posta erteleme'
+                            : ev.kind === 'payment'
+                              ? 'Ödeme'
+                              : ev.kind === 'mail'
+                                ? 'Posta'
+                                : 'Etkinlik'}
+                        </em>
+                      </div>
+                    </button>
                   </li>
                 ))}
 
@@ -1041,6 +1124,9 @@ export function EkolojikPostaHubScreen({
                   </button>
                   <button type="button" className="btn btn-sm btn-outline" onClick={() => startForward(selectedInbox)}>
                     İlet
+                  </button>
+                  <button type="button" className="btn btn-sm btn-outline" onClick={() => void addInboxToCalendar(selectedInbox)}>
+                    Takvime ekle
                   </button>
                   {selectedInbox.kind === 'bill' && (
                     <button type="button" className="btn btn-sm btn-primary" onClick={addBillToPaymentCalendar}>
@@ -1247,13 +1333,169 @@ export function EkolojikPostaHubScreen({
           )}
 
           {folder === 'kisiler' && (
-            <p className="module-hint">Listeden kişi seçerek doğrudan e-posta yazabilirsiniz (NB Kişiler).</p>
+            <div className="posta-hub-contacts-detail">
+              {selectedContact ? (
+                <>
+                  <h2>{selectedContact.name}</h2>
+                  <p className="posta-hub-detail-meta">{selectedContact.email}</p>
+                  {selectedContact.phone && <p className="posta-hub-detail-meta">Tel: {selectedContact.phone}</p>}
+                  {selectedContact.lastCorrespondenceAt && (
+                    <p className="posta-hub-detail-meta">
+                      Son yazışma: {new Date(selectedContact.lastCorrespondenceAt).toLocaleString('tr-TR')}
+                      {selectedContact.lastSubject ? ` — ${selectedContact.lastSubject}` : ''}
+                    </p>
+                  )}
+                  <div className="posta-hub-detail-buttons">
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => openComposeForContact(selectedContact)}>
+                      E-posta yaz
+                    </button>
+                    {selectedContact.manual && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        onClick={async () => {
+                          const result = await deletePostaContact(selectedContact.id);
+                          setFlash(result.ok ? 'Kişi silindi' : result.error ?? 'Silinemedi');
+                          if (result.ok) {
+                            setSelectedContactId(null);
+                            await refreshContacts();
+                          }
+                        }}
+                      >
+                        Sil
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="module-hint">Kişi seçin veya yeni kayıt ekleyin.</p>
+              )}
+              <h3 className="posta-hub-subtitle">Yeni kişi</h3>
+              <label className="settings-field settings-field--full">
+                <span>Ad</span>
+                <input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} />
+              </label>
+              <label className="settings-field settings-field--full">
+                <span>E-posta</span>
+                <input value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} />
+              </label>
+              <label className="settings-field settings-field--full">
+                <span>Telefon</span>
+                <input value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} />
+              </label>
+              <div className="posta-hub-detail-buttons">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  disabled={!newContactEmail.includes('@') || !newContactName.trim()}
+                  onClick={async () => {
+                    const result = await savePostaContact({
+                      name: newContactName.trim(),
+                      email: newContactEmail.trim(),
+                      phone: newContactPhone.trim() || undefined,
+                    });
+                    setFlash(result.ok ? 'Kişi kaydedildi' : result.error ?? 'Kaydedilemedi');
+                    if (result.ok) {
+                      setNewContactName('');
+                      setNewContactEmail('');
+                      setNewContactPhone('');
+                      await refreshContacts();
+                    }
+                  }}
+                >
+                  Kaydet
+                </button>
+                <a className="btn btn-sm btn-outline" href={postaContactsExportVcfUrl()} download>
+                  vCard indir
+                </a>
+                <label className="btn btn-sm btn-outline posta-hub-file-btn">
+                  İçe aktar
+                  <input
+                    type="file"
+                    accept=".vcf,.csv,text/vcard,text/csv"
+                    hidden
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      const text = await file.text();
+                      const format = file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'vcf';
+                      const result = await importPostaContacts(text, format);
+                      setFlash(result.ok ? `${result.imported ?? 0} kişi içe aktarıldı` : result.error ?? 'Hata');
+                      if (result.ok) await refreshContacts();
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
           )}
 
           {folder === 'takvim' && (
-            <p className="module-hint">
-              Ödeme hatırlatmaları POS takviminden gelir. Fatura e-postasında “Ödeme takvimine işle” ile eklenir.
-            </p>
+            <div className="posta-hub-calendar-detail">
+              {selectedCalendarEvent ? (
+                <>
+                  <h2>{selectedCalendarEvent.title}</h2>
+                  <p className="posta-hub-detail-meta">
+                    {selectedCalendarEvent.date} · {selectedCalendarEvent.kind}
+                    {selectedCalendarEvent.amount != null ? ` · ${selectedCalendarEvent.amount} ₺` : ''}
+                  </p>
+                  {selectedCalendarEvent.notes && (
+                    <pre className="posta-hub-detail-body">{selectedCalendarEvent.notes}</pre>
+                  )}
+                  {selectedCalendarEvent.editable && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      onClick={async () => {
+                        const result = await deletePostaCalendarEvent(selectedCalendarEvent.id);
+                        setFlash(result.ok ? 'Etkinlik silindi' : result.error ?? 'Silinemedi');
+                        if (result.ok) {
+                          setSelectedCalendarId(null);
+                          await refreshCalendar();
+                        }
+                      }}
+                    >
+                      Etkinliği sil
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="module-hint">Ödeme, ertelenen e-posta ve manuel etkinlikler burada listelenir.</p>
+              )}
+              <h3 className="posta-hub-subtitle">Manuel etkinlik</h3>
+              <label className="settings-field settings-field--full">
+                <span>Başlık</span>
+                <input value={newCalTitle} onChange={(e) => setNewCalTitle(e.target.value)} />
+              </label>
+              <label className="settings-field settings-field--full">
+                <span>Tarih</span>
+                <input type="date" value={newCalDate} onChange={(e) => setNewCalDate(e.target.value)} />
+              </label>
+              <label className="settings-field settings-field--full">
+                <span>Not</span>
+                <textarea rows={2} value={newCalNotes} onChange={(e) => setNewCalNotes(e.target.value)} />
+              </label>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                disabled={!newCalTitle.trim()}
+                onClick={async () => {
+                  const result = await savePostaCalendarEvent({
+                    title: newCalTitle.trim(),
+                    date: newCalDate,
+                    notes: newCalNotes.trim() || undefined,
+                  });
+                  setFlash(result.ok ? 'Etkinlik eklendi' : result.error ?? 'Eklenemedi');
+                  if (result.ok) {
+                    setNewCalTitle('');
+                    setNewCalNotes('');
+                    await refreshCalendar();
+                  }
+                }}
+              >
+                Etkinlik ekle
+              </button>
+            </div>
           )}
         </section>
       </div>

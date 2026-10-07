@@ -27,8 +27,8 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 | Arama / filtre | Gelişmiş | Yok | **15** |
 | Yaz: CC/BCC, ek, ilet | ✅ | ✅ Faz 16 | — |
 | Yanıtla / tümünü yanıtla / ilet | ✅ | ✅ Faz 16 | — |
-| Kişiler defteri | CardDAV benzeri | Müşteri listesi | **17** |
-| Takvim | Posta içi | Ödeme hatırlatma listesi | **17** |
+| Kişiler defteri | CardDAV benzeri | ✅ Faz 17 | — |
+| Takvim | Posta içi | ✅ Faz 17 | — |
 | Müşteri mesajları hub | Tam sohbet UX | Thread+ek | **18** |
 | Sohbet tam ekran | ✅ | Sekme var, UX kısmi | **18** |
 | Depolama göstergesi | ✅ | Yok | **19** |
@@ -91,7 +91,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 17 — Kişiler & Takvim (NB menü maddeleri)
+## Faz 17 — Kişiler & Takvim (NB menü maddeleri) ✅ (2026-10-07)
 
 **Amaç:** Kişiler ve Takvim menüleri NB seviyesinde işlevsel.
 
