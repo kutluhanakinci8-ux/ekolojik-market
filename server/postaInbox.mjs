@@ -20,6 +20,7 @@ import { countStaffUnreadMessagingThreads } from './messaging/store.mjs';
 import { persistImapAttachments, readPostaInboxAttachment } from './postaInboxAttachments.mjs';
 import { applyPostaFlagsToItem, getPostaInboxFlagsMap, patchPostaInboxFlags } from './postaInboxFlags.mjs';
 import { groupIntoConversations, parseThreadHeadersFromRaw } from './postaConversation.mjs';
+import { applyPostaRulesToImapMessages } from './postaRules.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -232,6 +233,9 @@ export async function syncPostaInboxFromImap(dataDir, tenantId = 'main', { maxMe
     const saved = await ingestImapMessages(dataDir, tenantId, fetched, job.imapFolder);
     added += saved.added.length;
     updated += saved.updated?.length ?? 0;
+    if (job.imapFolder === 'inbox' && saved.added?.length) {
+      await applyPostaRulesToImapMessages(dataDir, tenantId, saved.added);
+    }
     folderStats[job.imapFolder] = { scanned: fetched.length, added: saved.added.length };
   }
 

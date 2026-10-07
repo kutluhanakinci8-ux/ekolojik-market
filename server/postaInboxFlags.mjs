@@ -27,6 +27,7 @@ export function applyPostaFlagsToItem(item, flagsMap) {
   const f = flagsMap[item.id] ?? {};
   const snoozedUntil = f.snoozedUntil ?? null;
   const snoozeActive = snoozedUntil && Date.parse(snoozedUntil) > Date.now();
+  const labels = Array.isArray(f.labels) ? f.labels.filter(Boolean) : [];
   return {
     ...item,
     starred: Boolean(f.starred),
@@ -34,6 +35,7 @@ export function applyPostaFlagsToItem(item, flagsMap) {
     trashed: Boolean(f.trashed),
     snoozedUntil,
     snoozeActive,
+    labels,
   };
 }
 
@@ -47,6 +49,11 @@ export async function patchPostaInboxFlags(dataDir, tenantId, id, patch) {
   if (patch.trashed != null) next.trashed = Boolean(patch.trashed);
   if (patch.snoozedUntil !== undefined) {
     next.snoozedUntil = patch.snoozedUntil || null;
+  }
+  if (patch.labels != null) {
+    const add = Array.isArray(patch.labels) ? patch.labels : [];
+    const merged = new Set([...(Array.isArray(prev.labels) ? prev.labels : []), ...add].map(String));
+    next.labels = [...merged].filter(Boolean);
   }
   map[id] = next;
   await writeFlags(dataDir, tenantId, map);

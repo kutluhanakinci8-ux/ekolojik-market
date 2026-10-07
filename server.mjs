@@ -102,6 +102,10 @@ import {
 } from './server/postaCalendar.mjs';
 import { getPostaStorageSummary } from './server/postaStorage.mjs';
 import { batchPostaInboxAction, markAllPostaInboxReadInFolder } from './server/postaInboxBatch.mjs';
+import { listPostaRules, savePostaRules } from './server/postaRules.mjs';
+import { getPostaOutboxAnalytics } from './server/postaOutboxAnalytics.mjs';
+import { suggestPostaCompose, isPostaAiEnabled } from './server/postaAiCompose.mjs';
+import { recordMailOpen, mailTrackPixelResponse } from './server/postaMailTrack.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -510,6 +514,22 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const postaTrackMatch = pathname.match(/^\/api\/posta\/track\/open\/([a-f0-9]+)\.gif$/i);
+    if (postaTrackMatch && req.method === 'GET') {
+      try {
+        await recordMailOpen(DATA_DIR, postaTrackMatch[1], { ip: getRequestIp(req) });
+        res.writeHead(200, {
+          'Content-Type': 'image/gif',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        });
+        res.end(mailTrackPixelResponse());
+      } catch {
+        res.writeHead(200, { 'Content-Type': 'image/gif' });
+        res.end(mailTrackPixelResponse());
+      }
+      return;
+    }
+
     if (
       (pathname === '/api/posta/inbox' || pathname === '/api/posta/inbox/search') &&
       req.method === 'GET'
@@ -666,6 +686,63 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/rules' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaRules(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/rules' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaRules(DATA_DIR, tenantId, data?.rules);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/analytics' && req.method === 'GET') {
+      const days = Number(url.searchParams.get('days') || 14);
+      try {
+        const result = await getPostaOutboxAnalytics(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Analitik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/compose/ai-suggest' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      try {
+        const result = await suggestPostaCompose({
+          subject: data?.subject,
+          body: data?.body,
+          tone: data?.tone,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...result, aiEnabled: isPostaAiEnabled() }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'AI öneri hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/inbox/flags' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       const data = await readRequestBody(req);
@@ -681,6 +758,7 @@ const server = createServer(async (req, res) => {
           spam: data?.spam,
           trashed: data?.trashed,
           snoozedUntil: data?.snoozedUntil,
+          labels: data?.labels,
         });
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));

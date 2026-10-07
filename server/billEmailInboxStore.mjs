@@ -70,7 +70,7 @@ export async function saveBillEmailInboxBatch(dataDir, tenantId, entries) {
       snippet: entry.snippet ?? '',
       amount: entry.amount ?? null,
       dueDate: entry.dueDate ?? null,
-      matched: Boolean(entry.sourceId),
+      matched: entry.matched != null ? Boolean(entry.matched) : Boolean(entry.sourceId),
       ingestedAt: new Date().toISOString(),
     };
     added.push(row);

@@ -39,7 +39,7 @@ import {
   type MessagingMessage,
   type MessagingThread,
 } from '../../services/messagingService';
-import { fetchPostaMailSettings } from '../../services/postaSettingsService';
+import { fetchPostaAiSuggest, fetchPostaMailSettings } from '../../services/postaSettingsService';
 import { PostaComposePanel } from './PostaComposePanel';
 import {
   buildForwardBody,
@@ -168,6 +168,7 @@ export function EkolojikPostaHubScreen({
     null,
   );
   const [loading, setLoading] = useState(false);
+  const [composeAiBusy, setComposeAiBusy] = useState(false);
   const [imapConfigured, setImapConfigured] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [msgDraft, setMsgDraft] = useState('');
@@ -577,6 +578,26 @@ export function EkolojikPostaHubScreen({
     beginComposeFromRow(row, 'replyAll', threadMessages);
 
   const startForward = (row: PostaInboxItem) => beginComposeFromRow(row, 'forward');
+
+  const runComposeAiSuggest = async () => {
+    setComposeAiBusy(true);
+    setFlash(null);
+    try {
+      const result = await fetchPostaAiSuggest({
+        subject: composeSubject,
+        body: composeBody,
+        tone: 'profesyonel',
+      });
+      if (result.ok && result.suggestion) {
+        setComposeBody(result.suggestion);
+        setFlash(`AI öneri (${result.provider ?? 'ai'}) uygulandı`);
+      } else {
+        setFlash(result.error ?? 'AI öneri alınamadı (EKOLOJIK_POSTA_AI=1)');
+      }
+    } finally {
+      setComposeAiBusy(false);
+    }
+  };
 
   const sendCompose = async () => {
     setLoading(true);
@@ -1281,6 +1302,8 @@ export function EkolojikPostaHubScreen({
               onSend={() => void sendCompose()}
               onSaveDraft={() => void persistComposeDraft(false)}
               autosaveDraft={() => void persistComposeDraft(true)}
+              onAiSuggest={() => void runComposeAiSuggest()}
+              aiBusy={composeAiBusy}
             />
           )}
 

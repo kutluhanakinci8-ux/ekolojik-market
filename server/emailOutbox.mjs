@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
+import { createMailTrackToken, isMailTrackEnabled } from './postaMailTrack.mjs';
 
 const MAX_ATTEMPTS = 3;
 const RETRY_SECONDS = [60, 120, 300];
@@ -93,6 +94,7 @@ export async function enqueueEkolojikMail(
     references: references ?? null,
     attachments: Array.isArray(attachments) ? attachments : [],
     signatureAppended: Boolean(signatureAppended),
+    trackToken: isMailTrackEnabled() ? createMailTrackToken(id) : null,
     status: 'pending',
     attempts: 0,
     maxAttempts: MAX_ATTEMPTS,

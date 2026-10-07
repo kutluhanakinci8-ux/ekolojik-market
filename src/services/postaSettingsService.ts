@@ -86,6 +86,66 @@ export async function downloadPostaContactCsv(from?: string, to?: string) {
   downloadBlob(blob, 'ekolojik-contact.csv');
 }
 
+export type PostaInboxRule = {
+  id: string;
+  enabled: boolean;
+  name: string;
+  subjectContains: string;
+  fromContains: string;
+  routeToFatura: boolean;
+  label: string | null;
+};
+
+export type PostaOutboxAnalytics = {
+  ok: boolean;
+  windowDays?: number;
+  counts?: { pending: number; sent: number; failed: number };
+  window?: {
+    sent: number;
+    failed: number;
+    attempted: number;
+    successRatePercent: number | null;
+  };
+  byDay?: { date: string; sent: number; failed: number }[];
+  recentErrors?: { id: string; to: string; subject: string; at?: string; error?: string }[];
+  mailTrackEnabled?: boolean;
+  error?: string;
+};
+
+export async function fetchPostaOutboxAnalytics(days = 14): Promise<PostaOutboxAnalytics> {
+  const res = await fetch(`/api/posta/outbox/analytics?days=${days}`);
+  return res.json();
+}
+
+export async function fetchPostaRules(): Promise<{ ok: boolean; rules?: PostaInboxRule[]; error?: string }> {
+  const res = await fetch('/api/posta/rules');
+  return res.json();
+}
+
+export async function savePostaInboxRules(
+  rules: PostaInboxRule[],
+): Promise<{ ok: boolean; rules?: PostaInboxRule[]; error?: string }> {
+  const res = await fetch('/api/posta/rules', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rules }),
+  });
+  return res.json();
+}
+
+export async function fetchPostaAiSuggest(payload: {
+  subject?: string;
+  body?: string;
+  tone?: string;
+}): Promise<{ ok: boolean; suggestion?: string; provider?: string; error?: string; aiEnabled?: boolean }> {
+  const res = await fetch('/api/posta/compose/ai-suggest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
 export async function downloadMessagingExportZip() {
   const res = await fetch('/api/messaging/export');
   if (!res.ok) {
