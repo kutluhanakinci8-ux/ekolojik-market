@@ -1048,14 +1048,15 @@ export function EkolojikPostaHubScreen({
   ]);
 
   return (
-    <div className="module-screen posta-hub-screen">
-      <header className="module-header posta-hub-header">
-        <div>
+    <div className="module-screen posta-hub-screen posta-hub-screen--premium">
+      <header className="module-header posta-hub-header posta-hub-hero">
+        <div className="posta-hub-hero-text">
+          <p className="posta-hub-eyebrow">Ekolojik Market</p>
           <h1>
-            Ekolojik Posta & Mesaj{' '}
+            Posta Merkezi{' '}
             <span
               className={`posta-live-pill posta-live-pill--${liveSse}`}
-              title="SSE canlılık (NB PM-6)"
+              title="Canlı güncelleme"
             >
               {liveSse === 'open' ? 'Canlı' : liveSse === 'connecting' ? 'Bağlanıyor' : 'Yedek yenileme'}
             </span>
@@ -1103,9 +1104,9 @@ export function EkolojikPostaHubScreen({
       )}
       {pushConfig && (
         <div className="posta-hub-push-bar">
-          <span className="module-hint">
-            NB PM-4 — PWA push: {pushConfig.configured ? 'VAPID hazır' : 'VAPID eksik'} · abone cihaz{' '}
-            {pushSubscribers}
+          <span className="posta-hub-push-title">
+            Masaüstü bildirimleri · {pushConfig.configured ? 'Hazır' : 'Kurulum gerekli'} ·{' '}
+            {pushSubscribers} cihaz
           </span>
           <div className="posta-hub-compose-actions">
             <button
@@ -1169,21 +1170,24 @@ export function EkolojikPostaHubScreen({
             </button>
           </div>
           {!pushConfig.configured && pushConfig.hint && (
-            <p className="settings-hint">{pushConfig.hint}</p>
+            <p className="posta-hub-push-hint">{pushConfig.hint}</p>
           )}
         </div>
       )}
 
       {postaStorage && hubLayout !== 'sohbet' && (
-        <div className="posta-hub-storage" role="status" aria-label="Posta depolama">
-          <div className="posta-hub-storage-label">
-            Depolama {postaStorage.percent}% · Ek limiti {Math.round(postaStorage.maxAttachmentBytes / (1024 * 1024))} MB
-          </div>
-          <div className="posta-hub-storage-track">
-            <div
-              className={`posta-hub-storage-fill${postaStorage.percent >= 85 ? ' is-warn' : ''}`}
-              style={{ width: `${postaStorage.percent}%` }}
-            />
+        <div className="posta-hub-meta-strip">
+          <div className="posta-hub-storage" role="status" aria-label="Posta depolama">
+            <div className="posta-hub-storage-label">
+              Depolama kullanımı {postaStorage.percent}% · Ek üst sınır{' '}
+              {Math.round(postaStorage.maxAttachmentBytes / (1024 * 1024))} MB
+            </div>
+            <div className="posta-hub-storage-track">
+              <div
+                className={`posta-hub-storage-fill${postaStorage.percent >= 85 ? ' is-warn' : ''}`}
+                style={{ width: `${postaStorage.percent}%` }}
+              />
+            </div>
           </div>
         </div>
       )}
