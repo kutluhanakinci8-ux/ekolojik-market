@@ -34,6 +34,8 @@ import {
   fetchMessagingMessages,
   fetchMessagingThreads,
   markMessagingThreadRead,
+  fetchMessagingTyping,
+  postMessagingTyping,
   patchMessagingThreadFlags,
   postMessagingMessage,
   type MessagingMessage,
@@ -121,6 +123,13 @@ const KIND_LABEL: Record<string, string> = {
   bill: 'Fatura',
 };
 
+function messagingReadLabel(m: MessagingMessage) {
+  if (m.direction === 'staff') {
+    return m.readByCustomerAt ? 'Okundu' : 'Gönderildi';
+  }
+  return m.readByStaffAt ? 'Okundu' : 'Yeni';
+}
+
 function playHubMessagePing() {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -197,6 +206,11 @@ export function EkolojikPostaHubScreen({
   const [liveSse, setLiveSse] = useState<'connecting' | 'open' | 'closed'>('closed');
   const liveRevisionRef = useRef(0);
   const [msgDraft, setMsgDraft] = useState('');
+  const [threadTyping, setThreadTyping] = useState<{ staff: boolean; customer: boolean }>({
+    staff: false,
+    customer: false,
+  });
+  const typingPulseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [msgBusy, setMsgBusy] = useState(false);
   const [templates, setTemplates] = useState<MailTemplate[]>([]);
   const [recipientHints, setRecipientHints] = useState<string[]>([]);
@@ -504,6 +518,36 @@ export function EkolojikPostaHubScreen({
         refreshLive();
       });
       es.addEventListener('ping', () => setLiveSse('open'));
+      es.addEventListener('messaging', (ev) => {
+        try {
+          const data = JSON.parse(String((ev as MessageEvent).data)) as {
+            signal?: string;
+            threadId?: string;
+            party?: string;
+            active?: boolean;
+          };
+          if (data.signal === 'typing' && data.threadId === selectedThreadId) {
+            setThreadTyping((prev) => ({
+              ...prev,
+              [data.party === 'customer' ? 'customer' : 'staff']: Boolean(data.active),
+            }));
+          }
+          if (data.signal === 'message' || data.signal === 'read') {
+            if (folder === 'mesajlar') void refreshThreads();
+            if (data.threadId === selectedThreadId || !data.threadId) {
+              if (selectedThreadId) {
+                void fetchMessagingMessages(selectedThreadId, { limit: 200, q: msgSearchQ.trim() || undefined }).then(
+                  (r) => {
+                    if (r.ok && r.messages) setThreadMessages(r.messages);
+                  },
+                );
+              }
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      });
       es.onerror = () => {
         setLiveSse('closed');
         es?.close();
@@ -519,7 +563,7 @@ export function EkolojikPostaHubScreen({
       if (pollTimer) clearInterval(pollTimer);
       setLiveSse('closed');
     };
-  }, [folder, inboxFolder, refreshInbox, refreshThreads, refreshSent]);
+  }, [folder, inboxFolder, refreshInbox, refreshThreads, refreshSent, selectedThreadId, msgSearchQ]);
 
   useEffect(() => {
     if (!selectedSentId || folder !== 'gonderilen') {
@@ -549,6 +593,21 @@ export function EkolojikPostaHubScreen({
       if (r.ok && r.messages) setThreadMessages(r.messages);
     });
   }, [selectedThreadId, folder, msgSearchQ]);
+
+  useEffect(() => {
+    if (!selectedThreadId || folder !== 'mesajlar') {
+      setThreadTyping({ staff: false, customer: false });
+      return undefined;
+    }
+    const id = window.setInterval(() => {
+      void fetchMessagingTyping(selectedThreadId).then((r) => {
+        if (r.ok && r.typing) {
+          setThreadTyping({ staff: r.typing.staff, customer: r.typing.customer });
+        }
+      });
+    }, 2800);
+    return () => window.clearInterval(id);
+  }, [selectedThreadId, folder]);
 
   const selectedThread = useMemo(
     () => threads.find((t) => t.id === selectedThreadId) ?? null,
@@ -1731,12 +1790,18 @@ export function EkolojikPostaHubScreen({
                 value={msgSearchQ}
                 onChange={(e) => setMsgSearchQ(e.target.value)}
               />
+              {threadTyping.customer && (
+                <p className="posta-hub-typing-hint" aria-live="polite">Müşteri yazıyor…</p>
+              )}
               <ul className="crm-messaging-messages posta-hub-sohbet-messages">
                 {threadMessages.map((m) => (
                   <li key={m.id} className={`crm-msg crm-msg--${m.direction}`}>
                     <header>
                       <strong>{m.authorName}</strong>
                       <time>{new Date(m.createdAt).toLocaleString('tr-TR')}</time>
+                      <span className="posta-msg-read" title="Okundu bilgisi (NB Faz 33)">
+                        {messagingReadLabel(m)}
+                      </span>
                     </header>
                     <p>{m.bodyText}</p>
                     {m.attachments?.length ? (
@@ -1758,7 +1823,15 @@ export function EkolojikPostaHubScreen({
                   rows={3}
                   placeholder="Mesaj yazın…"
                   value={msgDraft}
-                  onChange={(e) => setMsgDraft(e.target.value)}
+                  onChange={(e) => {
+                    setMsgDraft(e.target.value);
+                    if (!selectedThreadId) return;
+                    if (typingPulseRef.current) clearTimeout(typingPulseRef.current);
+                    void postMessagingTyping(selectedThreadId, true, 'staff');
+                    typingPulseRef.current = setTimeout(() => {
+                      if (selectedThreadId) void postMessagingTyping(selectedThreadId, false, 'staff');
+                    }, 2200);
+                  }}
                 />
                 <label className="settings-field settings-field--full">
                   <span>Ek (max 10 MB)</span>

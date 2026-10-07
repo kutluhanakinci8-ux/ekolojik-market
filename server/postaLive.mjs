@@ -185,6 +185,19 @@ export function attachPostaSseStream(req, res, tenantId, { fetchUnread }) {
   return cleanup;
 }
 
+export function broadcastPostaSseEvent(tenantId, eventName, payload = {}) {
+  globalRevision += 1;
+  lastBroadcastAt = new Date().toISOString();
+  const body = { ...payload, revision: globalRevision, at: lastBroadcastAt };
+  const set = clientSet(tenantId);
+  for (const c of [...set]) {
+    if (!sseWrite(c.res, { event: eventName, data: body, id: globalRevision })) {
+      set.delete(c);
+    }
+  }
+  return globalRevision;
+}
+
 export async function notifyPostaLiveInbox(dataDir, tenantId, meta = {}, fetchUnread) {
   if (meta.messageAt) {
     await recordPostaDeliveryLatency(dataDir, {

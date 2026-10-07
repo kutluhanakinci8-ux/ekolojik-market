@@ -12,6 +12,7 @@ export type MessagingThread = {
   messageCount: number;
   lastMessageDirection?: 'staff' | 'customer';
   staffLastReadAt?: string | null;
+  customerLastReadAt?: string | null;
   pinned?: boolean;
   archived?: boolean;
   muted?: boolean;
@@ -32,7 +33,15 @@ export type MessagingMessage = {
   bodyText: string;
   authorName: string;
   createdAt: string;
+  readByStaffAt?: string | null;
+  readByCustomerAt?: string | null;
   attachments?: MessagingAttachment[];
+};
+
+export type MessagingTypingState = {
+  staff: boolean;
+  customer: boolean;
+  expiresAt: string | null;
 };
 
 function tenantQuery(tenant?: string) {
@@ -92,6 +101,39 @@ export async function fetchMessagingMessages(
 export async function markMessagingThreadRead(threadId: string) {
   const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' });
   return res.json() as Promise<{ ok: boolean }>;
+}
+
+export async function fetchMessagingTyping(threadId: string): Promise<{
+  ok: boolean;
+  typing?: MessagingTypingState;
+}> {
+  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/typing`);
+  return res.json();
+}
+
+export async function postMessagingTyping(threadId: string, active: boolean, party: 'staff' | 'customer' = 'staff') {
+  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/typing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active, party }),
+  });
+  return res.json() as Promise<{ ok: boolean; typing?: MessagingTypingState }>;
+}
+
+export async function markMessagingMessageRead(
+  threadId: string,
+  messageId: string,
+  party: 'staff' | 'customer' = 'staff',
+) {
+  const res = await fetch(
+    `/api/messaging/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/read`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ party }),
+    },
+  );
+  return res.json() as Promise<{ ok: boolean; updated?: number }>;
 }
 
 export async function patchMessagingThreadFlags(
