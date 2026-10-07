@@ -112,6 +112,30 @@ export type PostaOutboxAnalytics = {
   error?: string;
 };
 
+export type PostaDeliverabilityHub = {
+  ok: boolean;
+  domain?: string;
+  primaryFrom?: string;
+  fromName?: string;
+  replyTo?: string;
+  opsEmail?: string;
+  aliases?: string[];
+  smtp?: { configured: boolean; verified: boolean; host: string | null; error?: string | null };
+  dns?: {
+    spf: { status: string; value: string | null };
+    dmarc: { status: string; value: string | null };
+    dkim: { status: string; value: string | null };
+    selector?: string;
+  };
+  suggestedRecords?: { spf: string; dmarc: string; dkimHint: string };
+  error?: string;
+};
+
+export async function fetchPostaDeliverability(): Promise<PostaDeliverabilityHub> {
+  const res = await fetch('/api/posta/deliverability');
+  return res.json();
+}
+
 export async function fetchPostaOutboxAnalytics(days = 14): Promise<PostaOutboxAnalytics> {
   const res = await fetch(`/api/posta/outbox/analytics?days=${days}`);
   return res.json();

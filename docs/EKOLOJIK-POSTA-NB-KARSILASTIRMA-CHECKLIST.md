@@ -49,7 +49,7 @@ Notlar:
 
 - SMTP host / relay: ___________________
 - IMAP kutu: ___________________
-- Bilinçli eksik (kapatma sonrası boş olmalı): **Yok** — ESP tam analitik, JMAP, WebSocket (yukarıdaki “Bilinçli sınırlar” dokümanda)
+- Bilinçli eksik / Wave 2: `docs/PLAN-EKOLOJIK-POSTA-NB-WAVE2.md` (PM-8 matris UI, RTE, CalDAV, push, …)
 
 ```bash
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-ui-yuruyus.sh

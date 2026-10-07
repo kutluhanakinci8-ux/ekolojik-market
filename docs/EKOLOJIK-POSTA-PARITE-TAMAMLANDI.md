@@ -1,6 +1,6 @@
 # Ekolojik Posta & Mesaj — NB parite tamamlandı
 
-**Durum:** Faz **1–24** kapandı (2026-10-07). Nakliye Borsası Lerta Posta ile **işlevsel eşdeğer** hub; bilinçli altyapı farkları dokümante.
+**Durum:** Faz **1–24** (POS hub) + **Wave 2** NB PM uyarlaması devam ediyor (`docs/PLAN-EKOLOJIK-POSTA-NB-WAVE2.md`). Faz **25**: gönderen/DNS deliverability paneli (NB PM-3/PM-7).
 
 ## Tek komut doğrulama (VPS)
 
