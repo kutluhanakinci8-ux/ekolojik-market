@@ -171,6 +171,32 @@ export async function fetchPostaOutboxAnalytics(days = 14): Promise<PostaOutboxA
   return res.json();
 }
 
+export type PostaEngagementSummary = {
+  ok: boolean;
+  windowDays?: number;
+  mailTrackEnabled?: boolean;
+  clickTrackEnabled?: boolean;
+  webhookConfigured?: boolean;
+  counts?: {
+    opens: number;
+    uniqueOpens: number;
+    clicks: number;
+    uniqueClicks: number;
+    bounces: number;
+  };
+  error?: string;
+};
+
+export async function fetchPostaEngagementSummary(days = 14): Promise<PostaEngagementSummary> {
+  const res = await fetch(`/api/posta/engagement/summary?days=${days}`);
+  return res.json();
+}
+
+export function downloadPostaEngagementCsv(type: 'combined' | 'opens' | 'clicks' | 'bounces' = 'combined', days = 90) {
+  const params = new URLSearchParams({ type, days: String(days) });
+  window.open(`/api/posta/engagement/export.csv?${params}`, '_blank', 'noopener,noreferrer');
+}
+
 export async function fetchPostaRules(): Promise<{ ok: boolean; rules?: PostaInboxRule[]; error?: string }> {
   const res = await fetch('/api/posta/rules');
   return res.json();

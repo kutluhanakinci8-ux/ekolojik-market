@@ -42,6 +42,12 @@ export async function recordMailOpen(dataDir, token, meta = {}) {
     ...meta,
   });
   await appendFile(trackLogPath(dataDir), `${line}\n`, 'utf8');
+  try {
+    const { notifyEngagementOpen } = await import('./postaEngagement.mjs');
+    await notifyEngagementOpen(dataDir, token, meta);
+  } catch {
+    /* webhook opsiyonel */
+  }
   return { ok: true };
 }
 

@@ -14,7 +14,7 @@ Faz 1–24: hub, IMAP, compose, sohbet, depolama, kurallar, AI/track lite, PWA l
 | **26** | PM-8 (bildirim matrisi) | Olay×kanal tablosu (ops e-posta) | ✅ |
 | **27** | PM-2 (RTE compose) | Zengin metin araç çubuğu genişletme | ✅ |
 | **28** | PM-5 (CalDAV/CardDAV) | Harici sync köprüsü veya ICS export | ✅ |
-| **29** | PM-10 (engagement) | Tıklama + bounce CSV, webhook lite | plan |
+| **29** | PM-10 (engagement) | Tıklama + bounce CSV, webhook lite | ✅ |
 | **30** | PM-4 (PWA push) | Web push VAPID (POS PWA) | plan |
 | **31** | PM-9 (kurallar G5+) | Nested OR, gönderen+ek boyutu kuralları | plan |
 | **32** | PM-6 (canlılık) | SSE iyileştirme / mesaj gecikme metrik | plan |
