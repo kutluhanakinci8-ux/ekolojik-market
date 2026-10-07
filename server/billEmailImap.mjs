@@ -52,14 +52,18 @@ function formatAddress(entry) {
   return '';
 }
 
-export async function fetchRecentInboxMessages(config, { sinceDate, maxMessages = 40 } = {}) {
+export async function fetchRecentMailboxMessages(
+  config,
+  mailboxPath = 'INBOX',
+  { sinceDate, maxMessages = 40 } = {},
+) {
   const client = buildImapClient(config);
   const since = sinceDate instanceof Date && Number.isFinite(sinceDate.getTime())
     ? sinceDate
     : new Date(Date.now() - 14 * 86400000);
 
   await client.connect();
-  const lock = await client.getMailboxLock('INBOX');
+  const lock = await client.getMailboxLock(mailboxPath);
   const collected = [];
 
   try {
@@ -86,6 +90,7 @@ export async function fetchRecentInboxMessages(config, { sinceDate, maxMessages 
 
       collected.push({
         imapUid: msg.uid,
+        imapMailboxPath: mailboxPath,
         messageId,
         from,
         to,
@@ -104,4 +109,25 @@ export async function fetchRecentInboxMessages(config, { sinceDate, maxMessages 
 
   collected.sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt));
   return collected;
+}
+
+export async function fetchRecentInboxMessages(config, options = {}) {
+  return fetchRecentMailboxMessages(config, 'INBOX', options);
+}
+
+/** UID ile mesajı başka klasöre taşı (COPY+EXPUNGE veya MOVE). */
+export async function moveImapMessage(config, { fromMailbox, uid, toMailbox }) {
+  if (!fromMailbox || !toMailbox || !uid) {
+    throw new Error('fromMailbox, toMailbox ve uid gerekli');
+  }
+  const client = buildImapClient(config);
+  await client.connect();
+  const lock = await client.getMailboxLock(fromMailbox);
+  try {
+    const result = await client.messageMove([uid], toMailbox, { uid: true });
+    return { ok: true, moved: result?.moved ?? 1 };
+  } finally {
+    lock.release();
+    await client.logout();
+  }
 }

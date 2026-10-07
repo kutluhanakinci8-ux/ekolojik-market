@@ -3,7 +3,6 @@ import type { Store } from '../../store/useStore';
 import {
   fetchEmailHealth,
   fetchOutboxMessage,
-  fetchRecentOutbox,
   retryOutboxMessage,
   sendEmailTest,
 } from '../../services/emailOutboxService';
@@ -18,6 +17,7 @@ import {
   markPostaInboxRead,
   patchPostaInboxFlags,
   syncPostaInboxImap,
+  fetchPostaSent,
   type MailTemplate,
   type PostaComposeDraft,
   type PostaInboxFolder,
@@ -46,14 +46,7 @@ function readFileAsAttachment(file: File) {
   });
 }
 
-type PostaFolder =
-  | PostaInboxFolder
-  | 'mesajlar'
-  | 'gonderilen'
-  | 'yaz'
-  | 'taslaklar'
-  | 'kisiler'
-  | 'takvim';
+type PostaFolder = PostaInboxFolder | 'mesajlar' | 'gonderilen' | 'yaz' | 'kisiler' | 'takvim';
 type HubLayout = 'posta' | 'sohbet' | 'tam';
 
 const INBOX_FOLDERS: PostaInboxFolder[] = [
@@ -65,6 +58,7 @@ const INBOX_FOLDERS: PostaInboxFolder[] = [
   'spam',
   'arsiv',
   'cop',
+  'taslaklar',
 ];
 
 function isInboxMailFolder(folder: PostaFolder): folder is PostaInboxFolder {
@@ -74,6 +68,8 @@ function isInboxMailFolder(folder: PostaFolder): folder is PostaInboxFolder {
 const KIND_LABEL: Record<string, string> = {
   contact: 'İletişim formu',
   imap: 'E-posta',
+  'imap-sent': 'IMAP gönderilen',
+  outbox: 'Outbox',
   bill: 'Fatura',
 };
 
@@ -100,7 +96,7 @@ export function EkolojikPostaHubScreen({
   const [hubLayout, setHubLayout] = useState<HubLayout>('posta');
   const [inboxRows, setInboxRows] = useState<PostaInboxItem[]>([]);
   const [threads, setThreads] = useState<MessagingThread[]>([]);
-  const [sentRows, setSentRows] = useState<Array<Record<string, unknown>>>([]);
+  const [sentRows, setSentRows] = useState<PostaInboxItem[]>([]);
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<MessagingMessage[]>([]);
@@ -165,11 +161,8 @@ export function EkolojikPostaHubScreen({
   }, []);
 
   const refreshSent = useCallback(async () => {
-    const recent = await fetchRecentOutbox(80);
-    const sent = (recent.items ?? []).filter(
-      (r) => r.folder === 'sent' || r.status === 'sent' || r.status === 'failed',
-    );
-    setSentRows(sent as Array<Record<string, unknown>>);
+    const recent = await fetchPostaSent(80);
+    if (recent.ok && recent.items) setSentRows(recent.items);
   }, []);
 
   const refreshHealth = useCallback(async () => {
@@ -215,7 +208,10 @@ export function EkolojikPostaHubScreen({
     }
     if (folder === 'mesajlar') void refreshThreads();
     if (folder === 'gonderilen') void refreshSent();
-    if (folder === 'taslaklar') void refreshDrafts();
+    if (folder === 'taslaklar') {
+      void refreshDrafts();
+      void refreshInbox('taslaklar');
+    }
   }, [folder, refreshInbox, refreshThreads, refreshSent, refreshDrafts]);
 
   useEffect(() => {
@@ -244,10 +240,15 @@ export function EkolojikPostaHubScreen({
       setSentDetail(null);
       return;
     }
+    const row = sentRows.find((r) => String(r.id) === selectedSentId);
+    if (row && (row.kind === 'imap-sent' || row.kind === 'imap')) {
+      setSentDetail(row as unknown as Record<string, unknown>);
+      return;
+    }
     void fetchOutboxMessage(selectedSentId).then((r) => {
       if (r.ok && r.message) setSentDetail(r.message);
     });
-  }, [selectedSentId, folder]);
+  }, [selectedSentId, folder, sentRows]);
 
   useEffect(() => {
     if (!selectedThreadId || folder !== 'mesajlar') {
@@ -667,7 +668,23 @@ export function EkolojikPostaHubScreen({
                   </li>
                 ))}
 
-              {folder === 'taslaklar' && drafts.length === 0 && <li className="posta-hub-empty">Taslak yok</li>}
+              {folder === 'taslaklar' && drafts.length === 0 && inboxRows.length === 0 && (
+                <li className="posta-hub-empty">Taslak yok — IMAP yenile veya Yaz’dan kaydedin</li>
+              )}
+              {folder === 'taslaklar' &&
+                inboxRows.map((row) => (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      className={selectedInboxId === row.id ? 'is-active' : ''}
+                      onClick={() => void openInboxItem(row)}
+                    >
+                      <strong>{row.subject}</strong>
+                      <span>IMAP taslak</span>
+                      <em>{row.preview.slice(0, 80)}</em>
+                    </button>
+                  </li>
+                ))}
               {folder === 'taslaklar' &&
                 drafts.map((d) => (
                   <li key={d.id}>
@@ -756,11 +773,7 @@ export function EkolojikPostaHubScreen({
                       <strong>{String(row.to ?? '')}</strong>
                       <span>{String(row.subject ?? '')}</span>
                       <span className="posta-hub-sent-status">{String(row.status ?? row.folder ?? '')}</span>
-                      <time>
-                        {row.sentAt || row.createdAt
-                          ? new Date(String(row.sentAt || row.createdAt)).toLocaleString('tr-TR')
-                          : '—'}
-                      </time>
+                      <time>{row.at ? new Date(row.at).toLocaleString('tr-TR') : '—'}</time>
                     </button>
                   </li>
                 ))}
@@ -1012,7 +1025,9 @@ export function EkolojikPostaHubScreen({
                 {String(sentDetail.to ?? '')} · {String(sentDetail.status ?? sentDetail.folder ?? '')} ·{' '}
                 {sentDetail.lastError ? `Hata: ${String(sentDetail.lastError)}` : '—'}
               </p>
-              <pre className="posta-hub-detail-body">{String(sentDetail.text ?? '')}</pre>
+              <pre className="posta-hub-detail-body">
+                {String(sentDetail.text ?? sentDetail.bodyText ?? '')}
+              </pre>
               {(sentDetail.status === 'failed' || sentDetail.folder === 'failed') && (
                 <button type="button" className="btn btn-primary btn-sm" disabled={loading} onClick={() => void retrySent()}>
                   Tekrar dene

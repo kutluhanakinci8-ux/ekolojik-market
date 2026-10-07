@@ -71,7 +71,8 @@ import {
   syncPostaInboxFromImap,
   getComposeRecipientHints,
   loadPostaInboxAttachment,
-  patchPostaInboxFlags,
+  applyPostaInboxFlags,
+  listUnifiedPostaSent,
 } from './server/postaInbox.mjs';
 import {
   deletePostaComposeDraft,
@@ -527,6 +528,20 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/sent' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 80);
+      try {
+        const result = await listUnifiedPostaSent(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Gönderilen hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/inbox/sync' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       try {
@@ -578,7 +593,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
-        const result = await patchPostaInboxFlags(DATA_DIR, tenantId, id, {
+        const result = await applyPostaInboxFlags(DATA_DIR, tenantId, id, {
           starred: data?.starred,
           spam: data?.spam,
           trashed: data?.trashed,

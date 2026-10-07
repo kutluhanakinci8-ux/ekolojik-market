@@ -40,7 +40,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 14 — IMAP klasör senkronu & Gönderilen birleşik
+## Faz 14 — IMAP klasör senkronu & Gönderilen birleşik ✅ (2026-10-07)
 
 **Amaç:** Spam/çöp/arşiv bayrakları mümkün olduğunda **sunucu klasörüyle** uyumlu; Gönderilen = outbox + IMAP Sent.
 
