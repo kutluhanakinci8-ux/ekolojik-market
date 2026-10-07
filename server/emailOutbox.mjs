@@ -55,6 +55,8 @@ export async function enqueueEkolojikMail(
   dataDir,
   {
     to,
+    cc,
+    bcc,
     subject,
     text,
     html,
@@ -63,6 +65,8 @@ export async function enqueueEkolojikMail(
     source = 'crm',
     inReplyTo,
     references,
+    attachments,
+    signatureAppended,
   },
 ) {
   await ensureDirs(dataDir);
@@ -78,6 +82,8 @@ export async function enqueueEkolojikMail(
     id,
     idempotencyKey: key,
     to,
+    cc: cc?.trim() || null,
+    bcc: bcc?.trim() || null,
     subject,
     text: text ?? '',
     html: html ?? null,
@@ -85,6 +91,8 @@ export async function enqueueEkolojikMail(
     source,
     inReplyTo: inReplyTo ?? null,
     references: references ?? null,
+    attachments: Array.isArray(attachments) ? attachments : [],
+    signatureAppended: Boolean(signatureAppended),
     status: 'pending',
     attempts: 0,
     maxAttempts: MAX_ATTEMPTS,

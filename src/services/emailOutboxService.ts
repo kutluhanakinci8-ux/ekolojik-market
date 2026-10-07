@@ -16,13 +16,22 @@ export async function fetchEmailHealth(): Promise<{
   return res.json();
 }
 
+export type EmailOutboundAttachment = {
+  fileName: string;
+  mimeType: string;
+  dataBase64: string;
+};
+
 export async function sendEmailTest(payload: {
   to: string;
+  cc?: string;
+  bcc?: string;
   subject?: string;
   body?: string;
   html?: string;
   inReplyTo?: string;
   references?: string;
+  attachments?: EmailOutboundAttachment[];
 }): Promise<{ ok: boolean; error?: string; provider?: string; message?: string }> {
   const res = await fetch('/api/email/test', {
     method: 'POST',

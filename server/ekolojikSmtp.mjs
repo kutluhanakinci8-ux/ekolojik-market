@@ -63,6 +63,8 @@ export async function verifyEkolojikSmtp() {
 
 export async function sendViaEkolojikSmtp({
   to,
+  cc,
+  bcc,
   subject,
   text,
   html,
@@ -70,6 +72,7 @@ export async function sendViaEkolojikSmtp({
   replyTo,
   inReplyTo,
   references,
+  attachments,
 }) {
   const c = getEkolojikMailConfig();
   const from = buildFromHeader(fromName || c.fromName, c.from);
@@ -77,14 +80,25 @@ export async function sendViaEkolojikSmtp({
   const headers = {};
   if (inReplyTo?.includes('@') || inReplyTo?.startsWith('<')) headers['In-Reply-To'] = inReplyTo;
   if (references?.trim()) headers.References = references.trim();
+  const mailAttachments = (attachments ?? [])
+    .filter((a) => a?.dataBase64)
+    .map((a) => ({
+      filename: a.fileName || 'ek',
+      content: Buffer.from(String(a.dataBase64).replace(/\s/g, ''), 'base64'),
+      contentType: a.mimeType || undefined,
+    }));
+
   const info = await getTransporter().sendMail({
     from,
     to,
+    cc: cc?.trim() || undefined,
+    bcc: bcc?.trim() || undefined,
     replyTo: reply,
     subject,
     text: text || subject,
     html: html || undefined,
     headers: Object.keys(headers).length ? headers : undefined,
+    attachments: mailAttachments.length ? mailAttachments : undefined,
   });
   return {
     messageId: info.messageId,

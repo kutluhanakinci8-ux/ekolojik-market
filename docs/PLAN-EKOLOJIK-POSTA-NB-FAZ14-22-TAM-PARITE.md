@@ -25,8 +25,8 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 | IMAP Sent/Junk/Trash/Drafts | ✅ | Kısmen (outbox + bayrak) | **14** |
 | Konuşma görünümü | Thread by header | Satır liste | **15** |
 | Arama / filtre | Gelişmiş | Yok | **15** |
-| Yaz: CC/BCC, ek, ilet | ✅ | Temel alıcı+md | **16** |
-| Yanıtla / tümünü yanıtla / ilet | ✅ | Yanıt | **16** |
+| Yaz: CC/BCC, ek, ilet | ✅ | ✅ Faz 16 | — |
+| Yanıtla / tümünü yanıtla / ilet | ✅ | ✅ Faz 16 | — |
 | Kişiler defteri | CardDAV benzeri | Müşteri listesi | **17** |
 | Takvim | Posta içi | Ödeme hatırlatma listesi | **17** |
 | Müşteri mesajları hub | Tam sohbet UX | Thread+ek | **18** |
@@ -74,7 +74,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 16 — Yaz ekranı tam parite (compose)
+## Faz 16 — Yaz ekranı tam parite (compose) ✅ (2026-10-07)
 
 **Amaç:** NB compose özellik seti.
 

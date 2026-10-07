@@ -6,6 +6,7 @@ export type PostaInboxItem = {
   from?: string;
   fromName?: string;
   to?: string | null;
+  cc?: string | null;
   subject: string;
   preview: string;
   unread: boolean;
@@ -74,6 +75,8 @@ export type PostaInboxFolder =
 export type PostaComposeDraft = {
   id: string;
   to: string;
+  cc?: string;
+  bcc?: string;
   subject: string;
   body: string;
   inReplyTo?: string | null;

@@ -34,6 +34,16 @@ import {
   type MessagingMessage,
   type MessagingThread,
 } from '../../services/messagingService';
+import { fetchPostaMailSettings } from '../../services/postaSettingsService';
+import { PostaComposePanel } from './PostaComposePanel';
+import {
+  buildForwardBody,
+  buildForwardSubject,
+  buildReplyAllRecipients,
+  buildReplySubject,
+  mergeReferences,
+  type OutboundAttachment,
+} from '../../utils/postaComposeClient';
 
 function readFileAsAttachment(file: File) {
   return new Promise<{ fileName: string; mimeType: string; dataBase64: string }>((resolve, reject) => {
@@ -109,8 +119,13 @@ export function EkolojikPostaHubScreen({
   const [health, setHealth] = useState<Awaited<ReturnType<typeof fetchEmailHealth>> | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [composeTo, setComposeTo] = useState('');
+  const [composeCc, setComposeCc] = useState('');
+  const [composeBcc, setComposeBcc] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState<OutboundAttachment[]>([]);
+  const [mailSignatureHtml, setMailSignatureHtml] = useState<string | null>(null);
+  const [ourMailAddresses, setOurMailAddresses] = useState<string[]>([]);
   const [composeReply, setComposeReply] = useState<{ inReplyTo?: string; references?: string } | null>(
     null,
   );
@@ -197,7 +212,19 @@ export function EkolojikPostaHubScreen({
   }, []);
 
   const refreshHealth = useCallback(async () => {
-    setHealth(await fetchEmailHealth());
+    const h = await fetchEmailHealth();
+    setHealth(h);
+    const from = h.from?.includes('@') ? [h.from] : [];
+    setOurMailAddresses(from);
+  }, []);
+
+  useEffect(() => {
+    void fetchPostaMailSettings().then((r) => {
+      if (r.ok && r.effective?.signatureHtml) setMailSignatureHtml(r.effective.signatureHtml);
+      if (r.ok && r.effective?.from?.includes('@')) {
+        setOurMailAddresses((prev) => [...new Set([...prev, r.effective!.from])]);
+      }
+    });
   }, []);
 
   const refreshDrafts = useCallback(async () => {
@@ -320,37 +347,84 @@ export function EkolojikPostaHubScreen({
     }
   };
 
-  const startReply = (row: PostaInboxItem) => {
+  const ourEmailSet = useMemo(() => new Set(ourMailAddresses.map((e) => e.toLowerCase())), [ourMailAddresses]);
+
+  const beginComposeFromRow = (row: PostaInboxItem, mode: 'reply' | 'replyAll' | 'forward', threadMessages?: PostaInboxItem[]) => {
+    if (mode === 'forward') {
+      setComposeTo('');
+      setComposeCc('');
+      setComposeBcc('');
+      setComposeSubject(buildForwardSubject(row.subject ?? ''));
+      setComposeBody(buildForwardBody(row));
+      setComposeReply(null);
+      setComposeAttachments([]);
+      setComposeDraftId(null);
+      setFolder('yaz');
+      return;
+    }
+
     const to =
       row.kind === 'contact'
         ? String(row.from ?? '')
         : String(row.from ?? '').match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? row.from ?? '';
-    setComposeTo(to);
-    const subj = row.subject?.startsWith('Re:') ? row.subject : `Re: ${row.subject}`;
-    setComposeSubject(subj);
+    if (mode === 'replyAll') {
+      const { to: replyTo, cc } = buildReplyAllRecipients(row, ourEmailSet, threadMessages ?? []);
+      setComposeTo(replyTo || to);
+      setComposeCc(cc);
+      setComposeBcc('');
+    } else {
+      setComposeTo(to);
+      setComposeCc('');
+      setComposeBcc('');
+    }
+    setComposeSubject(buildReplySubject(row.subject ?? ''));
     setComposeBody('');
-    if (row.kind === 'imap' && row.messageId) {
-      setComposeReply({ inReplyTo: row.messageId, references: row.messageId });
+    setComposeAttachments([]);
+    setComposeDraftId(null);
+    const mid = row.messageId ?? null;
+    if (mid) {
+      setComposeReply({
+        inReplyTo: mid,
+        references: mergeReferences(row.references, mid),
+      });
     } else {
       setComposeReply(null);
     }
     setFolder('yaz');
   };
 
+  const startReply = (row: PostaInboxItem) => beginComposeFromRow(row, 'reply');
+
+  const startReplyAll = (row: PostaInboxItem, threadMessages?: PostaInboxItem[]) =>
+    beginComposeFromRow(row, 'replyAll', threadMessages);
+
+  const startForward = (row: PostaInboxItem) => beginComposeFromRow(row, 'forward');
+
   const sendCompose = async () => {
     setLoading(true);
     try {
       const result = await sendEmailTest({
         to: composeTo.trim(),
+        cc: composeCc.trim() || undefined,
+        bcc: composeBcc.trim() || undefined,
         subject: composeSubject.trim() || 'Ekolojik Market',
         body: composeBody.trim(),
         inReplyTo: composeReply?.inReplyTo,
         references: composeReply?.references,
+        attachments: composeAttachments.length ? composeAttachments : undefined,
       });
       setFlash(result.ok ? 'Gönderildi / kuyruğa alındı' : result.error ?? 'Gönderilemedi');
       if (result.ok) {
         setComposeBody('');
+        setComposeCc('');
+        setComposeBcc('');
+        setComposeAttachments([]);
         setComposeReply(null);
+        if (composeDraftId) {
+          await deletePostaComposeDraft(composeDraftId);
+          setComposeDraftId(null);
+          await refreshDrafts();
+        }
         await refreshSent();
       }
       await refreshHealth();
@@ -373,14 +447,6 @@ export function EkolojikPostaHubScreen({
     }
   };
 
-  const applyTemplate = (templateId: string) => {
-    const t = templates.find((x) => x.id === templateId);
-    if (!t) return;
-    setComposeSubject(t.subject);
-    setComposeBody(t.body);
-    setComposeReply(null);
-  };
-
   const addBillToPaymentCalendar = () => {
     if (!selectedInbox || selectedInbox.kind !== 'bill') return;
     const amount = selectedInbox.amount ?? 0;
@@ -398,15 +464,6 @@ export function EkolojikPostaHubScreen({
       notes: `Posta fatura · ${selectedInbox.id}`,
     });
     setFlash('Ödeme takvimine eklendi');
-  };
-
-  const wrapComposeSelection = (before: string, after: string) => {
-    const el = document.getElementById('posta-compose-body') as HTMLTextAreaElement | null;
-    if (!el) return;
-    const start = el.selectionStart ?? composeBody.length;
-    const end = el.selectionEnd ?? composeBody.length;
-    const next = composeBody.slice(0, start) + before + composeBody.slice(start, end) + after + composeBody.slice(end);
-    setComposeBody(next);
   };
 
   const retrySent = async () => {
@@ -465,8 +522,11 @@ export function EkolojikPostaHubScreen({
 
   const openDraft = (draft: PostaComposeDraft) => {
     setComposeTo(draft.to);
+    setComposeCc(draft.cc ?? '');
+    setComposeBcc(draft.bcc ?? '');
     setComposeSubject(draft.subject);
     setComposeBody(draft.body);
+    setComposeAttachments([]);
     setComposeDraftId(draft.id);
     setComposeReply(
       draft.inReplyTo ? { inReplyTo: draft.inReplyTo, references: draft.references ?? draft.inReplyTo } : null,
@@ -474,23 +534,28 @@ export function EkolojikPostaHubScreen({
     setFolder('yaz');
   };
 
-  const persistComposeDraft = async () => {
-    const result = await savePostaComposeDraft({
-      id: composeDraftId ?? undefined,
-      to: composeTo,
-      subject: composeSubject,
-      body: composeBody,
-      inReplyTo: composeReply?.inReplyTo ?? null,
-      references: composeReply?.references ?? null,
-    });
-    if (result.ok && result.draft) {
-      setComposeDraftId(result.draft.id);
-      setFlash('Taslak kaydedildi');
-      await refreshDrafts();
-    } else {
-      setFlash(result.error ?? 'Taslak kaydedilemedi');
-    }
-  };
+  const persistComposeDraft = useCallback(
+    async (silent = false) => {
+      const result = await savePostaComposeDraft({
+        id: composeDraftId ?? undefined,
+        to: composeTo,
+        cc: composeCc,
+        bcc: composeBcc,
+        subject: composeSubject,
+        body: composeBody,
+        inReplyTo: composeReply?.inReplyTo ?? null,
+        references: composeReply?.references ?? null,
+      });
+      if (result.ok && result.draft) {
+        setComposeDraftId(result.draft.id);
+        if (!silent) setFlash('Taslak kaydedildi');
+        await refreshDrafts();
+      } else if (!silent) {
+        setFlash(result.error ?? 'Taslak kaydedilemedi');
+      }
+    },
+    [composeDraftId, composeTo, composeCc, composeBcc, composeSubject, composeBody, composeReply, refreshDrafts],
+  );
 
   const filteredContacts = useMemo(() => {
     const q = contactSearch.trim().toLowerCase();
@@ -884,72 +949,30 @@ export function EkolojikPostaHubScreen({
 
         <section className="posta-hub-detail">
           {folder === 'yaz' && (
-            <div className="posta-hub-compose-form">
-              <h2>Yeni e-posta</h2>
-              {templates.length > 0 && (
-                <label className="settings-field settings-field--full">
-                  <span>Şablon</span>
-                  <select defaultValue="" onChange={(e) => e.target.value && applyTemplate(e.target.value)}>
-                    <option value="">— Seçin —</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <label className="settings-field settings-field--full">
-                <span>Alıcı</span>
-                <input list="posta-recipient-hints" value={composeTo} onChange={(e) => setComposeTo(e.target.value)} />
-                <datalist id="posta-recipient-hints">
-                  {composeAllHints.map((email) => (
-                    <option key={email} value={email} />
-                  ))}
-                </datalist>
-              </label>
-              <label className="settings-field settings-field--full">
-                <span>Konu</span>
-                <input value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} />
-              </label>
-              <div className="posta-compose-toolbar">
-                <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('**', '**')}>
-                  Kalın
-                </button>
-                <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('\n- ', '')}>
-                  Liste
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
-                  onClick={() => wrapComposeSelection('[', '](https://)')}
-                >
-                  Link
-                </button>
-              </div>
-              <label className="settings-field settings-field--full">
-                <span>Metin</span>
-                <textarea
-                  id="posta-compose-body"
-                  rows={8}
-                  value={composeBody}
-                  onChange={(e) => setComposeBody(e.target.value)}
-                />
-              </label>
-              <div className="posta-hub-compose-actions">
-                <button type="button" className="btn btn-outline" disabled={loading} onClick={() => void persistComposeDraft()}>
-                  Taslak kaydet
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={loading || !composeTo.includes('@')}
-                  onClick={() => void sendCompose()}
-                >
-                  Gönder
-                </button>
-              </div>
-            </div>
+            <PostaComposePanel
+              ourEmails={ourMailAddresses}
+              hints={composeAllHints}
+              templates={templates}
+              loading={loading}
+              composeTo={composeTo}
+              composeCc={composeCc}
+              composeBcc={composeBcc}
+              composeSubject={composeSubject}
+              composeBody={composeBody}
+              attachments={composeAttachments}
+              signaturePreviewHtml={mailSignatureHtml}
+              onChange={(patch) => {
+                if (patch.to !== undefined) setComposeTo(patch.to);
+                if (patch.cc !== undefined) setComposeCc(patch.cc);
+                if (patch.bcc !== undefined) setComposeBcc(patch.bcc);
+                if (patch.subject !== undefined) setComposeSubject(patch.subject);
+                if (patch.body !== undefined) setComposeBody(patch.body);
+                if (patch.attachments !== undefined) setComposeAttachments(patch.attachments);
+              }}
+              onSend={() => void sendCompose()}
+              onSaveDraft={() => void persistComposeDraft(false)}
+              autosaveDraft={() => void persistComposeDraft(true)}
+            />
           )}
 
           {selectedConversation && isInboxMailFolder(folder) && mailListMode === 'conversation' && (
@@ -973,13 +996,34 @@ export function EkolojikPostaHubScreen({
                 ))}
               </ul>
               {selectedConversation.messages.length > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary"
-                  onClick={() => startReply(selectedConversation.messages[selectedConversation.messages.length - 1])}
-                >
-                  Son mesaja yanıt
-                </button>
+                <div className="posta-hub-detail-buttons">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => startReply(selectedConversation.messages[selectedConversation.messages.length - 1])}
+                  >
+                    Yanıt
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() =>
+                      startReplyAll(
+                        selectedConversation.messages[selectedConversation.messages.length - 1],
+                        selectedConversation.messages,
+                      )
+                    }
+                  >
+                    Tümünü yanıtla
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => startForward(selectedConversation.messages[selectedConversation.messages.length - 1])}
+                  >
+                    İlet
+                  </button>
+                </div>
               )}
             </>
           )}
@@ -991,6 +1035,12 @@ export function EkolojikPostaHubScreen({
                 <div className="posta-hub-detail-buttons">
                   <button type="button" className="btn btn-sm btn-outline" onClick={() => startReply(selectedInbox)}>
                     Yanıt
+                  </button>
+                  <button type="button" className="btn btn-sm btn-outline" onClick={() => startReplyAll(selectedInbox)}>
+                    Tümünü yanıtla
+                  </button>
+                  <button type="button" className="btn btn-sm btn-outline" onClick={() => startForward(selectedInbox)}>
+                    İlet
                   </button>
                   {selectedInbox.kind === 'bill' && (
                     <button type="button" className="btn btn-sm btn-primary" onClick={addBillToPaymentCalendar}>

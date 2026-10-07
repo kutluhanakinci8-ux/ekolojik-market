@@ -15487,7 +15487,19 @@ input {
   font-size: 12px;
 }
 .posta-hub-conv-preview { font-size: 12px; color: var(--text-muted); margin: 0; }
-.posta-hub-compose-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.posta-hub-compose-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.posta-compose-preview {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-2, #f8fafc);
+  max-width: 520px;
+}
+.posta-compose-preview-body { font-size: 14px; line-height: 1.5; }
+.posta-compose-preview-sig { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border, #e2e8f0); font-size: 13px; }
+.posta-compose-autosave-note { font-size: 12px; color: var(--muted, #64748b); margin-right: auto; }
+.posta-compose-attach-total { font-size: 12px; color: var(--muted, #64748b); }
+.posta-compose-toggle-cc { align-self: flex-start; }
 .posta-hub-contacts-search { padding: 8px 12px; }
 .posta-hub-contacts-search input { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
 .posta-hub-calendar-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }

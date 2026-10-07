@@ -25,13 +25,15 @@ export function createDeliverMessage(dataDir) {
     const pres = await getEffectiveMailPresentation(dataDir);
     let text = message.text;
     let html = message.html;
-    if (pres.signatureHtml?.trim()) {
+    if (pres.signatureHtml?.trim() && !message.signatureAppended) {
       const merged = appendSignature(text, html, pres.signatureHtml);
       text = merged.text;
       html = merged.html;
     }
     return sendViaEkolojikSmtp({
       to: message.to,
+      cc: message.cc,
+      bcc: message.bcc,
       subject: message.subject,
       text,
       html: html ?? undefined,
@@ -39,6 +41,7 @@ export function createDeliverMessage(dataDir) {
       replyTo: pres.replyTo,
       inReplyTo: message.inReplyTo,
       references: message.references,
+      attachments: message.attachments,
     });
   };
 }
@@ -48,7 +51,20 @@ export function createDeliverMessage(dataDir) {
  * SMTP yoksa kuyruğa yazar; SMTP varsa hemen göndermeyi dener.
  */
 export async function sendEkolojikMail(dataDir, payload) {
-  const { to, subject, body, fromName, idempotencyKey, html, source, inReplyTo, references } = payload;
+  const {
+    to,
+    cc,
+    bcc,
+    subject,
+    body,
+    fromName,
+    idempotencyKey,
+    html,
+    source,
+    inReplyTo,
+    references,
+    attachments,
+  } = payload;
   if (!to?.includes('@')) {
     return { ok: false, error: 'Geçersiz e-posta adresi' };
   }
@@ -77,6 +93,8 @@ export async function sendEkolojikMail(dataDir, payload) {
 
   const enqueued = await enqueueEkolojikMail(dataDir, {
     to,
+    cc,
+    bcc,
     subject,
     text: textBody,
     html: htmlBody,
@@ -85,6 +103,8 @@ export async function sendEkolojikMail(dataDir, payload) {
     source: source ?? 'crm',
     inReplyTo,
     references,
+    attachments,
+    signatureAppended: Boolean(pres.signatureHtml?.trim()),
   });
 
   if (!isEkolojikSmtpConfigured()) {
