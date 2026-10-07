@@ -201,6 +201,51 @@ export async function fetchPostaEngagementSummary(days = 14): Promise<PostaEngag
   return res.json();
 }
 
+export type PostaLiveCapabilities = {
+  ok: boolean;
+  version?: number;
+  heartbeatSec?: number;
+  unreadPollSec?: number;
+  retryMs?: number;
+  events?: string[];
+};
+
+export type PostaLiveMetrics = {
+  ok: boolean;
+  windowDays?: number;
+  capabilities?: PostaLiveCapabilities;
+  sse?: {
+    connectedClients: number;
+    revision: number;
+    lastBroadcastAt: string | null;
+    heartbeatMs: number;
+    unreadPollMs: number;
+    retryMs: number;
+  };
+  deliveryLatency?: {
+    sampleCount: number;
+    avgMs: number | null;
+    p50Ms: number | null;
+    p95Ms: number | null;
+    maxMs: number | null;
+    byChannel: Record<
+      string,
+      { count: number; avgMs: number | null; p50Ms: number | null; p95Ms: number | null }
+    >;
+  };
+  error?: string;
+};
+
+export async function fetchPostaLiveCapabilities(): Promise<PostaLiveCapabilities> {
+  const res = await fetch('/api/posta/live/capabilities');
+  return res.json();
+}
+
+export async function fetchPostaLiveMetrics(days = 7): Promise<PostaLiveMetrics> {
+  const res = await fetch(`/api/posta/live/metrics?days=${days}`);
+  return res.json();
+}
+
 export function downloadPostaEngagementCsv(type: 'combined' | 'opens' | 'clicks' | 'bounces' = 'combined', days = 90) {
   const params = new URLSearchParams({ type, days: String(days) });
   window.open(`/api/posta/engagement/export.csv?${params}`, '_blank', 'noopener,noreferrer');

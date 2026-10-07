@@ -194,6 +194,8 @@ export function EkolojikPostaHubScreen({
   const [composeAiBusy, setComposeAiBusy] = useState(false);
   const [imapConfigured, setImapConfigured] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [liveSse, setLiveSse] = useState<'connecting' | 'open' | 'closed'>('closed');
+  const liveRevisionRef = useRef(0);
   const [msgDraft, setMsgDraft] = useState('');
   const [msgBusy, setMsgBusy] = useState(false);
   const [templates, setTemplates] = useState<MailTemplate[]>([]);
@@ -478,21 +480,44 @@ export function EkolojikPostaHubScreen({
   useEffect(() => {
     if (folder === 'yaz') return undefined;
     let es: EventSource | null = null;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
     const refreshLive = () => {
       if (isInboxMailFolder(folder)) void refreshInbox(inboxFolder);
       if (folder === 'mesajlar') void refreshThreads();
       if (folder === 'gonderilen') void refreshSent();
     };
+    setLiveSse('connecting');
     try {
       es = new EventSource('/api/posta/events');
-      es.onmessage = () => refreshLive();
+      es.onopen = () => setLiveSse('open');
+      es.addEventListener('unread', () => refreshLive());
+      es.addEventListener('inbox', (ev) => {
+        try {
+          const data = JSON.parse(String((ev as MessageEvent).data)) as { revision?: number };
+          if (data.revision && data.revision !== liveRevisionRef.current) {
+            liveRevisionRef.current = data.revision;
+            playHubMessagePing();
+          }
+        } catch {
+          /* ignore */
+        }
+        refreshLive();
+      });
+      es.addEventListener('ping', () => setLiveSse('open'));
+      es.onerror = () => {
+        setLiveSse('closed');
+        es?.close();
+        es = null;
+        if (!pollTimer) pollTimer = setInterval(refreshLive, 15000);
+      };
     } catch {
-      timer = setInterval(refreshLive, 15000);
+      setLiveSse('closed');
+      pollTimer = setInterval(refreshLive, 15000);
     }
     return () => {
       es?.close();
-      if (timer) clearInterval(timer);
+      if (pollTimer) clearInterval(pollTimer);
+      setLiveSse('closed');
     };
   }, [folder, inboxFolder, refreshInbox, refreshThreads, refreshSent]);
 
@@ -967,7 +992,15 @@ export function EkolojikPostaHubScreen({
     <div className="module-screen posta-hub-screen">
       <header className="module-header posta-hub-header">
         <div>
-          <h1>Ekolojik Posta & Mesaj</h1>
+          <h1>
+            Ekolojik Posta & Mesaj{' '}
+            <span
+              className={`posta-live-pill posta-live-pill--${liveSse}`}
+              title="SSE canlılık (NB PM-6)"
+            >
+              {liveSse === 'open' ? 'Canlı' : liveSse === 'connecting' ? 'Bağlanıyor' : 'Yedek yenileme'}
+            </span>
+          </h1>
           <p>Nakliye Borsası Posta menüsü ile aynı klasörler — veri ve sunucu tamamen Ekolojik</p>
         </div>
         <div className="posta-hub-view-switch" role="tablist" aria-label="Görünüm">

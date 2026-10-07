@@ -17,6 +17,7 @@ import {
   fetchPostaDeliverability,
   fetchPostaNotificationsMatrix,
   fetchPostaEngagementSummary,
+  fetchPostaLiveMetrics,
   fetchPostaOutboxAnalytics,
   downloadPostaEngagementCsv,
   fetchPostaRules,
@@ -27,6 +28,7 @@ import {
   type PostaNotificationMatrix,
   type PostaNotificationMatrixHub,
   type PostaEngagementSummary,
+  type PostaLiveMetrics,
   type PostaOutboxAnalytics,
 } from '../../services/postaSettingsService';
 
@@ -74,9 +76,10 @@ export function EmailOutboxSettingsPanel() {
   const [postaRules, setPostaRules] = useState<PostaInboxRule[]>([]);
   const [deliverability, setDeliverability] = useState<PostaDeliverabilityHub | null>(null);
   const [notifyMatrixHub, setNotifyMatrixHub] = useState<PostaNotificationMatrixHub | null>(null);
+  const [liveMetrics, setLiveMetrics] = useState<PostaLiveMetrics | null>(null);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, engagement, rules, deliv, notifyHub] = await Promise.all([
+    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub] = await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
@@ -84,6 +87,7 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaMailSettings(),
       fetchPostaOutboxAnalytics(14),
       fetchPostaEngagementSummary(14),
+      fetchPostaLiveMetrics(7),
       fetchPostaRules(),
       fetchPostaDeliverability(),
       fetchPostaNotificationsMatrix(),
@@ -100,6 +104,7 @@ export function EmailOutboxSettingsPanel() {
     }
     if (analytics.ok) setOutboxAnalytics(analytics);
     if (engagement.ok) setEngagementSummary(engagement);
+    if (live.ok) setLiveMetrics(live);
     if (rules.ok && rules.rules) setPostaRules(rules.rules);
     if (deliv.ok) setDeliverability(deliv);
     if (notifyHub.ok) setNotifyMatrixHub(notifyHub);
@@ -599,6 +604,43 @@ export function EmailOutboxSettingsPanel() {
         <code>EKOLOJIK_POSTA_ENGAGEMENT_WEBHOOK</code> (JSON webhook), <code>EKOLOJIK_PUSH_VAPID_*</code> (PWA
         push), <code>EKOLOJIK_POSTA_AI=1</code>
       </p>
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>NB PM-6 — canlılık (SSE + gecikme metrik)</h3>
+          <p>
+            Heartbeat {liveMetrics?.sse?.heartbeatMs ? liveMetrics.sse.heartbeatMs / 1000 : 25}s · SSE istemci{' '}
+            {liveMetrics?.sse?.connectedClients ?? 0}
+          </p>
+        </div>
+      </div>
+      {liveMetrics?.ok && (
+        <div className="settings-stat-grid">
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Ortalama gecikme</span>
+            <strong>
+              {liveMetrics.deliveryLatency?.avgMs != null ? `${liveMetrics.deliveryLatency.avgMs} ms` : '—'}
+            </strong>
+            <span className="settings-hint">mesaj zamanı → sunucu bildirimi</span>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">p50 / p95</span>
+            <strong>
+              {liveMetrics.deliveryLatency?.p50Ms != null ? liveMetrics.deliveryLatency.p50Ms : '—'} /{' '}
+              {liveMetrics.deliveryLatency?.p95Ms != null ? liveMetrics.deliveryLatency.p95Ms : '—'} ms
+            </strong>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Örnek sayısı</span>
+            <strong>{liveMetrics.deliveryLatency?.sampleCount ?? 0}</strong>
+            <span className="settings-hint">son {liveMetrics.windowDays ?? 7} gün</span>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">SSE revizyon</span>
+            <strong>{liveMetrics.sse?.revision ?? 0}</strong>
+          </article>
+        </div>
+      )}
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
         <div>

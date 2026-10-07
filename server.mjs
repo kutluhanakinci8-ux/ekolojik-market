@@ -132,6 +132,12 @@ import {
   savePostaPushSubscription,
   sendPostaWebPush,
 } from './server/postaWebPush.mjs';
+import {
+  attachPostaSseStream,
+  getPostaLiveCapabilities,
+  getPostaLiveMetrics,
+  notifyPostaLiveInbox,
+} from './server/postaLive.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -653,6 +659,20 @@ const server = createServer(async (req, res) => {
       const tenantId = resolveTenantId(url);
       try {
         const result = await syncPostaInboxFromImap(DATA_DIR, tenantId);
+        if (result.ok && (result.added > 0 || result.updated > 0)) {
+          void notifyPostaLiveInbox(
+            DATA_DIR,
+            tenantId,
+            {
+              channel: 'imap',
+              reason: 'sync',
+              added: result.added ?? 0,
+              updated: result.updated ?? 0,
+              messageAt: new Date().toISOString(),
+            },
+            () => getPostaUnreadCounts(DATA_DIR, tenantId),
+          );
+        }
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -889,6 +909,25 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Deliverability hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/live/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaLiveCapabilities()));
+      return;
+    }
+
+    if (pathname === '/api/posta/live/metrics' && req.method === 'GET') {
+      const days = Number(url.searchParams.get('days') || 7);
+      try {
+        const result = await getPostaLiveMetrics(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Canlılık metrik hatası' }));
       }
       return;
     }
@@ -1231,26 +1270,9 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/events' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream; charset=utf-8',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
+      attachPostaSseStream(req, res, tenantId, {
+        fetchUnread: () => getPostaUnreadCounts(DATA_DIR, tenantId),
       });
-      const push = async () => {
-        try {
-          const payload = await getPostaUnreadCounts(DATA_DIR, tenantId);
-          res.write(`event: unread\ndata: ${JSON.stringify(payload)}\n\n`);
-        } catch (error) {
-          res.write(
-            `event: error\ndata: ${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'SSE hatası' })}\n\n`,
-          );
-        }
-      };
-      await push();
-      const timer = setInterval(() => {
-        void push();
-      }, 15000);
-      req.on('close', () => clearInterval(timer));
       return;
     }
 
@@ -1609,6 +1631,19 @@ const server = createServer(async (req, res) => {
         try {
           const result = await appendMessagingMessage(DATA_DIR, tenantId, threadId, data ?? {});
           if (result.ok && result.message) {
+            void notifyPostaLiveInbox(
+              DATA_DIR,
+              tenantId,
+              {
+                channel: 'messaging',
+                threadId,
+                messageId: result.message.id,
+                direction: result.message.direction,
+                messageAt: result.message.createdAt ?? new Date().toISOString(),
+                sourceId: result.message.id,
+              },
+              () => getPostaUnreadCounts(DATA_DIR, tenantId),
+            );
             try {
               result.notifications = await notifyOnMessagingMessage(DATA_DIR, {
                 thread: result.thread,
@@ -1739,6 +1774,17 @@ const server = createServer(async (req, res) => {
       try {
         const result = await saveContactMessage(DATA_DIR, data ?? {});
         if (result.ok && result.contact) {
+          void notifyPostaLiveInbox(
+            DATA_DIR,
+            resolveTenantId(url),
+            {
+              channel: 'contact',
+              contactId: result.contact.id,
+              messageAt: result.contact.createdAt ?? new Date().toISOString(),
+              sourceId: result.contact.id,
+            },
+            () => getPostaUnreadCounts(DATA_DIR, resolveTenantId(url)),
+          );
           try {
             result.notifications = await sendContactNotifications(DATA_DIR, result.contact);
           } catch (mailError) {
