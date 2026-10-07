@@ -15333,6 +15333,8 @@ input {
 .posta-live-pill--open { border-color: #2d8a4e; color: #1d6b3a; background: #e8f5ec; }
 .posta-live-pill--connecting { border-color: #c9a227; color: #7a5d00; background: #fff8e6; }
 .posta-live-pill--closed { border-color: var(--border); color: var(--text-muted); background: #f6f6f6; }
+.posta-hub-typing-hint { margin: 0 0 8px; font-size: 12px; color: var(--text-muted); font-style: italic; }
+.posta-msg-read { margin-left: 8px; font-size: 11px; color: var(--text-muted); font-weight: 500; }
 .posta-hub-smtp-warn { margin: 0 16px 12px; max-width: 960px; }
 .posta-hub-shell {
   display: grid;

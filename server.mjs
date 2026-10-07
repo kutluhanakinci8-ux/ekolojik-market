@@ -56,9 +56,38 @@ import {
   listMessagingMessages,
   appendMessagingMessage,
   markMessagingThreadStaffRead,
+  markMessagingMessagesRead,
+  markMessagingThreadCustomerRead,
   patchMessagingThread,
   searchMessagingInThread,
 } from './server/messaging/store.mjs';
+import {
+  getMessagingRealtimeCapabilities,
+  getMessagingTyping,
+  setMessagingTyping,
+} from './server/messaging/realtime.mjs';
+import {
+  assertMessagingPublicAuth,
+  getMessagingPublicCapabilities,
+  parseCustomerThreadToken,
+  publicCreateThread,
+  publicListMessages,
+  publicPostMessage,
+  publicTyping,
+} from './server/messaging/publicApi.mjs';
+import { getPostaJmapLiteSession, queryPostaJmapLiteMailbox } from './server/postaJmapLite.mjs';
+import {
+  deletePostaCalDavLiteEvent,
+  getPostaCalDavLitePrincipal,
+  listPostaCalDavLiteEvents,
+  upsertPostaCalDavLiteEvent,
+} from './server/postaCalDavLite.mjs';
+import {
+  assertPostaPublicMailAuth,
+  getPostaPublicMailCapabilities,
+  sendPostaPublicMail,
+} from './server/postaPublicMail.mjs';
+import { attachPostaWebSocketGateway } from './server/postaWsGateway.mjs';
 import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
 import { readMessagingAttachment } from './server/messaging/attachments.mjs';
@@ -134,6 +163,7 @@ import {
 } from './server/postaWebPush.mjs';
 import {
   attachPostaSseStream,
+  broadcastPostaSseEvent,
   getPostaLiveCapabilities,
   getPostaLiveMetrics,
   notifyPostaLiveInbox,
@@ -271,6 +301,13 @@ function getRequestIp(req) {
   let ip = req.socket?.remoteAddress || '';
   if (ip.startsWith('::ffff:')) ip = ip.slice(7);
   return ip || 'unknown';
+}
+
+let postaWsBroadcast = (_tenantId, _event, _data) => {};
+
+function notifyMessagingRealtime(tenantId, signal, extra = {}) {
+  broadcastPostaSseEvent(tenantId, 'messaging', { signal, ...extra });
+  postaWsBroadcast(tenantId, 'messaging', { signal, ...extra });
 }
 
 const server = createServer(async (req, res) => {
@@ -919,6 +956,238 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/tenants' && req.method === 'GET') {
+      try {
+        const store = await readTenantStore(DATA_DIR);
+        const ids = Object.keys(store?.tenants ?? { main: true });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, tenants: ids.length ? ids : ['main'], defaultTenant: 'main' }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Tenant listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/jmap-lite/session' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaJmapLiteSession()));
+      return;
+    }
+
+    if (pathname === '/api/posta/jmap-lite/Email/query' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const folder = url.searchParams.get('folder')?.trim() || 'gelen';
+      const limit = Number(url.searchParams.get('limit') || 50);
+      try {
+        const result = await queryPostaJmapLiteMailbox(DATA_DIR, tenantId, { folder, limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'JMAP lite hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/caldav-lite/principal' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaCalDavLitePrincipal()));
+      return;
+    }
+
+    if (pathname === '/api/posta/caldav-lite/events' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaCalDavLiteEvents(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV lite hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/caldav-lite/events' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaCalDavLiteEvent(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV lite yazma hatası' }));
+      }
+      return;
+    }
+
+    const calDavDeleteMatch = pathname.match(/^\/api\/posta\/caldav-lite\/events\/([^/]+)$/);
+    if (calDavDeleteMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const eventId = decodeURIComponent(calDavDeleteMatch[1]);
+      try {
+        const result = await deletePostaCalDavLiteEvent(DATA_DIR, tenantId, eventId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV lite silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/mail/v1/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaPublicMailCapabilities()));
+      return;
+    }
+
+    if (pathname === '/api/public/mail/v1/messages' && req.method === 'POST') {
+      const auth = assertPostaPublicMailAuth(req);
+      if (!auth.ok) {
+        res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(auth));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const result = await sendPostaPublicMail(DATA_DIR, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Public mail hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getMessagingPublicCapabilities()));
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads' && req.method === 'POST') {
+      const auth = assertMessagingPublicAuth(req);
+      if (!auth.ok) {
+        res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(auth));
+        return;
+      }
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await publicCreateThread(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Thread oluşturma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'GET') {
+      const token = url.searchParams.get('token')?.trim() || '';
+      const parsed = parseCustomerThreadToken(token);
+      if (!parsed.ok) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(parsed));
+        return;
+      }
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await publicListMessages(DATA_DIR, tenantId, parsed.threadId, parsed.customerId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+        notifyMessagingRealtime(tenantId, 'read', { threadId: parsed.threadId, party: 'customer' });
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'POST') {
+      const token = url.searchParams.get('token')?.trim() || '';
+      const parsed = parseCustomerThreadToken(token);
+      if (!parsed.ok) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(parsed));
+        return;
+      }
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await publicPostMessage(DATA_DIR, tenantId, parsed.threadId, parsed.customerId, data ?? {});
+        if (result.ok) {
+          notifyMessagingRealtime(tenantId, 'message', {
+            threadId: parsed.threadId,
+            messageId: result.message?.id,
+            direction: 'customer',
+          });
+          void notifyPostaLiveInbox(
+            DATA_DIR,
+            tenantId,
+            {
+              channel: 'messaging',
+              threadId: parsed.threadId,
+              messageId: result.message?.id,
+              direction: 'customer',
+              messageAt: result.message?.createdAt,
+            },
+            () => getPostaUnreadCounts(DATA_DIR, tenantId),
+          );
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj gönderim hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads/typing' && (req.method === 'GET' || req.method === 'POST')) {
+      const token = url.searchParams.get('token')?.trim() || '';
+      const parsed = parseCustomerThreadToken(token);
+      if (!parsed.ok) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(parsed));
+        return;
+      }
+      const tenantId = resolveTenantId(url);
+      try {
+        if (req.method === 'POST') {
+          const data = await readRequestBody(req);
+          const result = await publicTyping(
+            DATA_DIR,
+            tenantId,
+            parsed.threadId,
+            parsed.customerId,
+            Boolean(data?.active),
+          );
+          notifyMessagingRealtime(tenantId, 'typing', {
+            threadId: parsed.threadId,
+            party: 'customer',
+            active: Boolean(data?.active),
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        const typing = getMessagingTyping(tenantId, parsed.threadId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, typing }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Typing hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/live/metrics' && req.method === 'GET') {
       const days = Number(url.searchParams.get('days') || 7);
       try {
@@ -1509,6 +1778,17 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/messaging/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(
+        JSON.stringify({
+          ...getMessagingRealtimeCapabilities(),
+          public: getMessagingPublicCapabilities(),
+        }),
+      );
+      return;
+    }
+
     if (pathname === '/api/messaging/export' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
       try {
@@ -1581,9 +1861,33 @@ const server = createServer(async (req, res) => {
       const sub = parts[4];
       const tenantId = resolveTenantId(url);
 
+      if (sub === 'typing' && threadId && req.method === 'GET') {
+        const typing = getMessagingTyping(tenantId, threadId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, typing }));
+        return;
+      }
+
+      if (sub === 'typing' && threadId && req.method === 'POST') {
+        const data = await readRequestBody(req);
+        const party = data?.party === 'customer' ? 'customer' : 'staff';
+        const typing = setMessagingTyping(tenantId, threadId, party, Boolean(data?.active));
+        notifyMessagingRealtime(tenantId, 'typing', {
+          threadId,
+          party,
+          active: Boolean(data?.active),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, typing }));
+        return;
+      }
+
       if (sub === 'read' && threadId && req.method === 'POST') {
         try {
           const result = await markMessagingThreadStaffRead(DATA_DIR, tenantId, threadId);
+          if (result.ok) {
+            notifyMessagingRealtime(tenantId, 'read', { threadId, party: 'staff' });
+          }
           res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));
         } catch (error) {
@@ -1610,6 +1914,33 @@ const server = createServer(async (req, res) => {
         return;
       }
 
+      if (
+        parts[4] === 'messages' &&
+        parts[5] &&
+        parts[6] === 'read' &&
+        threadId &&
+        req.method === 'POST'
+      ) {
+        const messageId = decodeURIComponent(parts[5]);
+        const data = await readRequestBody(req);
+        const reader = data?.party === 'customer' ? 'customer' : 'staff';
+        try {
+          const result =
+            reader === 'customer'
+              ? await markMessagingThreadCustomerRead(DATA_DIR, tenantId, threadId, { messageId })
+              : await markMessagingMessagesRead(DATA_DIR, tenantId, threadId, { reader: 'staff', messageId });
+          if (result.ok) {
+            notifyMessagingRealtime(tenantId, 'read', { threadId, messageId, party: reader });
+          }
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj okundu hatası' }));
+        }
+        return;
+      }
+
       if (sub === 'messages' && threadId && req.method === 'GET') {
         const limit = Number(url.searchParams.get('limit') || 100);
         const q = url.searchParams.get('q')?.trim() || undefined;
@@ -1631,6 +1962,12 @@ const server = createServer(async (req, res) => {
         try {
           const result = await appendMessagingMessage(DATA_DIR, tenantId, threadId, data ?? {});
           if (result.ok && result.message) {
+            setMessagingTyping(tenantId, threadId, 'staff', false);
+            notifyMessagingRealtime(tenantId, 'message', {
+              threadId,
+              messageId: result.message.id,
+              direction: result.message.direction,
+            });
             void notifyPostaLiveInbox(
               DATA_DIR,
               tenantId,
@@ -1898,6 +2235,11 @@ const runRetention = () => {
 };
 setTimeout(runRetention, 60_000);
 setInterval(runRetention, RETENTION_MS);
+
+postaWsBroadcast = attachPostaWebSocketGateway(server, {
+  dataDir: DATA_DIR,
+  resolveTenantFromUrl: resolveTenantId,
+}).broadcast;
 
 server.listen(PORT, HOST, () => {
   console.log(`Market POS → http://${HOST}:${PORT}`);

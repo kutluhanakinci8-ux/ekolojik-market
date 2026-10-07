@@ -18,8 +18,11 @@ Faz 1–24: hub, IMAP, compose, sohbet, depolama, kurallar, AI/track lite, PWA l
 | **30** | PM-4 (PWA push) | Web push VAPID (POS PWA) | ✅ |
 | **31** | PM-9 (kurallar G5+) | Nested OR, gönderen+ek boyutu kuralları | ✅ |
 | **32** | PM-6 (canlılık) | SSE iyileştirme / mesaj gecikme metrik | ✅ |
-| **33** | Sohbet: okundu/typing (NB envanter #34) | Thread read receipt lite | plan |
-| **34** | Parite kapanış wave 2 | `sunucu-ekolojik-posta-nb-wave2-kapat.sh` | plan |
+| **33** | Sohbet: okundu/typing (NB envanter #34) | Thread + mesaj read receipt, typing, public widget | ✅ |
+| **34** | Parite kapanış wave 2 | `sunucu-ekolojik-posta-nb-wave2-kapat.sh` | ✅ |
+| **35** | P1 müşteri mesaj API | `/api/public/messaging/v1` + widget | ✅ |
+| **36** | P2 köprüler | JMAP lite, CalDAV lite, `/api/posta/ws` | ✅ |
+| **37** | P3 public mail + tenant | `/api/public/mail/v1`, `/api/posta/tenants` | ✅ |
 
 **Bilinçli NB farkı (ürün kararı):** Tam JMAP, WebSocket gateway, native mobil uygulama, Gmail admin embed — POS’ta PWA + IMAP yeterli.
 

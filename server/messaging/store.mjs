@@ -192,6 +192,8 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
     bodyText: bodyText || (hasAttachments ? '(ek dosya)' : ''),
     authorName: String(payload.authorName ?? (direction === 'customer' ? 'Müşteri' : 'POS')).trim(),
     createdAt: new Date().toISOString(),
+    readByStaffAt: null,
+    readByCustomerAt: null,
     attachments: [],
   };
 
@@ -230,14 +232,63 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
   return { ok: true, thread, message };
 }
 
-export async function markMessagingThreadStaffRead(dataDir, tenantId, threadId) {
+export async function markMessagingMessagesRead(
+  dataDir,
+  tenantId,
+  threadId,
+  { reader = 'staff', messageId } = {},
+) {
+  const party = reader === 'customer' ? 'customer' : 'staff';
   const root = await ensureRoot(dataDir, tenantId);
+  const got = await getMessagingThread(dataDir, tenantId, threadId);
+  if (!got.ok) return got;
+
+  const messages = await readMessages(root, threadId);
+  const now = new Date().toISOString();
+  let changed = 0;
+
+  const touch = (m) => {
+    if (party === 'staff' && m.direction === 'customer' && !m.readByStaffAt) {
+      m.readByStaffAt = now;
+      changed += 1;
+    }
+    if (party === 'customer' && m.direction === 'staff' && !m.readByCustomerAt) {
+      m.readByCustomerAt = now;
+      changed += 1;
+    }
+  };
+
+  if (messageId) {
+    const one = messages.find((m) => m.id === messageId);
+    if (one) touch(one);
+  } else {
+    for (const m of messages) touch(m);
+  }
+
+  if (changed > 0) await writeMessages(root, threadId, messages);
+
   const threads = await readThreads(root);
   const idx = threads.findIndex((t) => t.id === threadId);
-  if (idx < 0) return { ok: false, error: 'Thread bulunamadı' };
-  threads[idx].staffLastReadAt = new Date().toISOString();
-  await writeThreads(root, threads);
-  return { ok: true, thread: threads[idx] };
+  let threadRow = got.thread;
+  if (idx >= 0) {
+    if (party === 'staff') threads[idx].staffLastReadAt = now;
+    else threads[idx].customerLastReadAt = now;
+    threadRow = threads[idx];
+    await writeThreads(root, threads);
+  }
+
+  return { ok: true, thread: threadRow, updated: changed };
+}
+
+export async function markMessagingThreadStaffRead(dataDir, tenantId, threadId) {
+  return markMessagingMessagesRead(dataDir, tenantId, threadId, { reader: 'staff' });
+}
+
+export async function markMessagingThreadCustomerRead(dataDir, tenantId, threadId, opts = {}) {
+  return markMessagingMessagesRead(dataDir, tenantId, threadId, {
+    reader: 'customer',
+    messageId: opts.messageId,
+  });
 }
 
 export async function countStaffUnreadMessagingThreads(dataDir, tenantId = 'main') {
