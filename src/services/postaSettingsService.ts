@@ -111,12 +111,21 @@ export async function downloadPostaContactCsv(from?: string, to?: string) {
   downloadBlob(blob, 'ekolojik-contact.csv');
 }
 
+export type PostaRuleMatchGroup = {
+  subjectContains: string;
+  fromContains: string;
+};
+
 export type PostaInboxRule = {
   id: string;
   enabled: boolean;
   name: string;
   subjectContains: string;
   fromContains: string;
+  matchGroups?: PostaRuleMatchGroup[];
+  minAttachmentBytes?: number;
+  maxAttachmentBytes?: number | null;
+  rulesVersion?: number;
   routeToFatura: boolean;
   label: string | null;
 };

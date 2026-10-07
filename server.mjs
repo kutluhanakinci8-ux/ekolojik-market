@@ -115,7 +115,7 @@ import {
 } from './server/postaCalendarSync.mjs';
 import { getPostaStorageSummary } from './server/postaStorage.mjs';
 import { batchPostaInboxAction, markAllPostaInboxReadInFolder } from './server/postaInboxBatch.mjs';
-import { listPostaRules, savePostaRules } from './server/postaRules.mjs';
+import { getPostaRulesCapabilities, listPostaRules, savePostaRules } from './server/postaRules.mjs';
 import { getPostaOutboxAnalytics } from './server/postaOutboxAnalytics.mjs';
 import { getPostaDeliverabilityHub } from './server/postaDeliverability.mjs';
 import { suggestPostaCompose, isPostaAiEnabled } from './server/postaAiCompose.mjs';
@@ -733,6 +733,12 @@ const server = createServer(async (req, res) => {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu hatası' }));
       }
+      return;
+    }
+
+    if (pathname === '/api/posta/rules/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaRulesCapabilities()));
       return;
     }
 

@@ -596,7 +596,8 @@ export function EmailOutboxSettingsPanel() {
       <p className="settings-hint">
         İsteğe bağlı: <code>EKOLOJIK_MAIL_TRACK=1</code> (açılma + tıklama),{' '}
         <code>EKOLOJIK_MAIL_CLICK_TRACK=1</code> (yalnızca tıklama),{' '}
-        <code>EKOLOJIK_POSTA_ENGAGEMENT_WEBHOOK</code> (JSON webhook), <code>EKOLOJIK_POSTA_AI=1</code>
+        <code>EKOLOJIK_POSTA_ENGAGEMENT_WEBHOOK</code> (JSON webhook), <code>EKOLOJIK_PUSH_VAPID_*</code> (PWA
+        push), <code>EKOLOJIK_POSTA_AI=1</code>
       </p>
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
@@ -650,8 +651,8 @@ export function EmailOutboxSettingsPanel() {
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
         <div>
-          <h3>Posta kuralları (Fatura yönlendirme)</h3>
-          <p>Konu/from eşleşmesi → Fatura klasörü; IMAP sync sonrası uygulanır</p>
+          <h3>NB PM-9 — posta kuralları (OR grupları + ek boyutu)</h3>
+          <p>matchGroups: gruplar arası OR, grup içi konu+gönderen AND; IMAP sync sonrası uygulanır</p>
         </div>
         <button
           type="button"
@@ -691,25 +692,138 @@ export function EmailOutboxSettingsPanel() {
                 />{' '}
                 <strong>{rule.name}</strong>
               </label>
-              <div className="settings-form-grid" style={{ marginTop: 6 }}>
-                <label className="settings-field settings-field--full">
-                  <span>Konu içerir (| ile ayır)</span>
+              {(rule.matchGroups?.length
+                ? rule.matchGroups
+                : [{ subjectContains: rule.subjectContains, fromContains: rule.fromContains }]
+              ).map((group, groupIndex) => (
+                <div key={`${rule.id}-g-${groupIndex}`} className="settings-form-grid" style={{ marginTop: 6 }}>
+                  <p className="settings-hint settings-field--full">
+                    OR grubu {groupIndex + 1}
+                    {(rule.matchGroups?.length ?? 1) > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        style={{ marginLeft: 8 }}
+                        onClick={() =>
+                          setPostaRules((prev) =>
+                            prev.map((r) => {
+                              if (r.id !== rule.id) return r;
+                              const groups = [...(r.matchGroups ?? [{ subjectContains: r.subjectContains, fromContains: r.fromContains }])];
+                              groups.splice(groupIndex, 1);
+                              const first = groups[0] ?? { subjectContains: '', fromContains: '' };
+                              return {
+                                ...r,
+                                matchGroups: groups,
+                                subjectContains: first.subjectContains,
+                                fromContains: first.fromContains,
+                              };
+                            }),
+                          )
+                        }
+                      >
+                        Grubu sil
+                      </button>
+                    )}
+                  </p>
+                  <label className="settings-field settings-field--full">
+                    <span>Konu içerir (| ile ayır)</span>
+                    <input
+                      value={group.subjectContains}
+                      onChange={(e) =>
+                        setPostaRules((prev) =>
+                          prev.map((r) => {
+                            if (r.id !== rule.id) return r;
+                            const groups = [...(r.matchGroups ?? [{ subjectContains: r.subjectContains, fromContains: r.fromContains }])];
+                            groups[groupIndex] = { ...groups[groupIndex], subjectContains: e.target.value };
+                            const first = groups[0] ?? { subjectContains: '', fromContains: '' };
+                            return {
+                              ...r,
+                              matchGroups: groups,
+                              subjectContains: first.subjectContains,
+                              fromContains: first.fromContains,
+                            };
+                          }),
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="settings-field settings-field--full">
+                    <span>Gönderen içerir (| ile ayır)</span>
+                    <input
+                      value={group.fromContains}
+                      onChange={(e) =>
+                        setPostaRules((prev) =>
+                          prev.map((r) => {
+                            if (r.id !== rule.id) return r;
+                            const groups = [...(r.matchGroups ?? [{ subjectContains: r.subjectContains, fromContains: r.fromContains }])];
+                            groups[groupIndex] = { ...groups[groupIndex], fromContains: e.target.value };
+                            const first = groups[0] ?? { subjectContains: '', fromContains: '' };
+                            return {
+                              ...r,
+                              matchGroups: groups,
+                              subjectContains: first.subjectContains,
+                              fromContains: first.fromContains,
+                            };
+                          }),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() =>
+                  setPostaRules((prev) =>
+                    prev.map((r) =>
+                      r.id === rule.id
+                        ? {
+                            ...r,
+                            matchGroups: [
+                              ...(r.matchGroups ?? [{ subjectContains: r.subjectContains, fromContains: r.fromContains }]),
+                              { subjectContains: '', fromContains: '' },
+                            ],
+                          }
+                        : r,
+                    ),
+                  )
+                }
+              >
+                OR koşulu ekle
+              </button>
+              <div className="settings-form-grid" style={{ marginTop: 8 }}>
+                <label className="settings-field">
+                  <span>Min ek boyutu (bayt, 0=kapalı)</span>
                   <input
-                    value={rule.subjectContains}
+                    type="number"
+                    min={0}
+                    value={rule.minAttachmentBytes ?? 0}
                     onChange={(e) =>
                       setPostaRules((prev) =>
-                        prev.map((r) => (r.id === rule.id ? { ...r, subjectContains: e.target.value } : r)),
+                        prev.map((r) =>
+                          r.id === rule.id ? { ...r, minAttachmentBytes: Number(e.target.value) || 0 } : r,
+                        ),
                       )
                     }
                   />
                 </label>
-                <label className="settings-field settings-field--full">
-                  <span>Gönderen içerir</span>
+                <label className="settings-field">
+                  <span>Max ek boyutu (boş=sınırsız)</span>
                   <input
-                    value={rule.fromContains}
+                    type="number"
+                    min={0}
+                    value={rule.maxAttachmentBytes ?? ''}
                     onChange={(e) =>
                       setPostaRules((prev) =>
-                        prev.map((r) => (r.id === rule.id ? { ...r, fromContains: e.target.value } : r)),
+                        prev.map((r) =>
+                          r.id === rule.id
+                            ? {
+                                ...r,
+                                maxAttachmentBytes: e.target.value === '' ? null : Number(e.target.value) || 0,
+                              }
+                            : r,
+                        ),
                       )
                     }
                   />
