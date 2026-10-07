@@ -83,8 +83,41 @@ export function mergeReferences(existing: string | undefined | null, messageId: 
   return `${refs} ${mid}`;
 }
 
-export function formatPostaComposePreview(markdown: string) {
-  const src = String(markdown ?? '').trim();
+export function sanitizePostaComposeHtmlClient(raw: string) {
+  let html = String(raw ?? '').trim();
+  if (!html) return '';
+  html = html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+  html = html.replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '');
+  html = html.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  html = html.replace(/javascript:/gi, '');
+  return html;
+}
+
+export function stripHtmlToPlainText(html: string) {
+  return String(html ?? '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export type PostaComposeBodyFormat = 'markdown' | 'html';
+
+export function formatPostaComposePreview(body: string, format: PostaComposeBodyFormat = 'markdown') {
+  if (format === 'html') {
+    const safe = sanitizePostaComposeHtmlClient(body);
+    return safe ? `<div class="posta-compose-html-preview">${safe}</div>` : '';
+  }
+
+  const src = String(body ?? '').trim();
   if (!src) return '';
 
   const escapeHtml = (s: string) =>
@@ -95,8 +128,13 @@ export function formatPostaComposePreview(markdown: string) {
       .replace(/"/g, '&quot;');
 
   let html = escapeHtml(src);
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
   html = html.replace(/\n- (.+)/g, '\n<li>$1</li>');
   html = html.replace(/(<li>[\s\S]*?<\/li>)+/g, (block) => `<ul>${block}</ul>`);
   html = html.replace(/\n/g, '<br/>');

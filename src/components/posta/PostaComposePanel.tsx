@@ -5,7 +5,9 @@ import {
   POSTA_COMPOSE_MAX_ATTACH_BYTES,
   totalAttachmentBytes,
   type OutboundAttachment,
+  type PostaComposeBodyFormat,
 } from '../../utils/postaComposeClient';
+import { PostaComposeRichEditor } from './PostaComposeRichEditor';
 
 export type PostaComposePanelProps = {
   ourEmails: string[];
@@ -17,6 +19,7 @@ export type PostaComposePanelProps = {
   composeBcc: string;
   composeSubject: string;
   composeBody: string;
+  bodyFormat: PostaComposeBodyFormat;
   attachments: OutboundAttachment[];
   onChange: (patch: {
     to?: string;
@@ -24,6 +27,7 @@ export type PostaComposePanelProps = {
     bcc?: string;
     subject?: string;
     body?: string;
+    bodyFormat?: PostaComposeBodyFormat;
     attachments?: OutboundAttachment[];
   }) => void;
   onSend: () => void;
@@ -44,6 +48,7 @@ export function PostaComposePanel({
   composeBcc,
   composeSubject,
   composeBody,
+  bodyFormat,
   attachments,
   onChange,
   onSend,
@@ -74,7 +79,7 @@ export function PostaComposePanel({
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-  }, [composeTo, composeCc, composeBcc, composeSubject, composeBody, attachments.length, autosaveDraft]);
+  }, [composeTo, composeCc, composeBcc, composeSubject, composeBody, bodyFormat, attachments.length, autosaveDraft]);
 
   const wrapComposeSelection = (before: string, after: string) => {
     const el = document.getElementById('posta-compose-body') as HTMLTextAreaElement | null;
@@ -89,10 +94,11 @@ export function PostaComposePanel({
     const t = templates.find((x) => x.id === templateId);
     if (!t) return;
     skipAutosaveOnce.current = true;
-    onChange({ subject: t.subject, body: t.body });
+    onChange({ subject: t.subject, body: t.body, bodyFormat: 'markdown' });
   };
 
   const attachBytes = totalAttachmentBytes(attachments);
+  const isRich = bodyFormat === 'html';
 
   return (
     <div className="posta-hub-compose-form">
@@ -145,15 +151,22 @@ export function PostaComposePanel({
         <span>Konu</span>
         <input value={composeSubject} onChange={(e) => onChange({ subject: e.target.value })} />
       </label>
-      <div className="posta-compose-toolbar">
-        <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('**', '**')}>
-          Kalın
+
+      <div className="posta-compose-format-toggle">
+        <span className="settings-hint">NB PM-2 — biçim:</span>
+        <button
+          type="button"
+          className={`btn btn-sm ${isRich ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => onChange({ bodyFormat: 'html' })}
+        >
+          Zengin metin
         </button>
-        <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('\n- ', '')}>
-          Liste
-        </button>
-        <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('[', '](https://)')}>
-          Link
+        <button
+          type="button"
+          className={`btn btn-sm ${!isRich ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => onChange({ bodyFormat: 'markdown' })}
+        >
+          Markdown
         </button>
         <button type="button" className="btn btn-sm btn-outline" onClick={() => setShowPreview((v) => !v)}>
           {showPreview ? 'Düzenle' : 'Önizleme'}
@@ -164,24 +177,62 @@ export function PostaComposePanel({
           </button>
         )}
       </div>
+
       {!showPreview ? (
-        <label className="settings-field settings-field--full">
-          <span>Metin (Markdown)</span>
-          <textarea
-            id="posta-compose-body"
-            rows={8}
-            value={composeBody}
-            onChange={(e) => onChange({ body: e.target.value })}
+        isRich ? (
+          <PostaComposeRichEditor
+            html={composeBody}
+            disabled={loading}
+            onChange={(html) => onChange({ body: html })}
           />
-        </label>
+        ) : (
+          <>
+            <div className="posta-compose-toolbar">
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('**', '**')}>
+                Kalın
+              </button>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('_', '_')}>
+                İtalik
+              </button>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('`', '`')}>
+                Kod
+              </button>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('\n- ', '')}>
+                Liste
+              </button>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('\n> ', '')}>
+                Alıntı
+              </button>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('## ', '')}>
+                Başlık
+              </button>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => wrapComposeSelection('[', '](https://)')}>
+                Link
+              </button>
+            </div>
+            <label className="settings-field settings-field--full">
+              <span>Metin (Markdown)</span>
+              <textarea
+                id="posta-compose-body"
+                rows={8}
+                value={composeBody}
+                onChange={(e) => onChange({ body: e.target.value })}
+              />
+            </label>
+          </>
+        )
       ) : (
         <div className="posta-compose-preview">
-          <div className="posta-compose-preview-body" dangerouslySetInnerHTML={{ __html: formatPostaComposePreview(composeBody) }} />
+          <div
+            className="posta-compose-preview-body"
+            dangerouslySetInnerHTML={{ __html: formatPostaComposePreview(composeBody, bodyFormat) }}
+          />
           {signaturePreviewHtml?.trim() ? (
             <div className="posta-compose-preview-sig" dangerouslySetInnerHTML={{ __html: signaturePreviewHtml }} />
           ) : null}
         </div>
       )}
+
       <label className="settings-field settings-field--full">
         <span>Ek (toplam max 10 MB)</span>
         <input

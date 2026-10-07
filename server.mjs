@@ -84,6 +84,11 @@ import {
 } from './server/postaComposeDrafts.mjs';
 import { listMailTemplates } from './server/mailTemplates.mjs';
 import { formatPostaComposeBody } from './server/postaComposeFormat.mjs';
+import {
+  getPostaComposeRteCapabilities,
+  sanitizePostaComposeHtml,
+  stripHtmlToPlainText,
+} from './server/postaComposeRte.mjs';
 import { validateOutboundAttachments } from './server/postaComposeActions.mjs';
 import {
   listPostaContacts,
@@ -740,6 +745,12 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/compose/rte-capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaComposeRteCapabilities()));
+      return;
+    }
+
     if (pathname === '/api/posta/notifications/matrix' && req.method === 'GET') {
       try {
         const settings = await getPostaMailSettings(DATA_DIR);
@@ -1219,7 +1230,10 @@ const server = createServer(async (req, res) => {
           return;
         }
         const bodyRaw = data?.body?.trim() || 'Bu mesaj Ekolojik Market bağımsız posta outbox (Faz 1) testidir.';
-        const formatted = data?.html ? { text: bodyRaw, html: data.html } : formatPostaComposeBody(bodyRaw);
+        const htmlSanitized = data?.html ? sanitizePostaComposeHtml(data.html) : '';
+        const formatted = htmlSanitized
+          ? { text: stripHtmlToPlainText(htmlSanitized) || bodyRaw, html: htmlSanitized }
+          : formatPostaComposeBody(bodyRaw);
         const result = await sendEkolojikMail(DATA_DIR, {
           to,
           cc: data?.cc?.trim() || undefined,
