@@ -256,6 +256,7 @@ export function EkolojikPostaHubScreen({
   const [pushConfig, setPushConfig] = useState<PostaPushConfig | null>(null);
   const [pushSubscribers, setPushSubscribers] = useState(0);
   const [pushBusy, setPushBusy] = useState(false);
+  const [pushBarExpanded, setPushBarExpanded] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
@@ -1072,7 +1073,11 @@ export function EkolojikPostaHubScreen({
   ]);
 
   return (
-    <div className="module-screen posta-hub-screen posta-hub-screen--premium">
+    <div
+      className={`module-screen posta-hub-screen posta-hub-screen--premium${
+        hubLayout === 'sohbet' ? ' posta-hub-screen--sohbet-focus' : ''
+      }`}
+    >
       <header className="module-header posta-hub-header posta-hub-hero">
         <div className="posta-hub-hero-text">
           <p className="posta-hub-eyebrow">Ekolojik Market</p>
@@ -1126,7 +1131,18 @@ export function EkolojikPostaHubScreen({
           Çevrimdışı — son kaydedilen gelen kutusu listesi gösteriliyor (salt okuma).
         </p>
       )}
-      {pushConfig && (
+      {pushConfig && hubLayout === 'sohbet' && !pushBarExpanded ? (
+        <div className="posta-hub-push-compact">
+          <button
+            type="button"
+            className="posta-hub-push-compact-btn"
+            onClick={() => setPushBarExpanded(true)}
+          >
+            Bildirimler · {pushConfig.configured ? 'Hazır' : 'Kurulum'} · {pushSubscribers} cihaz
+          </button>
+        </div>
+      ) : null}
+      {pushConfig && (hubLayout !== 'sohbet' || pushBarExpanded) ? (
         <div className="posta-hub-push-bar">
           <span className="posta-hub-push-title">
             Masaüstü bildirimleri · {pushConfig.configured ? 'Hazır' : 'Kurulum gerekli'} ·{' '}
@@ -1192,12 +1208,21 @@ export function EkolojikPostaHubScreen({
             >
               Test push
             </button>
+            {hubLayout === 'sohbet' && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => setPushBarExpanded(false)}
+              >
+                Gizle
+              </button>
+            )}
           </div>
           {!pushConfig.configured && pushConfig.hint && (
             <p className="posta-hub-push-hint">{pushConfig.hint}</p>
           )}
         </div>
-      )}
+      ) : null}
 
       {postaStorage && hubLayout !== 'sohbet' && (
         <div className="posta-hub-meta-strip">

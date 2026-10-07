@@ -15558,6 +15558,36 @@ input {
   color: var(--text-muted, #64748b);
 }
 .posta-compose-html-preview blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid #cbd5e1; }
+.posta-hub-push-compact {
+  margin: 0 20px 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+.posta-hub-push-compact-btn {
+  border: 1px solid var(--posta-border-soft);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(27, 61, 26, 0.05);
+}
+.posta-hub-push-compact-btn:hover {
+  color: var(--greenleaf-dark);
+  border-color: rgba(81, 184, 72, 0.35);
+}
+.posta-hub-screen--sohbet-focus .posta-hub-hero {
+  margin-bottom: 10px;
+  padding: 16px 20px;
+}
+.posta-hub-screen--sohbet-focus .posta-hub-shell {
+  min-height: min(72vh, 680px);
+}
+.posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet .posta-hub-sohbet-messages {
+  max-height: min(68vh, 620px);
+}
 .posta-hub-push-bar {
   display: flex;
   flex-direction: column;
