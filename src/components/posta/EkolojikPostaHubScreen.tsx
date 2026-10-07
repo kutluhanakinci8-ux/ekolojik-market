@@ -1060,7 +1060,6 @@ export function EkolojikPostaHubScreen({
               {liveSse === 'open' ? 'Canlı' : liveSse === 'connecting' ? 'Bağlanıyor' : 'Yedek yenileme'}
             </span>
           </h1>
-          <p>Nakliye Borsası Posta menüsü ile aynı klasörler — veri ve sunucu tamamen Ekolojik</p>
         </div>
         <div className="posta-hub-view-switch" role="tablist" aria-label="Görünüm">
           {(['posta', 'sohbet', 'tam'] as HubLayout[]).map((mode) => (
@@ -1102,10 +1101,6 @@ export function EkolojikPostaHubScreen({
           Çevrimdışı — son kaydedilen gelen kutusu listesi gösteriliyor (salt okuma).
         </p>
       )}
-      <p className="module-hint posta-hub-hotkeys-hint" aria-hidden="true">
-        Kısayollar: <kbd>j</kbd>/<kbd>k</kbd> liste · <kbd>c</kbd> yaz · <kbd>r</kbd> yanıtla · <kbd>/</kbd> ara
-      </p>
-
       {pushConfig && (
         <div className="posta-hub-push-bar">
           <span className="module-hint">
