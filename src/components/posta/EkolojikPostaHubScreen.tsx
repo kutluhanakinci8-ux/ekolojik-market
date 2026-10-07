@@ -63,10 +63,14 @@ import {
 import {
   addMailToPostaCalendar,
   deletePostaCalendarEvent,
+  downloadPostaCalendarIcsExport,
   fetchPostaCalendar,
+  fetchPostaCalendarSyncHub,
+  rotatePostaCalendarSyncToken,
   savePostaCalendarEvent,
   syncPostaPaymentReminders,
   type PostaCalendarEvent,
+  type PostaCalendarSyncHub,
 } from '../../services/postaCalendarService';
 
 function readFileAsAttachment(file: File) {
@@ -200,6 +204,7 @@ export function EkolojikPostaHubScreen({
   const [postaContacts, setPostaContacts] = useState<PostaContact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<PostaCalendarEvent[]>([]);
+  const [calendarSyncHub, setCalendarSyncHub] = useState<PostaCalendarSyncHub | null>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
@@ -332,11 +337,12 @@ export function EkolojikPostaHubScreen({
 
   const refreshCalendar = useCallback(async () => {
     await syncPostaPaymentReminders(store.settings.paymentReminders ?? []);
-    const result = await fetchPostaCalendar(160);
+    const [result, sync] = await Promise.all([fetchPostaCalendar(160), fetchPostaCalendarSyncHub()]);
     if (result.ok && result.events) {
       setCalendarEvents(result.events);
       setSelectedCalendarId((cur) => cur ?? result.events![0]?.id ?? null);
     }
+    if (sync.ok) setCalendarSyncHub(sync);
   }, [store.settings.paymentReminders]);
 
   useEffect(() => {
@@ -1831,6 +1837,65 @@ export function EkolojikPostaHubScreen({
 
           {folder === 'takvim' && (
             <div className="posta-hub-calendar-detail">
+              {calendarSyncHub?.ics && (
+                <section className="posta-hub-calendar-sync">
+                  <h3 className="posta-hub-subtitle">NB PM-5 — harici takvim (ICS)</h3>
+                  <p className="module-hint">{calendarSyncHub.caldav?.note}</p>
+                  <p className="module-hint">{calendarSyncHub.refreshHint}</p>
+                  <label className="settings-field settings-field--full">
+                    <span>Abonelik URL (HTTPS)</span>
+                    <input readOnly value={calendarSyncHub.ics.subscribeUrl ?? ''} />
+                  </label>
+                  <label className="settings-field settings-field--full">
+                    <span>WebCal (Apple Takvim)</span>
+                    <input readOnly value={calendarSyncHub.ics.webcalUrl ?? ''} />
+                  </label>
+                  <div className="posta-hub-compose-actions">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      onClick={() => {
+                        const url = calendarSyncHub.ics?.subscribeUrl;
+                        if (url) void navigator.clipboard.writeText(url);
+                        setFlash('ICS abonelik URL kopyalandı');
+                      }}
+                    >
+                      URL kopyala
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      onClick={() => downloadPostaCalendarIcsExport()}
+                    >
+                      .ics indir
+                    </button>
+                    {calendarSyncHub.carddav?.vcardExportUrl && (
+                      <a
+                        className="btn btn-sm btn-outline"
+                        href={calendarSyncHub.carddav.vcardExportUrl}
+                        download
+                      >
+                        Kişiler (.vcf)
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      onClick={async () => {
+                        const result = await rotatePostaCalendarSyncToken();
+                        if (result.ok && result.hub) {
+                          setCalendarSyncHub(result.hub);
+                          setFlash('ICS abonelik anahtarı yenilendi — harici takvimde URL güncelleyin');
+                        } else {
+                          setFlash(result.error ?? 'Anahtar yenilenemedi');
+                        }
+                      }}
+                    >
+                      Abonelik anahtarını yenile
+                    </button>
+                  </div>
+                </section>
+              )}
               {selectedCalendarEvent ? (
                 <>
                   <h2>{selectedCalendarEvent.title}</h2>

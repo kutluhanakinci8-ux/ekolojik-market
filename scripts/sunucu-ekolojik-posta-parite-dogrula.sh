@@ -80,6 +80,7 @@ for path in \
   "/api/posta/drafts" \
   "/api/posta/contacts?limit=5" \
   "/api/posta/calendar" \
+  "/api/posta/calendar/sync" \
   "/api/posta/settings" \
   "/api/posta/templates" \
   "/api/posta/compose-hints?limit=5" \

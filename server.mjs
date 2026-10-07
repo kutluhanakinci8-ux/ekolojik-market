@@ -106,6 +106,13 @@ import {
   createCalendarEventFromMail,
   syncPaymentRemindersSnapshot,
 } from './server/postaCalendar.mjs';
+import {
+  buildPostaCalendarIcsFeed,
+  getPostaCalendarSyncHub,
+  resolvePostaPublicBaseUrl,
+  rotatePostaCalendarFeedToken,
+  validatePostaCalendarFeedToken,
+} from './server/postaCalendarSync.mjs';
 import { getPostaStorageSummary } from './server/postaStorage.mjs';
 import { batchPostaInboxAction, markAllPostaInboxReadInFolder } from './server/postaInboxBatch.mjs';
 import { listPostaRules, savePostaRules } from './server/postaRules.mjs';
@@ -908,6 +915,76 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kişi silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/sync' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const base = resolvePostaPublicBaseUrl(req);
+        const result = await getPostaCalendarSyncHub(DATA_DIR, tenantId, base);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim sync hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/sync/rotate-token' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const rotated = await rotatePostaCalendarFeedToken(DATA_DIR, tenantId);
+        const base = resolvePostaPublicBaseUrl(req);
+        const hub = await getPostaCalendarSyncHub(DATA_DIR, tenantId, base);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...rotated, hub }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Token hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/export.ics' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 200);
+      try {
+        const feed = await buildPostaCalendarIcsFeed(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-posta-calendar.ics"',
+        });
+        res.end(feed.ics);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'ICS export hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/feed.ics' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const token = url.searchParams.get('token')?.trim() ?? '';
+      try {
+        const valid = await validatePostaCalendarFeedToken(DATA_DIR, tenantId, token);
+        if (!valid) {
+          res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('Unauthorized');
+          return;
+        }
+        const limit = Number(url.searchParams.get('limit') || 200);
+        const feed = await buildPostaCalendarIcsFeed(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Cache-Control': 'private, max-age=300',
+        });
+        res.end(feed.ics);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('ICS feed error');
       }
       return;
     }

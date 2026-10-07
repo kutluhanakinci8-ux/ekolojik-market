@@ -61,3 +61,34 @@ export async function addMailToPostaCalendar(payload: {
   });
   return res.json() as Promise<{ ok: boolean; event?: PostaCalendarEvent; error?: string }>;
 }
+
+export type PostaCalendarSyncHub = {
+  ok: boolean;
+  mode?: string;
+  caldav?: { supported: boolean; note?: string };
+  carddav?: { supported: boolean; vcardExportPath?: string; vcardExportUrl?: string };
+  ics?: {
+    exportPath?: string;
+    exportUrl?: string;
+    subscribePath?: string;
+    subscribeUrl?: string;
+    webcalUrl?: string;
+    tokenRotatedAt?: string;
+  };
+  refreshHint?: string;
+  error?: string;
+};
+
+export async function fetchPostaCalendarSyncHub() {
+  const res = await fetch('/api/posta/calendar/sync');
+  return res.json() as Promise<PostaCalendarSyncHub>;
+}
+
+export async function rotatePostaCalendarSyncToken() {
+  const res = await fetch('/api/posta/calendar/sync/rotate-token', { method: 'POST' });
+  return res.json() as Promise<{ ok: boolean; hub?: PostaCalendarSyncHub; error?: string }>;
+}
+
+export function downloadPostaCalendarIcsExport() {
+  window.open('/api/posta/calendar/export.ics', '_blank', 'noopener,noreferrer');
+}
