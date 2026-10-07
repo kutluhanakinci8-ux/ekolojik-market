@@ -73,6 +73,7 @@ for path in \
   "/api/posta/sent?limit=3" \
   "/api/posta/storage" \
   "/api/posta/rules" \
+  "/api/posta/rules/capabilities" \
   "/api/posta/outbox/analytics?days=7" \
   "/api/posta/engagement/summary?days=7" \
   "/api/posta/push/config" \
