@@ -162,7 +162,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 22 — Tam parite kapısı (yeniden kapatma)
+## Faz 22 — Tam parite kapısı (yeniden kapatma) ✅ (2026-10-07)
 
 | # | İş | Çıktı |
 |---|-----|--------|
@@ -172,6 +172,8 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 | 22.4 | `EKOLOJIK-POSTA-KULLANIM.md` operatör rehberi | Doküman |
 
 **Kabul:** Checklist’te “bilinçli eksik” alanı **boş**; prod kapatma yeşil.
+
+Tek komut kapı: `bash scripts/sunucu-ekolojik-posta-faz22-dogrula.sh`
 
 ---
 

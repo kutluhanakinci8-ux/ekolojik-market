@@ -19,6 +19,7 @@ bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-gelen-smoke.sh" "${INSTALL_DIR}
 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-akis-a-smoke.sh" "${INSTALL_DIR}"
 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-akis-b-smoke.sh" "${INSTALL_DIR}"
 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-nb-checklist-dogrula.sh" "${INSTALL_DIR}"
+bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-faz22-e2e-smoke.sh"
 
 echo ""
-echo "✓ Akış C — tüm E2E smoke geçti"
+echo "✓ Akış C — tüm E2E smoke geçti (Faz 22 E2E dahil)"

@@ -13,7 +13,7 @@ warn() { echo "UYARI: $*"; }
 ok() { echo "OK   $*"; }
 bad() { echo "HATA: $*"; FAIL=1; }
 
-echo "=== Ekolojik Posta parite doğrulama (Faz 12) ==="
+echo "=== Ekolojik Posta parite doğrulama (Faz 12 + 14–21 API) ==="
 echo "Kök: ${ROOT}"
 echo "API:  ${BASE_URL}"
 
@@ -66,6 +66,17 @@ fi
 for path in \
   "/api/posta/unread-counts" \
   "/api/posta/inbox?folder=gelen&limit=5" \
+  "/api/posta/inbox?folder=fatura&limit=5" \
+  "/api/posta/inbox?folder=spam&limit=5" \
+  "/api/posta/inbox?folder=yildizli&limit=3" \
+  "/api/posta/inbox/search?folder=gelen&q=test&limit=3" \
+  "/api/posta/sent?limit=3" \
+  "/api/posta/storage" \
+  "/api/posta/rules" \
+  "/api/posta/outbox/analytics?days=7" \
+  "/api/posta/drafts" \
+  "/api/posta/contacts?limit=5" \
+  "/api/posta/calendar" \
   "/api/posta/settings" \
   "/api/posta/templates" \
   "/api/posta/compose-hints?limit=5" \
@@ -99,6 +110,12 @@ else
   warn "SSE kısa test — bağlantı veya proxy SSE'yi kesiyor olabilir"
 fi
 
+if curl -fsS "${BASE_URL}/posta-offline-sw.js" -o /tmp/ek-posta-sw.js 2>/dev/null; then
+  if head -1 /tmp/ek-posta-sw.js | grep -q 'posta'; then
+    ok "offline SW (Faz 21)"
+  fi
+fi
+
 SMTP_SCRIPT="${REPO_ROOT}/scripts/sunucu-ekolojik-smtp-dogrula.sh"
 if [[ -f "${SMTP_SCRIPT}" ]]; then
   if bash "${SMTP_SCRIPT}" "${ROOT}"; then
@@ -111,7 +128,7 @@ fi
 
 echo ""
 if [[ $FAIL -eq 0 ]]; then
-  echo "✓ Posta parite doğrulama geçti (Ekolojik SMB kapsamı)"
+  echo "✓ Posta parite doğrulama geçti (Faz 12 + 14–21 API)"
   exit 0
 fi
 echo "✗ Bazı kontroller başarısız — docs/EKOLOJIK-POSTA-E2E-SMOKE.md"
