@@ -81,6 +81,7 @@ import {
 } from './server/postaComposeDrafts.mjs';
 import { listMailTemplates } from './server/mailTemplates.mjs';
 import { formatPostaComposeBody } from './server/postaComposeFormat.mjs';
+import { validateOutboundAttachments } from './server/postaComposeActions.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -891,18 +892,27 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
+        const attachCheck = validateOutboundAttachments(data?.attachments);
+        if (!attachCheck.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: attachCheck.error }));
+          return;
+        }
         const bodyRaw = data?.body?.trim() || 'Bu mesaj Ekolojik Market bağımsız posta outbox (Faz 1) testidir.';
         const formatted = data?.html ? { text: bodyRaw, html: data.html } : formatPostaComposeBody(bodyRaw);
         const result = await sendEkolojikMail(DATA_DIR, {
           to,
+          cc: data?.cc?.trim() || undefined,
+          bcc: data?.bcc?.trim() || undefined,
           subject: data?.subject?.trim() || 'Ekolojik Market — SMTP test',
           body: formatted.text,
           html: formatted.html,
           fromName: data?.fromName,
           idempotencyKey: `test:${to}:${Date.now()}`,
-          source: 'test',
+          source: 'posta-compose',
           inReplyTo: data?.inReplyTo?.trim() || undefined,
           references: data?.references?.trim() || undefined,
+          attachments: attachCheck.attachments,
         });
         res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));

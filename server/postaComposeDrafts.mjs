@@ -39,6 +39,8 @@ export async function upsertPostaComposeDraft(dataDir, tenantId, payload) {
   const row = {
     id,
     to,
+    cc: String(payload.cc ?? '').trim(),
+    bcc: String(payload.bcc ?? '').trim(),
     subject,
     body,
     inReplyTo: payload.inReplyTo ?? null,
