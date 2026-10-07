@@ -1,46 +1,79 @@
 # Posta sekmesi — operatör kılavuzu (Ekolojik Market POS)
 
-NB **Lerta Posta** ile aynı **düzen** (Yaz · Gelen · Müşteri mesajları · Gönderilen); veri ve sunucu **Ekolojik’e özeldir**.
+NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm); veri ve sunucu **Ekolojik’e özeldir** (`EKOLOJIK_*`, `LERTA_PLATFORM_BRIDGE=0`).
 
-## Menü
+## Günlük kullanım
 
-1. Üst menüden **Posta** — yanındaki rozet okunmamış iletişim + IMAP + mesaj sayısını gösterir.
-2. Sol sütun: klasörler (Gelen, Gönderilen, Fatura filtresi, Arşiv).
-3. Orta: liste; sağ: okuma / yazma paneli.
+1. Üst menü **Posta** — rozet: okunmamış gelen + fatura + müşteri mesajları.
+2. Sol sütun: **Tümü**, **Gelen**, **Yıldızlı**, **Ertelenen**, **Fatura**, **Spam**, **Arşiv**, **Çöp**, **Taslaklar**, **Gönderilen**, **Müşteri mesajları**, **Kişiler**, **Takvim**.
+3. Orta: liste (Mesaj / Konuşma modu, arama, filtre çipleri).
+4. Sağ: okuma, yanıtla, ilet, tümünü yanıtla, takvime ekle.
 
-## Gelen
+### Klavye (Faz 21)
 
-- **Senkronize et** (IMAP yapılandırıldıysa) `info@` kutusunu çeker.
-- İletişim formu satırları ve e-postalar birlikte listelenir.
-- Satıra tıklayınca gövde okunur; **Yanıt** Yaz panelini doldurur.
+| Tuş | İşlem |
+|-----|--------|
+| `j` / `k` | Listedeki önceki / sonraki öğe |
+| `c` | Yaz (yeni e-posta) |
+| `r` | Seçili gelene yanıtla |
+| `/` | Arama kutusuna odaklan |
 
-## Yaz
+### Gelen ve IMAP
 
-- Alıcı: müşteri kitaplığı + son iletişim adresleri (otomatik tamamlama).
-- Hazır şablonlar (sipariş, stok, teşekkür, KVKK vb.).
-- Gönderim Ekolojik outbox + SMTP üzerinden gider.
+- **IMAP yenile**: yapılandırılmışsa kutuyu senkronize eder (Gelen, Gönderilen, Spam, Çöp, Taslaklar).
+- **Konuşma** modu: aynı konuya ait yanıtlar tek zincirde.
+- **Toplu işlem**: satır seç → okundu / arşiv / spam / çöp; **Tümünü okundu işaretle**.
+- **Depolama çubuğu**: ek + inbox JSON kullanım yüzdesi.
 
-## Müşteri mesajları
+### Fatura klasörü
 
-- Thread listesi; alttan mesaj yazın, ek ekleyin.
-- **Yeni thread**: müşteri seçerek açın.
-- Müşteri kartından **Posta sekmesinde aç** deep link ile aynı ekrana gelir.
+- Fatura kaynak eşleşmesi ve **kurallar** (Ayarlar → E-posta): konu veya gönderende “fatura”, “e-fatura” vb. → otomatik **Fatura** klasörü.
 
-## Gönderilen
+### Yaz
 
-- Outbox kayıtları: kuyruk, gönderildi, hata.
-- Hatalı satırda **Tekrar dene**.
+- Cc/Bcc, ek (10 MB toplam), imza, şablonlar, taslak otosave.
+- **AI öneri** (isteğe bağlı): sunucuda `EKOLOJIK_POSTA_AI=1` (+ isteğe bağlı harici API URL).
+
+### Müşteri mesajları (Sohbet)
+
+- **Sohbet** / **Tam** görünüm; thread arşiv, sabitle, sessize al, thread içi arama.
+- CRM’den `?customerId=` ile aynı thread açılır.
+
+### Gönderilen
+
+- Outbox + IMAP Sent birleşik liste; hatalı kayıt **Tekrar dene**.
+
+### Çevrimdışı (lite)
+
+- Ağ kesilirse son **Gelen** listesi salt okunur gösterilir (service worker + yerel önbellek).
 
 ## Ayarlar → E-posta
 
-- SMTP durumu, test maili, kuyruk işleme.
-- **Faz 11**: gönderen adı, Reply-To, ops e-postası, imza, bildirim aç/kapa.
-- **Rapor**: Outbox CSV, iletişim CSV, mesajlaşma ZIP (KVKK).
+- SMTP testi, kuyruk işleme, gönderen / Reply-To / ops / imza / bildirim matrisi.
+- **Outbox analitik** (son 14 gün gönderim / hata oranı).
+- **Posta kuralları** düzenleme.
+- Rapor: Outbox CSV, iletişim CSV, mesajlaşma ZIP (KVKK).
 
-## Altyapı hatırlatması
+## İsteğe bağlı sunucu bayrakları
 
-- `.env`: `EKOLOJIK_SMTP_HOST=mail.ekolojikmarket.com.tr` (VPS IP değil).
-- `LERTA_PLATFORM_BRIDGE=0` — NB posta API kullanılmaz.
+| Değişken | Açıklama |
+|----------|----------|
+| `EKOLOJIK_MAIL_TRACK=1` | Giden HTML’de açılma pikseli (varsayılan kapalı) |
+| `EKOLOJIK_POSTA_AI=1` | Compose AI öneri |
+| `EKOLOJIK_IMAP_WRITE=1` | Spam/çöp bayraklarında IMAP MOVE |
 
-VPS doğrulama: `bash scripts/sunucu-ekolojik-posta-parite-dogrula.sh`  
-Prod kapatma: `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh`
+## VPS doğrulama (tek komut)
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh /var/www/market-pos
+```
+
+Kabul sırası (E2E atlanabilir):
+
+```bash
+EKOLOJIK_SKIP_E2E=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-kabul-sira.sh /var/www/market-pos
+```
+
+Prod kapatma: `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh`  
+Manuel yürüyüş: `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md`  
+E2E senaryolar: `docs/EKOLOJIK-POSTA-E2E-SMOKE.md`

@@ -26,6 +26,16 @@ else
   FAIL=1
 fi
 
+if [[ "${EKOLOJIK_FAZ22_GATE:-0}" == "1" ]]; then
+  echo ""
+  echo "=== Faz 22 tam parite kapısı (EKOLOJIK_FAZ22_GATE=1) ==="
+  if bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh" "${INSTALL_DIR}"; then
+    :
+  else
+    FAIL=1
+  fi
+fi
+
 echo ""
 if bash "${REPO_ROOT}/scripts/sunucu-ekolojik-imap-dogrula.sh" "${INSTALL_DIR}"; then
   echo "OK   IMAP (Faz 7 Gelen)"

@@ -49,7 +49,7 @@ Notlar:
 
 - SMTP host / relay: ___________________
 - IMAP kutu: ___________________
-- Bilinçli eksik (kapatma sonrası boş olmalı): ___________________
+- Bilinçli eksik (kapatma sonrası boş olmalı): **Yok** — ESP tam analitik, JMAP, WebSocket (yukarıdaki “Bilinçli sınırlar” dokümanda)
 
 ```bash
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-ui-yuruyus.sh

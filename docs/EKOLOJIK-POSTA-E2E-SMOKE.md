@@ -64,8 +64,34 @@ Yalnızca Faz 5 otomatik kapı:
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-faz5-prod-dogrula.sh
 ```
 
-## Bilinen sınırlar (NB farkı)
+## Akış D — Faz 22 tam parite (API + manuel)
 
-- Dovecot/JMAP yok — IMAP tek kutu.
-- AI compose, open/click analitiği yok.
+Otomatik kapı:
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh /var/www/market-pos
+```
+
+Manuel (~20 dk):
+
+| Adım | NB | Ekolojik |
+|------|-----|----------|
+| 1 | Konuşma | Gelen → **Konuşma** → zincir aç |
+| 2 | İlet | Gelen detay → **İlet** → gönder veya taslak |
+| 3 | IMAP Junk | Spam klasörü + **IMAP yenile** |
+| 4 | Mesaj thread | Müşteri mesajları → yanıt + ek |
+| 5 | Toplu / depolama | Seç → arşiv; üstte depolama % |
+| 6 | Kurallar | Ayarlar → Fatura kuralı kayıtlı |
+
+E2E API smoke (Akış C sonunda da çalışır):
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-e2e-smoke.sh
+```
+
+## Bilinen sınırlar (NB farkı — bilinçli)
+
+- Dovecot/JMAP yok — standart IMAP klasörleri.
+- Açılma/tıklama ESP seviyesinde değil; `EKOLOJIK_MAIL_TRACK=1` ile lite piksel.
+- AI compose harici API ile opsiyonel; kapalı varsayılan.
 - WebSocket yok; SSE veya periyodik yenileme.
