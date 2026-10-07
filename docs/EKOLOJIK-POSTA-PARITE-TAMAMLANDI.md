@@ -1,6 +1,6 @@
 # Ekolojik Posta & Mesaj — NB parite tamamlandı
 
-**Durum:** Faz **1–22** kapandı (2026-10-07). Nakliye Borsası Lerta Posta ile **işlevsel eşdeğer** hub; bilinçli altyapı farkları dokümante.
+**Durum:** Faz **1–24** kapandı (2026-10-07). Nakliye Borsası Lerta Posta ile **işlevsel eşdeğer** hub; bilinçli altyapı farkları dokümante.
 
 ## Tek komut doğrulama (VPS)
 
@@ -20,7 +20,9 @@ bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-prod-kapat.sh /v
 |--------|--------|
 | Haftalık otomatik | `bash scripts/sunucu-ekolojik-posta-parite-cron-kur.sh` |
 | Manuel haftalık | `bash scripts/sunucu-ekolojik-posta-haftalik-dogrula.sh` |
-| Tam kabul sırası | `EKOLOJIK_SKIP_E2E=1 bash scripts/sunucu-ekolojik-posta-kabul-sira.sh` |
+| Tam kabul (tek komut) | `bash scripts/sunucu-ekolojik-posta-tam-kabul.sh` |
+| Tam kabul (adım adım) | `EKOLOJIK_SKIP_E2E=1 bash scripts/sunucu-ekolojik-posta-kabul-sira.sh` |
+| DNS strict (panel sonrası) | `EKOLOJIK_DNS_STRICT=1 bash scripts/sunucu-ekolojik-dns-mail-dogrula.sh` |
 | Günlük yedek | `scripts/sunucu-ekolojik-data-yedek-cron-kur.sh` |
 
 ## Referanslar

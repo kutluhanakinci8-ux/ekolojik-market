@@ -16,3 +16,18 @@ else
   echo "FAIL Faz 22 — log: ${LOG}" | tee -a "${LOG}"
   exit 1
 fi
+
+echo "--- DNS (uyarı modu) ---" | tee -a "${LOG}"
+if EKOLOJIK_DNS_STRICT=0 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-dns-mail-dogrula.sh" >>"${LOG}" 2>&1; then
+  echo "OK   DNS mail TXT (veya uyarı)" | tee -a "${LOG}"
+else
+  echo "UYARI: DNS doğrulama — panel SPF/DMARC/DKIM (strict: EKOLOJIK_DNS_STRICT=1)" | tee -a "${LOG}"
+fi
+
+for c in /etc/cron.d/ekolojik-posta-parite /etc/cron.d/ekolojik-market-data-backup; do
+  if [[ -f "${c}" ]]; then
+    echo "OK   cron $(basename "${c}")" | tee -a "${LOG}"
+  else
+    echo "UYARI: cron eksik ${c}" | tee -a "${LOG}"
+  fi
+done
