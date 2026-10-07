@@ -30,21 +30,27 @@ async function writeIndex(root, messages) {
   await writeFile(indexPath(root), JSON.stringify(messages.slice(0, 500), null, 2), 'utf8');
 }
 
+function entryDedupeKey(entry) {
+  if (entry.messageId?.trim()) return `mid:${entry.messageId.trim()}`;
+  return messageDedupeKey(entry);
+}
+
 export async function savePostaImapBatch(dataDir, tenantId, entries) {
   const root = await ensureDir(dataDir, tenantId);
   const existing = await readIndex(root);
-  const keys = new Set(existing.map((r) => r.dedupeKey));
+  const byKey = new Map(existing.map((r) => [r.dedupeKey, r]));
   const added = [];
+  const updated = [];
 
   for (const entry of entries) {
-    const dedupeKey = messageDedupeKey(entry);
-    if (keys.has(dedupeKey)) continue;
-    keys.add(dedupeKey);
-    const row = {
-      id: `pi-${randomUUID()}`,
+    const dedupeKey = entryDedupeKey(entry);
+    const prev = byKey.get(dedupeKey);
+    const patch = {
       dedupeKey,
       kind: 'imap',
       imapUid: entry.imapUid ?? null,
+      imapFolder: entry.imapFolder ?? 'inbox',
+      imapMailboxPath: entry.imapMailboxPath ?? 'INBOX',
       messageId: entry.messageId ?? null,
       from: entry.from ?? '',
       to: entry.to ?? '',
@@ -54,22 +60,42 @@ export async function savePostaImapBatch(dataDir, tenantId, entries) {
       bodyText: entry.bodyText ?? '',
       bodyHtml: entry.bodyHtml ?? '',
       attachments: entry.attachments ?? [],
+    };
+
+    if (prev) {
+      Object.assign(prev, patch, { updatedAt: new Date().toISOString() });
+      updated.push(prev);
+      continue;
+    }
+
+    const row = {
+      id: `pi-${randomUUID()}`,
+      ...patch,
       readAt: null,
       archivedAt: null,
       ingestedAt: new Date().toISOString(),
     };
     added.push(row);
+    byKey.set(dedupeKey, row);
     existing.unshift(row);
   }
 
   await writeIndex(root, existing);
-  return { added, total: existing.length };
+  return { added, updated, total: existing.length };
 }
 
-export async function listPostaImapMessages(dataDir, tenantId, { limit = 50, archived = false } = {}) {
+export async function listPostaImapMessages(
+  dataDir,
+  tenantId,
+  { limit = 50, archived = false, imapFolder = null } = {},
+) {
   const root = await ensureDir(dataDir, tenantId);
   let rows = await readIndex(root);
   rows = rows.filter((r) => (archived ? Boolean(r.archivedAt) : !r.archivedAt));
+  if (imapFolder) {
+    const want = String(imapFolder).toLowerCase();
+    rows = rows.filter((r) => (r.imapFolder ?? 'inbox').toLowerCase() === want);
+  }
   const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
   return rows.slice(0, max);
 }

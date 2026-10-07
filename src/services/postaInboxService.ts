@@ -1,6 +1,6 @@
 export type PostaInboxItem = {
   id: string;
-  kind: 'contact' | 'imap' | 'bill';
+  kind: 'contact' | 'imap' | 'bill' | 'outbox' | 'imap-sent';
   sourceId: string;
   at: string;
   from?: string;
@@ -22,6 +22,10 @@ export type PostaInboxItem = {
   trashed?: boolean;
   snoozedUntil?: string | null;
   snoozeActive?: boolean;
+  imapFolder?: string;
+  status?: string;
+  folder?: string;
+  lastError?: string | null;
 };
 
 export type PostaInboxFolder =
@@ -32,7 +36,8 @@ export type PostaInboxFolder =
   | 'spam'
   | 'arsiv'
   | 'cop'
-  | 'fatura';
+  | 'fatura'
+  | 'taslaklar';
 
 export type PostaComposeDraft = {
   id: string;
@@ -127,4 +132,9 @@ export async function savePostaComposeDraft(draft: Partial<PostaComposeDraft> & 
 export async function deletePostaComposeDraft(id: string) {
   const res = await fetch(`/api/posta/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' });
   return res.json() as Promise<{ ok: boolean; error?: string }>;
+}
+
+export async function fetchPostaSent(limit = 80) {
+  const res = await fetch(`/api/posta/sent?limit=${limit}`);
+  return res.json() as Promise<{ ok: boolean; items?: PostaInboxItem[]; imapConfigured?: boolean; error?: string }>;
 }

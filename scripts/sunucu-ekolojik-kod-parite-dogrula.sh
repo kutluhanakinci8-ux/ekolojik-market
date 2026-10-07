@@ -15,6 +15,8 @@ REQUIRED=(
   server/postaInbox.mjs
   server/postaInboxFlags.mjs
   server/postaComposeDrafts.mjs
+  server/postaImapMailboxes.mjs
+  server/postaImapActions.mjs
   server/postaComposeFormat.mjs
   server/postaInboxAttachments.mjs
   server/mailBodyParse.mjs

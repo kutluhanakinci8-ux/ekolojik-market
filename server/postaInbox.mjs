@@ -1,4 +1,11 @@
-import { fetchRecentInboxMessages, verifyImapMailbox } from './billEmailImap.mjs';
+import {
+  buildImapClient,
+  fetchRecentMailboxMessages,
+  verifyImapMailbox,
+} from './billEmailImap.mjs';
+import { resolvePostaImapMailboxes } from './postaImapMailboxes.mjs';
+import { applyImapMoveForFlags } from './postaImapActions.mjs';
+import { listMergedRecentOutbox } from './emailOutbox.mjs';
 import { parseMailBody } from './mailBodyParse.mjs';
 import { listBillEmailInbox, messageDedupeKey } from './billEmailInboxStore.mjs';
 import {
@@ -15,7 +22,13 @@ import { applyPostaFlagsToItem, getPostaInboxFlagsMap, patchPostaInboxFlags } fr
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export { patchPostaInboxFlags };
+export async function applyPostaInboxFlags(dataDir, tenantId, id, patch) {
+  const result = await patchPostaInboxFlags(dataDir, tenantId, id, patch);
+  if (!result.ok || !String(id).startsWith('pi-')) return result;
+  const move = await applyImapMoveForFlags(dataDir, tenantId, id, patch);
+  if (!move.ok) return move;
+  return { ...result, imapMove: move.skipped ? null : move };
+}
 
 const SUBJECT_LABELS = {
   genel: 'Genel',
@@ -93,6 +106,7 @@ function toUnifiedImap(row) {
     bodyText: row.bodyText ?? '',
     bodyHtml: row.bodyHtml ?? '',
     messageId: row.messageId ?? null,
+    imapFolder: row.imapFolder ?? 'inbox',
     attachments: row.attachments ?? [],
     raw: row,
   };
@@ -135,6 +149,33 @@ async function writeBillIndex(dataDir, tenantId, rows) {
   await writeFile(path, JSON.stringify(rows.slice(0, 500), null, 2), 'utf8');
 }
 
+async function ingestImapMessages(dataDir, tenantId, fetched, imapFolder) {
+  const entries = [];
+  for (const msg of fetched) {
+    const raw = msg.rawSource || msg.text || '';
+    const parsed = parseMailBody(raw);
+    const attachments =
+      imapFolder === 'inbox' || imapFolder === 'sent'
+        ? await persistImapAttachments(dataDir, tenantId, raw)
+        : [];
+    entries.push({
+      imapUid: msg.imapUid,
+      imapMailboxPath: msg.imapMailboxPath,
+      imapFolder,
+      messageId: msg.messageId,
+      from: msg.from,
+      to: msg.to,
+      subject: msg.subject,
+      receivedAt: msg.receivedAt,
+      snippet: parsed.snippet || msg.snippet,
+      bodyText: parsed.text,
+      bodyHtml: parsed.html,
+      attachments,
+    });
+  }
+  return savePostaImapBatch(dataDir, tenantId, entries);
+}
+
 export async function syncPostaInboxFromImap(dataDir, tenantId = 'main', { maxMessages = 40 } = {}) {
   if (!isEkolojikImapConfigured()) {
     return { ok: false, error: 'IMAP yapılandırılmadı (EKOLOJIK_IMAP_*)' };
@@ -149,41 +190,58 @@ export async function syncPostaInboxFromImap(dataDir, tenantId = 'main', { maxMe
     };
   }
 
+  const client = buildImapClient(config);
+  await client.connect();
+  const mailboxes = await resolvePostaImapMailboxes(client);
+  await client.logout();
+
   const sinceDate = new Date(Date.now() - 30 * 86400000);
-  let fetched = [];
-  try {
-    fetched = await fetchRecentInboxMessages(config, { sinceDate, maxMessages });
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'IMAP tarama hatası' };
+  const jobs = [
+    { imapFolder: 'inbox', path: mailboxes.inbox, max: maxMessages },
+    { imapFolder: 'sent', path: mailboxes.sent, max: Math.min(maxMessages, 35) },
+    { imapFolder: 'junk', path: mailboxes.junk, max: 25 },
+    { imapFolder: 'trash', path: mailboxes.trash, max: 25 },
+    { imapFolder: 'drafts', path: mailboxes.drafts, max: 20 },
+  ].filter((j) => j.path);
+
+  let scanned = 0;
+  let added = 0;
+  let updated = 0;
+  const folderStats = {};
+
+  for (const job of jobs) {
+    let fetched = [];
+    try {
+      fetched = await fetchRecentMailboxMessages(config, job.path, {
+        sinceDate,
+        maxMessages: job.max,
+      });
+    } catch (error) {
+      folderStats[job.imapFolder] = {
+        error: error instanceof Error ? error.message : 'tarama hatası',
+      };
+      continue;
+    }
+    scanned += fetched.length;
+    const saved = await ingestImapMessages(dataDir, tenantId, fetched, job.imapFolder);
+    added += saved.added.length;
+    updated += saved.updated?.length ?? 0;
+    folderStats[job.imapFolder] = { scanned: fetched.length, added: saved.added.length };
   }
 
-  const entries = [];
-  for (const msg of fetched) {
-    const raw = msg.rawSource || msg.text || '';
-    const parsed = parseMailBody(raw);
-    const attachments = await persistImapAttachments(dataDir, tenantId, raw);
-    entries.push({
-      imapUid: msg.imapUid,
-      messageId: msg.messageId,
-      from: msg.from,
-      to: msg.to,
-      subject: msg.subject,
-      receivedAt: msg.receivedAt,
-      snippet: parsed.snippet || msg.snippet,
-      bodyText: parsed.text,
-      bodyHtml: parsed.html,
-      attachments,
-    });
-  }
-
-  const saved = await savePostaImapBatch(dataDir, tenantId, entries);
   return {
     ok: true,
-    scanned: fetched.length,
-    added: saved.added.length,
-    total: saved.total,
-    message: `${fetched.length} mail tarandı · ${saved.added.length} yeni`,
+    scanned,
+    added,
+    updated,
+    folders: folderStats,
+    mailboxes,
+    message: `${scanned} mail tarandı · ${added} yeni · ${updated} güncellendi`,
   };
+}
+
+function imapFolderOf(item) {
+  return String(item.imapFolder ?? item.raw?.imapFolder ?? 'inbox').toLowerCase();
 }
 
 function buildGelenPool(contacts, imap, billRows) {
@@ -192,7 +250,7 @@ function buildGelenPool(contacts, imap, billRows) {
   );
   return [
     ...contacts.filter((i) => !i.archived),
-    ...imap.filter((i) => !i.archived),
+    ...imap.filter((i) => !i.archived && imapFolderOf(i) === 'inbox'),
   ].filter((row) => {
     if (row.kind !== 'imap') return true;
     return !matchedBillKeys.has(messageDedupeKey(row.raw));
@@ -201,11 +259,16 @@ function buildGelenPool(contacts, imap, billRows) {
 
 function filterByMailboxFolder(items, folder) {
   const f = String(folder || 'gelen').toLowerCase();
+  if (f === 'taslaklar') {
+    return items.filter((i) => i.kind === 'imap' && imapFolderOf(i) === 'drafts');
+  }
   if (f === 'cop') {
-    return items.filter((i) => i.trashed);
+    return items.filter((i) => i.trashed || imapFolderOf(i) === 'trash');
   }
   if (f === 'spam') {
-    return items.filter((i) => i.spam && !i.trashed);
+    return items.filter(
+      (i) => (i.spam || imapFolderOf(i) === 'junk') && imapFolderOf(i) !== 'trash' && !i.trashed,
+    );
   }
   if (f === 'arsiv') {
     return items.filter((i) => i.archived && !i.trashed && !i.spam);
@@ -220,10 +283,24 @@ function filterByMailboxFolder(items, folder) {
     return items.filter((i) => i.kind === 'bill' && !i.archived && !i.trashed && !i.spam);
   }
   if (f === 'tumu') {
-    return items.filter((i) => !i.trashed && !i.spam && !i.archived && !i.snoozeActive);
+    return items.filter(
+      (i) =>
+        !i.trashed &&
+        !i.spam &&
+        !i.archived &&
+        !i.snoozeActive &&
+        (i.kind !== 'imap' || imapFolderOf(i) === 'inbox'),
+    );
   }
   // gelen (varsayılan)
-  return items.filter((i) => !i.trashed && !i.spam && !i.archived && !i.snoozeActive);
+  return items.filter(
+    (i) =>
+      !i.trashed &&
+      !i.spam &&
+      !i.archived &&
+      !i.snoozeActive &&
+      (i.kind !== 'imap' || imapFolderOf(i) === 'inbox'),
+  );
 }
 
 export async function listUnifiedPostaInbox(dataDir, tenantId, { folder = 'gelen', limit = 60 } = {}) {
@@ -243,6 +320,8 @@ export async function listUnifiedPostaInbox(dataDir, tenantId, { folder = 'gelen
     base = billRows.filter((b) => b.matched || b.raw?.sourceId);
   } else if (f === 'arsiv') {
     base = [...contacts, ...imap, ...billRows].filter((i) => i.archived);
+  } else if (f === 'taslaklar') {
+    base = imap.map(toUnifiedImap);
   } else if (f === 'cop' || f === 'spam' || f === 'yildizli' || f === 'ertelenen' || f === 'tumu') {
     base = [
       ...contacts,
@@ -324,6 +403,41 @@ export async function getPostaUnreadCounts(dataDir, tenantId = 'main') {
     fatura: faturaUnread,
     messaging: messagingUnread,
     total: gelenUnread + faturaUnread + messagingUnread,
+  };
+}
+
+export async function listUnifiedPostaSent(dataDir, tenantId, { limit = 80 } = {}) {
+  const max = Math.min(Math.max(Number(limit) || 80, 1), 200);
+  const outboxRows = await listMergedRecentOutbox(dataDir, max);
+  const imapSent = (await listPostaImapMessages(dataDir, tenantId, { limit: max, imapFolder: 'sent' })).map(
+    toUnifiedImap,
+  );
+
+  const outboxItems = outboxRows.map((row) => ({
+    id: String(row.id ?? row.messageId ?? ''),
+    kind: 'outbox',
+    sourceId: String(row.id ?? ''),
+    at: String(row.sentAt || row.createdAt || new Date().toISOString()),
+    from: row.from ?? '',
+    fromName: row.fromName ?? 'Ekolojik Market',
+    to: row.to ?? '',
+    subject: String(row.subject ?? '(konu yok)'),
+    preview: String(row.text ?? row.subject ?? '').slice(0, 240),
+    unread: false,
+    archived: false,
+    bodyText: String(row.text ?? ''),
+    status: row.status ?? row.folder ?? 'sent',
+    folder: row.folder ?? 'sent',
+    lastError: row.lastError ?? null,
+    raw: row,
+  }));
+
+  const merged = [...outboxItems, ...imapSent.map((i) => ({ ...i, kind: 'imap-sent', status: 'imap-sent' }))];
+  merged.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  return {
+    ok: true,
+    items: merged.slice(0, max),
+    imapConfigured: isEkolojikImapConfigured(),
   };
 }
 
