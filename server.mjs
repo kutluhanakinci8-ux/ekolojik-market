@@ -125,6 +125,13 @@ import {
   getPostaEngagementSummary,
   recordMailClick,
 } from './server/postaEngagement.mjs';
+import {
+  getPostaPushConfig,
+  listPostaPushSubscriptionCount,
+  removePostaPushSubscription,
+  savePostaPushSubscription,
+  sendPostaWebPush,
+} from './server/postaWebPush.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -752,6 +759,70 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/config' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaPushConfig()));
+      return;
+    }
+
+    if (pathname === '/api/posta/push/status' && req.method === 'GET') {
+      try {
+        const cfg = getPostaPushConfig();
+        const subs = await listPostaPushSubscriptionCount(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, configured: cfg.configured, subscribers: subs.count }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Push durum hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/subscribe' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaPushSubscription(DATA_DIR, data?.subscription, {
+          userAgent: req.headers['user-agent'],
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Abonelik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/subscribe' && req.method === 'DELETE') {
+      const data = await readRequestBody(req);
+      try {
+        const result = await removePostaPushSubscription(DATA_DIR, data?.endpoint);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Abonelik silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/test' && req.method === 'POST') {
+      try {
+        const result = await sendPostaWebPush(DATA_DIR, {
+          title: 'Ekolojik Posta test',
+          body: 'Web push (NB PM-4) çalışıyor.',
+          url: '/',
+          tag: 'posta-push-test',
+        });
+        res.writeHead(result.ok ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Push test hatası' }));
       }
       return;
     }

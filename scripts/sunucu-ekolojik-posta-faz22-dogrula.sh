@@ -24,7 +24,7 @@ run() {
 run "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-parite-dogrula.sh" "${INSTALL_DIR}"
 run "${REPO_ROOT}/scripts/sunucu-ekolojik-imap-klasor-dogrula.sh"
 
-for n in 15 16 17 18 19 20 21 25 26 27 28 29; do
+for n in 15 16 17 18 19 20 21 25 26 27 28 29 30; do
   script="${REPO_ROOT}/scripts/sunucu-ekolojik-posta-faz${n}-dogrula.sh"
   if [[ -f "${script}" ]]; then
     echo "--- Faz ${n} ---"

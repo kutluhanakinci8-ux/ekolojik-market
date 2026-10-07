@@ -72,6 +72,14 @@ import {
   type PostaCalendarEvent,
   type PostaCalendarSyncHub,
 } from '../../services/postaCalendarService';
+import {
+  fetchPostaPushConfig,
+  fetchPostaPushStatus,
+  sendPostaPushTest,
+  subscribePostaWebPush,
+  unsubscribePostaWebPush,
+  type PostaPushConfig,
+} from '../../services/postaPushService';
 
 function readFileAsAttachment(file: File) {
   return new Promise<{ fileName: string; mimeType: string; dataBase64: string }>((resolve, reject) => {
@@ -205,6 +213,9 @@ export function EkolojikPostaHubScreen({
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<PostaCalendarEvent[]>([]);
   const [calendarSyncHub, setCalendarSyncHub] = useState<PostaCalendarSyncHub | null>(null);
+  const [pushConfig, setPushConfig] = useState<PostaPushConfig | null>(null);
+  const [pushSubscribers, setPushSubscribers] = useState(0);
+  const [pushBusy, setPushBusy] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
@@ -387,6 +398,11 @@ export function EkolojikPostaHubScreen({
     void fetchComposeRecipientHints().then((r) => {
       if (r.ok && r.emails) setRecipientHints(r.emails);
     });
+    void (async () => {
+      const [cfg, status] = await Promise.all([fetchPostaPushConfig(), fetchPostaPushStatus()]);
+      if (cfg.ok) setPushConfig(cfg);
+      if (status.ok) setPushSubscribers(status.subscribers ?? 0);
+    })();
   }, [refreshHealth]);
 
   useEffect(() => {
@@ -997,6 +1013,79 @@ export function EkolojikPostaHubScreen({
       <p className="module-hint posta-hub-hotkeys-hint" aria-hidden="true">
         Kısayollar: <kbd>j</kbd>/<kbd>k</kbd> liste · <kbd>c</kbd> yaz · <kbd>r</kbd> yanıtla · <kbd>/</kbd> ara
       </p>
+
+      {pushConfig && (
+        <div className="posta-hub-push-bar">
+          <span className="module-hint">
+            NB PM-4 — PWA push: {pushConfig.configured ? 'VAPID hazır' : 'VAPID eksik'} · abone cihaz{' '}
+            {pushSubscribers}
+          </span>
+          <div className="posta-hub-compose-actions">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              disabled={pushBusy || !pushConfig.configured || !pushConfig.publicKey}
+              onClick={async () => {
+                if (!pushConfig.publicKey) return;
+                setPushBusy(true);
+                try {
+                  const result = await subscribePostaWebPush(pushConfig.publicKey);
+                  setFlash(result.ok ? 'Push bildirimleri açıldı' : result.error ?? 'Push aboneliği başarısız');
+                  if (result.ok) {
+                    const status = await fetchPostaPushStatus();
+                    if (status.ok) setPushSubscribers(status.subscribers ?? 0);
+                  }
+                } finally {
+                  setPushBusy(false);
+                }
+              }}
+            >
+              Bildirimleri aç
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              disabled={pushBusy}
+              onClick={async () => {
+                setPushBusy(true);
+                try {
+                  await unsubscribePostaWebPush();
+                  const status = await fetchPostaPushStatus();
+                  if (status.ok) setPushSubscribers(status.subscribers ?? 0);
+                  setFlash('Push aboneliği kaldırıldı');
+                } finally {
+                  setPushBusy(false);
+                }
+              }}
+            >
+              Kapat
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              disabled={pushBusy || !pushConfig.configured}
+              onClick={async () => {
+                setPushBusy(true);
+                try {
+                  const result = await sendPostaPushTest();
+                  setFlash(
+                    result.ok
+                      ? `Test push gönderildi (${result.sent ?? 0} cihaz)`
+                      : result.error ?? 'Test push başarısız (VAPID veya abone yok)',
+                  );
+                } finally {
+                  setPushBusy(false);
+                }
+              }}
+            >
+              Test push
+            </button>
+          </div>
+          {!pushConfig.configured && pushConfig.hint && (
+            <p className="settings-hint">{pushConfig.hint}</p>
+          )}
+        </div>
+      )}
 
       {postaStorage && hubLayout !== 'sohbet' && (
         <div className="posta-hub-storage" role="status" aria-label="Posta depolama">
