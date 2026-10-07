@@ -14,9 +14,11 @@ import {
   downloadPostaOutboxCsv,
   downloadPostaContactCsv,
   downloadMessagingExportZip,
+  fetchPostaDeliverability,
   fetchPostaOutboxAnalytics,
   fetchPostaRules,
   savePostaInboxRules,
+  type PostaDeliverabilityHub,
   type PostaInboxRule,
   type PostaMailSettings,
   type PostaOutboxAnalytics,
@@ -63,9 +65,10 @@ export function EmailOutboxSettingsPanel() {
   const [exportTo, setExportTo] = useState('');
   const [outboxAnalytics, setOutboxAnalytics] = useState<PostaOutboxAnalytics | null>(null);
   const [postaRules, setPostaRules] = useState<PostaInboxRule[]>([]);
+  const [deliverability, setDeliverability] = useState<PostaDeliverabilityHub | null>(null);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, rules] = await Promise.all([
+    const [h, recent, iso, ret, posta, analytics, rules, deliv] = await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
@@ -73,6 +76,7 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaMailSettings(),
       fetchPostaOutboxAnalytics(14),
       fetchPostaRules(),
+      fetchPostaDeliverability(),
     ]);
     setHealth(h);
     setIsolation(iso);
@@ -80,6 +84,7 @@ export function EmailOutboxSettingsPanel() {
     if (posta.ok && posta.settings) setPostaSettings(posta.settings);
     if (analytics.ok) setOutboxAnalytics(analytics);
     if (rules.ok && rules.rules) setPostaRules(rules.rules);
+    if (deliv.ok) setDeliverability(deliv);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
     }
@@ -172,6 +177,60 @@ export function EmailOutboxSettingsPanel() {
 
       {health?.smtpError && (
         <p className="settings-flash settings-flash--pending">{health.smtpError}</p>
+      )}
+
+      {deliverability?.ok && (
+        <>
+          <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+            <div>
+              <h3>NB PM-3 — Gönderen & DNS (deliverability)</h3>
+              <p>
+                Alan: <strong>{deliverability.domain}</strong> · Gönderen: {deliverability.primaryFrom}
+                {deliverability.aliases?.length ? ` · +${deliverability.aliases.length} alias` : ''}
+              </p>
+            </div>
+          </div>
+          <div className="settings-stat-grid">
+            <article className="settings-stat-card">
+              <span className="settings-stat-label">SPF</span>
+              <strong className={deliverability.dns?.spf.status === 'ok' ? 'is-ok' : ''}>
+                {deliverability.dns?.spf.status ?? '—'}
+              </strong>
+            </article>
+            <article className="settings-stat-card">
+              <span className="settings-stat-label">DMARC</span>
+              <strong className={deliverability.dns?.dmarc.status === 'ok' ? 'is-ok' : ''}>
+                {deliverability.dns?.dmarc.status ?? '—'}
+              </strong>
+            </article>
+            <article className="settings-stat-card">
+              <span className="settings-stat-label">DKIM</span>
+              <strong className={deliverability.dns?.dkim.status === 'ok' ? 'is-ok' : ''}>
+                {deliverability.dns?.dkim.status ?? '—'}
+              </strong>
+            </article>
+            <article className="settings-stat-card">
+              <span className="settings-stat-label">SMTP doğrulama</span>
+              <strong className={deliverability.smtp?.verified ? 'is-ok' : ''}>
+                {deliverability.smtp?.verified ? 'Hazır' : 'Eksik'}
+              </strong>
+            </article>
+          </div>
+          {deliverability.suggestedRecords && (
+            <ul className="settings-hint" style={{ listStyle: 'none', padding: 0 }}>
+              <li>
+                <code>SPF</code> {deliverability.suggestedRecords.spf}
+              </li>
+              <li>
+                <code>DMARC</code> {deliverability.suggestedRecords.dmarc}
+              </li>
+              <li>{deliverability.suggestedRecords.dkimHint}</li>
+            </ul>
+          )}
+          <p className="settings-hint">
+            İsteğe bağlı alias: <code>EKOLOJIK_MAIL_ALIASES</code> (virgülle ayrılmış e-postalar)
+          </p>
+        </>
       )}
 
       <p className="settings-hint">
