@@ -153,7 +153,7 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 
 **Kabul:** NB ekran görüntüsündeki klasör listesi POS Posta’da görünür; yıldız/spam/çöp/erteleme kalıcı.
 
-**Sonraki (Faz 14):** IMAP Sent/Junk/Trash klasör sync, konuşma görünümü, depolama çubuğu.
+**Sonraki:** Tam parite yol haritası → **`docs/PLAN-EKOLOJIK-POSTA-NB-FAZ14-22-TAM-PARITE.md`** (Faz 14–22, eksik kalmayacak).
 
 ---
 
@@ -173,20 +173,13 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 ## Önerilen uygulama sırası
 
 ```text
-Faz 6 (SMTP/DNS)  ──bloker──►  Faz 7 (Gelen)  ──►  Faz 8 (Yaz/yanıt)
-                                      │
-                                      ▼
-                              Faz 9 (Mesaj hub)
-                                      │
-                                      ▼
-                              Faz 10 (badge/canlı)
-                                      │
-                                      ▼
-                              Faz 11 (admin/export)
-                                      │
-                                      ▼
-                              Faz 12 (doğrulama)
+Faz 6–12 ✅  →  Faz 13 ✅ (menü)
+                    │
+                    ▼
+        Faz 14–22 (tam parite — ayrı plan dosyası)
 ```
+
+Detay: `PLAN-EKOLOJIK-POSTA-NB-FAZ14-22-TAM-PARITE.md`
 
 **Paralel:** Faz 9 UI, Faz 6 altyapısı aynı sprintte farklı kişiler — ama **demo “tam NB gibi” için Faz 6 şart**.
 
@@ -199,13 +192,13 @@ Faz 6 (SMTP/DNS)  ──bloker──►  Faz 7 (Gelen)  ──►  Faz 8 (Yaz/ya
 | PM-1 Nav badge | Faz 10 |
 | PM-2 RTE şablon | Faz 8 |
 | PM-3 S-A4 gönderen | Faz 11.1 |
-| PM-4 PWA offline | v2 (POS PWA yoksa ertele) |
+| PM-4 PWA offline | Faz 21 lite |
 | PM-5 Dovecot | **Faz 6/7** (IMAP kutu; full Dovecot opsiyonel) |
 | PM-6 SSE | Faz 10 |
 | PM-7 Ek 10 MB | ✅ 5 MB (artırılabilir) |
 | PM-8 Bildirim matrisi | Faz 11.4 |
-| PM-9 AI | v2 kapalı |
-| PM-10 ESP analitik | Faz 11.2 lite |
+| PM-9 AI | Faz 20 (env) |
+| PM-10 ESP analitik | Faz 11.2 + Faz 20 |
 
 ---
 
