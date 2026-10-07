@@ -22,7 +22,7 @@ if(!d.ok || !d.counts) process.exit(1);
 console.log('OK   analytics sent', d.window?.sent ?? 0);
 "
 
-curl -fsS -X POST "${BASE}/api/posta/compose/ai-suggest" \
+curl -sS -X POST "${BASE}/api/posta/compose/ai-suggest" \
   -H 'Content-Type: application/json' \
   -d '{"subject":"test"}' | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
