@@ -18,6 +18,10 @@ import {
   patchPostaInboxFlags,
   syncPostaInboxImap,
   fetchPostaSent,
+  fetchPostaStorage,
+  batchPostaInboxAction,
+  markAllPostaInboxRead,
+  type PostaStorageSummary,
   type MailTemplate,
   type PostaComposeDraft,
   type PostaInboxFolder,
@@ -195,6 +199,9 @@ export function EkolojikPostaHubScreen({
   const [threadShowArchived, setThreadShowArchived] = useState(false);
   const [msgSearchQ, setMsgSearchQ] = useState('');
   const prevThreadsRef = useRef<MessagingThread[]>([]);
+  const [postaStorage, setPostaStorage] = useState<PostaStorageSummary | null>(null);
+  const [selectedInboxIds, setSelectedInboxIds] = useState<Set<string>>(() => new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
 
@@ -334,8 +341,22 @@ export function EkolojikPostaHubScreen({
     })();
   }, [deepLinkCustomerId, onDeepLinkConsumed]);
 
+  const refreshStorage = useCallback(async () => {
+    const r = await fetchPostaStorage();
+    if (r.ok) {
+      setPostaStorage({
+        usedBytes: r.usedBytes ?? 0,
+        quotaBytes: r.quotaBytes ?? 0,
+        percent: r.percent ?? 0,
+        maxAttachmentBytes: r.maxAttachmentBytes ?? 10 * 1024 * 1024,
+        breakdown: r.breakdown,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     void refreshHealth();
+    void refreshStorage();
     void fetchPostaTemplates().then((r) => {
       if (r.ok && r.templates) setTemplates(r.templates);
     });
@@ -343,6 +364,58 @@ export function EkolojikPostaHubScreen({
       if (r.ok && r.emails) setRecipientHints(r.emails);
     });
   }, [refreshHealth]);
+
+  useEffect(() => {
+    setSelectedInboxIds(new Set());
+  }, [folder, inboxFolder, mailListMode]);
+
+  const toggleInboxSelection = (id: string) => {
+    setSelectedInboxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedInboxItems = useMemo(
+    () =>
+      inboxRows
+        .filter((r) => !isPostaConversationItem(r) && selectedInboxIds.has(r.id))
+        .map((r) => ({ id: r.id, kind: r.kind, sourceId: r.sourceId })),
+    [inboxRows, selectedInboxIds],
+  );
+
+  const runInboxBatch = async (action: 'read' | 'archive' | 'spam' | 'trash') => {
+    if (!selectedInboxItems.length) return;
+    setBatchBusy(true);
+    try {
+      const result = await batchPostaInboxAction(action, selectedInboxItems);
+      setFlash(
+        result.ok
+          ? `${result.processed ?? 0} kayıt işlendi${result.failed ? ` (${result.failed} hata)` : ''}`
+          : result.error ?? 'Toplu işlem başarısız',
+      );
+      if (result.ok) {
+        setSelectedInboxIds(new Set());
+        await refreshInbox(inboxFolder);
+        await refreshStorage();
+      }
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
+  const markFolderAllRead = async () => {
+    setBatchBusy(true);
+    try {
+      const result = await markAllPostaInboxRead(inboxFolder);
+      setFlash(result.ok ? `${result.processed ?? 0} okundu işaretlendi` : result.error ?? 'İşlem başarısız');
+      if (result.ok) await refreshInbox(inboxFolder);
+    } finally {
+      setBatchBusy(false);
+    }
+  };
 
   useEffect(() => {
     setFlash(null);
@@ -807,6 +880,20 @@ export function EkolojikPostaHubScreen({
 
       {flash && <p className="settings-flash">{flash}</p>}
 
+      {postaStorage && hubLayout !== 'sohbet' && (
+        <div className="posta-hub-storage" role="status" aria-label="Posta depolama">
+          <div className="posta-hub-storage-label">
+            Depolama {postaStorage.percent}% · Ek limiti {Math.round(postaStorage.maxAttachmentBytes / (1024 * 1024))} MB
+          </div>
+          <div className="posta-hub-storage-track">
+            <div
+              className={`posta-hub-storage-fill${postaStorage.percent >= 85 ? ' is-warn' : ''}`}
+              style={{ width: `${postaStorage.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div
         className={`posta-hub-shell${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${hubLayout === 'sohbet' ? ' posta-hub-shell--sohbet' : ''}${
           hubLayout === 'sohbet' && selectedThreadId && folder === 'mesajlar' ? ' posta-hub-shell--sohbet-open' : ''
@@ -895,6 +982,38 @@ export function EkolojikPostaHubScreen({
                       Konuşma
                     </button>
                   </div>
+                  {mailListMode === 'message' && (
+                    <div className="posta-hub-bulk-bar">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        disabled={batchBusy}
+                        onClick={() => void markFolderAllRead()}
+                      >
+                        Tümünü okundu işaretle
+                      </button>
+                      {selectedInboxIds.size > 0 && (
+                        <>
+                          <span className="posta-hub-bulk-count">{selectedInboxIds.size} seçili</span>
+                          <button type="button" className="btn btn-sm btn-outline" disabled={batchBusy} onClick={() => void runInboxBatch('read')}>
+                            Okundu
+                          </button>
+                          <button type="button" className="btn btn-sm btn-outline" disabled={batchBusy} onClick={() => void runInboxBatch('archive')}>
+                            Arşiv
+                          </button>
+                          <button type="button" className="btn btn-sm btn-outline" disabled={batchBusy} onClick={() => void runInboxBatch('spam')}>
+                            Spam
+                          </button>
+                          <button type="button" className="btn btn-sm btn-outline" disabled={batchBusy} onClick={() => void runInboxBatch('trash')}>
+                            Çöp
+                          </button>
+                          <button type="button" className="btn btn-sm btn-outline" onClick={() => setSelectedInboxIds(new Set())}>
+                            Temizle
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <div className="posta-hub-filter-chips">
                     {(
                       [
@@ -977,11 +1096,22 @@ export function EkolojikPostaHubScreen({
                         <time>{row.at ? new Date(row.at).toLocaleString('tr-TR') : '—'}</time>
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        className={`${selectedInboxId === row.id ? 'is-active' : ''}${row.unread ? ' is-unread' : ''}`}
-                        onClick={() => void openInboxItem(row)}
-                      >
+                      <div className="posta-hub-list-row">
+                        {mailListMode === 'message' && (
+                          <input
+                            type="checkbox"
+                            className="posta-hub-row-check"
+                            checked={selectedInboxIds.has(row.id)}
+                            onChange={() => toggleInboxSelection(row.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Seç"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          className={`${selectedInboxId === row.id ? 'is-active' : ''}${row.unread ? ' is-unread' : ''}`}
+                          onClick={() => void openInboxItem(row)}
+                        >
                         <strong>
                           {row.starred ? '★ ' : ''}
                           {row.fromName || row.subject}
@@ -989,7 +1119,8 @@ export function EkolojikPostaHubScreen({
                         <span>{KIND_LABEL[row.kind] ?? row.kind}</span>
                         <em>{row.preview.slice(0, 80)}</em>
                         <time>{row.at ? new Date(row.at).toLocaleString('tr-TR') : '—'}</time>
-                      </button>
+                        </button>
+                      </div>
                     )}
                   </li>
                 ))}
@@ -1378,7 +1509,7 @@ export function EkolojikPostaHubScreen({
                   onChange={(e) => setMsgDraft(e.target.value)}
                 />
                 <label className="settings-field settings-field--full">
-                  <span>Ek (max 5 MB)</span>
+                  <span>Ek (max 10 MB)</span>
                   <input
                     type="file"
                     accept="image/*,.pdf,text/plain"
@@ -1386,8 +1517,8 @@ export function EkolojikPostaHubScreen({
                       const file = e.target.files?.[0];
                       e.target.value = '';
                       if (!file) return;
-                      if (file.size > 5 * 1024 * 1024) {
-                        setFlash('Dosya 5 MB sınırını aşıyor');
+                      if (file.size > 10 * 1024 * 1024) {
+                        setFlash('Dosya 10 MB sınırını aşıyor');
                         return;
                       }
                       try {

@@ -31,8 +31,8 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 | Takvim | Posta içi | ✅ Faz 17 | — |
 | Müşteri mesajları hub | Tam sohbet UX | ✅ Faz 18 | — |
 | Sohbet tam ekran | ✅ | ✅ Faz 18 | — |
-| Depolama göstergesi | ✅ | Yok | **19** |
-| Toplu işlem | Seç + işlem | Yok | **19** |
+| Depolama göstergesi | ✅ | ✅ Faz 19 | — |
+| Toplu işlem | Seç + işlem | ✅ Faz 19 | — |
 | Bildirim matrisi | Olay×kanal | JSON settings (Faz 11) | **18–19** |
 | Açılma / tıklama | ESP | Yok (bilinçli lite) | **20** |
 | AI compose | Opsiyonel | Yok | **20** (env) |
@@ -124,7 +124,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 19 — Operasyon, depolama, toplu işlem
+## Faz 19 — Operasyon, depolama, toplu işlem ✅ (2026-10-07)
 
 | # | İş | Çıktı |
 |---|-----|--------|
