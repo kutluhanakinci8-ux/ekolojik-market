@@ -15513,6 +15513,23 @@ input {
 .posta-hub-contacts-detail,
 .posta-hub-calendar-detail { max-width: 520px; display: flex; flex-direction: column; gap: 8px; }
 .posta-hub-file-btn { cursor: pointer; display: inline-flex; align-items: center; }
+.posta-hub-hotkeys-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.posta-hub-hotkeys-hint kbd {
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #ccc);
+  font-size: 0.75rem;
+}
+
+.posta-hub-offline-hint {
+  margin-bottom: 0.5rem;
+}
+
 .posta-hub-storage { margin: 0 0 10px; padding: 0 4px; }
 .posta-hub-storage-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
 .posta-hub-storage-track { height: 6px; background: #e8efe8; border-radius: 999px; overflow: hidden; }

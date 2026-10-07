@@ -35,8 +35,15 @@ Referans: Nakliye Borsası Lerta Posta + Mesajlaşma. Ekolojik: **aynı UX**, ay
 | 22 | Toplu işlem | batch API | 19 |
 | 23 | Kurallar / otomasyon | postaRules | 20 |
 | 24 | Açılma izleme (opsiyonel) | env flag | 20 |
+| 25 | Klavye kısayolları | j/k, c, r, / | 21 |
+| 26 | Offline posta (lite) | SW + localStorage | 21 |
+| 27 | Genişletilmiş UI yürüyüşü | ~30 dk doküman | 21 |
 
 Plan: `docs/PLAN-EKOLOJIK-POSTA-NB-FAZ14-22-TAM-PARITE.md`
+
+## Faz 14–21 tamamlanan maddeler (özet)
+
+- IMAP klasörleri, konuşma/arama, compose tam, kişi/takvim, sohbet, depolama/toplu, kurallar/analitik, kısayol + offline lite.
 
 Notlar:
 

@@ -84,6 +84,30 @@ export type PostaComposeDraft = {
   updatedAt: string;
 };
 
+const OFFLINE_INBOX_PREFIX = 'ekolojik-posta-inbox-offline-v1';
+
+function inboxOfflineKey(folder: string, params: URLSearchParams) {
+  return `${OFFLINE_INBOX_PREFIX}:${folder}:${params.toString()}`;
+}
+
+function saveInboxOffline(key: string, payload: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ at: Date.now(), payload }));
+  } catch {
+    /* quota */
+  }
+}
+
+function loadInboxOffline(key: string) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as { at: number; payload: Record<string, unknown> };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchPostaInbox(
   folder: PostaInboxFolder = 'gelen',
   limit = 80,
@@ -95,15 +119,42 @@ export async function fetchPostaInbox(
   if (query.unread) params.set('unread', '1');
   if (query.starred) params.set('starred', '1');
   if (query.hasAttachment) params.set('hasAttachment', '1');
-  const res = await fetch(`/api/posta/inbox?${params.toString()}`);
-  return res.json() as Promise<{
-    ok: boolean;
-    folder?: string;
-    listMode?: 'message' | 'conversation';
-    items?: PostaListItem[];
-    imapConfigured?: boolean;
-    error?: string;
-  }>;
+  const cacheKey = inboxOfflineKey(folder, params);
+  try {
+    const res = await fetch(`/api/posta/inbox?${params.toString()}`);
+    const data = await res.json();
+    if (data?.ok) saveInboxOffline(cacheKey, data);
+    return data as {
+      ok: boolean;
+      folder?: string;
+      listMode?: 'message' | 'conversation';
+      items?: PostaListItem[];
+      imapConfigured?: boolean;
+      offline?: boolean;
+      cachedAt?: number;
+      error?: string;
+    };
+  } catch {
+    const cached = loadInboxOffline(cacheKey);
+    if (cached?.payload) {
+      return {
+        ...(cached.payload as object),
+        ok: true,
+        offline: true,
+        cachedAt: cached.at,
+      } as {
+        ok: boolean;
+        folder?: string;
+        listMode?: 'message' | 'conversation';
+        items?: PostaListItem[];
+        imapConfigured?: boolean;
+        offline?: boolean;
+        cachedAt?: number;
+        error?: string;
+      };
+    }
+    return { ok: false, error: 'Ağ hatası — önbellek yok' };
+  }
 }
 
 export async function syncPostaInboxImap() {

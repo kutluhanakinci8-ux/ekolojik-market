@@ -203,6 +203,8 @@ export function EkolojikPostaHubScreen({
   const [postaStorage, setPostaStorage] = useState<PostaStorageSummary | null>(null);
   const [selectedInboxIds, setSelectedInboxIds] = useState<Set<string>>(() => new Set());
   const [batchBusy, setBatchBusy] = useState(false);
+  const [inboxOffline, setInboxOffline] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
 
@@ -240,6 +242,7 @@ export function EkolojikPostaHubScreen({
       });
       if (result.ok && result.items) {
         setInboxRows(result.items);
+        setInboxOffline(Boolean(result.offline));
         setImapConfigured(Boolean(result.imapConfigured));
         if (mailListMode === 'conversation') {
           setSelectedConversationId((cur) => cur ?? result.items![0]?.id ?? null);
@@ -356,6 +359,9 @@ export function EkolojikPostaHubScreen({
   }, []);
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker.register('/posta-offline-sw.js').catch(() => undefined);
+    }
     void refreshHealth();
     void refreshStorage();
     void fetchPostaTemplates().then((r) => {
@@ -858,6 +864,56 @@ export function EkolojikPostaHubScreen({
     setFolder(next);
   };
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName ?? '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+      if (folder === 'yaz') return;
+
+      if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        pickFolder('yaz');
+        return;
+      }
+      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey && selectedInbox) {
+        e.preventDefault();
+        startReply(selectedInbox);
+        return;
+      }
+      if ((e.key === 'j' || e.key === 'k') && isInboxMailFolder(folder)) {
+        const rows =
+          mailListMode === 'conversation'
+            ? inboxRows.filter((r) => isPostaConversationItem(r))
+            : inboxRows.filter((r) => !isPostaConversationItem(r));
+        if (!rows.length) return;
+        e.preventDefault();
+        const currentId =
+          mailListMode === 'conversation' ? selectedConversationId : selectedInboxId;
+        const idx = rows.findIndex((r) => r.id === currentId);
+        const nextIdx = e.key === 'j' ? Math.min(idx + 1, rows.length - 1) : Math.max(idx - 1, 0);
+        const next = rows[Math.max(nextIdx, 0)];
+        if (mailListMode === 'conversation') setSelectedConversationId(next.id);
+        else if (!isPostaConversationItem(next)) setSelectedInboxId(next.id);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    folder,
+    inboxRows,
+    mailListMode,
+    selectedConversationId,
+    selectedInboxId,
+    selectedInbox,
+    startReply,
+  ]);
+
   return (
     <div className="module-screen posta-hub-screen">
       <header className="module-header posta-hub-header">
@@ -900,6 +956,14 @@ export function EkolojikPostaHubScreen({
       )}
 
       {flash && <p className="settings-flash">{flash}</p>}
+      {inboxOffline && (
+        <p className="settings-flash settings-flash--pending posta-hub-offline-hint">
+          Çevrimdışı — son kaydedilen gelen kutusu listesi gösteriliyor (salt okuma).
+        </p>
+      )}
+      <p className="module-hint posta-hub-hotkeys-hint" aria-hidden="true">
+        Kısayollar: <kbd>j</kbd>/<kbd>k</kbd> liste · <kbd>c</kbd> yaz · <kbd>r</kbd> yanıtla · <kbd>/</kbd> ara
+      </p>
 
       {postaStorage && hubLayout !== 'sohbet' && (
         <div className="posta-hub-storage" role="status" aria-label="Posta depolama">
@@ -981,6 +1045,7 @@ export function EkolojikPostaHubScreen({
               {isInboxMailFolder(folder) && folder !== 'taslaklar' && (
                 <div className="posta-hub-list-toolbar">
                   <input
+                    ref={searchInputRef}
                     type="search"
                     className="posta-hub-search"
                     placeholder="Ara (konu, gönderen, metin)…"
