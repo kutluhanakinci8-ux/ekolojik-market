@@ -15427,7 +15427,16 @@ input {
 }
 .posta-hub-shell--tam .posta-hub-list { max-width: 380px; }
 .posta-hub-shell--tam .posta-hub-detail { padding: 20px 24px; }
-.posta-hub-shell--sohbet { grid-template-columns: 180px 1fr 1.1fr; }
+.posta-hub-shell--sohbet { grid-template-columns: 200px minmax(260px, 0.9fr) minmax(360px, 1.4fr); }
+.posta-hub-shell--sohbet-open .posta-hub-list { display: none; }
+.posta-hub-sohbet-panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
+.posta-hub-sohbet-messages { flex: 1; overflow: auto; max-height: min(58vh, 520px); }
+.posta-hub-msg-search { margin-bottom: 4px; }
+@media (max-width: 900px) {
+  .posta-hub-shell--sohbet { grid-template-columns: 1fr; }
+  .posta-hub-shell--sohbet-open .posta-hub-nav { display: none; }
+  .posta-hub-sohbet-messages { max-height: 45vh; }
+}
 .posta-hub-list-toolbar {
   display: flex;
   flex-direction: column;

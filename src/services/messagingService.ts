@@ -12,6 +12,9 @@ export type MessagingThread = {
   messageCount: number;
   lastMessageDirection?: 'staff' | 'customer';
   staffLastReadAt?: string | null;
+  pinned?: boolean;
+  archived?: boolean;
+  muted?: boolean;
 };
 
 export type MessagingAttachment = {
@@ -41,10 +44,14 @@ export async function fetchMessagingThreads(params: {
   customerId?: string;
   limit?: number;
   tenant?: string;
+  q?: string;
+  includeArchived?: boolean;
 }): Promise<{ ok: boolean; threads?: MessagingThread[]; error?: string }> {
   const q = new URLSearchParams();
   if (params.customerId) q.set('customerId', params.customerId);
   if (params.limit) q.set('limit', String(params.limit));
+  if (params.q?.trim()) q.set('q', params.q.trim());
+  if (params.includeArchived) q.set('includeArchived', '1');
   if (params.tenant && params.tenant !== 'main') q.set('tenant', params.tenant);
   const qs = q.toString();
   const res = await fetch(`/api/messaging/threads${qs ? `?${qs}` : ''}`);
@@ -71,10 +78,11 @@ export async function createMessagingThread(payload: {
 
 export async function fetchMessagingMessages(
   threadId: string,
-  params?: { limit?: number; tenant?: string },
+  params?: { limit?: number; tenant?: string; q?: string },
 ): Promise<{ ok: boolean; thread?: MessagingThread; messages?: MessagingMessage[]; error?: string }> {
   const q = new URLSearchParams();
   if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.q?.trim()) q.set('q', params.q.trim());
   if (params?.tenant && params.tenant !== 'main') q.set('tenant', params.tenant);
   const qs = q.toString();
   const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/messages${qs ? `?${qs}` : ''}`);
@@ -84,6 +92,18 @@ export async function fetchMessagingMessages(
 export async function markMessagingThreadRead(threadId: string) {
   const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' });
   return res.json() as Promise<{ ok: boolean }>;
+}
+
+export async function patchMessagingThreadFlags(
+  threadId: string,
+  flags: { pinned?: boolean; archived?: boolean; muted?: boolean },
+) {
+  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/flags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(flags),
+  });
+  return res.json() as Promise<{ ok: boolean; thread?: MessagingThread; error?: string }>;
 }
 
 export async function postMessagingMessage(
