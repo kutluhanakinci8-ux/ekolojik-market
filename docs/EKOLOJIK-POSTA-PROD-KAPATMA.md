@@ -1,6 +1,6 @@
-# Ekolojik Posta — prod kapatma (Faz 12 sonrası)
+# Ekolojik Posta — prod kapatma (Faz 12 + 22)
 
-NB parite kodu **Faz 6–12** ile tamamlandı. Canlı “yeşil” için altyapı + tek komut doğrulama.
+NB parite kodu **Faz 6–22** ile tamamlandı. Canlı “yeşil” için altyapı + tek komut doğrulama.
 
 ## Sıra
 
@@ -18,10 +18,22 @@ NB parite kodu **Faz 6–12** ile tamamlandı. Canlı “yeşil” için altyap�
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-prod-kapat.sh
 ```
 
-Alt adımlar:
+Tam parite kapısı (Faz 14–21 dahil):
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh /var/www/market-pos
+```
+
+Haftalık cron (önerilir):
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-parite-cron-kur.sh
+```
+
+Alt adımlar (prod-kapat):
 
 - `scripts/sunucu-ekolojik-env-audit.sh`
-- `scripts/sunucu-ekolojik-posta-parite-dogrula.sh`
+- `scripts/sunucu-ekolojik-posta-parite-dogrula.sh` (Faz 12 + 14–21 API)
 
 Deploy sonrası tam E2E (isteğe bağlı, ~1 dk):
 
