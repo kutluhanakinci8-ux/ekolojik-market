@@ -3,7 +3,7 @@
 **Referans:** Nakliye Borsası `LERTA_MAIL_MESSAGING_PARITY_100_ROADMAP.md` (PM-1…PM-10)  
 **Kural:** Aynı **ürün hissi** (3 sütun, Yaz, Gelen, Mesajlar, Gönderilen) — **ayrı kod, ayrı veri, ayrı DNS**. NB API / `lerta-mail-*` **kullanılmaz**.
 
-**Bugün (2026-10-06):** Faz 1–5 + Posta hub. **Faz 6–12 (kod):** SMTP doğrulama, birleşik inbox, yaz/yanıt, hub mesaj, badge/SSE, admin/export, parite script + rehberler. **Prod kapatma:** `docs/EKOLOJIK-POSTA-PROD-KAPATMA.md` + `sunucu-ekolojik-posta-prod-kapat.sh`.
+**Güncel (2026-10-07):** Faz **1–22** NB posta/mesaj paritesi kapandı. **Faz 23:** haftalık doğrulama cron + kapanış özeti. **Prod kapatma:** `docs/EKOLOJIK-POSTA-PROD-KAPATMA.md` · **Tam kapı:** `sunucu-ekolojik-posta-faz22-dogrula.sh` · **Özet:** `docs/EKOLOJIK-POSTA-PARITE-TAMAMLANDI.md`.
 
 ---
 

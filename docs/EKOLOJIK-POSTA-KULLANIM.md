@@ -75,5 +75,7 @@ EKOLOJIK_SKIP_E2E=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-po
 ```
 
 Prod kapatma: `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh`  
+Haftalık otomatik: `bash scripts/sunucu-ekolojik-posta-parite-cron-kur.sh` (root, bir kez)  
+Parite özeti: `docs/EKOLOJIK-POSTA-PARITE-TAMAMLANDI.md`  
 Manuel yürüyüş: `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md`  
 E2E senaryolar: `docs/EKOLOJIK-POSTA-E2E-SMOKE.md`
