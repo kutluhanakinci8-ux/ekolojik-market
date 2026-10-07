@@ -16,7 +16,9 @@ import {
   downloadMessagingExportZip,
   fetchPostaDeliverability,
   fetchPostaNotificationsMatrix,
+  fetchPostaEngagementSummary,
   fetchPostaOutboxAnalytics,
+  downloadPostaEngagementCsv,
   fetchPostaRules,
   savePostaInboxRules,
   type PostaDeliverabilityHub,
@@ -24,6 +26,7 @@ import {
   type PostaMailSettings,
   type PostaNotificationMatrix,
   type PostaNotificationMatrixHub,
+  type PostaEngagementSummary,
   type PostaOutboxAnalytics,
 } from '../../services/postaSettingsService';
 
@@ -67,18 +70,20 @@ export function EmailOutboxSettingsPanel() {
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
   const [outboxAnalytics, setOutboxAnalytics] = useState<PostaOutboxAnalytics | null>(null);
+  const [engagementSummary, setEngagementSummary] = useState<PostaEngagementSummary | null>(null);
   const [postaRules, setPostaRules] = useState<PostaInboxRule[]>([]);
   const [deliverability, setDeliverability] = useState<PostaDeliverabilityHub | null>(null);
   const [notifyMatrixHub, setNotifyMatrixHub] = useState<PostaNotificationMatrixHub | null>(null);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, rules, deliv, notifyHub] = await Promise.all([
+    const [h, recent, iso, ret, posta, analytics, engagement, rules, deliv, notifyHub] = await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
       fetchRetentionPolicy(),
       fetchPostaMailSettings(),
       fetchPostaOutboxAnalytics(14),
+      fetchPostaEngagementSummary(14),
       fetchPostaRules(),
       fetchPostaDeliverability(),
       fetchPostaNotificationsMatrix(),
@@ -94,6 +99,7 @@ export function EmailOutboxSettingsPanel() {
       });
     }
     if (analytics.ok) setOutboxAnalytics(analytics);
+    if (engagement.ok) setEngagementSummary(engagement);
     if (rules.ok && rules.rules) setPostaRules(rules.rules);
     if (deliv.ok) setDeliverability(deliv);
     if (notifyHub.ok) setNotifyMatrixHub(notifyHub);
@@ -588,9 +594,59 @@ export function EmailOutboxSettingsPanel() {
         </div>
       )}
       <p className="settings-hint">
-        İsteğe bağlı: <code>EKOLOJIK_MAIL_TRACK=1</code> (giden HTML), <code>EKOLOJIK_POSTA_AI=1</code> (compose
-        öneri)
+        İsteğe bağlı: <code>EKOLOJIK_MAIL_TRACK=1</code> (açılma + tıklama),{' '}
+        <code>EKOLOJIK_MAIL_CLICK_TRACK=1</code> (yalnızca tıklama),{' '}
+        <code>EKOLOJIK_POSTA_ENGAGEMENT_WEBHOOK</code> (JSON webhook), <code>EKOLOJIK_POSTA_AI=1</code>
       </p>
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>NB PM-10 — engagement (açılma / tıklama / bounce)</h3>
+          <p>Son {engagementSummary?.windowDays ?? 14} gün</p>
+        </div>
+      </div>
+      {engagementSummary?.ok && (
+        <div className="settings-stat-grid">
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Açılma</span>
+            <strong>{engagementSummary.counts?.opens ?? 0}</strong>
+            <span className="settings-hint">benzersiz {engagementSummary.counts?.uniqueOpens ?? 0}</span>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Tıklama</span>
+            <strong>{engagementSummary.counts?.clicks ?? 0}</strong>
+            <span className="settings-hint">benzersiz {engagementSummary.counts?.uniqueClicks ?? 0}</span>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Bounce / kalıcı hata</span>
+            <strong className={(engagementSummary.counts?.bounces ?? 0) > 0 ? 'is-warn' : ''}>
+              {engagementSummary.counts?.bounces ?? 0}
+            </strong>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Webhook</span>
+            <strong>{engagementSummary.webhookConfigured ? 'Tanımlı' : 'Kapalı'}</strong>
+          </article>
+        </div>
+      )}
+      <div className="settings-panel-actions">
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          disabled={loading}
+          onClick={() => downloadPostaEngagementCsv('combined', 90)}
+        >
+          Engagement CSV (hepsi)
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          disabled={loading}
+          onClick={() => downloadPostaEngagementCsv('bounces', 90)}
+        >
+          Bounce CSV
+        </button>
+      </div>
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
         <div>

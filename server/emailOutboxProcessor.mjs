@@ -6,6 +6,7 @@ import {
 } from './emailOutbox.mjs';
 import { getEffectiveMailPresentation } from './postaSettings.mjs';
 import { injectOpenTrackingPixel, isMailTrackEnabled } from './postaMailTrack.mjs';
+import { wrapHtmlLinksForClickTracking } from './postaEngagement.mjs';
 
 function appendSignature(text, html, signatureHtml) {
   const sig = String(signatureHtml ?? '').trim();
@@ -37,6 +38,7 @@ export function createDeliverMessage(dataDir) {
         process.env.EKOLOJIK_PUBLIC_URL?.trim() ||
         `http://127.0.0.1:${process.env.PORT || 5180}`;
       html = injectOpenTrackingPixel(html, message.trackToken, base);
+      html = wrapHtmlLinksForClickTracking(html, message.trackToken, base);
     }
     return sendViaEkolojikSmtp({
       to: message.to,

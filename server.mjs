@@ -120,6 +120,11 @@ import { getPostaOutboxAnalytics } from './server/postaOutboxAnalytics.mjs';
 import { getPostaDeliverabilityHub } from './server/postaDeliverability.mjs';
 import { suggestPostaCompose, isPostaAiEnabled } from './server/postaAiCompose.mjs';
 import { recordMailOpen, mailTrackPixelResponse } from './server/postaMailTrack.mjs';
+import {
+  buildPostaEngagementCsv,
+  getPostaEngagementSummary,
+  recordMailClick,
+} from './server/postaEngagement.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -528,6 +533,30 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const postaClickMatch = pathname.match(/^\/api\/posta\/track\/click\/([a-f0-9]+)$/i);
+    if (postaClickMatch && req.method === 'GET') {
+      const encoded = url.searchParams.get('u')?.trim() ?? '';
+      let target = '';
+      try {
+        target = Buffer.from(encoded, 'base64url').toString('utf8');
+      } catch {
+        target = '';
+      }
+      if (!/^https?:\/\//i.test(target)) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Bad link');
+        return;
+      }
+      try {
+        await recordMailClick(DATA_DIR, postaClickMatch[1], { url: target, ip: getRequestIp(req) });
+      } catch {
+        /* yine de yönlendir */
+      }
+      res.writeHead(302, { Location: target, 'Cache-Control': 'no-store' });
+      res.end();
+      return;
+    }
+
     const postaTrackMatch = pathname.match(/^\/api\/posta\/track\/open\/([a-f0-9]+)\.gif$/i);
     if (postaTrackMatch && req.method === 'GET') {
       try {
@@ -723,6 +752,41 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/engagement/summary' && req.method === 'GET') {
+      const days = Number(url.searchParams.get('days') || 14);
+      try {
+        const result = await getPostaEngagementSummary(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Engagement hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/engagement/export.csv' && req.method === 'GET') {
+      const type = url.searchParams.get('type')?.trim() || 'combined';
+      const days = Number(url.searchParams.get('days') || 90);
+      try {
+        const result = await buildPostaEngagementCsv(DATA_DIR, { type, days });
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="ekolojik-engagement-${type}.csv"`,
+        });
+        res.end(result.csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV hatası' }));
       }
       return;
     }

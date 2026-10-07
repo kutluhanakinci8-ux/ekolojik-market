@@ -218,6 +218,18 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
         } catch {
           /* bildirim opsiyonel */
         }
+        try {
+          const { recordEngagementBounce } = await import('./postaEngagement.mjs');
+          await recordEngagementBounce(dataDir, {
+            outboxId: message.id,
+            to: message.to,
+            subject: message.subject,
+            error: message.lastError,
+            source: message.source,
+          });
+        } catch {
+          /* engagement opsiyonel */
+        }
       } else {
         const delaySec = RETRY_SECONDS[Math.min(message.attempts - 1, RETRY_SECONDS.length - 1)];
         message.nextAttemptAt = new Date(Date.now() + delaySec * 1000).toISOString();

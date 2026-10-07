@@ -74,6 +74,7 @@ for path in \
   "/api/posta/storage" \
   "/api/posta/rules" \
   "/api/posta/outbox/analytics?days=7" \
+  "/api/posta/engagement/summary?days=7" \
   "/api/posta/deliverability" \
   "/api/posta/notifications/matrix" \
   "/api/posta/compose/rte-capabilities" \
