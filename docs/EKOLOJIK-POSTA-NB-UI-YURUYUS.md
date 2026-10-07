@@ -1,4 +1,4 @@
-# NB Lerta Posta ↔ Ekolojik — POS ekran yürüyüşü (~15 dk)
+# NB Lerta Posta ↔ Ekolojik — POS ekran yürüyüşü (~30 dk)
 
 Önkoşul: POS oturumu açık, `posta` sekmesi yetkili kullanıcı.
 
@@ -14,6 +14,14 @@
 | 8 | Gönderen ayarları | **Ayarlar → E-posta** — ad, ops, imza |
 | 9 | Export | Outbox CSV + mesajlaşma ZIP indir |
 | 10 | Bağımsız altyapı | **Ayarlar → Sistem** — Faz 5 ayrım yeşil |
+| 11 | Klavye kısayolları | Hub: `j`/`k` liste, `c` yaz, `r` yanıt, `/` ara |
+| 12 | Konuşma + ilet | Gelen → Konuşma modu → ilet / tümünü yanıtla |
+| 13 | IMAP Junk | Spam klasörü + IMAP yenile |
+| 14 | Toplu işlem | Gelen → seç → arşiv / spam |
+| 15 | Depolama çubuğu | Üst çubuk % doluluk |
+| 16 | Kurallar / analitik | **Ayarlar → E-posta** Faz 20 paneli |
+| 17 | Offline salt okuma | Ağ kes → son gelen listesi (SW + localStorage) |
+| 18 | Sohbet tam | **Sohbet** görünüm + `?customerId=` CRM |
 
 Otomatik (VPS):
 

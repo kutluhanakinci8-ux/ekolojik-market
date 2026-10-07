@@ -36,7 +36,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 | Bildirim matrisi | Olay×kanal | JSON settings (Faz 11) | **18–19** |
 | Açılma / tıklama | ESP | ✅ Faz 20 (env kapalı) | — |
 | AI compose | Opsiyonel | ✅ Faz 20 (env) | — |
-| PWA offline posta | NB | POS PWA kısıtlı | **21** (lite) |
+| PWA offline posta | NB | ✅ Faz 21 (lite) | — |
 
 ---
 
@@ -151,7 +151,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 21 — PWA, kısayollar, erişilebilirlik
+## Faz 21 — PWA, kısayollar, erişilebilirlik ✅ (2026-10-07)
 
 | # | İş | Çıktı |
 |---|-----|--------|
