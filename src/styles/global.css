@@ -15405,6 +15405,13 @@ input {
   color: var(--text-muted, #64748b);
 }
 .posta-compose-html-preview blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid #cbd5e1; }
+.posta-hub-calendar-sync {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  background: #f8fafc;
+}
 .posta-hub-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 12px 0; flex-wrap: wrap; }
 .posta-hub-list-head .posta-hub-list-title { margin: 0; }
 .posta-hub-modal-backdrop {
