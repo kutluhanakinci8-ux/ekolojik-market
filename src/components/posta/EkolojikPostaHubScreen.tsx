@@ -22,6 +22,8 @@ import {
   type PostaComposeDraft,
   type PostaInboxFolder,
   type PostaInboxItem,
+  type PostaListItem,
+  isPostaConversationItem,
 } from '../../services/postaInboxService';
 import {
   createMessagingThread,
@@ -94,7 +96,11 @@ export function EkolojikPostaHubScreen({
   const [folder, setFolder] = useState<PostaFolder>('gelen');
   const [inboxFolder, setInboxFolder] = useState<PostaInboxFolder>('gelen');
   const [hubLayout, setHubLayout] = useState<HubLayout>('posta');
-  const [inboxRows, setInboxRows] = useState<PostaInboxItem[]>([]);
+  const [inboxRows, setInboxRows] = useState<PostaListItem[]>([]);
+  const [mailListMode, setMailListMode] = useState<'message' | 'conversation'>('message');
+  const [listFilter, setListFilter] = useState<'all' | 'unread' | 'starred' | 'attachment'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [threads, setThreads] = useState<MessagingThread[]>([]);
   const [sentRows, setSentRows] = useState<PostaInboxItem[]>([]);
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
@@ -138,19 +144,44 @@ export function EkolojikPostaHubScreen({
     return [...emails].slice(0, 200);
   }, [recipientHints, store.customers]);
 
-  const selectedInbox = useMemo(
-    () => inboxRows.find((r) => r.id === selectedInboxId) ?? null,
-    [inboxRows, selectedInboxId],
-  );
+  const selectedInbox = useMemo(() => {
+    if (!selectedInboxId) return null;
+    const row = inboxRows.find((r) => r.id === selectedInboxId);
+    if (!row || isPostaConversationItem(row)) return null;
+    return row;
+  }, [inboxRows, selectedInboxId]);
 
-  const refreshInbox = useCallback(async (sub: PostaInboxFolder) => {
-    const result = await fetchPostaInbox(sub, 80);
-    if (result.ok && result.items) {
-      setInboxRows(result.items);
-      setImapConfigured(Boolean(result.imapConfigured));
-      setSelectedInboxId((cur) => cur ?? result.items![0]?.id ?? null);
-    }
-  }, []);
+  const selectedConversation = useMemo(() => {
+    if (!selectedConversationId) return null;
+    const row = inboxRows.find((r) => r.id === selectedConversationId);
+    if (!row || !isPostaConversationItem(row)) return null;
+    return row;
+  }, [inboxRows, selectedConversationId]);
+
+  const refreshInbox = useCallback(
+    async (sub: PostaInboxFolder) => {
+      const result = await fetchPostaInbox(sub, 80, {
+        q: searchQuery.trim() || undefined,
+        listMode: mailListMode,
+        unread: listFilter === 'unread' ? true : undefined,
+        starred: listFilter === 'starred' ? true : undefined,
+        hasAttachment: listFilter === 'attachment' ? true : undefined,
+      });
+      if (result.ok && result.items) {
+        setInboxRows(result.items);
+        setImapConfigured(Boolean(result.imapConfigured));
+        if (mailListMode === 'conversation') {
+          setSelectedConversationId((cur) => cur ?? result.items![0]?.id ?? null);
+          setSelectedInboxId(null);
+        } else {
+          const first = result.items.find((r) => !isPostaConversationItem(r));
+          setSelectedInboxId((cur) => cur ?? first?.id ?? null);
+          setSelectedConversationId(null);
+        }
+      }
+    },
+    [searchQuery, mailListMode, listFilter],
+  );
 
   const refreshThreads = useCallback(async () => {
     const result = await fetchMessagingThreads({ limit: 50 });
@@ -212,7 +243,7 @@ export function EkolojikPostaHubScreen({
       void refreshDrafts();
       void refreshInbox('taslaklar');
     }
-  }, [folder, refreshInbox, refreshThreads, refreshSent, refreshDrafts]);
+  }, [folder, refreshInbox, refreshThreads, refreshSent, refreshDrafts, searchQuery, mailListMode, listFilter]);
 
   useEffect(() => {
     if (folder === 'yaz') return undefined;
@@ -261,7 +292,14 @@ export function EkolojikPostaHubScreen({
     });
   }, [selectedThreadId, folder]);
 
+  const openConversationItem = (row: PostaListItem) => {
+    if (!isPostaConversationItem(row)) return;
+    setSelectedConversationId(row.id);
+    setSelectedInboxId(null);
+  };
+
   const openInboxItem = async (row: PostaInboxItem) => {
+    setSelectedConversationId(null);
     setSelectedInboxId(row.id);
     if (row.unread) {
       await markPostaInboxRead({ id: row.id, kind: row.kind, sourceId: row.sourceId });
@@ -632,6 +670,52 @@ export function EkolojikPostaHubScreen({
           <section className="posta-hub-list">
             <div className="posta-hub-list-head">
               <h2 className="posta-hub-list-title">{listTitle}</h2>
+              {isInboxMailFolder(folder) && folder !== 'taslaklar' && (
+                <div className="posta-hub-list-toolbar">
+                  <input
+                    type="search"
+                    className="posta-hub-search"
+                    placeholder="Ara (konu, gönderen, metin)…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <div className="posta-hub-list-mode" role="tablist" aria-label="Liste modu">
+                    <button
+                      type="button"
+                      className={mailListMode === 'message' ? 'active' : ''}
+                      onClick={() => setMailListMode('message')}
+                    >
+                      Mesaj
+                    </button>
+                    <button
+                      type="button"
+                      className={mailListMode === 'conversation' ? 'active' : ''}
+                      onClick={() => setMailListMode('conversation')}
+                    >
+                      Konuşma
+                    </button>
+                  </div>
+                  <div className="posta-hub-filter-chips">
+                    {(
+                      [
+                        ['all', 'Tümü'],
+                        ['unread', 'Okunmamış'],
+                        ['starred', 'Yıldızlı'],
+                        ['attachment', 'Ekli'],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={listFilter === key ? 'active' : ''}
+                        onClick={() => setListFilter(key)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {folder === 'mesajlar' && (
                 <button
                   type="button"
@@ -652,19 +736,36 @@ export function EkolojikPostaHubScreen({
               {isInboxMailFolder(folder) &&
                 inboxRows.map((row) => (
                   <li key={row.id}>
-                    <button
-                      type="button"
-                      className={`${selectedInboxId === row.id ? 'is-active' : ''}${row.unread ? ' is-unread' : ''}`}
-                      onClick={() => void openInboxItem(row)}
-                    >
-                      <strong>
-                        {row.starred ? '★ ' : ''}
-                        {row.fromName || row.subject}
-                      </strong>
-                      <span>{KIND_LABEL[row.kind] ?? row.kind}</span>
-                      <em>{row.preview.slice(0, 80)}</em>
-                      <time>{row.at ? new Date(row.at).toLocaleString('tr-TR') : '—'}</time>
-                    </button>
+                    {isPostaConversationItem(row) ? (
+                      <button
+                        type="button"
+                        className={`${selectedConversationId === row.id ? 'is-active' : ''}${row.unread ? ' is-unread' : ''}`}
+                        onClick={() => openConversationItem(row)}
+                      >
+                        <strong>
+                          {row.starred ? '★ ' : ''}
+                          {row.subject}
+                          <span className="posta-hub-conv-count"> ({row.count})</span>
+                        </strong>
+                        <span>Konuşma</span>
+                        <em>{row.preview.slice(0, 80)}</em>
+                        <time>{row.at ? new Date(row.at).toLocaleString('tr-TR') : '—'}</time>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`${selectedInboxId === row.id ? 'is-active' : ''}${row.unread ? ' is-unread' : ''}`}
+                        onClick={() => void openInboxItem(row)}
+                      >
+                        <strong>
+                          {row.starred ? '★ ' : ''}
+                          {row.fromName || row.subject}
+                        </strong>
+                        <span>{KIND_LABEL[row.kind] ?? row.kind}</span>
+                        <em>{row.preview.slice(0, 80)}</em>
+                        <time>{row.at ? new Date(row.at).toLocaleString('tr-TR') : '—'}</time>
+                      </button>
+                    )}
                   </li>
                 ))}
 
@@ -677,7 +778,7 @@ export function EkolojikPostaHubScreen({
                     <button
                       type="button"
                       className={selectedInboxId === row.id ? 'is-active' : ''}
-                      onClick={() => void openInboxItem(row)}
+                      onClick={() => void openInboxItem(row as PostaInboxItem)}
                     >
                       <strong>{row.subject}</strong>
                       <span>IMAP taslak</span>
@@ -851,7 +952,39 @@ export function EkolojikPostaHubScreen({
             </div>
           )}
 
-          {selectedInbox && isInboxMailFolder(folder) && (
+          {selectedConversation && isInboxMailFolder(folder) && mailListMode === 'conversation' && (
+            <>
+              <div className="posta-hub-detail-actions">
+                <h2>{selectedConversation.subject}</h2>
+                <span className="posta-hub-conv-count">{selectedConversation.count} mesaj</span>
+              </div>
+              <ul className="posta-hub-conversation-thread">
+                {selectedConversation.messages.map((msg) => (
+                  <li key={msg.id} className="posta-hub-conv-msg">
+                    <header>
+                      <strong>{msg.fromName || msg.from}</strong>
+                      <time>{msg.at ? new Date(msg.at).toLocaleString('tr-TR') : ''}</time>
+                      <button type="button" className="btn btn-sm btn-outline" onClick={() => void openInboxItem(msg)}>
+                        Aç
+                      </button>
+                    </header>
+                    <p className="posta-hub-conv-preview">{msg.preview.slice(0, 200)}</p>
+                  </li>
+                ))}
+              </ul>
+              {selectedConversation.messages.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => startReply(selectedConversation.messages[selectedConversation.messages.length - 1])}
+                >
+                  Son mesaja yanıt
+                </button>
+              )}
+            </>
+          )}
+
+          {selectedInbox && isInboxMailFolder(folder) && !selectedConversation && (
             <>
               <div className="posta-hub-detail-actions">
                 <h2>{selectedInbox.subject}</h2>

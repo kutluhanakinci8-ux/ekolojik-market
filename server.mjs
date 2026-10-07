@@ -489,12 +489,28 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (pathname === '/api/posta/inbox' && req.method === 'GET') {
+    if (
+      (pathname === '/api/posta/inbox' || pathname === '/api/posta/inbox/search') &&
+      req.method === 'GET'
+    ) {
       const tenantId = resolveTenantId(url);
       const folder = url.searchParams.get('folder')?.trim() || 'gelen';
       const limit = Number(url.searchParams.get('limit') || 60);
+      const q = url.searchParams.get('q')?.trim() || '';
+      const listMode = url.searchParams.get('listMode')?.trim() || 'message';
+      const unread = url.searchParams.get('unread');
+      const starred = url.searchParams.get('starred');
+      const hasAttachment = url.searchParams.get('hasAttachment');
       try {
-        const result = await listUnifiedPostaInbox(DATA_DIR, tenantId, { folder, limit });
+        const result = await listUnifiedPostaInbox(DATA_DIR, tenantId, {
+          folder,
+          limit,
+          q,
+          listMode,
+          unread,
+          starred,
+          hasAttachment,
+        });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {

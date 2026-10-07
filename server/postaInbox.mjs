@@ -19,6 +19,7 @@ import { getEkolojikImapConfig, isEkolojikImapConfigured } from './ekolojikMailC
 import { countStaffUnreadMessagingThreads } from './messaging/store.mjs';
 import { persistImapAttachments, readPostaInboxAttachment } from './postaInboxAttachments.mjs';
 import { applyPostaFlagsToItem, getPostaInboxFlagsMap, patchPostaInboxFlags } from './postaInboxFlags.mjs';
+import { groupIntoConversations, parseThreadHeadersFromRaw } from './postaConversation.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -106,6 +107,8 @@ function toUnifiedImap(row) {
     bodyText: row.bodyText ?? '',
     bodyHtml: row.bodyHtml ?? '',
     messageId: row.messageId ?? null,
+    inReplyTo: row.inReplyTo ?? null,
+    references: row.references ?? null,
     imapFolder: row.imapFolder ?? 'inbox',
     attachments: row.attachments ?? [],
     raw: row,
@@ -158,11 +161,14 @@ async function ingestImapMessages(dataDir, tenantId, fetched, imapFolder) {
       imapFolder === 'inbox' || imapFolder === 'sent'
         ? await persistImapAttachments(dataDir, tenantId, raw)
         : [];
+    const threadHdr = parseThreadHeadersFromRaw(raw);
     entries.push({
       imapUid: msg.imapUid,
       imapMailboxPath: msg.imapMailboxPath,
       imapFolder,
       messageId: msg.messageId,
+      inReplyTo: threadHdr.inReplyTo,
+      references: threadHdr.references,
       from: msg.from,
       to: msg.to,
       subject: msg.subject,
@@ -303,7 +309,28 @@ function filterByMailboxFolder(items, folder) {
   );
 }
 
-export async function listUnifiedPostaInbox(dataDir, tenantId, { folder = 'gelen', limit = 60 } = {}) {
+function applyInboxListFilters(items, { q, unread, hasAttachment, starred } = {}) {
+  let out = items;
+  if (unread === true || unread === '1') out = out.filter((i) => i.unread);
+  if (starred === true || starred === '1') out = out.filter((i) => i.starred);
+  if (hasAttachment === true || hasAttachment === '1') {
+    out = out.filter((i) => (i.attachments?.length ?? 0) > 0);
+  }
+  const needle = String(q ?? '').trim().toLowerCase();
+  if (needle) {
+    out = out.filter((i) =>
+      [i.subject, i.preview, i.from, i.fromName, i.bodyText, i.to]
+        .some((field) => String(field ?? '').toLowerCase().includes(needle)),
+    );
+  }
+  return out;
+}
+
+export async function listUnifiedPostaInbox(
+  dataDir,
+  tenantId,
+  { folder = 'gelen', limit = 60, q, unread, hasAttachment, starred, listMode } = {},
+) {
   const max = Math.min(Math.max(Number(limit) || 60, 1), 200);
   const flagsMap = await getPostaInboxFlagsMap(dataDir, tenantId);
   const contacts = (await listContactMessages(dataDir, 200)).map(toUnifiedContact);
@@ -332,13 +359,37 @@ export async function listUnifiedPostaInbox(dataDir, tenantId, { folder = 'gelen
     base = buildGelenPool(contacts, imap, billRows);
   }
 
-  const items = filterByMailboxFolder(
+  let items = filterByMailboxFolder(
     base.map((item) => applyPostaFlagsToItem(item, flagsMap)),
     folder,
   );
 
+  items = applyInboxListFilters(items, { q, unread, hasAttachment, starred });
   items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-  return { ok: true, folder, items: items.slice(0, max), imapConfigured: isEkolojikImapConfigured() };
+
+  const mode = String(listMode || 'message').toLowerCase();
+  if (mode === 'conversation') {
+    const conversations = groupIntoConversations(items).slice(0, max);
+    return {
+      ok: true,
+      folder,
+      listMode: 'conversation',
+      items: conversations,
+      imapConfigured: isEkolojikImapConfigured(),
+    };
+  }
+
+  return {
+    ok: true,
+    folder,
+    listMode: 'message',
+    items: items.slice(0, max),
+    imapConfigured: isEkolojikImapConfigured(),
+  };
+}
+
+export async function searchUnifiedPostaInbox(dataDir, tenantId, options = {}) {
+  return listUnifiedPostaInbox(dataDir, tenantId, options);
 }
 
 export async function markPostaInboxRead(dataDir, tenantId, { id, kind, sourceId }) {

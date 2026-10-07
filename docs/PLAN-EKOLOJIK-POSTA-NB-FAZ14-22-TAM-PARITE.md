@@ -57,7 +57,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 15 — Konuşma görünümü, arama, liste UX
+## Faz 15 — Konuşma görünümü, arama, liste UX ✅ (2026-10-07)
 
 **Amaç:** NB “konuşma” ve liste filtreleri.
 

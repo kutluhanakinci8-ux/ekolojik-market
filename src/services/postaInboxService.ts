@@ -26,6 +26,38 @@ export type PostaInboxItem = {
   status?: string;
   folder?: string;
   lastError?: string | null;
+  inReplyTo?: string | null;
+  references?: string | null;
+};
+
+export type PostaConversationItem = {
+  id: string;
+  kind: 'conversation';
+  threadId: string;
+  subject: string;
+  preview: string;
+  at: string;
+  from?: string;
+  fromName?: string;
+  unread: boolean;
+  starred?: boolean;
+  count: number;
+  messages: PostaInboxItem[];
+  sourceId?: string;
+};
+
+export type PostaListItem = PostaInboxItem | PostaConversationItem;
+
+export function isPostaConversationItem(row: PostaListItem): row is PostaConversationItem {
+  return row.kind === 'conversation';
+}
+
+export type PostaInboxQuery = {
+  q?: string;
+  listMode?: 'message' | 'conversation';
+  unread?: boolean;
+  starred?: boolean;
+  hasAttachment?: boolean;
 };
 
 export type PostaInboxFolder =
@@ -49,12 +81,23 @@ export type PostaComposeDraft = {
   updatedAt: string;
 };
 
-export async function fetchPostaInbox(folder: PostaInboxFolder = 'gelen', limit = 80) {
-  const res = await fetch(`/api/posta/inbox?folder=${folder}&limit=${limit}`);
+export async function fetchPostaInbox(
+  folder: PostaInboxFolder = 'gelen',
+  limit = 80,
+  query: PostaInboxQuery = {},
+) {
+  const params = new URLSearchParams({ folder, limit: String(limit) });
+  if (query.q?.trim()) params.set('q', query.q.trim());
+  if (query.listMode) params.set('listMode', query.listMode);
+  if (query.unread) params.set('unread', '1');
+  if (query.starred) params.set('starred', '1');
+  if (query.hasAttachment) params.set('hasAttachment', '1');
+  const res = await fetch(`/api/posta/inbox?${params.toString()}`);
   return res.json() as Promise<{
     ok: boolean;
     folder?: string;
-    items?: PostaInboxItem[];
+    listMode?: 'message' | 'conversation';
+    items?: PostaListItem[];
     imapConfigured?: boolean;
     error?: string;
   }>;
