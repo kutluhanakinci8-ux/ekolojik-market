@@ -37,6 +37,7 @@ import {
   getPostaMailSettings,
   savePostaMailSettings,
   getEffectiveMailPresentation,
+  getPostaNotificationsMatrixHub,
 } from './server/postaSettings.mjs';
 import {
   buildOutboxCsv,
@@ -735,6 +736,19 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Deliverability hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/notifications/matrix' && req.method === 'GET') {
+      try {
+        const settings = await getPostaMailSettings(DATA_DIR);
+        const result = getPostaNotificationsMatrixHub(settings);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bildirim matrisi hatası' }));
       }
       return;
     }
