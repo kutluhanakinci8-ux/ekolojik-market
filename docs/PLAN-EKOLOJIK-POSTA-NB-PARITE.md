@@ -7,15 +7,18 @@
 
 ---
 
-## Parite hedefi (Ekolojik için gerçekçi)
+## Parite hedefi (2026-10-07 güncelleme)
 
-| NB (Lerta Posta) | Ekolojik hedef (~SMB POS) | Kapsam dışı |
-|------------------|---------------------------|-------------|
-| Dovecot + tam webmail | Gmail/kurumsal **IMAP** + `info@` tek kutu | Kendi Dovecot (NB PM-5 kopyası) |
-| JMAP / CalDAV | — | Takvim/CardDAV (Faz 4b opsiyonel) |
-| SSE canlı sohbet | SSE veya 15 sn polling | WebSocket cluster |
-| AI compose | — | LLM yanıt önerisi (v2) |
-| ESP open/click | Outbox sent/failed + CSV export | Pixel tracking |
+**Kural:** Nakliye Borsası Posta’daki **mail + mesaj** deneyimi Ekolojik’e uyarlanır — “v2 / kapsam dışı” **yok** (yalnızca altyapı farkları aşağıda).
+
+| NB (Lerta Posta) | Ekolojik hedef | Not |
+|------------------|----------------|-----|
+| Sol menü: Tümü, Gelen, Yıldızlı, Ertelenen, Spam, Arşiv, Çöp, Taslaklar, Takvim, Kişiler | ✅ Faz 13 hub menüsü | Bayraklar `posta-inbox/*/flags.json` |
+| Dovecot + tam webmail | **IMAP** + iletişim + fatura birleşik | NB Dovecot kopyası yok |
+| JMAP / CalDAV | POS ödeme takvimi + hub **Takvim** | Harici CalDAV sync sonra |
+| SSE canlı sohbet | SSE veya 15 sn polling | WebSocket cluster yok |
+| AI compose | Sonraki sprint | LLM ayrı env |
+| ESP open/click | Outbox sent/failed + CSV export | Pixel tracking sonra |
 
 ## Çalışma düzeni (her faz sonrası)
 
@@ -135,6 +138,22 @@ Cloud Agent ortamında otomatik deploy için **`VPS_SSH_KEY`** veya **`VPS_SSH_K
 | 11.5 | `docs/EKOLOJIK-FAZ5-PROD-CHECKLIST.md` tam kapatma | Cron yedek, env audit |
 
 **Kabul:** Operatör tek ekrandan “kim ne aldı, ne gitti” raporu.
+
+---
+
+## Faz 13 — NB webmail menü paritesi (mail + mesaj UI)
+
+| # | İş | Çıktı |
+|---|-----|--------|
+| 13.1 | Hub sol menü: Tümü, Yıldızlı, Ertelenen, Spam, Çöp, Taslaklar, Takvim, Kişiler | `EkolojikPostaHubScreen.tsx` |
+| 13.2 | `POST /api/posta/inbox/flags` (yıldız, spam, çöp, erteleme) | `server/postaInboxFlags.mjs` |
+| 13.3 | Taslaklar: `GET/POST /api/posta/drafts`, `DELETE …/drafts/:id` | `server/postaComposeDrafts.mjs` |
+| 13.4 | Görünüm: Posta / Sohbet / Tam | Hub üst sekmeler |
+| 13.5 | İletişim formu UTF-8 mojibake düzeltme | `repairUtf8Mojibake` |
+
+**Kabul:** NB ekran görüntüsündeki klasör listesi POS Posta’da görünür; yıldız/spam/çöp/erteleme kalıcı.
+
+**Sonraki (Faz 14):** IMAP Sent/Junk/Trash klasör sync, konuşma görünümü, depolama çubuğu.
 
 ---
 

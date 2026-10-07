@@ -12,9 +12,15 @@ import {
   fetchComposeRecipientHints,
   fetchPostaInbox,
   fetchPostaTemplates,
+  fetchPostaComposeDrafts,
+  savePostaComposeDraft,
+  deletePostaComposeDraft,
   markPostaInboxRead,
+  patchPostaInboxFlags,
   syncPostaInboxImap,
   type MailTemplate,
+  type PostaComposeDraft,
+  type PostaInboxFolder,
   type PostaInboxItem,
 } from '../../services/postaInboxService';
 import {
@@ -40,8 +46,30 @@ function readFileAsAttachment(file: File) {
   });
 }
 
-type PostaFolder = 'gelen' | 'fatura' | 'arsiv' | 'mesajlar' | 'gonderilen' | 'yaz';
-type InboxFolder = 'gelen' | 'fatura' | 'arsiv';
+type PostaFolder =
+  | PostaInboxFolder
+  | 'mesajlar'
+  | 'gonderilen'
+  | 'yaz'
+  | 'taslaklar'
+  | 'kisiler'
+  | 'takvim';
+type HubLayout = 'posta' | 'sohbet' | 'tam';
+
+const INBOX_FOLDERS: PostaInboxFolder[] = [
+  'tumu',
+  'gelen',
+  'yildizli',
+  'ertelenen',
+  'fatura',
+  'spam',
+  'arsiv',
+  'cop',
+];
+
+function isInboxMailFolder(folder: PostaFolder): folder is PostaInboxFolder {
+  return (INBOX_FOLDERS as string[]).includes(folder);
+}
 
 const KIND_LABEL: Record<string, string> = {
   contact: 'İletişim formu',
@@ -68,7 +96,8 @@ export function EkolojikPostaHubScreen({
   onDeepLinkConsumed?: () => void;
 }) {
   const [folder, setFolder] = useState<PostaFolder>('gelen');
-  const [inboxFolder, setInboxFolder] = useState<InboxFolder>('gelen');
+  const [inboxFolder, setInboxFolder] = useState<PostaInboxFolder>('gelen');
+  const [hubLayout, setHubLayout] = useState<HubLayout>('posta');
   const [inboxRows, setInboxRows] = useState<PostaInboxItem[]>([]);
   const [threads, setThreads] = useState<MessagingThread[]>([]);
   const [sentRows, setSentRows] = useState<Array<Record<string, unknown>>>([]);
@@ -98,6 +127,9 @@ export function EkolojikPostaHubScreen({
   const [pendingMsgFiles, setPendingMsgFiles] = useState<
     Array<{ fileName: string; mimeType: string; dataBase64: string }>
   >([]);
+  const [drafts, setDrafts] = useState<PostaComposeDraft[]>([]);
+  const [composeDraftId, setComposeDraftId] = useState<string | null>(null);
+  const [contactSearch, setContactSearch] = useState('');
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
 
@@ -115,7 +147,7 @@ export function EkolojikPostaHubScreen({
     [inboxRows, selectedInboxId],
   );
 
-  const refreshInbox = useCallback(async (sub: InboxFolder) => {
+  const refreshInbox = useCallback(async (sub: PostaInboxFolder) => {
     const result = await fetchPostaInbox(sub, 80);
     if (result.ok && result.items) {
       setInboxRows(result.items);
@@ -142,6 +174,11 @@ export function EkolojikPostaHubScreen({
 
   const refreshHealth = useCallback(async () => {
     setHealth(await fetchEmailHealth());
+  }, []);
+
+  const refreshDrafts = useCallback(async () => {
+    const result = await fetchPostaComposeDrafts();
+    if (result.ok && result.drafts) setDrafts(result.drafts);
   }, []);
 
   useEffect(() => {
@@ -172,20 +209,21 @@ export function EkolojikPostaHubScreen({
 
   useEffect(() => {
     setFlash(null);
-    if (folder === 'gelen' || folder === 'fatura' || folder === 'arsiv') {
+    if (isInboxMailFolder(folder)) {
       setInboxFolder(folder);
       void refreshInbox(folder);
     }
     if (folder === 'mesajlar') void refreshThreads();
     if (folder === 'gonderilen') void refreshSent();
-  }, [folder, refreshInbox, refreshThreads, refreshSent]);
+    if (folder === 'taslaklar') void refreshDrafts();
+  }, [folder, refreshInbox, refreshThreads, refreshSent, refreshDrafts]);
 
   useEffect(() => {
     if (folder === 'yaz') return undefined;
     let es: EventSource | null = null;
     let timer: ReturnType<typeof setInterval> | null = null;
     const refreshLive = () => {
-      if (folder === 'gelen' || folder === 'fatura' || folder === 'arsiv') void refreshInbox(inboxFolder);
+      if (isInboxMailFolder(folder)) void refreshInbox(inboxFolder);
       if (folder === 'mesajlar') void refreshThreads();
       if (folder === 'gonderilen') void refreshSent();
     };
@@ -369,6 +407,65 @@ export function EkolojikPostaHubScreen({
     }
   };
 
+  const patchInboxFlags = async (patch: {
+    starred?: boolean;
+    spam?: boolean;
+    trashed?: boolean;
+    snoozedUntil?: string | null;
+  }) => {
+    if (!selectedInbox) return;
+    const result = await patchPostaInboxFlags({ id: selectedInbox.id, ...patch });
+    setFlash(result.ok ? 'Güncellendi' : result.error ?? 'İşlem başarısız');
+    if (result.ok) await refreshInbox(inboxFolder);
+  };
+
+  const snoozeSelectedOneDay = () => {
+    const until = new Date(Date.now() + 86400000).toISOString();
+    void patchInboxFlags({ snoozedUntil: until });
+  };
+
+  const openDraft = (draft: PostaComposeDraft) => {
+    setComposeTo(draft.to);
+    setComposeSubject(draft.subject);
+    setComposeBody(draft.body);
+    setComposeDraftId(draft.id);
+    setComposeReply(
+      draft.inReplyTo ? { inReplyTo: draft.inReplyTo, references: draft.references ?? draft.inReplyTo } : null,
+    );
+    setFolder('yaz');
+  };
+
+  const persistComposeDraft = async () => {
+    const result = await savePostaComposeDraft({
+      id: composeDraftId ?? undefined,
+      to: composeTo,
+      subject: composeSubject,
+      body: composeBody,
+      inReplyTo: composeReply?.inReplyTo ?? null,
+      references: composeReply?.references ?? null,
+    });
+    if (result.ok && result.draft) {
+      setComposeDraftId(result.draft.id);
+      setFlash('Taslak kaydedildi');
+      await refreshDrafts();
+    } else {
+      setFlash(result.error ?? 'Taslak kaydedilemedi');
+    }
+  };
+
+  const filteredContacts = useMemo(() => {
+    const q = contactSearch.trim().toLowerCase();
+    return customersForMessaging
+      .filter((c) => c.email?.includes('@'))
+      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q))
+      .slice(0, 120);
+  }, [customersForMessaging, contactSearch]);
+
+  const paymentReminders = useMemo(
+    () => (store.settings.paymentReminders ?? []).slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    [store.settings.paymentReminders],
+  );
+
   const createHubThread = async () => {
     const customer = customersForMessaging.find((c) => c.id === newThreadCustomerId);
     if (!customer) {
@@ -406,23 +503,55 @@ export function EkolojikPostaHubScreen({
     ((health.smtpError?.includes('ECONNREFUSED') ?? false) ||
       Boolean(health.smtpHostHint?.includes('VPS IP')));
 
-  const listTitle =
-    folder === 'gelen' || folder === 'fatura' || folder === 'arsiv'
-      ? folder === 'gelen'
-        ? 'Gelen kutusu'
-        : folder === 'fatura'
-          ? 'Fatura e-postaları'
-          : 'Arşiv'
-      : folder === 'mesajlar'
-        ? 'Yazışmalar'
-        : 'Gönderilen';
+  const FOLDER_TITLES: Record<PostaFolder, string> = {
+    tumu: 'Tümü',
+    gelen: 'Gelen kutusu',
+    yildizli: 'Yıldızlı',
+    ertelenen: 'Ertelenen',
+    fatura: 'Fatura e-postaları',
+    spam: 'Spam',
+    arsiv: 'Arşiv',
+    cop: 'Çöp',
+    mesajlar: 'Yazışmalar',
+    gonderilen: 'Gönderilen',
+    yaz: 'Yeni e-posta',
+    taslaklar: 'Taslaklar',
+    kisiler: 'Kişiler',
+    takvim: 'Takvim',
+  };
+
+  const listTitle = FOLDER_TITLES[folder] ?? 'Posta';
+
+  const pickFolder = (next: PostaFolder) => {
+    if (hubLayout === 'sohbet' && next !== 'mesajlar' && next !== 'yaz') {
+      setHubLayout('posta');
+    }
+    setFolder(next);
+  };
 
   return (
     <div className="module-screen posta-hub-screen">
       <header className="module-header posta-hub-header">
         <div>
           <h1>Ekolojik Posta & Mesaj</h1>
-          <p>Nakliye Borsası arayüzüne benzer — veri ve sunucu tamamen Ekolojik (NB ile paylaşılmaz)</p>
+          <p>Nakliye Borsası Posta menüsü ile aynı klasörler — veri ve sunucu tamamen Ekolojik</p>
+        </div>
+        <div className="posta-hub-view-switch" role="tablist" aria-label="Görünüm">
+          {(['posta', 'sohbet', 'tam'] as HubLayout[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={hubLayout === mode}
+              className={hubLayout === mode ? 'active' : ''}
+              onClick={() => {
+                setHubLayout(mode);
+                if (mode === 'sohbet') setFolder('mesajlar');
+              }}
+            >
+              {mode === 'posta' ? 'Posta' : mode === 'sohbet' ? 'Sohbet' : 'Tam'}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -443,51 +572,55 @@ export function EkolojikPostaHubScreen({
 
       {flash && <p className="settings-flash">{flash}</p>}
 
-      <div className="posta-hub-shell">
+      <div className={`posta-hub-shell${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${hubLayout === 'sohbet' ? ' posta-hub-shell--sohbet' : ''}`}>
         <aside className="posta-hub-folders" aria-label="Posta klasörleri">
-          <button type="button" className="btn btn-primary posta-hub-compose" onClick={() => setFolder('yaz')}>
+          <button type="button" className="btn btn-primary posta-hub-compose" onClick={() => pickFolder('yaz')}>
             Yaz
           </button>
-          <button
-            type="button"
-            className={folder === 'gelen' ? 'active' : ''}
-            onClick={() => setFolder('gelen')}
-          >
-            Gelen
-          </button>
-          <button
-            type="button"
-            className={folder === 'fatura' ? 'active' : ''}
-            onClick={() => setFolder('fatura')}
-          >
-            Fatura
-          </button>
-          <button
-            type="button"
-            className={folder === 'mesajlar' ? 'active' : ''}
-            onClick={() => setFolder('mesajlar')}
-          >
+          {hubLayout !== 'sohbet' && (
+            <>
+              <p className="posta-hub-folder-group">Gelen</p>
+              {(['tumu', 'gelen', 'yildizli', 'ertelenen'] as PostaInboxFolder[]).map((f) => (
+                <button key={f} type="button" className={folder === f ? 'active' : ''} onClick={() => pickFolder(f)}>
+                  {FOLDER_TITLES[f]}
+                </button>
+              ))}
+              <p className="posta-hub-folder-group">Mağaza</p>
+              <button type="button" className={folder === 'fatura' ? 'active' : ''} onClick={() => pickFolder('fatura')}>
+                Fatura
+              </button>
+            </>
+          )}
+          <button type="button" className={folder === 'mesajlar' ? 'active' : ''} onClick={() => pickFolder('mesajlar')}>
             Müşteri mesajları
           </button>
-          <button
-            type="button"
-            className={folder === 'gonderilen' ? 'active' : ''}
-            onClick={() => setFolder('gonderilen')}
-          >
-            Gönderilen
-          </button>
-          <button
-            type="button"
-            className={folder === 'arsiv' ? 'active' : ''}
-            onClick={() => setFolder('arsiv')}
-          >
-            Arşiv
-          </button>
+          {hubLayout !== 'sohbet' && (
+            <>
+              <button type="button" className={folder === 'gonderilen' ? 'active' : ''} onClick={() => pickFolder('gonderilen')}>
+                Gönderilen
+              </button>
+              <p className="posta-hub-folder-group">Diğer</p>
+              {(['spam', 'arsiv', 'cop'] as PostaInboxFolder[]).map((f) => (
+                <button key={f} type="button" className={folder === f ? 'active' : ''} onClick={() => pickFolder(f)}>
+                  {FOLDER_TITLES[f]}
+                </button>
+              ))}
+              <button type="button" className={folder === 'taslaklar' ? 'active' : ''} onClick={() => pickFolder('taslaklar')}>
+                Taslaklar
+              </button>
+              <button type="button" className={folder === 'takvim' ? 'active' : ''} onClick={() => pickFolder('takvim')}>
+                Takvim
+              </button>
+              <button type="button" className={folder === 'kisiler' ? 'active' : ''} onClick={() => pickFolder('kisiler')}>
+                Kişiler
+              </button>
+            </>
+          )}
           <div className="posta-hub-folder-meta">
             <small>SMTP</small>
             <strong>{health?.smtpVerified ? 'Hazır' : health?.smtpConfigured ? 'Hata' : 'Kapalı'}</strong>
           </div>
-          {imapConfigured && (folder === 'gelen' || folder === 'fatura') && (
+          {imapConfigured && isInboxMailFolder(folder) && folder !== 'cop' && folder !== 'spam' && (
             <button type="button" className="btn btn-sm btn-outline posta-hub-sync" disabled={syncBusy} onClick={() => void syncImap()}>
               {syncBusy ? 'IMAP…' : 'IMAP yenile'}
             </button>
@@ -512,10 +645,10 @@ export function EkolojikPostaHubScreen({
               )}
             </div>
             <ul>
-              {(folder === 'gelen' || folder === 'fatura' || folder === 'arsiv') && inboxRows.length === 0 && (
+              {isInboxMailFolder(folder) && inboxRows.length === 0 && (
                 <li className="posta-hub-empty">Kayıt yok — iletişim formu veya IMAP sync deneyin</li>
               )}
-              {(folder === 'gelen' || folder === 'fatura' || folder === 'arsiv') &&
+              {isInboxMailFolder(folder) &&
                 inboxRows.map((row) => (
                   <li key={row.id}>
                     <button
@@ -523,11 +656,73 @@ export function EkolojikPostaHubScreen({
                       className={`${selectedInboxId === row.id ? 'is-active' : ''}${row.unread ? ' is-unread' : ''}`}
                       onClick={() => void openInboxItem(row)}
                     >
-                      <strong>{row.fromName || row.subject}</strong>
+                      <strong>
+                        {row.starred ? '★ ' : ''}
+                        {row.fromName || row.subject}
+                      </strong>
                       <span>{KIND_LABEL[row.kind] ?? row.kind}</span>
                       <em>{row.preview.slice(0, 80)}</em>
                       <time>{row.at ? new Date(row.at).toLocaleString('tr-TR') : '—'}</time>
                     </button>
+                  </li>
+                ))}
+
+              {folder === 'taslaklar' && drafts.length === 0 && <li className="posta-hub-empty">Taslak yok</li>}
+              {folder === 'taslaklar' &&
+                drafts.map((d) => (
+                  <li key={d.id}>
+                    <button type="button" className={composeDraftId === d.id ? 'is-active' : ''} onClick={() => openDraft(d)}>
+                      <strong>{d.subject || '(konu yok)'}</strong>
+                      <span>{d.to || 'Alıcı yok'}</span>
+                      <time>{new Date(d.updatedAt).toLocaleString('tr-TR')}</time>
+                    </button>
+                  </li>
+                ))}
+
+              {folder === 'kisiler' && (
+                <li className="posta-hub-contacts-search">
+                  <input
+                    type="search"
+                    placeholder="Kişi ara…"
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                  />
+                </li>
+              )}
+              {folder === 'kisiler' && filteredContacts.length === 0 && (
+                <li className="posta-hub-empty">E-postalı müşteri bulunamadı</li>
+              )}
+              {folder === 'kisiler' &&
+                filteredContacts.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setComposeTo(c.email ?? '');
+                        setComposeSubject(`${c.name} — Ekolojik Market`);
+                        setComposeBody('');
+                        setComposeReply(null);
+                        setComposeDraftId(null);
+                        pickFolder('yaz');
+                      }}
+                    >
+                      <strong>{c.name}</strong>
+                      <span>{c.email}</span>
+                    </button>
+                  </li>
+                ))}
+
+              {folder === 'takvim' && paymentReminders.length === 0 && (
+                <li className="posta-hub-empty">Ödeme hatırlatması yok — fatura satırından ekleyebilirsiniz</li>
+              )}
+              {folder === 'takvim' &&
+                paymentReminders.map((r) => (
+                  <li key={r.id}>
+                    <div className="posta-hub-calendar-row">
+                      <strong>{r.title}</strong>
+                      <span>{r.dueDate}</span>
+                      <em>{r.amount}</em>
+                    </div>
                   </li>
                 ))}
 
@@ -627,18 +822,23 @@ export function EkolojikPostaHubScreen({
                   onChange={(e) => setComposeBody(e.target.value)}
                 />
               </label>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={loading || !composeTo.includes('@')}
-                onClick={() => void sendCompose()}
-              >
-                Gönder
-              </button>
+              <div className="posta-hub-compose-actions">
+                <button type="button" className="btn btn-outline" disabled={loading} onClick={() => void persistComposeDraft()}>
+                  Taslak kaydet
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={loading || !composeTo.includes('@')}
+                  onClick={() => void sendCompose()}
+                >
+                  Gönder
+                </button>
+              </div>
             </div>
           )}
 
-          {selectedInbox && (folder === 'gelen' || folder === 'fatura' || folder === 'arsiv') && (
+          {selectedInbox && isInboxMailFolder(folder) && (
             <>
               <div className="posta-hub-detail-actions">
                 <h2>{selectedInbox.subject}</h2>
@@ -651,7 +851,32 @@ export function EkolojikPostaHubScreen({
                       Ödeme takvimine işle
                     </button>
                   )}
-                  {folder !== 'arsiv' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => void patchInboxFlags({ starred: !selectedInbox.starred })}
+                  >
+                    {selectedInbox.starred ? 'Yıldızı kaldır' : 'Yıldızla'}
+                  </button>
+                  <button type="button" className="btn btn-sm btn-outline" onClick={() => void snoozeSelectedOneDay()}>
+                    Ertele (1 gün)
+                  </button>
+                  {folder !== 'spam' && (
+                    <button type="button" className="btn btn-sm btn-outline" onClick={() => void patchInboxFlags({ spam: true })}>
+                      Spam
+                    </button>
+                  )}
+                  {folder !== 'cop' && (
+                    <button type="button" className="btn btn-sm btn-outline" onClick={() => void patchInboxFlags({ trashed: true })}>
+                      Çöp
+                    </button>
+                  )}
+                  {folder === 'cop' && (
+                    <button type="button" className="btn btn-sm btn-outline" onClick={() => void patchInboxFlags({ trashed: false })}>
+                      Geri al
+                    </button>
+                  )}
+                  {folder !== 'arsiv' && folder !== 'cop' && (
                     <button type="button" className="btn btn-sm btn-outline" onClick={() => void archiveSelected()}>
                       Arşivle
                     </button>
@@ -798,6 +1023,39 @@ export function EkolojikPostaHubScreen({
 
           {folder === 'gonderilen' && !sentDetail && (
             <p className="module-hint">Listeden bir gönderim seçin — detay ve başarısız kayıtlar için tekrar dene.</p>
+          )}
+
+          {folder === 'taslaklar' && (
+            <div className="posta-hub-draft-detail">
+              <p className="module-hint">Taslak seçin veya Yaz ekranından yeni taslak oluşturun.</p>
+              {composeDraftId && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={async () => {
+                    const id = composeDraftId;
+                    const result = await deletePostaComposeDraft(id);
+                    setFlash(result.ok ? 'Taslak silindi' : result.error ?? 'Silinemedi');
+                    if (result.ok) {
+                      setComposeDraftId(null);
+                      await refreshDrafts();
+                    }
+                  }}
+                >
+                  Seçili taslağı sil
+                </button>
+              )}
+            </div>
+          )}
+
+          {folder === 'kisiler' && (
+            <p className="module-hint">Listeden kişi seçerek doğrudan e-posta yazabilirsiniz (NB Kişiler).</p>
+          )}
+
+          {folder === 'takvim' && (
+            <p className="module-hint">
+              Ödeme hatırlatmaları POS takviminden gelir. Fatura e-postasında “Ödeme takvimine işle” ile eklenir.
+            </p>
           )}
         </section>
       </div>

@@ -71,7 +71,13 @@ import {
   syncPostaInboxFromImap,
   getComposeRecipientHints,
   loadPostaInboxAttachment,
+  patchPostaInboxFlags,
 } from './server/postaInbox.mjs';
+import {
+  deletePostaComposeDraft,
+  listPostaComposeDrafts,
+  upsertPostaComposeDraft,
+} from './server/postaComposeDrafts.mjs';
 import { listMailTemplates } from './server/mailTemplates.mjs';
 import { formatPostaComposeBody } from './server/postaComposeFormat.mjs';
 let handleAsatProxy = null;
@@ -558,6 +564,73 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/flags' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const id = String(data?.id ?? '').trim();
+      if (!id) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'id gerekli' }));
+        return;
+      }
+      try {
+        const result = await patchPostaInboxFlags(DATA_DIR, tenantId, id, {
+          starred: data?.starred,
+          spam: data?.spam,
+          trashed: data?.trashed,
+          snoozedUntil: data?.snoozedUntil,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bayrak hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/drafts' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaComposeDrafts(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Taslak listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/drafts' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaComposeDraft(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Taslak kayıt hatası' }));
+      }
+      return;
+    }
+
+    const draftDeleteMatch = pathname.match(/^\/api\/posta\/drafts\/([^/]+)$/);
+    if (draftDeleteMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const draftId = decodeURIComponent(draftDeleteMatch[1]);
+      try {
+        const result = await deletePostaComposeDraft(DATA_DIR, tenantId, draftId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Taslak silme hatası' }));
       }
       return;
     }

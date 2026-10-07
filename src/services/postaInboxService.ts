@@ -17,9 +17,34 @@ export type PostaInboxItem = {
   amount?: number | null;
   dueDate?: string | null;
   matched?: boolean;
+  starred?: boolean;
+  spam?: boolean;
+  trashed?: boolean;
+  snoozedUntil?: string | null;
+  snoozeActive?: boolean;
 };
 
-export async function fetchPostaInbox(folder: 'gelen' | 'fatura' | 'arsiv' = 'gelen', limit = 60) {
+export type PostaInboxFolder =
+  | 'gelen'
+  | 'tumu'
+  | 'yildizli'
+  | 'ertelenen'
+  | 'spam'
+  | 'arsiv'
+  | 'cop'
+  | 'fatura';
+
+export type PostaComposeDraft = {
+  id: string;
+  to: string;
+  subject: string;
+  body: string;
+  inReplyTo?: string | null;
+  references?: string | null;
+  updatedAt: string;
+};
+
+export async function fetchPostaInbox(folder: PostaInboxFolder = 'gelen', limit = 80) {
   const res = await fetch(`/api/posta/inbox?folder=${folder}&limit=${limit}`);
   return res.json() as Promise<{
     ok: boolean;
@@ -68,4 +93,38 @@ export async function fetchPostaTemplates() {
 export async function fetchComposeRecipientHints() {
   const res = await fetch('/api/posta/compose-hints?limit=50');
   return res.json() as Promise<{ ok: boolean; emails?: string[] }>;
+}
+
+export async function patchPostaInboxFlags(payload: {
+  id: string;
+  starred?: boolean;
+  spam?: boolean;
+  trashed?: boolean;
+  snoozedUntil?: string | null;
+}) {
+  const res = await fetch('/api/posta/inbox/flags', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return res.json() as Promise<{ ok: boolean; error?: string; flags?: Record<string, unknown> }>;
+}
+
+export async function fetchPostaComposeDrafts() {
+  const res = await fetch('/api/posta/drafts');
+  return res.json() as Promise<{ ok: boolean; drafts?: PostaComposeDraft[]; error?: string }>;
+}
+
+export async function savePostaComposeDraft(draft: Partial<PostaComposeDraft> & { to?: string; subject?: string; body?: string }) {
+  const res = await fetch('/api/posta/drafts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+  });
+  return res.json() as Promise<{ ok: boolean; draft?: PostaComposeDraft; error?: string }>;
+}
+
+export async function deletePostaComposeDraft(id: string) {
+  const res = await fetch(`/api/posta/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return res.json() as Promise<{ ok: boolean; error?: string }>;
 }

@@ -15404,6 +15404,32 @@ input {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 .posta-hub-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.posta-hub-view-switch { display: flex; gap: 6px; flex-wrap: wrap; }
+.posta-hub-view-switch button {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.posta-hub-view-switch button.active { background: var(--greenleaf-dark); color: #fff; border-color: var(--greenleaf-dark); }
+.posta-hub-folder-group {
+  margin: 10px 0 4px;
+  padding: 0 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.posta-hub-shell--tam { grid-template-columns: 200px minmax(280px, 1fr) minmax(360px, 1.2fr); }
+.posta-hub-shell--sohbet { grid-template-columns: 180px 1fr 1.1fr; }
+.posta-hub-compose-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.posta-hub-contacts-search { padding: 8px 12px; }
+.posta-hub-contacts-search input { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
+.posta-hub-calendar-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.posta-hub-calendar-row strong { display: block; }
+.posta-hub-draft-detail { padding: 16px; }
 .cart-crm-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .cart-crm-input {
   flex: 1;

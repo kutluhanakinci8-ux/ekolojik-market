@@ -11,8 +11,11 @@ import { listContactMessages, markContactMessageRead, archiveContactMessage } fr
 import { getEkolojikImapConfig, isEkolojikImapConfigured } from './ekolojikMailConfig.mjs';
 import { countStaffUnreadMessagingThreads } from './messaging/store.mjs';
 import { persistImapAttachments, readPostaInboxAttachment } from './postaInboxAttachments.mjs';
+import { applyPostaFlagsToItem, getPostaInboxFlagsMap, patchPostaInboxFlags } from './postaInboxFlags.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
+export { patchPostaInboxFlags };
 
 const SUBJECT_LABELS = {
   genel: 'Genel',
@@ -27,30 +30,45 @@ function subjectLabel(code) {
   return SUBJECT_LABELS[key] ?? code ?? 'Genel';
 }
 
+/** UTF-8 metin yanlışlıkla latin1 okunduysa (MÃ¼Återi) düzelt. */
+function repairUtf8Mojibake(str) {
+  const s = String(str ?? '');
+  if (!s || !/[ÃÄÅÆØ]/.test(s)) return s;
+  try {
+    const fixed = Buffer.from(s, 'latin1').toString('utf8');
+    if (fixed !== s && !/[ÃÄÅÆØ]/.test(fixed)) return fixed;
+    return s;
+  } catch {
+    return s;
+  }
+}
+
 function isUnread(row) {
   return !row.readAt;
 }
 
 function toUnifiedContact(row) {
+  const name = repairUtf8Mojibake(row.name);
+  const message = repairUtf8Mojibake(row.message);
   return {
     id: `contact-${row.id}`,
     kind: 'contact',
     sourceId: row.id,
     at: row.createdAt,
     from: row.email,
-    fromName: row.name,
+    fromName: name,
     to: null,
     subject: subjectLabel(row.subject),
-    preview: row.message,
+    preview: message,
     unread: isUnread(row),
     archived: Boolean(row.archivedAt),
     bodyText: [
-      `Ad: ${row.name}`,
+      `Ad: ${name}`,
       `E-posta: ${row.email}`,
       row.phone ? `Telefon: ${row.phone}` : null,
       `Konu: ${subjectLabel(row.subject)}`,
       '',
-      row.message,
+      message,
     ]
       .filter(Boolean)
       .join('\n'),
@@ -168,8 +186,49 @@ export async function syncPostaInboxFromImap(dataDir, tenantId = 'main', { maxMe
   };
 }
 
+function buildGelenPool(contacts, imap, billRows) {
+  const matchedBillKeys = new Set(
+    billRows.filter((b) => b.matched && !b.archived).map((b) => messageDedupeKey(b.raw)),
+  );
+  return [
+    ...contacts.filter((i) => !i.archived),
+    ...imap.filter((i) => !i.archived),
+  ].filter((row) => {
+    if (row.kind !== 'imap') return true;
+    return !matchedBillKeys.has(messageDedupeKey(row.raw));
+  });
+}
+
+function filterByMailboxFolder(items, folder) {
+  const f = String(folder || 'gelen').toLowerCase();
+  if (f === 'cop') {
+    return items.filter((i) => i.trashed);
+  }
+  if (f === 'spam') {
+    return items.filter((i) => i.spam && !i.trashed);
+  }
+  if (f === 'arsiv') {
+    return items.filter((i) => i.archived && !i.trashed && !i.spam);
+  }
+  if (f === 'yildizli') {
+    return items.filter((i) => i.starred && !i.trashed && !i.spam);
+  }
+  if (f === 'ertelenen') {
+    return items.filter((i) => i.snoozeActive && !i.trashed && !i.spam);
+  }
+  if (f === 'fatura') {
+    return items.filter((i) => i.kind === 'bill' && !i.archived && !i.trashed && !i.spam);
+  }
+  if (f === 'tumu') {
+    return items.filter((i) => !i.trashed && !i.spam && !i.archived && !i.snoozeActive);
+  }
+  // gelen (varsayılan)
+  return items.filter((i) => !i.trashed && !i.spam && !i.archived && !i.snoozeActive);
+}
+
 export async function listUnifiedPostaInbox(dataDir, tenantId, { folder = 'gelen', limit = 60 } = {}) {
   const max = Math.min(Math.max(Number(limit) || 60, 1), 200);
+  const flagsMap = await getPostaInboxFlagsMap(dataDir, tenantId);
   const contacts = (await listContactMessages(dataDir, 200)).map(toUnifiedContact);
   const imap = (await listPostaImapMessages(dataDir, tenantId, { limit: 200 })).map(toUnifiedImap);
   const billResult = await listBillEmailInbox(dataDir, tenantId, { limit: 200 });
@@ -178,23 +237,26 @@ export async function listUnifiedPostaInbox(dataDir, tenantId, { folder = 'gelen
     return toUnifiedBill(withFlags);
   });
 
-  let items = [];
-  if (folder === 'fatura') {
-    items = billRows.filter((b) => !b.archived && (b.matched || b.raw?.sourceId));
-  } else if (folder === 'arsiv') {
-    items = [...contacts, ...imap, ...billRows].filter((i) => i.archived);
+  let base = [];
+  const f = String(folder || 'gelen').toLowerCase();
+  if (f === 'fatura') {
+    base = billRows.filter((b) => b.matched || b.raw?.sourceId);
+  } else if (f === 'arsiv') {
+    base = [...contacts, ...imap, ...billRows].filter((i) => i.archived);
+  } else if (f === 'cop' || f === 'spam' || f === 'yildizli' || f === 'ertelenen' || f === 'tumu') {
+    base = [
+      ...contacts,
+      ...imap,
+      ...billRows.filter((b) => b.matched || b.raw?.sourceId),
+    ];
   } else {
-    const matchedBillKeys = new Set(
-      billRows.filter((b) => b.matched && !b.archived).map((b) => messageDedupeKey(b.raw)),
-    );
-    items = [
-      ...contacts.filter((i) => !i.archived),
-      ...imap.filter((i) => !i.archived),
-    ].filter((row) => {
-      if (row.kind !== 'imap') return true;
-      return !matchedBillKeys.has(messageDedupeKey(row.raw));
-    });
+    base = buildGelenPool(contacts, imap, billRows);
   }
+
+  const items = filterByMailboxFolder(
+    base.map((item) => applyPostaFlagsToItem(item, flagsMap)),
+    folder,
+  );
 
   items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   return { ok: true, folder, items: items.slice(0, max), imapConfigured: isEkolojikImapConfigured() };
