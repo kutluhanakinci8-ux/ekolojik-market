@@ -53,15 +53,64 @@ function preview(text, max = 120) {
   return one.length <= max ? one : `${one.slice(0, max - 1)}…`;
 }
 
-export async function listMessagingThreads(dataDir, tenantId, { limit = 50, customerId } = {}) {
+function threadMatchesQuery(thread, q) {
+  if (!q) return true;
+  const hay = `${thread.subject} ${thread.customerName} ${thread.lastMessagePreview} ${thread.customerEmail ?? ''}`.toLowerCase();
+  return hay.includes(q);
+}
+
+export async function listMessagingThreads(
+  dataDir,
+  tenantId,
+  { limit = 50, customerId, q, includeArchived = false } = {},
+) {
   const root = await ensureRoot(dataDir, tenantId);
   let threads = await readThreads(root);
+  const query = String(q ?? '').trim().toLowerCase();
   if (customerId) {
     threads = threads.filter((t) => t.customerId === customerId);
   }
-  threads.sort((a, b) => Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt));
+  if (!includeArchived) {
+    threads = threads.filter((t) => !t.archived);
+  }
+  if (query) {
+    threads = threads.filter((t) => threadMatchesQuery(t, query));
+  }
+  threads.sort((a, b) => {
+    const pinA = a.pinned ? 1 : 0;
+    const pinB = b.pinned ? 1 : 0;
+    if (pinB !== pinA) return pinB - pinA;
+    return Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt);
+  });
   const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
   return { ok: true, threads: threads.slice(0, max) };
+}
+
+export async function patchMessagingThread(dataDir, tenantId, threadId, patch) {
+  const root = await ensureRoot(dataDir, tenantId);
+  const threads = await readThreads(root);
+  const idx = threads.findIndex((t) => t.id === threadId);
+  if (idx < 0) return { ok: false, error: 'Thread bulunamadı' };
+  const row = threads[idx];
+  if (patch.pinned != null) row.pinned = Boolean(patch.pinned);
+  if (patch.archived != null) row.archived = Boolean(patch.archived);
+  if (patch.muted != null) row.muted = Boolean(patch.muted);
+  row.updatedAt = new Date().toISOString();
+  threads[idx] = row;
+  await writeThreads(root, threads);
+  return { ok: true, thread: row };
+}
+
+export async function searchMessagingInThread(dataDir, tenantId, threadId, q, { limit = 100 } = {}) {
+  const listed = await listMessagingMessages(dataDir, tenantId, threadId, { limit: 500 });
+  if (!listed.ok) return listed;
+  const query = String(q ?? '').trim().toLowerCase();
+  if (!query) return listed;
+  const messages = (listed.messages ?? []).filter((m) =>
+    `${m.bodyText} ${m.authorName}`.toLowerCase().includes(query),
+  );
+  const max = Math.min(Math.max(Number(limit) || 100, 1), 500);
+  return { ok: true, thread: listed.thread, messages: messages.slice(-max), query };
 }
 
 export async function getMessagingThread(dataDir, tenantId, threadId) {
@@ -201,6 +250,7 @@ export async function countStaffUnreadMessagingThreads(dataDir, tenantId = 'main
   }
   let count = 0;
   for (const t of threads) {
+    if (t.archived) continue;
     if (t.lastMessageDirection !== 'customer') continue;
     const readAt = t.staffLastReadAt ? Date.parse(t.staffLastReadAt) : 0;
     const lastAt = Date.parse(t.lastMessageAt || t.updatedAt || 0);

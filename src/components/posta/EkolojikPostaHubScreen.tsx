@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Store } from '../../store/useStore';
 import {
   fetchEmailHealth,
@@ -30,6 +30,7 @@ import {
   fetchMessagingMessages,
   fetchMessagingThreads,
   markMessagingThreadRead,
+  patchMessagingThreadFlags,
   postMessagingMessage,
   type MessagingMessage,
   type MessagingThread,
@@ -100,6 +101,23 @@ const KIND_LABEL: Record<string, string> = {
   outbox: 'Outbox',
   bill: 'Fatura',
 };
+
+function playHubMessagePing() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.value = 0.04;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+    window.setTimeout(() => void ctx.close(), 200);
+  } catch {
+    /* sessiz */
+  }
+}
 
 function billDueToIso(due?: string | null): string {
   if (!due?.trim()) return new Date().toISOString().slice(0, 10);
@@ -173,6 +191,10 @@ export function EkolojikPostaHubScreen({
   const [newCalTitle, setNewCalTitle] = useState('');
   const [newCalDate, setNewCalDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [newCalNotes, setNewCalNotes] = useState('');
+  const [threadSearchQ, setThreadSearchQ] = useState('');
+  const [threadShowArchived, setThreadShowArchived] = useState(false);
+  const [msgSearchQ, setMsgSearchQ] = useState('');
+  const prevThreadsRef = useRef<MessagingThread[]>([]);
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
 
@@ -225,12 +247,32 @@ export function EkolojikPostaHubScreen({
   );
 
   const refreshThreads = useCallback(async () => {
-    const result = await fetchMessagingThreads({ limit: 50 });
+    const result = await fetchMessagingThreads({
+      limit: 80,
+      q: threadSearchQ.trim() || undefined,
+      includeArchived: threadShowArchived,
+    });
     if (result.ok && result.threads) {
+      let shouldPing = false;
+      for (const t of result.threads) {
+        const prev = prevThreadsRef.current.find((p) => p.id === t.id);
+        if (
+          prev &&
+          !t.muted &&
+          t.lastMessageDirection === 'customer' &&
+          t.lastMessageAt &&
+          prev.lastMessageAt !== t.lastMessageAt
+        ) {
+          shouldPing = true;
+          break;
+        }
+      }
+      if (shouldPing && folder === 'mesajlar') playHubMessagePing();
+      prevThreadsRef.current = result.threads;
       setThreads(result.threads);
       setSelectedThreadId((cur) => cur ?? result.threads![0]?.id ?? null);
     }
-  }, []);
+  }, [threadSearchQ, threadShowArchived, folder]);
 
   const refreshSent = useCallback(async () => {
     const recent = await fetchPostaSent(80);
@@ -277,6 +319,7 @@ export function EkolojikPostaHubScreen({
 
   useEffect(() => {
     if (!deepLinkCustomerId) return;
+    setHubLayout('sohbet');
     setFolder('mesajlar');
     void (async () => {
       const result = await fetchMessagingThreads({ customerId: deepLinkCustomerId, limit: 20 });
@@ -314,6 +357,10 @@ export function EkolojikPostaHubScreen({
       void refreshInbox('taslaklar');
     }
   }, [folder, refreshInbox, refreshThreads, refreshSent, refreshDrafts, searchQuery, mailListMode, listFilter]);
+
+  useEffect(() => {
+    if (folder === 'mesajlar') void refreshThreads();
+  }, [threadSearchQ, threadShowArchived, folder, refreshThreads]);
 
   useEffect(() => {
     if (folder === 'yaz') return undefined;
@@ -357,10 +404,25 @@ export function EkolojikPostaHubScreen({
       return;
     }
     void markMessagingThreadRead(selectedThreadId);
-    void fetchMessagingMessages(selectedThreadId, { limit: 200 }).then((r) => {
+    void fetchMessagingMessages(selectedThreadId, {
+      limit: 200,
+      q: msgSearchQ.trim() || undefined,
+    }).then((r) => {
       if (r.ok && r.messages) setThreadMessages(r.messages);
     });
-  }, [selectedThreadId, folder]);
+  }, [selectedThreadId, folder, msgSearchQ]);
+
+  const selectedThread = useMemo(
+    () => threads.find((t) => t.id === selectedThreadId) ?? null,
+    [threads, selectedThreadId],
+  );
+
+  const patchSelectedThread = async (flags: { pinned?: boolean; archived?: boolean; muted?: boolean }) => {
+    if (!selectedThreadId) return;
+    const result = await patchMessagingThreadFlags(selectedThreadId, flags);
+    setFlash(result.ok ? 'Güncellendi' : result.error ?? 'İşlem başarısız');
+    if (result.ok) await refreshThreads();
+  };
 
   const openConversationItem = (row: PostaListItem) => {
     if (!isPostaConversationItem(row)) return;
@@ -745,7 +807,11 @@ export function EkolojikPostaHubScreen({
 
       {flash && <p className="settings-flash">{flash}</p>}
 
-      <div className={`posta-hub-shell${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${hubLayout === 'sohbet' ? ' posta-hub-shell--sohbet' : ''}`}>
+      <div
+        className={`posta-hub-shell${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${hubLayout === 'sohbet' ? ' posta-hub-shell--sohbet' : ''}${
+          hubLayout === 'sohbet' && selectedThreadId && folder === 'mesajlar' ? ' posta-hub-shell--sohbet-open' : ''
+        }`}
+      >
         <aside className="posta-hub-folders" aria-label="Posta klasörleri">
           <button type="button" className="btn btn-primary posta-hub-compose" onClick={() => pickFolder('yaz')}>
             Yaz
@@ -851,16 +917,41 @@ export function EkolojikPostaHubScreen({
                 </div>
               )}
               {folder === 'mesajlar' && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
-                  onClick={() => {
-                    setNewThreadCustomerId(customersForMessaging[0]?.id ?? '');
-                    setShowNewThreadModal(true);
-                  }}
-                >
-                  Yeni yazışma
-                </button>
+                <div className="posta-hub-list-toolbar">
+                  <input
+                    className="posta-hub-search"
+                    type="search"
+                    placeholder="Yazışma ara…"
+                    value={threadSearchQ}
+                    onChange={(e) => setThreadSearchQ(e.target.value)}
+                  />
+                  <div className="posta-hub-filter-chips">
+                    <button
+                      type="button"
+                      className={!threadShowArchived ? 'active' : ''}
+                      onClick={() => setThreadShowArchived(false)}
+                    >
+                      Aktif
+                    </button>
+                    <button
+                      type="button"
+                      className={threadShowArchived ? 'active' : ''}
+                      onClick={() => setThreadShowArchived(true)}
+                    >
+                      Arşiv
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => {
+                      setNewThreadCustomerId(customersForMessaging[0]?.id ?? '');
+                      setShowNewThreadModal(true);
+                    }}
+                  >
+                    Yeni yazışma
+                  </button>
+                </div>
               )}
             </div>
             <ul>
@@ -1003,7 +1094,11 @@ export function EkolojikPostaHubScreen({
                       }`}
                       onClick={() => setSelectedThreadId(t.id)}
                     >
-                      <strong>{t.customerName}</strong>
+                      <strong>
+                        {t.pinned ? '📌 ' : ''}
+                        {t.muted ? '🔕 ' : ''}
+                        {t.customerName}
+                      </strong>
                       <span>{t.subject}</span>
                       <em>{t.lastMessagePreview}</em>
                     </button>
@@ -1202,9 +1297,58 @@ export function EkolojikPostaHubScreen({
           )}
 
           {folder === 'mesajlar' && selectedThreadId && (
-            <>
-              <h2>{threads.find((t) => t.id === selectedThreadId)?.subject ?? 'Mesajlar'}</h2>
-              <ul className="crm-messaging-messages">
+            <div className="posta-hub-sohbet-panel">
+              <div className="posta-hub-detail-actions">
+                <h2>{selectedThread?.subject ?? 'Mesajlar'}</h2>
+                <p className="posta-hub-detail-meta">
+                  {selectedThread?.customerName}
+                  {selectedThread?.customerEmail ? ` · ${selectedThread.customerEmail}` : ''}
+                </p>
+                <div className="posta-hub-detail-buttons">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => void patchSelectedThread({ pinned: !selectedThread?.pinned })}
+                  >
+                    {selectedThread?.pinned ? 'Sabiti kaldır' : 'Sabitle'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => void patchSelectedThread({ muted: !selectedThread?.muted })}
+                  >
+                    {selectedThread?.muted ? 'Sesi aç' : 'Sessize al'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => void patchSelectedThread({ archived: !selectedThread?.archived })}
+                  >
+                    {selectedThread?.archived ? 'Arşivden çıkar' : 'Arşivle'}
+                  </button>
+                  {selectedThread?.customerEmail && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => {
+                        setComposeTo(selectedThread.customerEmail ?? '');
+                        setComposeSubject(`${selectedThread.customerName} — ${selectedThread.subject}`);
+                        setFolder('yaz');
+                      }}
+                    >
+                      E-posta
+                    </button>
+                  )}
+                </div>
+              </div>
+              <input
+                className="posta-hub-search posta-hub-msg-search"
+                type="search"
+                placeholder="Thread içinde ara…"
+                value={msgSearchQ}
+                onChange={(e) => setMsgSearchQ(e.target.value)}
+              />
+              <ul className="crm-messaging-messages posta-hub-sohbet-messages">
                 {threadMessages.map((m) => (
                   <li key={m.id} className={`crm-msg crm-msg--${m.direction}`}>
                     <header>
@@ -1280,7 +1424,7 @@ export function EkolojikPostaHubScreen({
                   Gönder
                 </button>
               </div>
-            </>
+            </div>
           )}
 
           {folder === 'mesajlar' && !selectedThreadId && (

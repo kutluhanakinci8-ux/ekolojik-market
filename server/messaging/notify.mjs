@@ -1,5 +1,6 @@
 import { sendEkolojikMail } from '../emailOutboxProcessor.mjs';
 import { getEffectiveMailPresentation, shouldSendPostaNotification } from '../postaSettings.mjs';
+import { buildMessagingCustomerSummaryEmail } from '../mailTemplates.mjs';
 
 export function isMessagingCustomerEmailEnabled() {
   return process.env.EKOLOJIK_MESSAGING_CUSTOMER_EMAIL === '1';
@@ -8,7 +9,7 @@ export function isMessagingCustomerEmailEnabled() {
 export async function notifyOnMessagingMessage(dataDir, { thread, message }) {
   const summary = { ops: null, customer: null, opsSkipped: false, customerSkipped: false };
 
-  if (message.direction === 'customer') {
+  if (message.direction === 'customer' && !thread.muted) {
     const pres = await getEffectiveMailPresentation(dataDir);
     const opsEmail = pres.opsEmail;
     if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'messaging'))) {
@@ -34,21 +35,20 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message }) {
     }
   }
 
-  if (message.direction === 'staff' && isMessagingCustomerEmailEnabled()) {
+  if (message.direction === 'staff' && isMessagingCustomerEmailEnabled() && !thread.muted) {
     const to = thread.customerEmail?.trim();
     if (to?.includes('@')) {
+      const tpl = buildMessagingCustomerSummaryEmail({
+        customerName: thread.customerName,
+        subject: thread.subject,
+        bodyText: message.bodyText,
+        threadId: thread.id,
+      });
       summary.customer = await sendEkolojikMail(dataDir, {
         to,
-        subject: `Ekolojik Market — ${thread.subject}`,
-        body: [
-          `Sayın ${thread.customerName},`,
-          '',
-          'Size yeni bir mesaj iletildi:',
-          '',
-          message.bodyText,
-          '',
-          'Bu e-posta bilgilendirme amaçlıdır; yanıtlamak için mağazamızla iletişime geçebilirsiniz.',
-        ].join('\n'),
+        subject: tpl.subject,
+        body: tpl.text,
+        html: tpl.html,
         idempotencyKey: `messaging:customer:${message.id}`,
         source: 'messaging-customer',
       });

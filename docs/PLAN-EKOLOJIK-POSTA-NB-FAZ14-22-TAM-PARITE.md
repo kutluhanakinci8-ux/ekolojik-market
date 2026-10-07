@@ -29,8 +29,8 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 | Yanıtla / tümünü yanıtla / ilet | ✅ | ✅ Faz 16 | — |
 | Kişiler defteri | CardDAV benzeri | ✅ Faz 17 | — |
 | Takvim | Posta içi | ✅ Faz 17 | — |
-| Müşteri mesajları hub | Tam sohbet UX | Thread+ek | **18** |
-| Sohbet tam ekran | ✅ | Sekme var, UX kısmi | **18** |
+| Müşteri mesajları hub | Tam sohbet UX | ✅ Faz 18 | — |
+| Sohbet tam ekran | ✅ | ✅ Faz 18 | — |
 | Depolama göstergesi | ✅ | Yok | **19** |
 | Toplu işlem | Seç + işlem | Yok | **19** |
 | Bildirim matrisi | Olay×kanal | JSON settings (Faz 11) | **18–19** |
@@ -107,7 +107,7 @@ Sadece `git checkout` / repo içi `npm run build` **canlıyı güncellemez**.
 
 ---
 
-## Faz 18 — Mesajlaşma (Sohbet) tam parite
+## Faz 18 — Mesajlaşma (Sohbet) tam parite ✅ (2026-10-07)
 
 **Amaç:** NB `/messaging` hub deneyimi.
 

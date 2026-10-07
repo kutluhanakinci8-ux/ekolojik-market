@@ -52,3 +52,37 @@ export function listMailTemplates() {
 export function getMailTemplate(id) {
   return TEMPLATES.find((t) => t.id === id) ?? null;
 }
+
+/** Müşteriye “yazışmanız var” özet e-postası (Faz 18) */
+export function buildMessagingCustomerSummaryEmail({ customerName, subject, bodyText, threadId }) {
+  const name = String(customerName ?? 'Müşterimiz').trim();
+  const subj = String(subject ?? 'Yazışma').trim();
+  const preview = String(bodyText ?? '').trim().slice(0, 500);
+  const text = [
+    `Sayın ${name},`,
+    '',
+    'Ekolojik Market ile olan yazışmanızda yeni bir mesaj var.',
+    '',
+    `Konu: ${subj}`,
+    '',
+    preview,
+    '',
+    'Detay için mağazamızla iletişime geçebilir veya size gönderilen kanaldan yanıtlayabilirsiniz.',
+    '',
+    `Referans: ${threadId ?? '—'}`,
+    '',
+    '— Ekolojik Market',
+  ].join('\n');
+  const html = `<div style="font-family:sans-serif;font-size:14px;line-height:1.5">
+<p>Sayın ${name},</p>
+<p><strong>Yazışmanızda yeni mesaj var.</strong></p>
+<p>Konu: ${subj}</p>
+<blockquote style="border-left:3px solid #2d6a4f;padding-left:12px;color:#333">${preview.replace(/\n/g, '<br/>')}</blockquote>
+<p style="color:#666;font-size:12px">Referans: ${threadId ?? '—'}</p>
+</div>`;
+  return {
+    subject: `Ekolojik Market — yazışmanız var: ${subj}`,
+    text,
+    html,
+  };
+}

@@ -55,6 +55,8 @@ import {
   listMessagingMessages,
   appendMessagingMessage,
   markMessagingThreadStaffRead,
+  patchMessagingThread,
+  searchMessagingInThread,
 } from './server/messaging/store.mjs';
 import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
@@ -1126,8 +1128,10 @@ const server = createServer(async (req, res) => {
       const tenantId = resolveTenantId(url);
       const customerId = url.searchParams.get('customerId')?.trim() || undefined;
       const limit = Number(url.searchParams.get('limit') || 50);
+      const q = url.searchParams.get('q')?.trim() || undefined;
+      const includeArchived = url.searchParams.get('includeArchived') === '1';
       try {
-        const result = await listMessagingThreads(DATA_DIR, tenantId, { limit, customerId });
+        const result = await listMessagingThreads(DATA_DIR, tenantId, { limit, customerId, q, includeArchived });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -1182,10 +1186,30 @@ const server = createServer(async (req, res) => {
         return;
       }
 
+      if (sub === 'flags' && threadId && req.method === 'POST') {
+        const data = await readRequestBody(req);
+        try {
+          const result = await patchMessagingThread(DATA_DIR, tenantId, threadId, {
+            pinned: data?.pinned,
+            archived: data?.archived,
+            muted: data?.muted,
+          });
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bayrak hatası' }));
+        }
+        return;
+      }
+
       if (sub === 'messages' && threadId && req.method === 'GET') {
         const limit = Number(url.searchParams.get('limit') || 100);
+        const q = url.searchParams.get('q')?.trim() || undefined;
         try {
-          const result = await listMessagingMessages(DATA_DIR, tenantId, threadId, { limit });
+          const result = q
+            ? await searchMessagingInThread(DATA_DIR, tenantId, threadId, q, { limit })
+            : await listMessagingMessages(DATA_DIR, tenantId, threadId, { limit });
           res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));
         } catch (error) {
