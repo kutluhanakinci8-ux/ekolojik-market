@@ -76,6 +76,7 @@ for path in \
   "/api/posta/outbox/analytics?days=7" \
   "/api/posta/deliverability" \
   "/api/posta/notifications/matrix" \
+  "/api/posta/compose/rte-capabilities" \
   "/api/posta/drafts" \
   "/api/posta/contacts?limit=5" \
   "/api/posta/calendar" \

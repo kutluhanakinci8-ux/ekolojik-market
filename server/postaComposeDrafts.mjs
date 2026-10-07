@@ -43,6 +43,7 @@ export async function upsertPostaComposeDraft(dataDir, tenantId, payload) {
     bcc: String(payload.bcc ?? '').trim(),
     subject,
     body,
+    bodyFormat: payload.bodyFormat === 'html' ? 'html' : 'markdown',
     inReplyTo: payload.inReplyTo ?? null,
     references: payload.references ?? null,
     updatedAt: now,

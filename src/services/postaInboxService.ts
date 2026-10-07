@@ -79,6 +79,7 @@ export type PostaComposeDraft = {
   bcc?: string;
   subject: string;
   body: string;
+  bodyFormat?: 'markdown' | 'html';
   inReplyTo?: string | null;
   references?: string | null;
   updatedAt: string;

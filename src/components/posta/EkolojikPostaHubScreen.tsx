@@ -48,6 +48,9 @@ import {
   buildReplySubject,
   mergeReferences,
   type OutboundAttachment,
+  type PostaComposeBodyFormat,
+  sanitizePostaComposeHtmlClient,
+  stripHtmlToPlainText,
 } from '../../utils/postaComposeClient';
 import {
   deletePostaContact,
@@ -161,6 +164,14 @@ export function EkolojikPostaHubScreen({
   const [composeBcc, setComposeBcc] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeBodyFormat, setComposeBodyFormat] = useState<PostaComposeBodyFormat>(() => {
+    try {
+      const saved = localStorage.getItem('ekolojik-posta-compose-format');
+      return saved === 'markdown' ? 'markdown' : 'html';
+    } catch {
+      return 'html';
+    }
+  });
   const [composeAttachments, setComposeAttachments] = useState<OutboundAttachment[]>([]);
   const [mailSignatureHtml, setMailSignatureHtml] = useState<string | null>(null);
   const [ourMailAddresses, setOurMailAddresses] = useState<string[]>([]);
@@ -608,12 +619,16 @@ export function EkolojikPostaHubScreen({
   const sendCompose = async () => {
     setLoading(true);
     try {
+      const rich = composeBodyFormat === 'html';
+      const htmlPayload = rich ? sanitizePostaComposeHtmlClient(composeBody) : undefined;
+      const plainBody = rich ? stripHtmlToPlainText(htmlPayload ?? composeBody) : composeBody.trim();
       const result = await sendEmailTest({
         to: composeTo.trim(),
         cc: composeCc.trim() || undefined,
         bcc: composeBcc.trim() || undefined,
         subject: composeSubject.trim() || 'Ekolojik Market',
-        body: composeBody.trim(),
+        body: plainBody || ' ',
+        html: htmlPayload || undefined,
         inReplyTo: composeReply?.inReplyTo,
         references: composeReply?.references,
         attachments: composeAttachments.length ? composeAttachments : undefined,
@@ -731,6 +746,7 @@ export function EkolojikPostaHubScreen({
     setComposeBcc(draft.bcc ?? '');
     setComposeSubject(draft.subject);
     setComposeBody(draft.body);
+    setComposeBodyFormat(draft.bodyFormat === 'html' ? 'html' : 'markdown');
     setComposeAttachments([]);
     setComposeDraftId(draft.id);
     setComposeReply(
@@ -748,6 +764,7 @@ export function EkolojikPostaHubScreen({
         bcc: composeBcc,
         subject: composeSubject,
         body: composeBody,
+        bodyFormat: composeBodyFormat,
         inReplyTo: composeReply?.inReplyTo ?? null,
         references: composeReply?.references ?? null,
       });
@@ -759,7 +776,17 @@ export function EkolojikPostaHubScreen({
         setFlash(result.error ?? 'Taslak kaydedilemedi');
       }
     },
-    [composeDraftId, composeTo, composeCc, composeBcc, composeSubject, composeBody, composeReply, refreshDrafts],
+    [
+      composeDraftId,
+      composeTo,
+      composeCc,
+      composeBcc,
+      composeSubject,
+      composeBody,
+      composeBodyFormat,
+      composeReply,
+      refreshDrafts,
+    ],
   );
 
   const selectedContact = useMemo(
@@ -1354,6 +1381,7 @@ export function EkolojikPostaHubScreen({
               composeBcc={composeBcc}
               composeSubject={composeSubject}
               composeBody={composeBody}
+              bodyFormat={composeBodyFormat}
               attachments={composeAttachments}
               signaturePreviewHtml={mailSignatureHtml}
               onChange={(patch) => {
@@ -1362,6 +1390,14 @@ export function EkolojikPostaHubScreen({
                 if (patch.bcc !== undefined) setComposeBcc(patch.bcc);
                 if (patch.subject !== undefined) setComposeSubject(patch.subject);
                 if (patch.body !== undefined) setComposeBody(patch.body);
+                if (patch.bodyFormat !== undefined) {
+                  setComposeBodyFormat(patch.bodyFormat);
+                  try {
+                    localStorage.setItem('ekolojik-posta-compose-format', patch.bodyFormat);
+                  } catch {
+                    /* ignore */
+                  }
+                }
                 if (patch.attachments !== undefined) setComposeAttachments(patch.attachments);
               }}
               onSend={() => void sendCompose()}

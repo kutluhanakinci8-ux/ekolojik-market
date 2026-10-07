@@ -15383,6 +15383,28 @@ input {
 .posta-hub-sent-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .posta-hub-compose-form { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
 .posta-compose-toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+.posta-compose-format-toggle { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.posta-compose-rte {
+  min-height: 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #fff;
+}
+.posta-compose-rte:empty::before,
+.posta-compose-rte[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted, #94a3b8);
+}
+.posta-compose-rte blockquote {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border, #cbd5e1);
+  color: var(--text-muted, #64748b);
+}
+.posta-compose-html-preview blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid #cbd5e1; }
 .posta-hub-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 12px 0; flex-wrap: wrap; }
 .posta-hub-list-head .posta-hub-list-title { margin: 0; }
 .posta-hub-modal-backdrop {
