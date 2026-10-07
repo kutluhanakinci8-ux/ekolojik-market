@@ -82,6 +82,22 @@ import {
 import { listMailTemplates } from './server/mailTemplates.mjs';
 import { formatPostaComposeBody } from './server/postaComposeFormat.mjs';
 import { validateOutboundAttachments } from './server/postaComposeActions.mjs';
+import {
+  listPostaContacts,
+  upsertPostaContact,
+  deletePostaContact,
+  contactsToVcard,
+  parseVcardImport,
+  parseCsvContactsImport,
+  importPostaContacts,
+} from './server/postaContacts.mjs';
+import {
+  listPostaCalendar,
+  upsertPostaCalendarEvent,
+  deletePostaCalendarEvent,
+  createCalendarEventFromMail,
+  syncPaymentRemindersSnapshot,
+} from './server/postaCalendar.mjs';
 let handleAsatProxy = null;
 let ASAT_PROXY_PREFIX = '/asat-proxy';
 try {
@@ -648,6 +664,155 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Taslak kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const q = url.searchParams.get('q') ?? '';
+      const limit = Number(url.searchParams.get('limit') || 120);
+      try {
+        const result = await listPostaContacts(DATA_DIR, tenantId, { q, limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kişi listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaContact(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kişi kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts/import' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const format = String(data?.format ?? 'vcf').toLowerCase();
+      const text = String(data?.text ?? '');
+      try {
+        const rows = format === 'csv' ? parseCsvContactsImport(text) : parseVcardImport(text);
+        const result = await importPostaContacts(DATA_DIR, tenantId, rows);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İçe aktarma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts/export.vcf' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const listed = await listPostaContacts(DATA_DIR, tenantId, { limit: 500 });
+        const body = contactsToVcard(listed.contacts ?? []);
+        res.writeHead(200, {
+          'Content-Type': 'text/vcard; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-posta-contacts.vcf"',
+        });
+        res.end(body);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Dışa aktarma hatası' }));
+      }
+      return;
+    }
+
+    const contactDeleteMatch = pathname.match(/^\/api\/posta\/contacts\/([^/]+)$/);
+    if (contactDeleteMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const contactId = decodeURIComponent(contactDeleteMatch[1]);
+      try {
+        const result = await deletePostaContact(DATA_DIR, tenantId, contactId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kişi silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 120);
+      try {
+        const result = await listPostaCalendar(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaCalendarEvent(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/sync-payments' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await syncPaymentRemindersSnapshot(DATA_DIR, tenantId, data?.reminders ?? []);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ödeme senkron hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/from-mail' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await createCalendarEventFromMail(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim mail hatası' }));
+      }
+      return;
+    }
+
+    const calendarDeleteMatch = pathname.match(/^\/api\/posta\/calendar\/([^/]+)$/);
+    if (calendarDeleteMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const eventId = decodeURIComponent(calendarDeleteMatch[1]);
+      try {
+        const result = await deletePostaCalendarEvent(DATA_DIR, tenantId, eventId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim silme hatası' }));
       }
       return;
     }

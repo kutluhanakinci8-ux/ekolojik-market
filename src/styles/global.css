@@ -15500,6 +15500,10 @@ input {
 .posta-compose-autosave-note { font-size: 12px; color: var(--muted, #64748b); margin-right: auto; }
 .posta-compose-attach-total { font-size: 12px; color: var(--muted, #64748b); }
 .posta-compose-toggle-cc { align-self: flex-start; }
+.posta-hub-subtitle { margin: 16px 0 8px; font-size: 14px; }
+.posta-hub-contacts-detail,
+.posta-hub-calendar-detail { max-width: 520px; display: flex; flex-direction: column; gap: 8px; }
+.posta-hub-file-btn { cursor: pointer; display: inline-flex; align-items: center; }
 .posta-hub-contacts-search { padding: 8px 12px; }
 .posta-hub-contacts-search input { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
 .posta-hub-calendar-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
