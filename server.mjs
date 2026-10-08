@@ -87,6 +87,12 @@ import {
   getMessagingPublicConfigHub,
   saveMessagingPublicConfig,
 } from './server/messaging/publicConfig.mjs';
+import {
+  getTenantMailConfigHub,
+  getTenantImapConfig,
+  isTenantImapConfigured,
+  saveTenantMailConfig,
+} from './server/tenantMailConfig.mjs';
 import { getPostaJmapLiteSession, queryPostaJmapLiteMailbox } from './server/postaJmapLite.mjs';
 import {
   deletePostaCalDavLiteEvent,
@@ -1599,12 +1605,13 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/posta/imap/health' && req.method === 'GET') {
-      if (!isEkolojikImapConfigured()) {
+      const tenantId = resolveTenantId(url);
+      if (!(await isTenantImapConfigured(DATA_DIR, tenantId))) {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ ok: true, imapConfigured: false, imapVerified: false }));
+        res.end(JSON.stringify({ ok: true, imapConfigured: false, imapVerified: false, tenantId }));
         return;
       }
-      const cfg = getEkolojikImapConfig();
+      const cfg = await getTenantImapConfig(DATA_DIR, tenantId);
       try {
         const verify = await verifyImapMailbox(cfg);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1615,6 +1622,7 @@ const server = createServer(async (req, res) => {
             imapVerified: verify.ok,
             imapHost: cfg.imapHost,
             imapUser: cfg.imapUser,
+            tenantId,
             mailboxCount: verify.mailboxCount ?? null,
             unseenCount: verify.unseenCount ?? null,
             message: verify.message ?? null,
@@ -1629,9 +1637,38 @@ const server = createServer(async (req, res) => {
             imapVerified: false,
             imapHost: cfg.imapHost,
             imapUser: cfg.imapUser,
+            tenantId,
             error: error instanceof Error ? error.message : 'IMAP hatası',
           }),
         );
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/tenant-mail' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const hub = await getTenantMailConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Tenant mail okunamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/tenant-mail' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        await saveTenantMailConfig(DATA_DIR, tenantId, data ?? {});
+        const hub = await getTenantMailConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Tenant mail kaydedilemedi' }));
       }
       return;
     }

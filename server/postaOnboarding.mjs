@@ -1,4 +1,5 @@
-import { isEkolojikImapConfigured, isEkolojikSmtpConfigured } from './ekolojikMailConfig.mjs';
+import { isEkolojikSmtpConfigured } from './ekolojikMailConfig.mjs';
+import { isTenantImapConfigured, getTenantSmtpMailConfig } from './tenantMailConfig.mjs';
 import { verifyEkolojikSmtp } from './ekolojikSmtp.mjs';
 import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
 
@@ -50,14 +51,16 @@ export function ensurePostaOnboarding(settings, registrationEmail) {
   };
 }
 
-async function buildMailHealthSummary() {
-  const smtpConfigured = isEkolojikSmtpConfigured();
+async function buildMailHealthSummary(dataDir, tenantId) {
+  const mailCfg = await getTenantSmtpMailConfig(dataDir, tenantId);
+  const smtpConfigured = Boolean(mailCfg.smtpHost && mailCfg.from?.includes('@'));
   const verify = smtpConfigured ? await verifyEkolojikSmtp() : { ok: false, error: 'SMTP yapılandırılmadı' };
+  const imapConfigured = await isTenantImapConfigured(dataDir, tenantId);
   return {
     smtpConfigured,
     smtpVerified: Boolean(verify.ok),
     smtpError: verify.error ?? null,
-    imapConfigured: isEkolojikImapConfigured(),
+    imapConfigured,
   };
 }
 
@@ -69,7 +72,7 @@ function findPrimaryAdmin(users) {
 export async function getPostaOnboardingHub(dataDir, tenantId, store) {
   const settings = store?.settings ?? {};
   const onboarding = ensurePostaOnboarding(settings);
-  const mailHealth = await buildMailHealthSummary();
+  const mailHealth = await buildMailHealthSummary(dataDir, tenantId);
   const publicApiConfigured = await isMessagingPublicApiConfigured(dataDir, tenantId);
   const users = Array.isArray(store?.users) ? store.users : [];
   const primaryAdmin = findPrimaryAdmin(users);

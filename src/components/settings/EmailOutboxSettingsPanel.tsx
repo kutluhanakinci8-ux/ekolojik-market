@@ -37,6 +37,11 @@ import {
   seedPostaOnboardingAliasRules,
 } from '../../services/postaOnboardingService';
 import { signalPostaOnboardingOpen } from '../../storage/postaOnboardingSession';
+import {
+  fetchTenantMailConfig,
+  saveTenantMailConfig,
+  type TenantMailConfigHub,
+} from '../../services/postaTenantMailService';
 
 type OutboxRow = {
   id: string;
@@ -84,9 +89,14 @@ export function EmailOutboxSettingsPanel() {
   const [notifyMatrixHub, setNotifyMatrixHub] = useState<PostaNotificationMatrixHub | null>(null);
   const [liveMetrics, setLiveMetrics] = useState<PostaLiveMetrics | null>(null);
   const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
+  const [tenantMail, setTenantMail] = useState<TenantMailConfigHub | null>(null);
+  const [tenantImapHost, setTenantImapHost] = useState('');
+  const [tenantImapUser, setTenantImapUser] = useState('');
+  const [tenantImapPass, setTenantImapPass] = useState('');
+  const [tenantUsePlatformEnv, setTenantUsePlatformEnv] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub] =
+    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub] =
       await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
@@ -100,6 +110,7 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaDeliverability(),
       fetchPostaNotificationsMatrix(),
       fetchPostaOnboardingHub(),
+      fetchTenantMailConfig(),
     ]);
     setHealth(h);
     setIsolation(iso);
@@ -117,6 +128,13 @@ export function EmailOutboxSettingsPanel() {
     if (rules.ok && rules.rules) setPostaRules(rules.rules);
     if (deliv.ok) setDeliverability(deliv);
     setOnboardingStatus(onboardingHub?.onboarding?.status ?? null);
+    if (tenantMailHub?.ok) {
+      setTenantMail(tenantMailHub);
+      setTenantUsePlatformEnv(tenantMailHub.usePlatformEnv);
+      setTenantImapHost(tenantMailHub.imap.host ?? '');
+      setTenantImapUser(tenantMailHub.imap.user ?? '');
+      setTenantImapPass('');
+    }
     if (notifyHub.ok) setNotifyMatrixHub(notifyHub);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
@@ -173,6 +191,66 @@ export function EmailOutboxSettingsPanel() {
       </div>
 
       {flash && <p className="settings-flash">{flash}</p>}
+
+      <article className="settings-subpanel" style={{ marginBottom: 16 }}>
+        <h3>Mağaza posta kutusu (Faz 6)</h3>
+        <p className="settings-hint">
+          Varsayılan: sunucu <code>.env</code> (EKOLOJIK_IMAP_*). İşaret kaldırılırsa bu mağaza için özel IMAP kullanılır.
+        </p>
+        <label className="settings-hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="checkbox"
+            checked={tenantUsePlatformEnv}
+            onChange={(e) => setTenantUsePlatformEnv(e.target.checked)}
+          />
+          Platform .env kullan (paylaşımlı işletme kutusu)
+        </label>
+        {!tenantUsePlatformEnv && (
+          <div style={{ display: 'grid', gap: 8, marginTop: 8, maxWidth: 480 }}>
+            <input placeholder="IMAP host" value={tenantImapHost} onChange={(e) => setTenantImapHost(e.target.value)} />
+            <input placeholder="IMAP kullanıcı" value={tenantImapUser} onChange={(e) => setTenantImapUser(e.target.value)} />
+            <input
+              type="password"
+              placeholder="IMAP şifre (boş = değişmez)"
+              value={tenantImapPass}
+              onChange={(e) => setTenantImapPass(e.target.value)}
+            />
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              const saved = await saveTenantMailConfig({
+                usePlatformEnv: tenantUsePlatformEnv,
+                imap: {
+                  host: tenantImapHost.trim(),
+                  user: tenantImapUser.trim(),
+                  pass: tenantImapPass.trim() || undefined,
+                },
+              });
+              setLoading(false);
+              if (!saved) {
+                setFlash('Mağaza posta ayarı kaydedilemedi.');
+                return;
+              }
+              setTenantMail(saved);
+              setFlash('Mağaza IMAP ayarı kaydedildi.');
+              await refresh();
+            }}
+          >
+            Mağaza IMAP kaydet
+          </button>
+        </div>
+        {tenantMail?.effective && (
+          <p className="settings-hint">
+            Etkin IMAP: {tenantMail.effective.imapConfigured ? tenantMail.effective.imapUser || '—' : 'yapılandırılmadı'}
+          </p>
+        )}
+      </article>
 
       <article className="settings-subpanel" style={{ marginBottom: 16 }}>
         <h3>Posta kurulum sihirbazı</h3>

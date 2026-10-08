@@ -238,15 +238,11 @@ Public API tenant çözümlemesi: `X-Ekolojik-Tenant` header veya embed snippet�
 
 ---
 
-## Faz 6 — İleri (multi-tenant gerçek posta kutusu)
+## Faz 6 — Tenant posta kutusu (kademeli)
 
-Şu an **Faz 0–5** tek VPS / tek `.env` ile uyumlu. İleride tenant başına SMTP/IMAP:
-
-- `data/tenants/{id}/mail-env.json` veya secrets vault
-- `getEkolojikMailConfig(tenantId)` refactor
-- Onboarding adım 1: tenant admin kendi IMAP bilgisini girer (şifreli saklama)
-
-Bu faz **ürün planı dışı**; onboarding şeması `mailHealth` adımına “tenant credentials” alt tipi eklenerek genişletilebilir.
+- [x] **6a** — `data/tenant-mail/{tenantId}.json`, `GET/PUT /api/posta/tenant-mail`, IMAP sync tenant-aware (`tenantMailConfig.mjs`)
+- [ ] **6b** — Giden SMTP / outbox tenant override (`getTenantSmtpMailConfig` → `ekolojikSmtp.mjs`)
+- [ ] **6c** — Onboarding adım 1’de tenant IMAP formu (şimdilik Ayarlar → E-posta)
 
 ---
 

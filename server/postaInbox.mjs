@@ -26,7 +26,7 @@ import {
   findPostaImapMessage,
 } from './postaInboxStore.mjs';
 import { listContactMessages, markContactMessageRead, archiveContactMessage } from './tenantAuth.mjs';
-import { getEkolojikImapConfig, isEkolojikImapConfigured } from './ekolojikMailConfig.mjs';
+import { getTenantImapConfig, isTenantImapConfigured } from './tenantMailConfig.mjs';
 import { countStaffUnreadMessagingThreads } from './messaging/store.mjs';
 import { persistImapAttachments, readPostaInboxAttachment } from './postaInboxAttachments.mjs';
 import { applyPostaFlagsToItem, getPostaInboxFlagsMap, patchPostaInboxFlags } from './postaInboxFlags.mjs';
@@ -184,10 +184,10 @@ async function ingestImapMessages(dataDir, tenantId, fetched, imapFolder) {
 }
 
 export async function syncPostaInboxFromImap(dataDir, tenantId = 'main', { maxMessages = 40 } = {}) {
-  if (!isEkolojikImapConfigured()) {
-    return { ok: false, error: 'IMAP yapılandırılmadı (EKOLOJIK_IMAP_*)' };
+  if (!(await isTenantImapConfigured(dataDir, tenantId))) {
+    return { ok: false, error: 'IMAP yapılandırılmadı (platform env veya mağaza ayarı)' };
   }
-  const config = getEkolojikImapConfig();
+  const config = await getTenantImapConfig(dataDir, tenantId);
   try {
     await verifyImapMailbox(config);
   } catch (error) {
@@ -379,7 +379,7 @@ export async function listUnifiedPostaInbox(
       folder,
       listMode: 'conversation',
       items: conversations,
-      imapConfigured: isEkolojikImapConfigured(),
+      imapConfigured: await isTenantImapConfigured(dataDir, tenantId),
     };
   }
 
@@ -388,7 +388,7 @@ export async function listUnifiedPostaInbox(
     folder,
     listMode: 'message',
     items: items.slice(0, max),
-    imapConfigured: isEkolojikImapConfigured(),
+    imapConfigured: await isTenantImapConfigured(dataDir, tenantId),
   };
 }
 
@@ -492,7 +492,7 @@ export async function listUnifiedPostaSent(dataDir, tenantId, { limit = 80 } = {
   return {
     ok: true,
     items: merged.slice(0, max),
-    imapConfigured: isEkolojikImapConfigured(),
+    imapConfigured: await isTenantImapConfigured(dataDir, tenantId),
   };
 }
 

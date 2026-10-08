@@ -4,10 +4,10 @@ import {
   isEkolojikImapWriteEnabled,
   resolvePostaImapMailboxes,
 } from './postaImapMailboxes.mjs';
-import { getEkolojikImapConfig, isEkolojikImapConfigured } from './ekolojikMailConfig.mjs';
+import { getTenantImapConfig, isTenantImapConfigured } from './tenantMailConfig.mjs';
 
 export async function applyImapMoveForFlags(dataDir, tenantId, inboxId, flagsPatch) {
-  if (!isEkolojikImapConfigured() || !isEkolojikImapWriteEnabled()) {
+  if (!(await isTenantImapConfigured(dataDir, tenantId)) || !isEkolojikImapWriteEnabled()) {
     return { ok: true, skipped: 'imap_write_disabled' };
   }
   const row = await findPostaImapMessage(dataDir, tenantId, inboxId);
@@ -15,7 +15,7 @@ export async function applyImapMoveForFlags(dataDir, tenantId, inboxId, flagsPat
     return { ok: true, skipped: 'no_imap_row' };
   }
 
-  const config = getEkolojikImapConfig();
+  const config = await getTenantImapConfig(dataDir, tenantId);
   const client = buildImapClient(config);
   await client.connect();
   let mailboxes;
