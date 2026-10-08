@@ -15590,10 +15590,60 @@ input {
   background: #fcfefb;
 }
 .posta-hub-screen--premium .posta-hub-folders {
+  --posta-folder-gutter: 16px;
+  padding: 12px var(--posta-folder-gutter) 10px;
+  gap: 6px;
+  align-items: stretch;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
+  box-sizing: border-box;
+}
+.posta-hub-screen--premium .posta-hub-folder-group {
+  margin: 10px 0 2px;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.posta-hub-screen--premium .posta-hub-folders > .posta-hub-compose {
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-sizing: border-box;
+  box-shadow: 0 8px 20px rgba(45, 145, 41, 0.22);
+}
+.posta-hub-screen--premium .posta-hub-folders > button:not(.posta-hub-compose):not(.posta-hub-sync) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-sizing: border-box;
+  text-align: left;
+}
+.posta-hub-screen--premium .posta-hub-folders > .posta-hub-sync {
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-sizing: border-box;
+  justify-content: center;
+}
+.posta-hub-screen--premium .posta-hub-folder-meta {
+  width: 100%;
+  margin-top: auto;
+  padding: 12px 14px;
+  box-sizing: border-box;
 }
 .posta-hub-screen--premium .posta-hub-list {
   display: flex;
