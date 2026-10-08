@@ -4,7 +4,9 @@
 set -euo pipefail
 
 ROOT="${1:-/var/www/market-pos}"
-REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
+SCRIPT_DIR_EARLY="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-$(cd "${SCRIPT_DIR_EARLY}/.." && pwd)}"
+export EKOLOJIK_REPO_ROOT="${REPO_ROOT}"
 ENV_FILE="${ROOT}/.env"
 BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT:-5180}}"
 
