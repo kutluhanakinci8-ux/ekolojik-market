@@ -1091,7 +1091,7 @@ export function EkolojikPostaHubScreen({
   return (
     <div
       className={`module-screen posta-hub-screen posta-hub-screen--premium${
-        hubLayout === 'sohbet' || folder === 'mesajlar' ? ' posta-hub-screen--sohbet-focus' : ''
+        hubLayout === 'sohbet' ? ' posta-hub-screen--sohbet-focus' : ''
       }`}
     >
       <header className="module-header posta-hub-header posta-hub-hero">
@@ -1265,7 +1265,7 @@ export function EkolojikPostaHubScreen({
       )}
 
       <div
-        className={`posta-hub-shell${folder === 'mesajlar' ? ' posta-yazisma-shell' : ''}${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${hubLayout === 'sohbet' ? ' posta-hub-shell--sohbet' : ''}${
+        className={`posta-hub-shell${hubLayout === 'sohbet' ? ' posta-yazisma-shell posta-hub-shell--sohbet' : ''}${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${
           hubLayout === 'sohbet' && folder === 'yaz' ? ' posta-hub-shell--sohbet-yaz' : ''
         }${
           hubLayout === 'sohbet' && selectedThreadId && folder === 'mesajlar' ? ' posta-hub-shell--sohbet-open' : ''
