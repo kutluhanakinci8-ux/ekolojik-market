@@ -51,7 +51,7 @@
 
 .posta-yazisma-threads {
   list-style: none;
-  margin: 0;
+  margin: 4px 0 0;
   padding: 0 0 6px;
   width: 100%;
   flex: 1 1 auto;
