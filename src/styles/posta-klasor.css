@@ -1,3 +1,38 @@
+/* Posta (görünüm) — klasör değişince shell/kolon sabit (3 kolon grid-column) */
+
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) {
+  width: 100%;
+  max-width: 1480px;
+  box-sizing: border-box;
+}
+
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .posta-hub-meta-strip,
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .settings-flash,
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .posta-hub-smtp-warn,
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .posta-hub-offline-hint {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-hub-folders {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-hub-list,
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-yazisma-col {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-hub-detail {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+}
+
 /* Posta klasör rail — posta-yazisma-col + posta-yazisma-thread-card (mesaj sekmesi ile birebir) */
 
 .posta-hub-screen--premium .posta-hub-folders {
