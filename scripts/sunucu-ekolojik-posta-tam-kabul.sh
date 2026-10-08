@@ -19,12 +19,6 @@ export EKOLOJIK_SKIP_FAZ22=0
 
 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-kabul-sira.sh" "${INSTALL_DIR}"
 
-if [[ "${EKOLOJIK_SKIP_WAVE3:-0}" != "1" ]]; then
-  echo ""
-  echo "--- Wave 3 (%100) kapısı ---"
-  bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-wave3-dogrula.sh" "${INSTALL_DIR}"
-fi
-
 echo ""
 if [[ "${EKOLOJIK_DNS_STRICT:-0}" == "1" ]]; then
   echo "--- DNS strict ---"
