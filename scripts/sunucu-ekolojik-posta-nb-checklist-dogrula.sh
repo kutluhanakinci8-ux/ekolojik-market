@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# NB Lerta Posta ↔ Ekolojik — otomatik API kapısı (UI satırları manuel kalır)
+# NB Lerta Posta ↔ Ekolojik — API kapısı (Faz 38+ auth; UI satırları manuel)
 set -euo pipefail
 
 ROOT="${1:-/var/www/market-pos}"
@@ -22,25 +22,59 @@ curl_ok() {
   curl -fsS "$1" | grep -q "$2"
 }
 
+http_code() {
+  curl -s -o /dev/null -w "%{http_code}" "$1"
+}
+
 echo "=== Ekolojik Posta NB checklist (API) ==="
 echo "API: ${BASE_URL}"
 echo ""
 
-check 1 "Nav badge — unread API" curl_ok "${BASE_URL}/api/posta/unread-counts" '"ok":true'
-check 2 "Hub API — inbox + templates" curl_ok "${BASE_URL}/api/posta/inbox?folder=gelen&limit=3" '"ok":true'
-check 3 "Gelen birleşik inbox" curl_ok "${BASE_URL}/api/posta/inbox?folder=gelen&limit=5" '"items"'
-check 4 "Yaz — şablon + compose hints" curl_ok "${BASE_URL}/api/posta/templates" '"templates"'
-check 4b "compose hints" curl_ok "${BASE_URL}/api/posta/compose-hints?limit=5" '"emails"'
-check 5 "Müşteri mesajları" curl_ok "${BASE_URL}/api/messaging/threads?limit=5" '"ok":true'
-check 6 "Gönderilen / outbox" curl_ok "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
-check 7 "SSE endpoint" bash -c "curl -fsS -N --max-time 5 '${BASE_URL}/api/posta/events' 2>/dev/null | head -c 8 | grep -q ."
-check 8 "Posta ayarları" curl_ok "${BASE_URL}/api/posta/settings" '"ok":true'
-check 9 "Export CSV" curl_ok "${BASE_URL}/api/posta/export/outbox.csv" 'alici;konu'
 check 10 "Bağımsız altyapı" curl_ok "${BASE_URL}/api/system/ekolojik-isolation" '"ok":true'
+check 7b "E-posta health" curl_ok "${BASE_URL}/api/email/health" '"ok":true'
+check 7 "SSE endpoint" bash -c "curl -fsS -N --max-time 5 '${BASE_URL}/api/posta/events' 2>/dev/null | head -c 8 | grep -q ."
+check 40w "Widget statik" bash -c "curl -fsS '${BASE_URL}/widget/messaging.js' | head -c 40 | grep -q ."
+check 38a "Export anonim korumalı" bash -c "[[ $(http_code '${BASE_URL}/api/posta/export/outbox.csv') == '401' ]]"
+check 38b "Messaging threads anonim korumalı" bash -c "[[ $(http_code '${BASE_URL}/api/messaging/threads?limit=1') == '401' ]]"
+check 38c "Portal session geçersiz token" bash -c "[[ $(http_code '${BASE_URL}/api/public/messaging/v1/portal/session?token=bad') == '401' ]]"
+check 50 "Public messaging capabilities" curl_ok "${BASE_URL}/api/public/messaging/v1/capabilities" '"apiPrefix"'
+
+TOKEN="${EKOLOJIK_POS_QA_TOKEN:-}"
+if [[ -z "${TOKEN}" ]]; then
+  for cred in "yonetici:yonetici123" "kasiyer:kasiyer123" "admin:admin123"; do
+    user="${cred%%:*}"
+    pass="${cred#*:}"
+    resp="$(curl -fsS -X POST "${BASE_URL}/api/auth/pos-token" \
+      -H 'Content-Type: application/json' \
+      -d "{\"username\":\"${user}\",\"password\":\"${pass}\"}" 2>/dev/null || true)"
+    if echo "${resp}" | grep -q '"token"'; then
+      TOKEN="$(echo "${resp}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
+      break
+    fi
+  done
+fi
+
+if [[ -n "${TOKEN}" ]]; then
+  AUTH_H="Authorization: Bearer ${TOKEN}"
+  check 1 "Nav badge — unread API" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/unread-counts" '"ok":true'
+  check 2 "Hub API — inbox" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=3" '"ok":true'
+  check 3 "Gelen birleşik inbox" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=5" '"items"'
+  check 4 "Yaz — şablon" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/templates" '"templates"'
+  check 4b "compose hints" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/compose-hints?limit=5" '"emails"'
+  check 5 "Müşteri mesajları" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/messaging/threads?limit=5" '"ok":true'
+  check 6 "Gönderilen / outbox" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
+  check 8 "Posta ayarları" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/settings" '"ok":true'
+  check 9 "Export CSV (auth)" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" 'alici;konu'
+  check 49 "Messaging SLA" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/messaging/sla?days=7" '"ok":true'
+  check 49b "Bot config hub" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/messaging/bot-config" '"bot"'
+else
+  echo "WARN #1-9 Oturum token yok — EKOLOJIK_POS_QA_TOKEN veya demo kullanıcı ile tam kapı çalıştırın"
+  check 1s "Unread API korumalı (anon)" bash -c "[[ $(http_code '${BASE_URL}/api/posta/unread-counts') == '401' ]]"
+fi
 
 if [[ $FAIL -eq 0 ]]; then
   echo ""
-  echo "✓ NB checklist API kapısı geçti (UI tablosu: docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md)"
+  echo "✓ NB checklist API kapısı geçti (UI: docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md)"
   exit 0
 fi
 echo ""

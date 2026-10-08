@@ -26,6 +26,7 @@ export type PostaInboxItem = {
   snoozedUntil?: string | null;
   snoozeActive?: boolean;
   imapFolder?: string;
+  serverFolder?: string;
   status?: string;
   folder?: string;
   lastError?: string | null;

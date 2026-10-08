@@ -15,6 +15,7 @@ import {
   downloadPostaContactCsv,
   downloadMessagingExportZip,
   fetchPostaDeliverability,
+  seedPostaDeliverabilityAliases,
   fetchPostaNotificationsMatrix,
   fetchPostaEngagementSummary,
   fetchPostaLiveMetrics,
@@ -42,12 +43,24 @@ import {
   saveTenantMailConfig,
   type TenantMailConfigHub,
 } from '../../services/postaTenantMailService';
+import { PostaDnsChecklist } from '../posta/PostaDnsChecklist';
 import {
   archiveFailedOutbox,
   fetchFailedOutboxList,
   requeueFailedOutbox,
   type FailedOutboxRow,
 } from '../../services/postaOutboxOpsService';
+import {
+  fetchPostaPushConfig,
+  fetchPostaPushStatus,
+  sendPostaPushTest,
+  subscribePostaWebPush,
+} from '../../services/postaPushService';
+import {
+  fetchMessagingChannelsHub,
+  saveMessagingChannelsHub,
+  type MessagingChannelsHub,
+} from '../../services/messagingChannelsService';
 
 type OutboxRow = {
   id: string;
@@ -106,9 +119,15 @@ export function EmailOutboxSettingsPanel() {
   const [tenantUsePlatformEnv, setTenantUsePlatformEnv] = useState(true);
   const [failedRows, setFailedRows] = useState<FailedOutboxRow[]>([]);
   const [selectedFailedIds, setSelectedFailedIds] = useState<Set<string>>(() => new Set());
+  const [pushConfig, setPushConfig] = useState<Awaited<ReturnType<typeof fetchPostaPushConfig>> | null>(null);
+  const [pushSubscribers, setPushSubscribers] = useState(0);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [channelsHub, setChannelsHub] = useState<MessagingChannelsHub | null>(null);
+  const [waVerifyToken, setWaVerifyToken] = useState('');
+  const [waDisplayPhone, setWaDisplayPhone] = useState('');
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub, failedHub] =
+    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub, failedHub, pushCfg, pushStatus, channels] =
       await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
@@ -124,6 +143,9 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaOnboardingHub(),
       fetchTenantMailConfig(),
       fetchFailedOutboxList(120),
+      fetchPostaPushConfig(),
+      fetchPostaPushStatus(),
+      fetchMessagingChannelsHub(),
     ]);
     setHealth(h);
     setIsolation(iso);
@@ -159,6 +181,12 @@ export function EmailOutboxSettingsPanel() {
     if (failedHub.ok && Array.isArray(failedHub.items)) {
       setFailedRows(failedHub.items);
       setSelectedFailedIds(new Set());
+    }
+    if (pushCfg?.ok) setPushConfig(pushCfg);
+    if (pushStatus?.ok) setPushSubscribers(pushStatus.subscribers ?? 0);
+    if (channels?.ok) {
+      setChannelsHub(channels);
+      setWaDisplayPhone(channels.whatsapp?.displayPhone ?? '');
     }
   }, []);
 
@@ -433,45 +461,39 @@ export function EmailOutboxSettingsPanel() {
               </p>
             </div>
           </div>
-          <div className="settings-stat-grid">
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">SPF</span>
-              <strong className={deliverability.dns?.spf.status === 'ok' ? 'is-ok' : ''}>
-                {deliverability.dns?.spf.status ?? '—'}
-              </strong>
-            </article>
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">DMARC</span>
-              <strong className={deliverability.dns?.dmarc.status === 'ok' ? 'is-ok' : ''}>
-                {deliverability.dns?.dmarc.status ?? '—'}
-              </strong>
-            </article>
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">DKIM</span>
-              <strong className={deliverability.dns?.dkim.status === 'ok' ? 'is-ok' : ''}>
-                {deliverability.dns?.dkim.status ?? '—'}
-              </strong>
-            </article>
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">SMTP doğrulama</span>
-              <strong className={deliverability.smtp?.verified ? 'is-ok' : ''}>
-                {deliverability.smtp?.verified ? 'Hazır' : 'Eksik'}
-              </strong>
-            </article>
+          <PostaDnsChecklist hub={deliverability} />
+          <div className="settings-panel-actions" style={{ marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                const r = await seedPostaDeliverabilityAliases();
+                if (r.deliverability) setDeliverability(r.deliverability);
+                setFlash(r.ok ? `Alias: ${(r.aliases ?? []).join(', ') || 'zaten tanımlı'}` : 'Alias seed başarısız');
+                setLoading(false);
+              }}
+            >
+              siparis@ / fatura@ alias seed
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                const d = await fetchPostaDeliverability();
+                setDeliverability(d);
+                setLoading(false);
+              }}
+            >
+              DNS yeniden kontrol
+            </button>
           </div>
-          {deliverability.suggestedRecords && (
-            <ul className="settings-hint" style={{ listStyle: 'none', padding: 0 }}>
-              <li>
-                <code>SPF</code> {deliverability.suggestedRecords.spf}
-              </li>
-              <li>
-                <code>DMARC</code> {deliverability.suggestedRecords.dmarc}
-              </li>
-              <li>{deliverability.suggestedRecords.dkimHint}</li>
-            </ul>
-          )}
           <p className="settings-hint">
-            İsteğe bağlı alias: <code>EKOLOJIK_MAIL_ALIASES</code> (virgülle ayrılmış e-postalar)
+            Tenant alias: <code>settings.postaAliases</code> · sunucu: <code>EKOLOJIK_MAIL_ALIASES</code> · DNS script:{' '}
+            <code>EKOLOJIK_VERIFY_TENANT={deliverability.tenantId ?? 'main'}</code>
           </p>
         </>
       )}
@@ -529,6 +551,8 @@ export function EmailOutboxSettingsPanel() {
                 replyTo: postaSettings.replyTo,
                 opsEmail: postaSettings.opsEmail,
                 signatureHtml: postaSettings.signatureHtml,
+                customerTrackingNoticeEnabled: postaSettings.customerTrackingNoticeEnabled,
+                customerTrackingNoticeText: postaSettings.customerTrackingNoticeText,
                 notifications: postaSettings.notifications,
                 notificationMatrix: postaSettings.notificationMatrix,
               });
@@ -592,6 +616,30 @@ export function EmailOutboxSettingsPanel() {
                 setPostaSettings({ ...postaSettings, signatureHtml: e.target.value })
               }
               placeholder="<p>Ekolojik Market</p>"
+            />
+          </label>
+          <label className="settings-field settings-field--full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={postaSettings.customerTrackingNoticeEnabled !== false}
+              onChange={(e) =>
+                setPostaSettings({
+                  ...postaSettings,
+                  customerTrackingNoticeEnabled: e.target.checked,
+                })
+              }
+            />
+            <span>Müşteri otomatik e-postada KVKK / izleme bilgilendirme metni (track açıkken)</span>
+          </label>
+          <label className="settings-field settings-field--full">
+            <span>İzleme bilgilendirme metni (boş = varsayılan KVKK)</span>
+            <textarea
+              rows={3}
+              value={postaSettings.customerTrackingNoticeText ?? ''}
+              onChange={(e) =>
+                setPostaSettings({ ...postaSettings, customerTrackingNoticeText: e.target.value })
+              }
+              placeholder="Bu ileti, istatistiksel açılma/tıklama ölçümü içerebilir…"
             />
           </label>
           <div className="settings-field settings-field--full">
@@ -873,8 +921,130 @@ export function EmailOutboxSettingsPanel() {
             <span className="settings-stat-label">SSE revizyon</span>
             <strong>{liveMetrics.sse?.revision ?? 0}</strong>
           </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">WebSocket istemci</span>
+            <strong>{liveMetrics.ws?.connectedClients ?? 0}</strong>
+            <span className="settings-hint">{liveMetrics.ws?.path ?? '/api/posta/ws'}</span>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">WS mesaj gecikmesi (p50)</span>
+            <strong>
+              {liveMetrics.deliveryLatency?.byChannel?.['ws-messaging']?.p50Ms != null
+                ? `${liveMetrics.deliveryLatency.byChannel['ws-messaging'].p50Ms} ms`
+                : '—'}
+            </strong>
+          </article>
         </div>
       )}
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>PWA push (masaüstü / iOS)</h3>
+          <p>
+            VAPID: {pushConfig?.configured ? 'yapılandırıldı' : 'eksik'} · abone cihaz: {pushSubscribers}
+          </p>
+        </div>
+        <div className="settings-panel-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={pushBusy || !pushConfig?.configured || !pushConfig.publicKey}
+            onClick={async () => {
+              if (!pushConfig?.publicKey) return;
+              setPushBusy(true);
+              try {
+                const sub = await subscribePostaWebPush(pushConfig.publicKey);
+                setFlash(sub.ok ? 'Push aboneliği kaydedildi' : sub.error ?? 'Abonelik başarısız');
+                const st = await fetchPostaPushStatus();
+                if (st.ok) setPushSubscribers(st.subscribers ?? 0);
+              } finally {
+                setPushBusy(false);
+              }
+            }}
+          >
+            Bildirimleri aç
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={pushBusy || !pushConfig?.configured}
+            onClick={async () => {
+              setPushBusy(true);
+              try {
+                const result = await sendPostaPushTest();
+                setFlash(
+                  result.ok
+                    ? `Test push gönderildi (${result.sent ?? 0} cihaz)`
+                    : result.error ?? 'Test başarısız',
+                );
+              } finally {
+                setPushBusy(false);
+              }
+            }}
+          >
+            Test bildirimi gönder
+          </button>
+        </div>
+      </div>
+      <p className="settings-hint">
+        <strong>iOS (PWA):</strong> Safari → Paylaş → Ana Ekrana Ekle; sonra POS’u ana ekrandan açın. iOS 16.4+ için
+        Ayarlar → Bildirimler’den site iznini verin. Sunucuda{' '}
+        <code>EKOLOJIK_PUSH_VAPID_PUBLIC_KEY</code> / <code>PRIVATE_KEY</code> tanımlı olmalı (
+        <code>web-push generate-vapid-keys</code>).
+      </p>
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>Omnichannel — WhatsApp (Cloud API)</h3>
+          <p>
+            Webhook: <code>{channelsHub?.whatsapp?.webhookPath ?? '/api/webhooks/messaging/whatsapp'}</code>
+            {channelsHub?.whatsapp?.webhookUrlHint ?? ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={loading || !channelsHub?.whatsapp?.configured}
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const result = await saveMessagingChannelsHub({
+                whatsapp: {
+                  enabled: true,
+                  displayPhone: waDisplayPhone || null,
+                  verifyToken: waVerifyToken || undefined,
+                },
+              });
+              if (result.ok) {
+                setChannelsHub(result);
+                setFlash('WhatsApp kanalı kaydedildi');
+              } else {
+                setFlash(result.error ?? 'Kayıt başarısız');
+              }
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          WhatsApp’ı etkinleştir
+        </button>
+      </div>
+      <p className="settings-hint">
+        Sunucu env: <code>EKOLOJIK_WHATSAPP_ACCESS_TOKEN</code>, <code>EKOLOJIK_WHATSAPP_PHONE_NUMBER_ID</code>,{' '}
+        <code>EKOLOJIK_WHATSAPP_VERIFY_TOKEN</code>. Meta webhook doğrulaması GET ile yapılır.
+      </p>
+      <label className="settings-field">
+        <span>Görünen işletme hattı (opsiyonel)</span>
+        <input value={waDisplayPhone} onChange={(e) => setWaDisplayPhone(e.target.value)} placeholder="+90…" />
+      </label>
+      <label className="settings-field">
+        <span>Verify token (tenant özel, boş = env)</span>
+        <input value={waVerifyToken} onChange={(e) => setWaVerifyToken(e.target.value)} placeholder="meta-verify-token" />
+      </label>
+      <p className="settings-hint">
+        Durum: {channelsHub?.whatsapp?.configured ? 'Graph API hazır' : 'env eksik'} ·{' '}
+        {channelsHub?.whatsapp?.enabled ? 'kanal açık' : 'kanal kapalı'}
+      </p>
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
         <div>

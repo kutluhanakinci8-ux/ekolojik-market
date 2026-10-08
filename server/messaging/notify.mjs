@@ -1,7 +1,9 @@
 import { sendEkolojikMail } from '../emailOutboxProcessor.mjs';
+import { appendCustomerTrackingNotice } from '../postaCustomerEmailCompliance.mjs';
 import { getEffectiveMailPresentation, shouldSendPostaNotification } from '../postaSettings.mjs';
 import { recordPostaHubAlert } from '../postaHubAlerts.mjs';
 import { buildMessagingCustomerSummaryEmail } from '../mailTemplates.mjs';
+import { buildPortalUrlForThread, enrichCustomerMailWithPortalUrl } from './customerPortal.mjs';
 
 export function isMessagingCustomerEmailEnabled() {
   return process.env.EKOLOJIK_MESSAGING_CUSTOMER_EMAIL === '1';
@@ -13,7 +15,7 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message, tenan
   if (message.direction === 'customer' && !thread.muted) {
     const pres = await getEffectiveMailPresentation(dataDir, tenantId);
     const opsEmail = pres.opsEmail;
-    if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'messaging'))) {
+    if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'messaging', 'opsEmail', tenantId))) {
       summary.ops = await sendEkolojikMail(dataDir, {
         to: opsEmail,
         subject: `[Mesaj] ${thread.customerName} — ${thread.subject}`,
@@ -36,7 +38,7 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message, tenan
       summary.opsSkipped = true;
     }
 
-    if (await shouldSendPostaNotification(dataDir, 'messaging', 'inAppHub')) {
+    if (await shouldSendPostaNotification(dataDir, 'messaging', 'inAppHub', tenantId)) {
       await recordPostaHubAlert(dataDir, {
         event: 'messaging',
         threadId: thread.id,
@@ -51,17 +53,26 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message, tenan
   if (message.direction === 'staff' && isMessagingCustomerEmailEnabled() && !thread.muted) {
     const to = thread.customerEmail?.trim();
     if (to?.includes('@')) {
-      const tpl = buildMessagingCustomerSummaryEmail({
+      let tpl = buildMessagingCustomerSummaryEmail({
         customerName: thread.customerName,
         subject: thread.subject,
         bodyText: message.bodyText,
         threadId: thread.id,
       });
+      const origin = String(process.env.EKOLOJIK_PUBLIC_ORIGIN ?? '').trim();
+      if (origin) {
+        const portalUrl = await buildPortalUrlForThread(dataDir, tenantId, thread, origin);
+        tpl = enrichCustomerMailWithPortalUrl(tpl, portalUrl);
+      }
+      const withNotice = await appendCustomerTrackingNotice(dataDir, tenantId, {
+        text: tpl.text,
+        html: tpl.html,
+      });
       summary.customer = await sendEkolojikMail(dataDir, {
         to,
         subject: tpl.subject,
-        body: tpl.text,
-        html: tpl.html,
+        body: withNotice.text,
+        html: withNotice.html,
         idempotencyKey: `messaging:customer:${message.id}`,
         source: 'messaging-customer',
         tenantId,

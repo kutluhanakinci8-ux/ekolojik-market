@@ -86,6 +86,13 @@ export async function listMessagingThreads(
   return { ok: true, threads: threads.slice(0, max) };
 }
 
+const THREAD_STATUSES = new Set(['open', 'waiting', 'closed']);
+
+function normalizeThreadStatus(value) {
+  const s = String(value ?? '').trim().toLowerCase();
+  return THREAD_STATUSES.has(s) ? s : null;
+}
+
 export async function patchMessagingThread(dataDir, tenantId, threadId, patch) {
   const root = await ensureRoot(dataDir, tenantId);
   const threads = await readThreads(root);
@@ -95,6 +102,19 @@ export async function patchMessagingThread(dataDir, tenantId, threadId, patch) {
   if (patch.pinned != null) row.pinned = Boolean(patch.pinned);
   if (patch.archived != null) row.archived = Boolean(patch.archived);
   if (patch.muted != null) row.muted = Boolean(patch.muted);
+  if (patch.botHandoff != null) row.botHandoff = Boolean(patch.botHandoff);
+  if (patch.status != null) {
+    const next = normalizeThreadStatus(patch.status);
+    if (!next) return { ok: false, error: 'Geçersiz durum (open, waiting, closed)' };
+    row.status = next;
+  }
+  if (patch.assignedUserId !== undefined) {
+    const id = patch.assignedUserId == null || patch.assignedUserId === ''
+      ? null
+      : String(patch.assignedUserId).trim();
+    row.assignedUserId = id || null;
+    if (id) row.botHandoff = true;
+  }
   row.updatedAt = new Date().toISOString();
   threads[idx] = row;
   await writeThreads(root, threads);
@@ -131,13 +151,21 @@ export async function createMessagingThread(dataDir, tenantId, payload) {
   const root = await ensureRoot(dataDir, tenantId);
   const threads = await readThreads(root);
   const now = new Date().toISOString();
+  const channel = String(payload.channel ?? 'web').trim().toLowerCase() || 'web';
   const thread = {
     id: `em-${randomUUID()}`,
     customerId,
     customerName,
     customerEmail: String(payload.customerEmail ?? '').trim() || null,
     subject: String(payload.subject ?? '').trim() || `Müşteri: ${customerName}`,
+    channel,
+    externalId: payload.externalId ? String(payload.externalId).trim() : null,
     status: 'open',
+    assignedUserId: null,
+    botHandoff: false,
+    firstCustomerMessageAt: null,
+    firstStaffResponseAt: null,
+    firstResponseMs: null,
     createdAt: now,
     updatedAt: now,
     lastMessageAt: now,
@@ -185,12 +213,15 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
   }
 
   const direction = payload.direction === 'customer' ? 'customer' : 'staff';
+  const messageKind =
+    payload.messageKind === 'bot' ? 'bot' : payload.messageKind === 'human' ? 'human' : null;
   const message = {
     id: `msg-${randomUUID()}`,
     threadId,
     direction,
     bodyText: bodyText || (hasAttachments ? '(ek dosya)' : ''),
     authorName: String(payload.authorName ?? (direction === 'customer' ? 'Müşteri' : 'POS')).trim(),
+    messageKind,
     createdAt: new Date().toISOString(),
     readByStaffAt: null,
     readByCustomerAt: null,
@@ -223,13 +254,55 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
   thread.lastMessagePreview = preview(bodyText || message.attachments[0]?.fileName || '');
   thread.messageCount = (thread.messageCount ?? 0) + 1;
   thread.lastMessageDirection = direction;
-  if (direction === 'staff') {
+  if (direction === 'customer') {
+    if (thread.status === 'closed') thread.status = 'open';
+    if (!thread.firstCustomerMessageAt) {
+      thread.firstCustomerMessageAt = message.createdAt;
+    }
+  }
+  if (direction === 'staff' && messageKind !== 'bot') {
+    thread.staffLastReadAt = message.createdAt;
+    if (thread.firstCustomerMessageAt && !thread.firstStaffResponseAt) {
+      thread.firstStaffResponseAt = message.createdAt;
+      const t0 = Date.parse(thread.firstCustomerMessageAt);
+      const t1 = Date.parse(message.createdAt);
+      if (Number.isFinite(t0) && Number.isFinite(t1) && t1 >= t0) {
+        thread.firstResponseMs = t1 - t0;
+      }
+    }
+    if (thread.status === 'waiting') thread.status = 'open';
+  }
+  if (direction === 'staff' && messageKind === 'bot') {
     thread.staffLastReadAt = message.createdAt;
   }
   threads[idx] = thread;
   await writeThreads(root, threads);
 
-  return { ok: true, thread, message };
+  let botResult = null;
+  if (direction === 'customer') {
+    try {
+      const { runMessagingBotAfterCustomerMessage } = await import('./bot.mjs');
+      botResult = await runMessagingBotAfterCustomerMessage(dataDir, tenantId, thread, message);
+    } catch {
+      botResult = { ok: false };
+    }
+  }
+
+  if (direction === 'staff' && thread.channel && thread.channel !== 'web') {
+    try {
+      const { dispatchStaffMessageToExternalChannel } = await import('./omnichannel.mjs');
+      await dispatchStaffMessageToExternalChannel(dataDir, tenantId, thread, message);
+    } catch {
+      /* harici kanal opsiyonel */
+    }
+  }
+
+  const finalThread =
+    botResult?.ok && direction === 'customer'
+      ? (await getMessagingThread(dataDir, tenantId, threadId)).thread ?? thread
+      : thread;
+
+  return { ok: true, thread: finalThread, message, bot: botResult?.bot ?? null };
 }
 
 export async function markMessagingMessagesRead(

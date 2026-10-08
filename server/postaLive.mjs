@@ -26,7 +26,7 @@ export function getPostaLiveCapabilities() {
     heartbeatSec: HEARTBEAT_MS / 1000,
     unreadPollSec: UNREAD_POLL_MS / 1000,
     retryMs: RETRY_MS,
-    events: ['unread', 'inbox', 'ping'],
+    events: ['unread', 'inbox', 'messaging', 'ping'],
   };
 }
 
@@ -118,6 +118,14 @@ export async function getPostaLiveMetrics(dataDir, { days = 7 } = {}) {
   let sseClients = 0;
   for (const set of clientsByTenant.values()) sseClients += set.size;
 
+  let ws = null;
+  try {
+    const { getPostaWsGatewayMetrics } = await import('./postaWsGateway.mjs');
+    ws = getPostaWsGatewayMetrics();
+  } catch {
+    ws = null;
+  }
+
   return {
     ok: true,
     windowDays: days,
@@ -130,6 +138,7 @@ export async function getPostaLiveMetrics(dataDir, { days = 7 } = {}) {
       unreadPollMs: UNREAD_POLL_MS,
       retryMs: RETRY_MS,
     },
+    ws,
     deliveryLatency: {
       sampleCount: delays.length,
       avgMs: delays.length ? Math.round(delays.reduce((a, b) => a + b, 0) / delays.length) : null,

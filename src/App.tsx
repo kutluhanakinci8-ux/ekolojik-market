@@ -9,6 +9,7 @@ import { LandingPricing } from './landing/LandingPricing';
 import { LandingContact } from './landing/LandingContact';
 import { LandingLogin } from './landing/LandingLogin';
 import { LandingRegister } from './landing/LandingRegister';
+import { CustomerMessagesPortal } from './portal/CustomerMessagesPortal';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="kayit" element={<LandingRegister />} />
       </Route>
       <Route path="/app" element={<PosApp />} />
+      <Route path="/portal/mesajlar" element={<CustomerMessagesPortal />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

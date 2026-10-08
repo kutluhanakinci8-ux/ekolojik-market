@@ -6,6 +6,31 @@ import {
 } from './postaImapMailboxes.mjs';
 import { getTenantImapConfig, isTenantImapConfigured } from './tenantMailConfig.mjs';
 
+/** IMAP MOVE hedefi — Sent/Junk/Drafts/Trash (Faz 45 regression için saf fonksiyon). */
+export function resolveImapMoveTarget(flagsPatch, row, mailboxes) {
+  if (!row || !mailboxes) return null;
+  const folder = String(row.imapFolder ?? 'inbox').toLowerCase();
+
+  if (flagsPatch.trashed === true && mailboxes.trash) {
+    return { targetPath: mailboxes.trash, targetFolder: 'trash' };
+  }
+  if (flagsPatch.spam === true && mailboxes.junk) {
+    return { targetPath: mailboxes.junk, targetFolder: 'junk' };
+  }
+  if (flagsPatch.spam === false && folder === 'junk' && mailboxes.inbox) {
+    return { targetPath: mailboxes.inbox, targetFolder: 'inbox' };
+  }
+  if (flagsPatch.trashed === false && folder === 'trash' && mailboxes.inbox) {
+    return { targetPath: mailboxes.inbox, targetFolder: 'inbox' };
+  }
+  if (flagsPatch.trashed === false && flagsPatch.spam === false && mailboxes.inbox) {
+    if (folder === 'junk' || folder === 'trash') {
+      return { targetPath: mailboxes.inbox, targetFolder: 'inbox' };
+    }
+  }
+  return null;
+}
+
 export async function applyImapMoveForFlags(dataDir, tenantId, inboxId, flagsPatch) {
   if (!(await isTenantImapConfigured(dataDir, tenantId)) || !isEkolojikImapWriteEnabled()) {
     return { ok: true, skipped: 'imap_write_disabled' };
@@ -25,18 +50,9 @@ export async function applyImapMoveForFlags(dataDir, tenantId, inboxId, flagsPat
     await client.logout();
   }
 
-  let targetPath = null;
-  let targetFolder = null;
-  if (flagsPatch.trashed === true && mailboxes.trash) {
-    targetPath = mailboxes.trash;
-    targetFolder = 'trash';
-  } else if (flagsPatch.spam === true && mailboxes.junk) {
-    targetPath = mailboxes.junk;
-    targetFolder = 'junk';
-  } else if (flagsPatch.trashed === false && flagsPatch.spam === false && mailboxes.inbox) {
-    targetPath = mailboxes.inbox;
-    targetFolder = 'inbox';
-  }
+  const move = resolveImapMoveTarget(flagsPatch, row, mailboxes);
+  const targetPath = move?.targetPath ?? null;
+  const targetFolder = move?.targetFolder ?? null;
 
   if (!targetPath || targetPath === row.imapMailboxPath) {
     return { ok: true, skipped: 'no_move' };

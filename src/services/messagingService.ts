@@ -6,7 +6,12 @@ export type MessagingThread = {
   customerName: string;
   customerEmail?: string | null;
   subject: string;
-  status: string;
+  status: 'open' | 'waiting' | 'closed' | string;
+  assignedUserId?: string | null;
+  botHandoff?: boolean;
+  firstCustomerMessageAt?: string | null;
+  firstStaffResponseAt?: string | null;
+  firstResponseMs?: number | null;
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string;
@@ -18,6 +23,8 @@ export type MessagingThread = {
   pinned?: boolean;
   archived?: boolean;
   muted?: boolean;
+  channel?: 'web' | 'whatsapp' | 'sms' | string;
+  externalId?: string | null;
 };
 
 export type MessagingAttachment = {
@@ -38,6 +45,27 @@ export type MessagingMessage = {
   readByStaffAt?: string | null;
   readByCustomerAt?: string | null;
   attachments?: MessagingAttachment[];
+  messageKind?: 'bot' | 'human' | null;
+};
+
+export type MessagingSlaMetrics = {
+  ok: boolean;
+  windowDays?: number;
+  counts?: {
+    threadsTracked?: number;
+    firstResponseRecorded?: number;
+    pendingFirstResponse?: number;
+    open?: number;
+    waiting?: number;
+    closed?: number;
+  };
+  firstResponse?: {
+    avgMs?: number | null;
+    medianMs?: number | null;
+    p90Ms?: number | null;
+    samples?: number;
+  };
+  error?: string;
 };
 
 export type MessagingTypingState = {
@@ -140,7 +168,14 @@ export async function markMessagingMessageRead(
 
 export async function patchMessagingThreadFlags(
   threadId: string,
-  flags: { pinned?: boolean; archived?: boolean; muted?: boolean },
+  flags: {
+    pinned?: boolean;
+    archived?: boolean;
+    muted?: boolean;
+    status?: 'open' | 'waiting' | 'closed';
+    assignedUserId?: string | null;
+    botHandoff?: boolean;
+  },
 ) {
   const res = await posHubFetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/flags`, {
     method: 'POST',
@@ -165,5 +200,17 @@ export async function postMessagingMessage(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
+  return res.json();
+}
+
+export async function fetchMessagingSlaMetrics(params?: {
+  days?: number;
+  tenant?: string;
+}): Promise<MessagingSlaMetrics> {
+  const q = new URLSearchParams();
+  if (params?.days) q.set('days', String(params.days));
+  if (params?.tenant && params.tenant !== 'main') q.set('tenant', params.tenant);
+  const qs = q.toString();
+  const res = await posHubFetch(`/api/messaging/sla${qs ? `?${qs}` : ''}`);
   return res.json();
 }

@@ -117,13 +117,19 @@ export async function getPostaCalendarSyncHub(dataDir, tenantId, publicBaseUrl) 
     ok: true,
     mode: 'ics-subscribe',
     caldav: {
-      supported: false,
-      note: 'Tam CalDAV sunucusu POS kapsamı dışında; ICS abonelik + vCard dışa aktarma (NB PM-5 uyarlaması).',
+      supported: true,
+      mode: 'lite-rest',
+      principalPath: '/api/posta/caldav-lite/principal',
+      eventsPath: '/api/posta/caldav-lite/events',
+      note: 'İki yön: hub takvim + CalDAV lite REST; harici uygulama için ICS abonelik.',
     },
     carddav: {
-      supported: false,
+      supported: true,
+      mode: 'lite-vcard',
+      principalPath: '/api/posta/carddav-lite/principal',
       vcardExportPath: '/api/posta/contacts/export.vcf',
-      vcardExportUrl: `${base}/api/posta/contacts/export.vcf`,
+      vcardExportUrl: `${base}/api/posta/contacts/export.vcf?tenant=${encodeURIComponent(tenantId)}`,
+      vcardImportPath: '/api/posta/contacts/import',
     },
     ics: {
       exportPath: '/api/posta/calendar/export.ics',

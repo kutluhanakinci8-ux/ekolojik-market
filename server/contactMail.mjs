@@ -1,5 +1,6 @@
 import { getEkolojikMailConfig } from './ekolojikMailConfig.mjs';
 import { sendEkolojikMail } from './emailOutboxProcessor.mjs';
+import { appendCustomerTrackingNotice } from './postaCustomerEmailCompliance.mjs';
 import { getEffectiveMailPresentation, shouldSendPostaNotification } from './postaSettings.mjs';
 
 const SUBJECT_LABELS = {
@@ -32,9 +33,9 @@ function formatOpsBody(record) {
   return lines.join('\n');
 }
 
-function formatAutoreplyBody(record) {
+function formatAutoreplyBody(record, portalUrl) {
   const brand = getEkolojikMailConfig().fromName || 'Ekolojik Market';
-  return [
+  const lines = [
     `Sayın ${record.name},`,
     '',
     `${brand} iletişim formundan gönderdiğiniz mesajı aldık.`,
@@ -43,9 +44,12 @@ function formatAutoreplyBody(record) {
     'Özet:',
     `- Konu: ${subjectLabel(record.subject)}`,
     `- Referans: ${record.id}`,
-    '',
-    'Bu e-posta otomatik gönderilmiştir; lütfen yanıtlamayın.',
-  ].join('\n');
+  ];
+  if (portalUrl) {
+    lines.push('', 'Talep durumunu ve yazışmayı buradan takip edebilirsiniz:', portalUrl);
+  }
+  lines.push('', 'Bu e-posta otomatik gönderilmiştir; lütfen yanıtlamayın.');
+  return lines.join('\n');
 }
 
 export function isContactAutoreplyEnabled() {
@@ -53,7 +57,7 @@ export function isContactAutoreplyEnabled() {
 }
 
 /** İletişim kaydı sonrası operatör bildirimi + isteğe bağlı müşteri otomatik yanıt */
-export async function sendContactNotifications(dataDir, record, tenantId = 'main') {
+export async function sendContactNotifications(dataDir, record, tenantId = 'main', { portalUrl } = {}) {
   if (!record?.id) {
     return { ok: false, error: 'Geçersiz iletişim kaydı' };
   }
@@ -62,7 +66,7 @@ export async function sendContactNotifications(dataDir, record, tenantId = 'main
   const opsEmail = pres.opsEmail;
   const summary = { ops: null, autoreply: null, opsSkipped: false, autoreplySkipped: false };
 
-  if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'contact'))) {
+  if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'contact', 'opsEmail', tenantId))) {
     summary.ops = await sendEkolojikMail(dataDir, {
       to: opsEmail,
       subject: `[İletişim] ${subjectLabel(record.subject)} — ${record.name}`,
@@ -76,12 +80,15 @@ export async function sendContactNotifications(dataDir, record, tenantId = 'main
   }
 
   const autoreplyMatrix =
-    await shouldSendPostaNotification(dataDir, 'contact', 'customerAutoreply');
+    await shouldSendPostaNotification(dataDir, 'contact', 'customerAutoreply', tenantId);
   if ((isContactAutoreplyEnabled() || autoreplyMatrix) && record.email?.includes('@')) {
+    const baseBody = formatAutoreplyBody(record, portalUrl);
+    const withNotice = await appendCustomerTrackingNotice(dataDir, tenantId, { text: baseBody, html: null });
     summary.autoreply = await sendEkolojikMail(dataDir, {
       to: record.email,
       subject: 'Ekolojik Market — talebiniz alındı',
-      body: formatAutoreplyBody(record),
+      body: withNotice.text,
+      html: withNotice.html ?? undefined,
       idempotencyKey: `contact:reply:${record.id}`,
       source: 'contact-autoreply',
       tenantId,

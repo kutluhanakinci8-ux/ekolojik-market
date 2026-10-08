@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createDefaultPostaOnboarding } from './postaOnboarding.mjs';
+import { defaultAliasesForDomain } from './postaDeliverability.mjs';
 
 const DEFAULT_SETTINGS = {
   businessName: 'Ekolojik Market',
@@ -86,6 +87,7 @@ export async function listTenantIds(dataDir) {
 function createInitialStore({ businessName, adminName, username, passwordHash, email, phone, plan }) {
   const now = new Date().toISOString();
   const userId = `U${Date.now()}`;
+  const mailDomain = email.includes('@') ? email.split('@')[1].trim().toLowerCase() : '';
 
   return {
     updatedAt: now,
@@ -104,6 +106,12 @@ function createInitialStore({ businessName, adminName, username, passwordHash, e
       businessName,
       tenantMeta: { email, phone, plan, trialEndsAt: new Date(Date.now() + 14 * 86400000).toISOString() },
       postaOnboarding: createDefaultPostaOnboarding(email),
+      postaAliases: defaultAliasesForDomain(mailDomain),
+      postaMail: {
+        opsEmail: email,
+        fromName: businessName,
+        updatedAt: now,
+      },
     },
     priceType: 'partner',
     users: [

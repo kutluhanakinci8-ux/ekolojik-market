@@ -20,7 +20,9 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 
 ### Gelen ve IMAP
 
+- **Tam webmail / Dovecot JMAP yok** — okuma ve klasörler POS **Posta hub** ve salt okunur **JMAP lite** köprüsü (`GET /api/posta/jmap-lite/*`) üzerinden; gönderim hub **Yaz** ve outbox ile yapılır.
 - **IMAP yenile**: yapılandırılmışsa kutuyu senkronize eder (Gelen, Gönderilen, Spam, Çöp, Taslaklar).
+- Mesaj detayında **Sunucu klasörü** (inbox / sent / junk / trash / drafts), IMAP bayraklarıyla uyumlu gösterilir.
 - **Konuşma** modu: aynı konuya ait yanıtlar tek zincirde.
 - **Toplu işlem**: satır seç → okundu / arşiv / spam / çöp; **Tümünü okundu işaretle**.
 - **Depolama çubuğu**: ek + inbox JSON kullanım yüzdesi.
@@ -47,6 +49,17 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 
 - Ağ kesilirse son **Gelen** listesi salt okunur gösterilir (service worker + yerel önbellek).
 
+### Takvim ve kişiler (CalDAV / CardDAV lite)
+
+- Hub **Takvim**: etkinlik ekleme/düzenleme; harici uygulama için **ICS abonelik** (`Ayarlar → E-posta` veya takvim paneli).
+- **CalDAV lite** (`GET /api/posta/caldav-lite/*`): REST ile etkinlik listesi / yazma / silme (tam CalDAV sunucu değil).
+- **CardDAV lite**: `export.vcf` dışa aktarma, `POST /api/posta/contacts/import` ile vCard/CSV içe aktarma.
+
+### PWA push
+
+- **Ayarlar → E-posta**: “Test bildirimi gönder” ve abonelik (VAPID gerekli).
+- **iOS**: Safari → Ana Ekrana Ekle → uygulamayı ana ekrandan açın → bildirim izni (iOS 16.4+).
+
 ## Ayarlar → E-posta
 
 - SMTP testi, kuyruk işleme, gönderen / Reply-To / ops / imza / bildirim matrisi.
@@ -59,8 +72,11 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 | Değişken | Açıklama |
 |----------|----------|
 | `EKOLOJIK_MAIL_TRACK=1` | Giden HTML’de açılma pikseli (varsayılan kapalı) |
+| Hub engagement şeridi | Track açıkken Posta başlığında özet; detay **Ayarlar → E-posta** |
+| KVKK izleme metni | Ayarlar → müşteri otomatik e-posta bilgilendirme (iletişim + mesaj özet maili) |
 | `EKOLOJIK_POSTA_AI=1` | Compose AI öneri |
 | `EKOLOJIK_IMAP_WRITE=1` | Spam/çöp bayraklarında IMAP MOVE |
+| JMAP lite smoke | `npm run test:jmap-lite` (opsiyonel `EKOLOJIK_VERIFY_BASE_URL`) |
 
 ## VPS doğrulama (tek komut)
 

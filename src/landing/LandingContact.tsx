@@ -8,16 +8,22 @@ export function LandingContact() {
   const [subject, setSubject] = useState('genel');
   const [message, setMessage] = useState('');
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
+  const [reference, setReference] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setFlash(null);
+    setPortalUrl(null);
+    setReference(null);
     const result = await submitContactForm({ name, email, phone, subject, message });
     setBusy(false);
     if (result.ok) {
       setFlash({ type: 'success', text: result.message ?? 'Mesajınız alındı.' });
+      setPortalUrl(result.portalUrl ?? null);
+      setReference(result.reference ?? null);
       setName('');
       setEmail('');
       setPhone('');
@@ -57,6 +63,13 @@ export function LandingContact() {
         <form className="landing-contact-form landing-form-grid" onSubmit={handleSubmit}>
           {flash && (
             <p className={`landing-flash landing-flash--${flash.type}`} role="alert">{flash.text}</p>
+          )}
+          {portalUrl && (
+            <p className="landing-flash landing-flash--success" role="status">
+              Talebinizi takip edin:{' '}
+              <a href={portalUrl}>Müşteri portalı</a>
+              {reference ? ` (referans: ${reference})` : ''}
+            </p>
           )}
           <label>
             Ad Soyad

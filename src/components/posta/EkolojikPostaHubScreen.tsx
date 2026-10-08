@@ -39,10 +39,17 @@ import {
   postMessagingTyping,
   patchMessagingThreadFlags,
   postMessagingMessage,
+  fetchMessagingSlaMetrics,
   type MessagingMessage,
+  type MessagingSlaMetrics,
   type MessagingThread,
 } from '../../services/messagingService';
-import { fetchPostaAiSuggest, fetchPostaMailSettings } from '../../services/postaSettingsService';
+import {
+  fetchPostaAiSuggest,
+  fetchPostaEngagementSummary,
+  fetchPostaMailSettings,
+  type PostaEngagementSummary,
+} from '../../services/postaSettingsService';
 import { PostaComposePanel } from './PostaComposePanel';
 import {
   buildForwardBody,
@@ -159,6 +166,20 @@ function formatMessagingTime(iso: string) {
   });
 }
 
+function threadStatusLabel(status?: string) {
+  if (status === 'waiting') return 'Beklemede';
+  if (status === 'closed') return 'Kapalı';
+  return 'Açık';
+}
+
+function formatSlaDuration(ms?: number | null) {
+  if (ms == null || !Number.isFinite(ms)) return '—';
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min} dk`;
+  const h = Math.floor(min / 60);
+  return `${h} sa ${min % 60} dk`;
+}
+
 function playHubMessagePing() {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -263,6 +284,7 @@ export function EkolojikPostaHubScreen({
   const [pushBusy, setPushBusy] = useState(false);
   const [pushPanelOpen, setPushPanelOpen] = useState(false);
   const pushPanelRef = useRef<HTMLDivElement>(null);
+  const [engagementSummary, setEngagementSummary] = useState<PostaEngagementSummary | null>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
@@ -292,6 +314,11 @@ export function EkolojikPostaHubScreen({
   }, [pushPanelOpen]);
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
+  const staffUsersForAssign = useMemo(
+    () => store.users.filter((u) => u.isActive),
+    [store.users],
+  );
+  const [messagingSla, setMessagingSla] = useState<MessagingSlaMetrics | null>(null);
 
   const composeAllHints = useMemo(() => {
     const emails = new Set(recipientHints.map((e) => e.toLowerCase()));
@@ -457,9 +484,14 @@ export function EkolojikPostaHubScreen({
       if (r.ok && r.emails) setRecipientHints(r.emails);
     });
     void (async () => {
-      const [cfg, status] = await Promise.all([fetchPostaPushConfig(), fetchPostaPushStatus()]);
+      const [cfg, status, engagement] = await Promise.all([
+        fetchPostaPushConfig(),
+        fetchPostaPushStatus(),
+        fetchPostaEngagementSummary(14),
+      ]);
       if (cfg.ok) setPushConfig(cfg);
       if (status.ok) setPushSubscribers(status.subscribers ?? 0);
+      if (engagement.ok) setEngagementSummary(engagement);
     })();
   }, [refreshHealth]);
 
@@ -532,6 +564,15 @@ export function EkolojikPostaHubScreen({
   useEffect(() => {
     if (folder === 'mesajlar') void refreshThreads();
   }, [threadSearchQ, threadShowArchived, folder, refreshThreads]);
+
+  const refreshMessagingSla = useCallback(async () => {
+    const r = await fetchMessagingSlaMetrics({ days: 14 });
+    if (r.ok) setMessagingSla(r);
+  }, []);
+
+  useEffect(() => {
+    if (folder === 'mesajlar') void refreshMessagingSla();
+  }, [folder, refreshMessagingSla]);
 
   useEffect(() => {
     if (folder === 'yaz') return undefined;
@@ -656,7 +697,13 @@ export function EkolojikPostaHubScreen({
     [threads, selectedThreadId],
   );
 
-  const patchSelectedThread = async (flags: { pinned?: boolean; archived?: boolean; muted?: boolean }) => {
+  const patchSelectedThread = async (flags: {
+    pinned?: boolean;
+    archived?: boolean;
+    muted?: boolean;
+    status?: 'open' | 'waiting' | 'closed';
+    assignedUserId?: string | null;
+  }) => {
     if (!selectedThreadId) return;
     const result = await patchMessagingThreadFlags(selectedThreadId, flags);
     setFlash(result.ok ? 'Güncellendi' : result.error ?? 'İşlem başarısız');
@@ -1122,6 +1169,25 @@ export function EkolojikPostaHubScreen({
             </div>
           </div>
         )}
+        {engagementSummary &&
+          (engagementSummary.mailTrackEnabled || engagementSummary.clickTrackEnabled) && (
+            <div className="posta-hub-engagement-strip" role="status" style={{ marginTop: 8, fontSize: '0.85rem' }}>
+              Engagement (son {engagementSummary.windowDays ?? 14} gün): açılma{' '}
+              <strong>{engagementSummary.counts?.opens ?? 0}</strong> (
+              {engagementSummary.counts?.uniqueOpens ?? 0} benzersiz) · tıklama{' '}
+              <strong>{engagementSummary.counts?.clicks ?? 0}</strong> · bounce{' '}
+              <strong>{engagementSummary.counts?.bounces ?? 0}</strong>
+              <span className="module-hint"> — detay: Ayarlar → E-posta</span>
+            </div>
+          )}
+        {folder === 'mesajlar' && messagingSla?.ok && (
+          <div className="posta-hub-engagement-strip" role="status" style={{ marginTop: 8, fontSize: '0.85rem' }}>
+            Mesaj SLA (son {messagingSla.windowDays ?? 14} gün): ilk yanıt ort.{' '}
+            <strong>{formatSlaDuration(messagingSla.firstResponse?.avgMs)}</strong> · beklemede{' '}
+            <strong>{messagingSla.counts?.waiting ?? 0}</strong> · yanıt bekliyor{' '}
+            <strong>{messagingSla.counts?.pendingFirstResponse ?? 0}</strong>
+          </div>
+        )}
         <div className="posta-hub-hero-actions">
           {pushConfig && (
             <div className="posta-hub-push-anchor" ref={pushPanelRef}>
@@ -1419,9 +1485,19 @@ export function EkolojikPostaHubScreen({
                     <span className="posta-yazisma-thread-body">
                       <span className="posta-yazisma-thread-top">
                         <span className="posta-yazisma-thread-top-title">
-                          <span className="posta-yazisma-thread-badges" aria-hidden={!t.pinned && !t.muted}>
+                          <span className="posta-yazisma-thread-badges" aria-hidden={!t.pinned && !t.muted && !t.channel}>
                             <span title={t.pinned ? 'Sabit' : undefined}>{t.pinned ? '📌' : ''}</span>
                             <span title={t.muted ? 'Sessiz' : undefined}>{t.muted ? '🔕' : ''}</span>
+                            {t.channel && t.channel !== 'web' && (
+                              <span className="posta-channel-badge" title={`Kanal: ${t.channel}`}>
+                                {t.channel === 'whatsapp' ? 'WA' : t.channel.toUpperCase()}
+                              </span>
+                            )}
+                            {t.status && t.status !== 'open' && (
+                              <span className="posta-channel-badge" title="Durum">
+                                {threadStatusLabel(t.status)}
+                              </span>
+                            )}
                           </span>
                           <strong>{t.customerName}</strong>
                         </span>
@@ -1839,6 +1915,11 @@ export function EkolojikPostaHubScreen({
                 {KIND_LABEL[selectedInbox.kind]} · {selectedInbox.fromName || selectedInbox.from} ·{' '}
                 {selectedInbox.at ? new Date(selectedInbox.at).toLocaleString('tr-TR') : ''}
               </p>
+              {selectedInbox.serverFolder && (
+                <p className="posta-hub-detail-meta">
+                  Sunucu klasörü: <code>{selectedInbox.serverFolder}</code>
+                </p>
+              )}
               {selectedInbox.kind === 'bill' && selectedInbox.amount != null && (
                 <p className="posta-hub-detail-meta">
                   Tutar: {selectedInbox.amount} · Vade: {selectedInbox.dueDate ?? '—'}
@@ -1900,6 +1981,46 @@ export function EkolojikPostaHubScreen({
                   </div>
                 </div>
                 <div className="posta-hub-sohbet-toolbar posta-hub-detail-buttons">
+                  <label className="posta-hub-thread-workflow">
+                    <select
+                      className="posta-hub-search"
+                      aria-label="Thread durumu"
+                      value={selectedThread?.status ?? 'open'}
+                      onChange={(e) =>
+                        void patchSelectedThread({
+                          status: e.target.value as 'open' | 'waiting' | 'closed',
+                        })
+                      }
+                    >
+                      <option value="open">Açık</option>
+                      <option value="waiting">Beklemede</option>
+                      <option value="closed">Kapalı</option>
+                    </select>
+                  </label>
+                  <label className="posta-hub-thread-workflow">
+                    <select
+                      className="posta-hub-search"
+                      aria-label="Atanan operatör"
+                      value={selectedThread?.assignedUserId ?? ''}
+                      onChange={(e) =>
+                        void patchSelectedThread({
+                          assignedUserId: e.target.value || null,
+                        })
+                      }
+                    >
+                      <option value="">Atanmamış</option>
+                      {staffUsersForAssign.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.displayName || u.username}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedThread?.firstResponseMs != null && (
+                    <span className="posta-hub-sohbet-strip-meta" title="İlk operatör yanıt süresi">
+                      İlk yanıt: {formatSlaDuration(selectedThread.firstResponseMs)}
+                    </span>
+                  )}
                   <button
                     type="button"
                     className="btn btn-sm btn-outline"
@@ -1953,7 +2074,12 @@ export function EkolojikPostaHubScreen({
               )}
               <ul className="crm-messaging-messages posta-hub-sohbet-messages">
                 {threadMessages.map((m) => (
-                  <li key={m.id} className={`crm-msg crm-msg--${m.direction} posta-sohbet-msg`}>
+                  <li
+                    key={m.id}
+                    className={`crm-msg crm-msg--${m.direction} posta-sohbet-msg${
+                      m.messageKind === 'bot' ? ' posta-sohbet-msg--bot' : ''
+                    }`}
+                  >
                     <span className="posta-sohbet-msg-avatar" aria-hidden="true">
                       {messagingInitials(m.authorName)}
                     </span>

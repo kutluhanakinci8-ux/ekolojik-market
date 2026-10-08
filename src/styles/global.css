@@ -16351,6 +16351,10 @@ input {
 .posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg .posta-sohbet-msg-meta {
   justify-content: flex-end;
 }
+.posta-sohbet-msg--bot .posta-sohbet-msg-body {
+  opacity: 0.92;
+  font-style: italic;
+}
 .posta-hub-screen--premium .crm-msg--customer.posta-sohbet-msg .posta-sohbet-msg-body {
   margin-right: auto;
   margin-left: 0;
@@ -16978,4 +16982,111 @@ input {
   cursor: pointer;
   font-size: 0.9rem;
   text-decoration: underline;
+}
+
+.portal-mesajlar-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+.portal-mesajlar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.portal-mesajlar-kicker {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0 0 4px;
+}
+.portal-mesajlar-meta {
+  color: #475569;
+  font-size: 0.9rem;
+  margin: 8px 0 0;
+}
+.portal-mesajlar-home {
+  font-size: 0.9rem;
+  color: #2d6a4f;
+  text-decoration: none;
+}
+.portal-mesajlar-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.portal-mesajlar-hint {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+.portal-mesajlar-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.portal-mesajlar-lookup {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.portal-mesajlar-lookup label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.portal-mesajlar-lookup input {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+.portal-mesajlar-messages {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.portal-mesajlar-msg {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+.portal-mesajlar-msg--staff {
+  background: #ecfdf5;
+  margin-left: 12%;
+}
+.portal-mesajlar-msg--customer {
+  margin-right: 12%;
+}
+.portal-mesajlar-msg--bot {
+  font-style: italic;
+  opacity: 0.92;
+}
+.portal-mesajlar-msg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+.portal-mesajlar-compose {
+  display: grid;
+  gap: 8px;
+}
+.portal-mesajlar-compose textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  resize: vertical;
 }

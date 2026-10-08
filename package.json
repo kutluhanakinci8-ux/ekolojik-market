@@ -13,7 +13,19 @@
     "scrape:greenleaf": "node scripts/scrape-greenleaf.mjs",
     "scrape:greenleaf-shop": "node scripts/scrape-greenleaf-shop.mjs",
     "translate:greenleaf-shop": "node scripts/translate-greenleaf-shop.mjs",
-    "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs"
+    "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs",
+    "test:tenant-mail": "node scripts/e2e-tenant-mail.mjs",
+    "test:jmap-lite": "node scripts/jmap-lite-smoke.mjs",
+    "test:imap-move": "node scripts/posta-imap-move-regression.mjs",
+    "test:faz46": "node scripts/faz46-caldav-push-smoke.mjs",
+    "test:faz47": "node scripts/faz47-engagement-smoke.mjs",
+    "test:faz48": "node scripts/faz48-omnichannel-smoke.mjs",
+    "test:faz49": "node scripts/faz49-bot-sla-smoke.mjs",
+    "test:faz50": "node scripts/faz50-portal-smoke.mjs",
+    "test": "node scripts/run-unit-tests.mjs && node scripts/run-wave-smokes.mjs",
+    "test:qa": "node scripts/pre-release-qa.mjs",
+    "test:ci": "node scripts/ci-with-server.mjs",
+    "test:faz52": "node scripts/faz52-closure-smoke.mjs"
   },
   "dependencies": {
     "imapflow": "^1.7.8",

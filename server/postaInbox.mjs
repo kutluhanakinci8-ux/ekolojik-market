@@ -496,6 +496,30 @@ export async function listUnifiedPostaSent(dataDir, tenantId, { limit = 80 } = {
   };
 }
 
+export async function getPostaInboxItemById(dataDir, tenantId, id) {
+  const key = String(id ?? '').trim();
+  if (!key) return null;
+  const flagsMap = await getPostaInboxFlagsMap(dataDir, tenantId);
+  if (key.startsWith('pi-')) {
+    const row = await findPostaImapMessage(dataDir, tenantId, key);
+    if (!row) return null;
+    return applyPostaFlagsToItem(toUnifiedImap(row), flagsMap);
+  }
+  if (key.startsWith('contact-')) {
+    const contactId = key.replace(/^contact-/, '');
+    for (const c of await listContactMessages(dataDir, 500)) {
+      if (c.id === contactId) return applyPostaFlagsToItem(toUnifiedContact(c), flagsMap);
+    }
+    return null;
+  }
+  const billResult = await listBillEmailInbox(dataDir, tenantId, { limit: 300 });
+  for (const row of billResult.messages ?? []) {
+    const unified = toUnifiedBill(row);
+    if (unified.id === key) return applyPostaFlagsToItem(unified, flagsMap);
+  }
+  return null;
+}
+
 export async function loadPostaInboxAttachment(dataDir, tenantId, inboxId, attachmentId) {
   const row = await findPostaImapMessage(dataDir, tenantId, inboxId);
   const meta = row?.attachments?.find((a) => a.id === attachmentId);
