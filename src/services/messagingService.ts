@@ -18,6 +18,8 @@ export type MessagingThread = {
   pinned?: boolean;
   archived?: boolean;
   muted?: boolean;
+  channel?: 'web' | 'whatsapp' | 'sms' | string;
+  externalId?: string | null;
 };
 
 export type MessagingAttachment = {
