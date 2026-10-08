@@ -15360,6 +15360,78 @@ input {
   color: var(--text);
 }
 .posta-hub-header { align-items: flex-start; gap: 12px; }
+.posta-hub-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.posta-hub-push-anchor {
+  position: relative;
+}
+.posta-hub-push-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--posta-border-soft);
+  background: #fff;
+  color: var(--greenleaf-dark);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(27, 61, 26, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+.posta-hub-push-bell:hover,
+.posta-hub-push-bell.is-open {
+  border-color: rgba(81, 184, 72, 0.45);
+  box-shadow: 0 6px 18px rgba(45, 107, 40, 0.12);
+}
+.posta-hub-push-bell.is-warn {
+  color: #c2410c;
+}
+.posta-hub-push-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(180deg, var(--greenleaf) 0%, var(--greenleaf-dark) 100%);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(45, 107, 40, 0.35);
+}
+.posta-hub-push-badge--warn {
+  background: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
+}
+.posta-hub-push-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--posta-border-soft);
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(27, 61, 26, 0.15);
+}
+.posta-hub-push-popover .posta-hub-push-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.posta-hub-push-popover .posta-hub-push-hint {
+  margin: 10px 0 0;
+}
 .posta-live-pill {
   display: inline-flex;
   align-items: center;
@@ -15583,9 +15655,9 @@ input {
   padding: 16px 20px;
 }
 .posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet {
-  height: calc(100dvh - 200px);
+  height: calc(100dvh - 168px);
   min-height: 480px;
-  max-height: calc(100dvh - 160px);
+  max-height: calc(100dvh - 140px);
 }
 .posta-hub-push-bar {
   display: flex;

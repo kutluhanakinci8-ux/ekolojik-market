@@ -256,7 +256,8 @@ export function EkolojikPostaHubScreen({
   const [pushConfig, setPushConfig] = useState<PostaPushConfig | null>(null);
   const [pushSubscribers, setPushSubscribers] = useState(0);
   const [pushBusy, setPushBusy] = useState(false);
-  const [pushBarExpanded, setPushBarExpanded] = useState(false);
+  const [pushPanelOpen, setPushPanelOpen] = useState(false);
+  const pushPanelRef = useRef<HTMLDivElement>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
@@ -273,6 +274,17 @@ export function EkolojikPostaHubScreen({
   const [batchBusy, setBatchBusy] = useState(false);
   const [inboxOffline, setInboxOffline] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!pushPanelOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!pushPanelRef.current?.contains(e.target as Node)) {
+        setPushPanelOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [pushPanelOpen]);
 
   const customersForMessaging = useMemo(() => store.customers.slice(0, 500), [store.customers]);
 
@@ -1091,22 +1103,122 @@ export function EkolojikPostaHubScreen({
             </span>
           </h1>
         </div>
-        <div className="posta-hub-view-switch" role="tablist" aria-label="Görünüm">
-          {(['posta', 'sohbet', 'tam'] as HubLayout[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              role="tab"
-              aria-selected={hubLayout === mode}
-              className={hubLayout === mode ? 'active' : ''}
-              onClick={() => {
-                setHubLayout(mode);
-                if (mode === 'sohbet') setFolder('mesajlar');
-              }}
-            >
-              {mode === 'posta' ? 'Posta' : mode === 'sohbet' ? 'Sohbet' : 'Tam'}
-            </button>
-          ))}
+        <div className="posta-hub-hero-actions">
+          {pushConfig && (
+            <div className="posta-hub-push-anchor" ref={pushPanelRef}>
+              <button
+                type="button"
+                className={`posta-hub-push-bell${pushPanelOpen ? ' is-open' : ''}${
+                  !pushConfig.configured ? ' is-warn' : ''
+                }`}
+                aria-expanded={pushPanelOpen}
+                aria-haspopup="dialog"
+                title="Masaüstü bildirimleri"
+                onClick={() => setPushPanelOpen((open) => !open)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V4a2 2 0 1 0-4 0v.29A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"
+                  />
+                </svg>
+                {!pushConfig.configured ? (
+                  <span className="posta-hub-push-badge posta-hub-push-badge--warn" aria-hidden="true">!</span>
+                ) : pushSubscribers > 0 ? (
+                  <span className="posta-hub-push-badge">{pushSubscribers}</span>
+                ) : null}
+              </button>
+              {pushPanelOpen && (
+                <div className="posta-hub-push-popover" role="dialog" aria-label="Masaüstü bildirimleri">
+                  <p className="posta-hub-push-title">
+                    Masaüstü bildirimleri · {pushConfig.configured ? 'Hazır' : 'Kurulum gerekli'} ·{' '}
+                    {pushSubscribers} cihaz
+                  </p>
+                  <div className="posta-hub-compose-actions">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      disabled={pushBusy || !pushConfig.configured || !pushConfig.publicKey}
+                      onClick={async () => {
+                        if (!pushConfig.publicKey) return;
+                        setPushBusy(true);
+                        try {
+                          const result = await subscribePostaWebPush(pushConfig.publicKey);
+                          setFlash(result.ok ? 'Push bildirimleri açıldı' : result.error ?? 'Push aboneliği başarısız');
+                          if (result.ok) {
+                            const status = await fetchPostaPushStatus();
+                            if (status.ok) setPushSubscribers(status.subscribers ?? 0);
+                          }
+                        } finally {
+                          setPushBusy(false);
+                        }
+                      }}
+                    >
+                      Bildirimleri aç
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      disabled={pushBusy}
+                      onClick={async () => {
+                        setPushBusy(true);
+                        try {
+                          await unsubscribePostaWebPush();
+                          const status = await fetchPostaPushStatus();
+                          if (status.ok) setPushSubscribers(status.subscribers ?? 0);
+                          setFlash('Push aboneliği kaldırıldı');
+                        } finally {
+                          setPushBusy(false);
+                        }
+                      }}
+                    >
+                      Kapat
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      disabled={pushBusy || !pushConfig.configured}
+                      onClick={async () => {
+                        setPushBusy(true);
+                        try {
+                          const result = await sendPostaPushTest();
+                          setFlash(
+                            result.ok
+                              ? `Test push gönderildi (${result.sent ?? 0} cihaz)`
+                              : result.error ?? 'Test push başarısız (VAPID veya abone yok)',
+                          );
+                        } finally {
+                          setPushBusy(false);
+                        }
+                      }}
+                    >
+                      Test push
+                    </button>
+                  </div>
+                  {!pushConfig.configured && pushConfig.hint && (
+                    <p className="posta-hub-push-hint">{pushConfig.hint}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="posta-hub-view-switch" role="tablist" aria-label="Görünüm">
+            {(['posta', 'sohbet', 'tam'] as HubLayout[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="tab"
+                aria-selected={hubLayout === mode}
+                className={hubLayout === mode ? 'active' : ''}
+                onClick={() => {
+                  setHubLayout(mode);
+                  if (mode === 'sohbet') setFolder('mesajlar');
+                }}
+              >
+                {mode === 'posta' ? 'Posta' : mode === 'sohbet' ? 'Sohbet' : 'Tam'}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -1131,99 +1243,6 @@ export function EkolojikPostaHubScreen({
           Çevrimdışı — son kaydedilen gelen kutusu listesi gösteriliyor (salt okuma).
         </p>
       )}
-      {pushConfig && hubLayout === 'sohbet' && !pushBarExpanded ? (
-        <div className="posta-hub-push-compact">
-          <button
-            type="button"
-            className="posta-hub-push-compact-btn"
-            onClick={() => setPushBarExpanded(true)}
-          >
-            Bildirimler · {pushConfig.configured ? 'Hazır' : 'Kurulum'} · {pushSubscribers} cihaz
-          </button>
-        </div>
-      ) : null}
-      {pushConfig && (hubLayout !== 'sohbet' || pushBarExpanded) ? (
-        <div className="posta-hub-push-bar">
-          <span className="posta-hub-push-title">
-            Masaüstü bildirimleri · {pushConfig.configured ? 'Hazır' : 'Kurulum gerekli'} ·{' '}
-            {pushSubscribers} cihaz
-          </span>
-          <div className="posta-hub-compose-actions">
-            <button
-              type="button"
-              className="btn btn-sm btn-outline"
-              disabled={pushBusy || !pushConfig.configured || !pushConfig.publicKey}
-              onClick={async () => {
-                if (!pushConfig.publicKey) return;
-                setPushBusy(true);
-                try {
-                  const result = await subscribePostaWebPush(pushConfig.publicKey);
-                  setFlash(result.ok ? 'Push bildirimleri açıldı' : result.error ?? 'Push aboneliği başarısız');
-                  if (result.ok) {
-                    const status = await fetchPostaPushStatus();
-                    if (status.ok) setPushSubscribers(status.subscribers ?? 0);
-                  }
-                } finally {
-                  setPushBusy(false);
-                }
-              }}
-            >
-              Bildirimleri aç
-            </button>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline"
-              disabled={pushBusy}
-              onClick={async () => {
-                setPushBusy(true);
-                try {
-                  await unsubscribePostaWebPush();
-                  const status = await fetchPostaPushStatus();
-                  if (status.ok) setPushSubscribers(status.subscribers ?? 0);
-                  setFlash('Push aboneliği kaldırıldı');
-                } finally {
-                  setPushBusy(false);
-                }
-              }}
-            >
-              Kapat
-            </button>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline"
-              disabled={pushBusy || !pushConfig.configured}
-              onClick={async () => {
-                setPushBusy(true);
-                try {
-                  const result = await sendPostaPushTest();
-                  setFlash(
-                    result.ok
-                      ? `Test push gönderildi (${result.sent ?? 0} cihaz)`
-                      : result.error ?? 'Test push başarısız (VAPID veya abone yok)',
-                  );
-                } finally {
-                  setPushBusy(false);
-                }
-              }}
-            >
-              Test push
-            </button>
-            {hubLayout === 'sohbet' && (
-              <button
-                type="button"
-                className="btn btn-sm btn-outline"
-                onClick={() => setPushBarExpanded(false)}
-              >
-                Gizle
-              </button>
-            )}
-          </div>
-          {!pushConfig.configured && pushConfig.hint && (
-            <p className="posta-hub-push-hint">{pushConfig.hint}</p>
-          )}
-        </div>
-      ) : null}
-
       {postaStorage && hubLayout !== 'sohbet' && (
         <div className="posta-hub-meta-strip">
           <div className="posta-hub-storage" role="status" aria-label="Posta depolama">
