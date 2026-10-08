@@ -15665,7 +15665,10 @@ input {
   flex-direction: column;
   gap: 0;
   padding: 8px 16px 6px;
+  padding-bottom: 6px;
   min-height: 0;
+  flex: 1 1 auto;
+  max-height: 100%;
 }
 .module-screen.posta-hub-screen--sohbet-focus > .posta-hub-hero,
 .module-screen.posta-hub-screen--sohbet-focus > .settings-flash,
@@ -15686,6 +15689,11 @@ input {
   min-height: 0;
   height: auto;
   max-height: none;
+  overflow: hidden;
+}
+.posta-hub-screen--sohbet-focus .posta-hub-shell {
+  min-height: 0;
+  overflow: hidden;
 }
 .posta-hub-push-bar {
   display: flex;
@@ -15808,22 +15816,48 @@ input {
   width: 100%;
   box-sizing: border-box;
 }
+.posta-hub-list.posta-hub-list--sohbet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
 .posta-hub-list--sohbet .posta-hub-list-rail--sohbet > ul {
   list-style: none;
   margin: 0;
-  padding: 8px 0 12px;
+  padding: 0 0 12px;
   width: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .posta-hub-list--sohbet .posta-hub-list-rail--sohbet .posta-hub-thread-item {
   margin: 0;
   padding: 0;
   width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+  flex: 0 0 auto;
 }
 .posta-hub-list--sohbet .posta-hub-list-rail--sohbet .posta-hub-thread-btn {
   width: 100%;
   max-width: 100%;
-  margin: 0 0 6px;
+  margin: 0;
+  box-sizing: border-box;
+}
+.posta-hub-list--sohbet .posta-hub-list-rail--sohbet .posta-hub-list-toolbar {
+  width: 100%;
+  align-items: stretch;
+}
+.posta-hub-list--sohbet .posta-hub-list-rail--sohbet .posta-hub-list-toolbar > .btn {
+  align-self: stretch;
+  width: 100%;
   box-sizing: border-box;
 }
 .posta-hub-list--sohbet .posta-hub-list-rail--sohbet li button.is-unread {
@@ -15833,19 +15867,42 @@ input {
 .posta-hub-list--sohbet .posta-hub-list-rail--sohbet li button.is-unread.is-active {
   box-shadow: inset 3px 0 0 var(--greenleaf), 0 8px 20px rgba(45, 107, 40, 0.1);
 }
-.posta-hub-list--sohbet .posta-hub-thread-top strong {
+.posta-hub-thread-top-title {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+  flex: 1 1 auto;
+}
+.posta-hub-list--sohbet .posta-hub-thread-top strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.posta-hub-thread-badges {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  width: 2.35em;
 }
 .posta-hub-thread-pin,
 .posta-hub-thread-mute {
   flex-shrink: 0;
   display: inline-flex;
-  width: 1.15em;
+  width: 1.1em;
   justify-content: center;
-  margin-right: 2px;
+  font-size: 0.92em;
+  line-height: 1;
+}
+.posta-hub-list--sohbet .posta-hub-thread-btn.is-unread {
+  border-left: none;
+  box-shadow: inset 3px 0 0 var(--greenleaf), 0 1px 2px rgba(27, 61, 26, 0.04);
+}
+.posta-hub-list--sohbet .posta-hub-thread-btn.is-unread.is-active {
+  box-shadow: inset 3px 0 0 var(--greenleaf), 0 8px 20px rgba(45, 107, 40, 0.1);
 }
 .posta-hub-sohbet-strip {
   display: flex;

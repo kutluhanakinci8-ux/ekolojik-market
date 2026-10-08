@@ -1087,7 +1087,7 @@ export function EkolojikPostaHubScreen({
   return (
     <div
       className={`module-screen posta-hub-screen posta-hub-screen--premium${
-        hubLayout === 'sohbet' ? ' posta-hub-screen--sohbet-focus' : ''
+        hubLayout === 'sohbet' || folder === 'mesajlar' ? ' posta-hub-screen--sohbet-focus' : ''
       }`}
     >
       <header className="module-header posta-hub-header posta-hub-hero">
@@ -1607,11 +1607,17 @@ export function EkolojikPostaHubScreen({
                       </span>
                       <span className="posta-hub-thread-body">
                         <span className="posta-hub-thread-top">
-                          <strong>
-                            {t.pinned ? <span className="posta-hub-thread-pin" title="Sabit">📌</span> : null}
-                            {t.muted ? <span className="posta-hub-thread-mute" title="Sessiz">🔕</span> : null}
-                            {t.customerName}
-                          </strong>
+                          <span className="posta-hub-thread-top-title">
+                            <span className="posta-hub-thread-badges" aria-hidden={!t.pinned && !t.muted}>
+                              <span className="posta-hub-thread-pin" title={t.pinned ? 'Sabit' : undefined}>
+                                {t.pinned ? '📌' : ''}
+                              </span>
+                              <span className="posta-hub-thread-mute" title={t.muted ? 'Sessiz' : undefined}>
+                                {t.muted ? '🔕' : ''}
+                              </span>
+                            </span>
+                            <strong>{t.customerName}</strong>
+                          </span>
                           <time dateTime={t.lastMessageAt}>{formatMessagingTime(t.lastMessageAt)}</time>
                         </span>
                         <span className="posta-hub-thread-subject">{t.subject}</span>
