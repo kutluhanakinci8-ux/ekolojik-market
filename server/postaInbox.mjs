@@ -56,19 +56,6 @@ function subjectLabel(code) {
   return SUBJECT_LABELS[key] ?? code ?? 'Genel';
 }
 
-/** UTF-8 metin yanlışlıkla latin1 okunduysa (MÃ¼Återi) düzelt. */
-function repairUtf8Mojibake(str) {
-  const s = String(str ?? '');
-  if (!s || !/[ÃÄÅÆØ]/.test(s)) return s;
-  try {
-    const fixed = Buffer.from(s, 'latin1').toString('utf8');
-    if (fixed !== s && !/[ÃÄÅÆØ]/.test(fixed)) return fixed;
-    return s;
-  } catch {
-    return s;
-  }
-}
-
 function isUnread(row) {
   return !row.readAt;
 }
