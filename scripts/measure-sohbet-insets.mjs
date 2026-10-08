@@ -38,14 +38,14 @@ async function buildAuthBootstrap() {
 
 async function measureList(page) {
   return page.evaluate(() => {
-    const rail = document.querySelector('.posta-hub-list-rail--sohbet');
-    const railRect = rail?.getBoundingClientRect();
-    const search = document.querySelector('.posta-hub-list--sohbet .posta-hub-search');
+    const col = document.querySelector('.posta-yazisma-col');
+    const colRect = col?.getBoundingClientRect();
+    const search = document.querySelector('.posta-yazisma-col .posta-hub-search');
     const searchRect = search?.getBoundingClientRect();
-    const buttons = [...document.querySelectorAll('.posta-hub-list--sohbet .posta-hub-thread-btn')];
+    const buttons = [...document.querySelectorAll('.posta-yazisma-thread-card')];
     return {
-      railLeft: railRect?.left ?? null,
-      railWidth: railRect?.width ?? null,
+      colLeft: colRect?.left ?? null,
+      colWidth: colRect?.width ?? null,
       searchLeft: searchRect?.left ?? null,
       threads: buttons.map((btn, i) => {
         const r = btn.getBoundingClientRect();
@@ -54,7 +54,7 @@ async function measureList(page) {
         const liR = li?.getBoundingClientRect();
         return {
           index: i,
-          name: btn.querySelector('.posta-hub-thread-top strong')?.textContent?.trim().slice(0, 40) ?? '',
+          name: btn.querySelector('.posta-yazisma-thread-top strong')?.textContent?.trim().slice(0, 40) ?? '',
           btnLeft: r.left,
           btnRight: r.right,
           liLeft: liR?.left ?? null,
@@ -63,7 +63,7 @@ async function measureList(page) {
           borderLeftWidth: cs.borderLeftWidth,
           boxShadow: cs.boxShadow !== 'none' ? 'yes' : 'no',
           unread: btn.classList.contains('is-unread'),
-          pinned: Boolean(btn.querySelector('.posta-hub-thread-pin')),
+          pinned: Boolean(btn.querySelector('.posta-yazisma-thread-badges span')),
         };
       }),
     };
@@ -72,7 +72,9 @@ async function measureList(page) {
 
 async function measureOpenThread(page) {
   return page.evaluate(() => {
-    const inner = document.querySelector('.posta-hub-sohbet-inner');
+    const inner =
+      document.querySelector('.posta-yazisma-chat-frame') ||
+      document.querySelector('.posta-hub-sohbet-inner');
     if (!inner) return null;
     const innerRect = inner.getBoundingClientRect();
     const csInner = getComputedStyle(inner);
@@ -128,7 +130,7 @@ async function openSohbet(page) {
     await sohbetTab.click();
     await page.waitForTimeout(600);
   }
-  await page.waitForSelector('.posta-hub-list--sohbet .posta-hub-thread-btn', { timeout: 20000 });
+  await page.waitForSelector('.posta-yazisma-thread-card', { timeout: 20000 });
 }
 
 async function main() {
@@ -148,18 +150,18 @@ async function main() {
   await openSohbet(page);
 
   const listBase = await measureList(page);
-  const railLeft = listBase.railLeft;
+  const colLeft = listBase.colLeft;
   const listRows = listBase.threads.map((t) => ({
     ...t,
-    deltaFromRail: railLeft != null ? round(t.btnLeft - railLeft) : null,
+    deltaFromCol: colLeft != null ? round(t.btnLeft - colLeft) : null,
     deltaFromSearch: listBase.searchLeft != null ? round(t.btnLeft - listBase.searchLeft) : null,
   }));
 
   console.log('\n=== Yazışma listesi (sol kenar, px) ===');
-  console.log(`Rail sol: ${round(listBase.railLeft)} | Arama sol: ${round(listBase.searchLeft)}`);
+  console.log(`Kolon sol: ${round(listBase.colLeft)} | Arama sol: ${round(listBase.searchLeft)}`);
   for (const row of listRows) {
     console.log(
-      `#${row.index + 1} ${row.unread ? '●' : '○'} ${row.pinned ? '📌' : '  '} | btn=${round(row.btnLeft)} Δrail=${row.deltaFromRail} Δarama=${row.deltaFromSearch} padL=${row.paddingLeft} borderL=${row.borderLeftWidth}`,
+      `#${row.index + 1} ${row.unread ? '●' : '○'} | btn=${round(row.btnLeft)} Δkolon=${row.deltaFromCol} Δarama=${row.deltaFromSearch} padL=${row.paddingLeft}`,
     );
   }
   const btnLefts = listRows.map((r) => round(r.btnLeft));
@@ -167,14 +169,16 @@ async function main() {
   console.log(`\nListe kartları benzersiz btn.left: ${uniqueBtnLeft.join(', ')} (adet: ${uniqueBtnLeft.length}/${btnLefts.length})`);
 
   const threadMeasures = [];
-  const buttons = page.locator('.posta-hub-list--sohbet .posta-hub-thread-btn');
+  const buttons = page.locator('.posta-yazisma-thread-card');
   const count = await buttons.count();
 
   for (let i = 0; i < count; i++) {
     await buttons.nth(i).click();
-    await page.waitForSelector('.posta-hub-sohbet-inner', { timeout: 15000 });
+    await page.waitForSelector('.posta-yazisma-chat-frame, .posta-hub-sohbet-inner', { timeout: 15000 });
     await page.waitForTimeout(400);
-    const name = await buttons.nth(i).evaluate((el) => el.querySelector('.posta-hub-thread-top strong')?.textContent?.trim() ?? '');
+    const name = await buttons.nth(i).evaluate((el) =>
+      el.querySelector('.posta-yazisma-thread-top strong')?.textContent?.trim() ?? '',
+    );
     const m = await measureOpenThread(page);
     threadMeasures.push({ name: name.slice(0, 36), ...m });
   }
