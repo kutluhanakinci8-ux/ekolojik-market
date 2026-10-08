@@ -111,6 +111,10 @@ const INBOX_FOLDERS: PostaInboxFolder[] = [
   'taslaklar',
 ];
 
+function postaFolderRailCardClass(selected: boolean) {
+  return `posta-yazisma-thread-card posta-yazisma-thread-card--folder${selected ? ' is-active' : ''}`;
+}
+
 function isInboxMailFolder(folder: PostaFolder): folder is PostaInboxFolder {
   return (INBOX_FOLDERS as string[]).includes(folder);
 }
@@ -1269,48 +1273,40 @@ export function EkolojikPostaHubScreen({
       >
         {hubLayout !== 'sohbet' && (
         <aside className="posta-hub-folders" aria-label="Posta klasörleri">
-          <div className="posta-klasor-scroll">
-            <ul className="posta-klasor-list">
-              <li className="posta-klasor-compose-li">
-                <button type="button" className="btn btn-primary posta-hub-compose posta-klasor-btn" onClick={() => pickFolder('yaz')}>
+          <div className="posta-yazisma-col posta-klasor-rail">
+            <ul className="posta-yazisma-threads">
+              <li className="posta-yazisma-thread">
+                <button type="button" className="btn btn-primary posta-hub-compose" onClick={() => pickFolder('yaz')}>
                   Yaz
                 </button>
               </li>
               <li className="posta-hub-folder-group" aria-hidden="true">Gelen</li>
               {(['tumu', 'gelen', 'yildizli', 'ertelenen'] as PostaInboxFolder[]).map((f) => (
-                <li key={f}>
-                  <button
-                    type="button"
-                    className={`posta-klasor-btn${folder === f ? ' active' : ''}`}
-                    onClick={() => pickFolder(f)}
-                  >
+                <li key={f} className="posta-yazisma-thread">
+                  <button type="button" className={postaFolderRailCardClass(folder === f)} onClick={() => pickFolder(f)}>
                     {FOLDER_TITLES[f]}
                   </button>
                 </li>
               ))}
               <li className="posta-hub-folder-group" aria-hidden="true">Mağaza</li>
-              <li>
-                <button
-                  type="button"
-                  className={`posta-klasor-btn${folder === 'fatura' ? ' active' : ''}`}
-                  onClick={() => pickFolder('fatura')}
-                >
+              <li className="posta-yazisma-thread">
+                <button type="button" className={postaFolderRailCardClass(folder === 'fatura')} onClick={() => pickFolder('fatura')}>
                   Fatura
                 </button>
               </li>
-              <li>
+              <li className="posta-yazisma-thread">
                 <button
                   type="button"
-                  className={`posta-klasor-btn${folder === 'mesajlar' ? ' active' : ''}`}
+                  className={postaFolderRailCardClass(folder === 'mesajlar')}
                   onClick={() => pickFolder('mesajlar')}
                 >
                   Müşteri mesajları
                 </button>
               </li>
-              <li>
+              <li className="posta-yazisma-thread">
                 <button
                   type="button"
-                  className={`posta-klasor-btn${folder === 'gonderilen' ? ' active' : ''}`}
+                  className={postaFolderRailCardClass(folder === 'gonderilen')}
                   onClick={() => pickFolder('gonderilen')}
                 >
                   Gönderilen
@@ -1318,40 +1314,28 @@ export function EkolojikPostaHubScreen({
               </li>
               <li className="posta-hub-folder-group" aria-hidden="true">Diğer</li>
               {(['spam', 'arsiv', 'cop'] as PostaInboxFolder[]).map((f) => (
-                <li key={f}>
-                  <button
-                    type="button"
-                    className={`posta-klasor-btn${folder === f ? ' active' : ''}`}
-                    onClick={() => pickFolder(f)}
-                  >
+                <li key={f} className="posta-yazisma-thread">
+                  <button type="button" className={postaFolderRailCardClass(folder === f)} onClick={() => pickFolder(f)}>
                     {FOLDER_TITLES[f]}
                   </button>
                 </li>
               ))}
-              <li>
+              <li className="posta-yazisma-thread">
                 <button
                   type="button"
-                  className={`posta-klasor-btn${folder === 'taslaklar' ? ' active' : ''}`}
+                  className={postaFolderRailCardClass(folder === 'taslaklar')}
                   onClick={() => pickFolder('taslaklar')}
                 >
                   Taslaklar
                 </button>
               </li>
-              <li>
-                <button
-                  type="button"
-                  className={`posta-klasor-btn${folder === 'takvim' ? ' active' : ''}`}
-                  onClick={() => pickFolder('takvim')}
-                >
+              <li className="posta-yazisma-thread">
+                <button type="button" className={postaFolderRailCardClass(folder === 'takvim')} onClick={() => pickFolder('takvim')}>
                   Takvim
                 </button>
               </li>
-              <li>
-                <button
-                  type="button"
-                  className={`posta-klasor-btn${folder === 'kisiler' ? ' active' : ''}`}
-                  onClick={() => pickFolder('kisiler')}
-                >
+              <li className="posta-yazisma-thread">
+                <button type="button" className={postaFolderRailCardClass(folder === 'kisiler')} onClick={() => pickFolder('kisiler')}>
                   Kişiler
                 </button>
               </li>
@@ -1456,7 +1440,7 @@ export function EkolojikPostaHubScreen({
         )}
 
         {folder !== 'yaz' && folder !== 'mesajlar' && (
-          <section className="posta-hub-list">
+          <section className="posta-hub-list posta-yazisma-col posta-hub-list-col">
             <div className="posta-hub-list-head">
               <h2 className="posta-hub-list-title">{listTitle}</h2>
               {isInboxMailFolder(folder) && folder !== 'taslaklar' && (

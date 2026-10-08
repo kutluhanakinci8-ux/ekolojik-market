@@ -150,6 +150,19 @@
   box-shadow: 0 8px 20px rgba(45, 107, 40, 0.1);
 }
 
+/* Sol klasör menüsü — yazışma listesi kartının aynısı (tek gutter, is-active) */
+.posta-yazisma-thread-card--folder {
+  align-items: center;
+  gap: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.posta-yazisma-thread-card--folder.is-active {
+  color: var(--greenleaf-dark);
+}
+
 .posta-yazisma-thread-card.is-unread {
   box-shadow: inset 3px 0 0 var(--greenleaf), 0 1px 2px rgba(27, 61, 26, 0.04);
 }
