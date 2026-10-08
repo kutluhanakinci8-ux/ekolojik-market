@@ -538,6 +538,8 @@ export function EmailOutboxSettingsPanel() {
                 replyTo: postaSettings.replyTo,
                 opsEmail: postaSettings.opsEmail,
                 signatureHtml: postaSettings.signatureHtml,
+                customerTrackingNoticeEnabled: postaSettings.customerTrackingNoticeEnabled,
+                customerTrackingNoticeText: postaSettings.customerTrackingNoticeText,
                 notifications: postaSettings.notifications,
                 notificationMatrix: postaSettings.notificationMatrix,
               });
@@ -601,6 +603,30 @@ export function EmailOutboxSettingsPanel() {
                 setPostaSettings({ ...postaSettings, signatureHtml: e.target.value })
               }
               placeholder="<p>Ekolojik Market</p>"
+            />
+          </label>
+          <label className="settings-field settings-field--full" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={postaSettings.customerTrackingNoticeEnabled !== false}
+              onChange={(e) =>
+                setPostaSettings({
+                  ...postaSettings,
+                  customerTrackingNoticeEnabled: e.target.checked,
+                })
+              }
+            />
+            <span>Müşteri otomatik e-postada KVKK / izleme bilgilendirme metni (track açıkken)</span>
+          </label>
+          <label className="settings-field settings-field--full">
+            <span>İzleme bilgilendirme metni (boş = varsayılan KVKK)</span>
+            <textarea
+              rows={3}
+              value={postaSettings.customerTrackingNoticeText ?? ''}
+              onChange={(e) =>
+                setPostaSettings({ ...postaSettings, customerTrackingNoticeText: e.target.value })
+              }
+              placeholder="Bu ileti, istatistiksel açılma/tıklama ölçümü içerebilir…"
             />
           </label>
           <div className="settings-field settings-field--full">

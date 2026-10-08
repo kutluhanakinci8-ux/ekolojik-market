@@ -369,6 +369,7 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
             subject: message.subject,
             error: message.lastError,
             source: message.source,
+            tenantId: tid,
           });
         } catch {
           /* engagement opsiyonel */
@@ -383,6 +384,24 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
   }
 
   return results;
+}
+
+export async function findOutboxMessageByTrackToken(dataDir, token) {
+  const needle = String(token ?? '').trim();
+  if (!needle) return null;
+  const root = outboxRoot(dataDir);
+  await migrateLegacyFlatOutbox(root);
+  for (const sub of ['pending', 'sent', 'failed']) {
+    const locations = await collectJsonFilesInState(root, sub);
+    for (const loc of locations) {
+      const raw = await readFile(join(loc.dir, loc.file), 'utf8');
+      const msg = JSON.parse(raw);
+      if (msg.trackToken === needle) {
+        return { message: msg, folder: sub, tenantId: msg.tenantId ?? loc.tenantId };
+      }
+    }
+  }
+  return null;
 }
 
 export async function findOutboxMessageById(dataDir, id) {

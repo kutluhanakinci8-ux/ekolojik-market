@@ -42,7 +42,12 @@ import {
   type MessagingMessage,
   type MessagingThread,
 } from '../../services/messagingService';
-import { fetchPostaAiSuggest, fetchPostaMailSettings } from '../../services/postaSettingsService';
+import {
+  fetchPostaAiSuggest,
+  fetchPostaEngagementSummary,
+  fetchPostaMailSettings,
+  type PostaEngagementSummary,
+} from '../../services/postaSettingsService';
 import { PostaComposePanel } from './PostaComposePanel';
 import {
   buildForwardBody,
@@ -263,6 +268,7 @@ export function EkolojikPostaHubScreen({
   const [pushBusy, setPushBusy] = useState(false);
   const [pushPanelOpen, setPushPanelOpen] = useState(false);
   const pushPanelRef = useRef<HTMLDivElement>(null);
+  const [engagementSummary, setEngagementSummary] = useState<PostaEngagementSummary | null>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
@@ -457,9 +463,14 @@ export function EkolojikPostaHubScreen({
       if (r.ok && r.emails) setRecipientHints(r.emails);
     });
     void (async () => {
-      const [cfg, status] = await Promise.all([fetchPostaPushConfig(), fetchPostaPushStatus()]);
+      const [cfg, status, engagement] = await Promise.all([
+        fetchPostaPushConfig(),
+        fetchPostaPushStatus(),
+        fetchPostaEngagementSummary(14),
+      ]);
       if (cfg.ok) setPushConfig(cfg);
       if (status.ok) setPushSubscribers(status.subscribers ?? 0);
+      if (engagement.ok) setEngagementSummary(engagement);
     })();
   }, [refreshHealth]);
 
@@ -1122,6 +1133,17 @@ export function EkolojikPostaHubScreen({
             </div>
           </div>
         )}
+        {engagementSummary &&
+          (engagementSummary.mailTrackEnabled || engagementSummary.clickTrackEnabled) && (
+            <div className="posta-hub-engagement-strip" role="status" style={{ marginTop: 8, fontSize: '0.85rem' }}>
+              Engagement (son {engagementSummary.windowDays ?? 14} gün): açılma{' '}
+              <strong>{engagementSummary.counts?.opens ?? 0}</strong> (
+              {engagementSummary.counts?.uniqueOpens ?? 0} benzersiz) · tıklama{' '}
+              <strong>{engagementSummary.counts?.clicks ?? 0}</strong> · bounce{' '}
+              <strong>{engagementSummary.counts?.bounces ?? 0}</strong>
+              <span className="module-hint"> — detay: Ayarlar → E-posta</span>
+            </div>
+          )}
         <div className="posta-hub-hero-actions">
           {pushConfig && (
             <div className="posta-hub-push-anchor" ref={pushPanelRef}>

@@ -1,5 +1,6 @@
 import { getEkolojikMailConfig } from './ekolojikMailConfig.mjs';
 import { sendEkolojikMail } from './emailOutboxProcessor.mjs';
+import { appendCustomerTrackingNotice } from './postaCustomerEmailCompliance.mjs';
 import { getEffectiveMailPresentation, shouldSendPostaNotification } from './postaSettings.mjs';
 
 const SUBJECT_LABELS = {
@@ -78,10 +79,13 @@ export async function sendContactNotifications(dataDir, record, tenantId = 'main
   const autoreplyMatrix =
     await shouldSendPostaNotification(dataDir, 'contact', 'customerAutoreply', tenantId);
   if ((isContactAutoreplyEnabled() || autoreplyMatrix) && record.email?.includes('@')) {
+    const baseBody = formatAutoreplyBody(record);
+    const withNotice = await appendCustomerTrackingNotice(dataDir, tenantId, { text: baseBody, html: null });
     summary.autoreply = await sendEkolojikMail(dataDir, {
       to: record.email,
       subject: 'Ekolojik Market — talebiniz alındı',
-      body: formatAutoreplyBody(record),
+      body: withNotice.text,
+      html: withNotice.html ?? undefined,
       idempotencyKey: `contact:reply:${record.id}`,
       source: 'contact-autoreply',
       tenantId,
