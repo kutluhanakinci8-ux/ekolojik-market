@@ -223,3 +223,67 @@ export function completePostaOnboarding(store, options = {}) {
     onboarding,
   };
 }
+
+/**
+ * Mevcut mağazalar (Faz 3): tüm adminlere posta sekmesi + onboarding tamamlandı.
+ * Yeni kayıtlar (registrationEmail dolu, henüz tamamlanmamış) otomatik tamamlanmaz — sihirbaz kalır.
+ */
+export function migrateLegacyPostaOnboarding(store) {
+  if (!store || typeof store !== 'object') {
+    return { store, changed: false };
+  }
+
+  const settings = { ...(store.settings ?? {}) };
+  let users = Array.isArray(store.users) ? store.users : [];
+  let changed = false;
+
+  const applyGrant = (primaryOnly) => {
+    const grant = grantPostaTabToUsers({ ...store, settings, users }, { primaryOnly });
+    if (grant.changed) {
+      users = grant.users;
+      changed = true;
+    }
+  };
+
+  if (settings.postaOnboardingLegacyMigratedAt) {
+    applyGrant(false);
+    if (!changed) return { store, changed: false };
+    return { store: { ...store, settings, users, updatedAt: new Date().toISOString() }, changed: true };
+  }
+
+  const onboarding = settings.postaOnboarding;
+  const regEmail = String(onboarding?.registrationEmail ?? '').trim();
+  const isNewTenantInWizard =
+    Boolean(regEmail) && onboarding?.status !== 'completed' && onboarding?.status !== 'dismissed';
+
+  if (isNewTenantInWizard) {
+    applyGrant(true);
+    if (!changed) return { store, changed: false };
+    return { store: { ...store, settings, users, updatedAt: new Date().toISOString() }, changed: true };
+  }
+
+  applyGrant(false);
+
+  const completedAt = new Date().toISOString();
+  const mergedOnboarding = ensurePostaOnboarding(settings, settings.tenantMeta?.email);
+  settings.postaOnboarding = {
+    ...mergedOnboarding,
+    status: 'completed',
+    startedAt: mergedOnboarding.startedAt || completedAt,
+    completedAt,
+    migratedFromLegacy: true,
+    notes: mergedOnboarding.notes || 'Otomatik migrasyon (mevcut mağaza)',
+    steps: {
+      mailHealth: { done: true, skipped: false, at: completedAt },
+      messagingEmbed: { done: false, skipped: true, at: completedAt },
+      postaTab: { done: true, skipped: false, at: completedAt },
+    },
+  };
+  settings.postaOnboardingLegacyMigratedAt = completedAt;
+  changed = true;
+
+  return {
+    store: { ...store, settings, users, updatedAt: completedAt },
+    changed: true,
+  };
+}

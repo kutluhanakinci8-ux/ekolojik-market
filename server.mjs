@@ -44,6 +44,7 @@ import {
   getPostaOnboardingHub,
   patchPostaOnboardingState,
   completePostaOnboarding,
+  migrateLegacyPostaOnboarding,
 } from './server/postaOnboarding.mjs';
 import {
   buildOutboxCsv,
@@ -238,13 +239,23 @@ function resolveTenantId(url) {
 }
 
 async function readStoreData(tenantId = 'main') {
-  const data = await readTenantStore(DATA_DIR, tenantId);
-  if (!data?.products?.length) return data;
-  const { snapshot, changed } = applyIrsaliyeStockToStoreSnapshot(data);
-  if (changed) {
-    await writeStoreData(snapshot, tenantId);
+  let data = await readTenantStore(DATA_DIR, tenantId);
+  if (!data) return null;
+
+  const { store: migrated, changed: migChanged } = migrateLegacyPostaOnboarding(data);
+  data = migrated;
+  let persist = migChanged;
+
+  if (data?.products?.length) {
+    const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
+    data = snapshot;
+    if (stockChanged) persist = true;
   }
-  return snapshot;
+
+  if (persist) {
+    await writeStoreData(data, tenantId);
+  }
+  return data;
 }
 
 async function writeStoreData(data, tenantId = 'main') {
