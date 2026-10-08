@@ -3,6 +3,7 @@ import {
   enqueueEkolojikMail,
   processPendingOutbox,
   findOutboxByIdempotency,
+  idempotencyKeyForTenant,
 } from './emailOutbox.mjs';
 import { getEffectiveMailPresentation } from './postaSettings.mjs';
 import { injectOpenTrackingPixel, isMailTrackEnabled } from './postaMailTrack.mjs';
@@ -92,7 +93,10 @@ export async function sendEkolojikMail(dataDir, payload) {
     htmlBody = merged.html;
   }
 
-  const key = idempotencyKey || `ekolojik:${source ?? 'crm'}:${to}:${subject}`;
+  const key = idempotencyKeyForTenant(
+    tenantId,
+    idempotencyKey || `ekolojik:${source ?? 'crm'}:${to}:${subject}`,
+  );
   const existing = await findOutboxByIdempotency(dataDir, key);
   if (existing?.status === 'sent') {
     return {

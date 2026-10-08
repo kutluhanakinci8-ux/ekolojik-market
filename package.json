@@ -13,7 +13,8 @@
     "scrape:greenleaf": "node scripts/scrape-greenleaf.mjs",
     "scrape:greenleaf-shop": "node scripts/scrape-greenleaf-shop.mjs",
     "translate:greenleaf-shop": "node scripts/translate-greenleaf-shop.mjs",
-    "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs"
+    "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs",
+    "test:tenant-mail": "node scripts/e2e-tenant-mail.mjs"
   },
   "dependencies": {
     "imapflow": "^1.7.8",

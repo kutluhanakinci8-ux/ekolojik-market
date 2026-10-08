@@ -62,7 +62,7 @@ export async function sendContactNotifications(dataDir, record, tenantId = 'main
   const opsEmail = pres.opsEmail;
   const summary = { ops: null, autoreply: null, opsSkipped: false, autoreplySkipped: false };
 
-  if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'contact'))) {
+  if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'contact', 'opsEmail', tenantId))) {
     summary.ops = await sendEkolojikMail(dataDir, {
       to: opsEmail,
       subject: `[İletişim] ${subjectLabel(record.subject)} — ${record.name}`,
@@ -76,7 +76,7 @@ export async function sendContactNotifications(dataDir, record, tenantId = 'main
   }
 
   const autoreplyMatrix =
-    await shouldSendPostaNotification(dataDir, 'contact', 'customerAutoreply');
+    await shouldSendPostaNotification(dataDir, 'contact', 'customerAutoreply', tenantId);
   if ((isContactAutoreplyEnabled() || autoreplyMatrix) && record.email?.includes('@')) {
     summary.autoreply = await sendEkolojikMail(dataDir, {
       to: record.email,

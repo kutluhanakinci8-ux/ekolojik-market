@@ -107,6 +107,11 @@ function createInitialStore({ businessName, adminName, username, passwordHash, e
       tenantMeta: { email, phone, plan, trialEndsAt: new Date(Date.now() + 14 * 86400000).toISOString() },
       postaOnboarding: createDefaultPostaOnboarding(email),
       postaAliases: defaultAliasesForDomain(mailDomain),
+      postaMail: {
+        opsEmail: email,
+        fromName: businessName,
+        updatedAt: now,
+      },
     },
     priceType: 'partner',
     users: [
