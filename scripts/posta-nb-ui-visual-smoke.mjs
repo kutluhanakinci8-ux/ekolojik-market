@@ -177,6 +177,73 @@ async function main() {
     console.log('WARN #3 Gelen satır yok — boş inbox');
   }
 
+  const postaView = page.locator('.posta-hub-view-switch button', { hasText: /^Posta$/ });
+  if (await postaView.count()) {
+    await postaView.click();
+    await page.waitForTimeout(400);
+  }
+
+  await page.locator('button.posta-hub-compose', { hasText: 'Yaz' }).first().click();
+  await page.waitForSelector('.posta-hub-compose-form', { timeout: 20000 });
+  console.log('OK   #4 Yaz + şablon formu');
+
+  await page.locator('button', { hasText: 'Müşteri mesajları' }).first().click();
+  await page.waitForTimeout(1000);
+  assert((await page.locator('.posta-yazisma-col, .posta-hub-list').count()) > 0, '#5 mesajlar kolonu yok');
+  console.log('OK   #5 Müşteri mesajları hub');
+
+  const bodyMesajlar = await page.locator('body').innerText();
+  if (/Mesaj SLA/i.test(bodyMesajlar)) {
+    console.log('OK   #24 Messaging SLA şeridi');
+  } else {
+    console.log('WARN #24 SLA şeridi — veri yok veya kapalı');
+  }
+
+  if (await page.locator('.posta-hub-hero-storage, .posta-hub-hero-storage-label').count()) {
+    console.log('OK   #15 Depolama çubuğu (hero)');
+  } else {
+    console.log('WARN #15 depolama çubuğu görünmedi');
+  }
+
+  if (/Engagement/i.test(bodyMesajlar)) {
+    console.log('OK   #22 Engagement şeridi');
+  } else {
+    console.log('WARN #22 engagement — izleme kapalı veya özet yok');
+  }
+
+  const widgetRes = await page.request.get(`${BASE}/widget/messaging.js`);
+  assert(widgetRes.ok(), '#20 widget yüklenemedi');
+  console.log('OK   #20 Widget statik');
+
+  await page.locator('nav.app-topbar-tabs button', { hasText: 'Ayarlar' }).click();
+  await page.waitForTimeout(800);
+  const emailTab = page.locator('button', { hasText: 'E-posta' });
+  if (await emailTab.count()) {
+    await emailTab.first().click();
+    await page.waitForTimeout(2000);
+    const bodySettings = await page.locator('body').innerText();
+    assert(/outbox|Gönderilen|kuyruk/i.test(bodySettings), '#6 outbox ayarları görünmedi');
+    console.log('OK   #6 Gönderilen / outbox (Ayarlar → E-posta)');
+    assert(
+      /Faz 5 — ayrım kontrolü|LERTA_PLATFORM_BRIDGE|bridge/i.test(bodySettings),
+      '#10 Faz 5 izolasyon paneli yok',
+    );
+    console.log('OK   #10 Bağımsız altyapı (Faz 5)');
+    if (/deliverability|DNS|Gönderen & DNS/i.test(bodySettings)) {
+      console.log('OK   #21 DNS deliverability paneli');
+    } else {
+      console.log('WARN #21 deliverability paneli görünmedi');
+    }
+    if (/messaging|Mesajlaşma|public-config/i.test(bodySettings)) {
+      console.log('OK   #20b Messaging / public key (ayarlar)');
+    }
+  } else {
+    console.log('WARN #6/#10/#21 — E-posta ayar sekmesi bulunamadı');
+  }
+
+  await page.locator('nav.app-topbar-tabs button', { hasText: 'Posta' }).click();
+  await page.waitForSelector('.posta-hub-screen--premium', { timeout: 20000 });
+
   const sohbetTab = page.locator('.posta-hub-view-switch button', { hasText: /^Sohbet$/ });
   if ((await sohbetTab.count()) > 0) {
     await sohbetTab.click();
