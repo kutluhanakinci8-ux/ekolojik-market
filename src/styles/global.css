@@ -15374,8 +15374,10 @@ input {
   min-width: 0;
 }
 .posta-hub-hero {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
+  gap: 16px 20px;
   margin: 0 20px 16px;
   padding: 20px 24px;
   background: var(--posta-surface);
@@ -15407,12 +15409,39 @@ input {
   color: var(--text);
 }
 .posta-hub-header { align-items: flex-start; gap: 12px; }
+.posta-hub-hero-text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.posta-hub-hero-storage {
+  flex: 1 1 180px;
+  min-width: 160px;
+  max-width: 280px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--posta-border-soft);
+  background: linear-gradient(180deg, #fafdfb 0%, #f3faf2 100%);
+  box-sizing: border-box;
+}
+.posta-hub-hero-storage-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+.posta-hub-hero-storage-track {
+  margin: 0;
+}
 .posta-hub-hero-actions {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex: 0 1 auto;
+  margin-left: auto;
 }
 .posta-hub-push-anchor {
   position: relative;
@@ -15779,6 +15808,9 @@ input {
 .posta-hub-screen--sohbet-focus .posta-hub-hero {
   margin-bottom: 8px;
   padding: 12px var(--posta-yazisma-gutter, 16px);
+}
+.posta-hub-screen--sohbet-focus .posta-hub-hero-storage {
+  max-width: 240px;
 }
 .posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet {
   min-height: 0;
