@@ -36,7 +36,13 @@ Otomatik (VPS):
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-ui-yuruyus.sh
 ```
 
-Headless POS (Playwright — otomatik: #1–6, #10, #15, #18–18b, #20–21, #24–25; WARN olabilir: #22; manuel: #7–9, #11–14, #16–17, #19, #23):
+Tek kapı (VPS):
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-wave3-operator-kapi.sh /var/www/market-pos
+```
+
+Headless POS (Playwright — otomatik: #1–11, #13, #15–16, #18–19, #20–21, #24–25; WARN: #22–23; manuel: #12, #14, #17):
 
 ```bash
 npm i -D playwright && npx playwright install chromium
