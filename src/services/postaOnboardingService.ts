@@ -118,6 +118,8 @@ export type MessagingPublicConfigHub = {
   rotatedAt: string | null;
   apiPrefix: string;
   authHeader: string;
+  allowedOrigins?: string[];
+  widgetScriptUrl?: string;
 };
 
 export async function fetchMessagingPublicConfig(): Promise<MessagingPublicConfigHub | null> {
@@ -139,14 +141,39 @@ export async function rotateMessagingPublicKey(): Promise<MessagingPublicConfigH
 export function buildMessagingEmbedSnippet(tenantId: string, apiKey: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ekolojikmarket.com.tr';
   const key = apiKey || 'API_ANAHTARI';
-  const tenantQs = tenantId && tenantId !== 'main' ? `?tenant=${encodeURIComponent(tenantId)}` : '';
-  return `<!-- Ekolojik müşteri mesajlaşma -->
+  const tenantLine =
+    tenantId && tenantId !== 'main' ? `\n    tenantId: '${tenantId}',` : `\n    tenantId: 'main',`;
+  return `<!-- Ekolojik müşteri mesajlaşma (Faz 40) -->
+<script src="${origin}/widget/messaging.js" defer></script>
 <script>
-  window.EkolojikMessaging = {
-    tenantId: '${tenantId}',
-    apiBase: '${origin}/api/public/messaging/v1',
-    apiKey: '${key}',
-    tenantQuery: '${tenantQs}'
-  };
+  document.addEventListener('DOMContentLoaded', function () {
+    EkolojikMessaging.init({${tenantLine}
+      apiKey: '${key}',
+      apiBase: '${origin}/api/public/messaging/v1'
+    });
+  });
 </script>`;
+}
+
+export async function saveMessagingAllowedOrigins(origins: string[]): Promise<MessagingPublicConfigHub | null> {
+  const res = await posHubFetch(`/api/messaging/public-config${tenantQuery()}`, {
+    method: 'POST',
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ allowedOrigins: origins }),
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as MessagingPublicConfigHub;
+}
+
+export async function testMessagingWidgetSmoke(): Promise<{
+  ok: boolean;
+  thread?: { id: string };
+  error?: string;
+}> {
+  const res = await posHubFetch(`/api/messaging/widget-test${tenantQuery()}`, {
+    method: 'POST',
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: '{}',
+  });
+  return res.json();
 }

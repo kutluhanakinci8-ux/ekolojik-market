@@ -104,7 +104,9 @@ import {
   publicListMessages,
   publicPostMessage,
   publicTyping,
+  smokeTestMessagingWidget,
 } from './server/messaging/publicApi.mjs';
+import { writeMessagingCorsHeaders } from './server/messaging/publicCors.mjs';
 import {
   getMessagingPublicConfigHub,
   saveMessagingPublicConfig,
@@ -272,6 +274,21 @@ async function serveFile(path, res) {
 function resolveTenantId(url) {
   const tenant = url.searchParams.get('tenant')?.trim();
   return tenant && tenant !== 'main' ? tenant : 'main';
+}
+
+async function publicMessagingCorsGuard(req, res, tenantId) {
+  const cors = await writeMessagingCorsHeaders(req, res, DATA_DIR, tenantId);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(cors.ok ? 204 : cors.status ?? 403);
+    res.end();
+    return false;
+  }
+  if (!cors.ok && req.headers.origin) {
+    res.writeHead(cors.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: cors.error }));
+    return false;
+  }
+  return true;
 }
 
 async function readStoreData(tenantId = 'main') {
@@ -1232,6 +1249,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/capabilities' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       try {
         const caps = await getMessagingPublicCapabilities(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1245,6 +1263,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const auth = await assertMessagingPublicAuth(req, DATA_DIR, tenantId);
       if (!auth.ok) {
         res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1265,6 +1284,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const token = url.searchParams.get('token')?.trim() || '';
       const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
@@ -1286,6 +1306,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const token = url.searchParams.get('token')?.trim() || '';
       const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
@@ -1326,6 +1347,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads/typing' && (req.method === 'GET' || req.method === 'POST')) {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const token = url.searchParams.get('token')?.trim() || '';
       const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
@@ -2143,6 +2165,20 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/messaging/widget-test' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const result = await smokeTestMessagingWidget(DATA_DIR, tenantId);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Widget test hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/messaging/capabilities' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
       try {
@@ -2578,6 +2614,23 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname.endsWith('/')) pathname += 'index.html';
+
+    if (pathname === '/widget/messaging.js') {
+      const widgetPath = join(DIST, 'widget', 'messaging.js');
+      try {
+        const data = await readFile(widgetPath);
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+        });
+        res.end(data);
+        return;
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('widget/messaging.js bulunamadı — npm run build');
+        return;
+      }
+    }
 
     const filePath = join(DIST, pathname);
     const fileStat = await stat(filePath).catch(() => null);

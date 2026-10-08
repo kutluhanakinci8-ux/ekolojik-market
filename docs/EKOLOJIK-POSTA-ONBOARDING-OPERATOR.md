@@ -101,6 +101,9 @@ bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh
 |-----|-----|
 | `GET /api/messaging/public-config?tenant=…` | Anahtar durumu |
 | `POST /api/messaging/public-config` body `{ "rotate": true }` | Yeni tenant anahtarı |
+| `GET /widget/messaging.js` | Embed script (cache 24s sunucu) |
+| `POST /api/messaging/widget-test` | Admin smoke — test thread POS Sohbet’e düşer |
+| `allowedOrigins` (public-config JSON) | Harici site CORS allowlist |
 | `GET /api/public/messaging/v1/capabilities?tenant=…` | Widget “API açık mı?” |
 
 Embed örneği (sihirbazda kopyalanır):

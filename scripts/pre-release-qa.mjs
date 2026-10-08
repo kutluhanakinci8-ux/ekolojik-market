@@ -241,8 +241,24 @@ async function postaMessagingGate(token) {
   }
 }
 
+async function widgetStaticGate() {
+  console.log('\n=== 6. Widget statik ===\n');
+  try {
+    const r = await http('GET', '/widget/messaging.js');
+    if (r.status === 200 && r.json?._raw?.includes('EkolojikMessaging')) {
+      pass('widget', 'GET /widget/messaging.js');
+    } else if (r.status === 200) {
+      pass('widget', 'GET /widget/messaging.js', '200');
+    } else {
+      fail('widget', 'GET /widget/messaging.js', `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    fail('widget', '/widget/messaging.js', e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function integrationGate() {
-  console.log('\n=== 6. Entegrasyon / yapı ===\n');
+  console.log('\n=== 7. Entegrasyon / yapı ===\n');
   const iso = await http('GET', '/api/system/ekolojik-isolation');
   if (iso.ok && (iso.json?.ok === true || iso.json?.checks)) {
     pass('integration', 'ekolojik-isolation', `HTTP ${iso.status}`);
@@ -260,7 +276,7 @@ async function integrationGate() {
 }
 
 async function localOutboxStructure() {
-  console.log('\n=== 7. Outbox yapı (yerel modül) ===\n');
+  console.log('\n=== 8. Outbox yapı (yerel modül) ===\n');
   const tmp = join(REPO, '.qa-tmp-data');
   await mkdir(tmp, { recursive: true });
   const { enqueueEkolojikMail, getOutboxCounts, processPendingOutbox } = await import('../server/emailOutbox.mjs');
@@ -296,6 +312,7 @@ async function main() {
     await securityGate();
     const token = await authAndDataGate();
     await postaMessagingGate(token);
+    await widgetStaticGate();
     await integrationGate();
   } else {
     warn('run', 'Canlı API testleri atlandı — sunucu ayakta değil');
