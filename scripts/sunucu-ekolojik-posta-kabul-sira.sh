@@ -59,8 +59,15 @@ else
 fi
 echo ""
 
-echo "--- 7/7 Özet ---"
+if [[ "${EKOLOJIK_SKIP_WAVE3:-0}" != "1" ]]; then
+  echo "--- 7/8 Wave 3 doğrulama (Faz 38–52) ---"
+  bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-wave3-dogrula.sh" "${INSTALL_DIR}"
+  echo ""
+fi
+
+echo "--- 8/8 Özet ---"
 echo "Kod statik: bash ${REPO_ROOT}/scripts/sunucu-ekolojik-kod-parite-dogrula.sh"
+echo "Wave 3: bash ${REPO_ROOT}/scripts/sunucu-ekolojik-posta-wave3-dogrula.sh ${INSTALL_DIR}"
 echo "DNS panel: SPF/DMARC/DKIM TXT yayınlandıktan sonra EKOLOJIK_DNS_STRICT=1 dns-mail-dogrula"
 echo "Manuel UI: docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md"
 echo "Operatör: docs/EKOLOJIK-POSTA-KULLANIM.md"
