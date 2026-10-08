@@ -15582,11 +15582,10 @@ input {
   margin-bottom: 10px;
   padding: 16px 20px;
 }
-.posta-hub-screen--sohbet-focus .posta-hub-shell {
-  min-height: min(72vh, 680px);
-}
-.posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet .posta-hub-sohbet-messages {
-  max-height: min(68vh, 620px);
+.posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet {
+  height: calc(100dvh - 200px);
+  min-height: 480px;
+  max-height: calc(100dvh - 160px);
 }
 .posta-hub-push-bar {
   display: flex;
@@ -15714,15 +15713,38 @@ input {
 }
 .posta-hub-shell--sohbet .posta-hub-list {
   border-right: 1px solid var(--posta-border-soft);
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-.posta-hub-sohbet-panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
-.posta-hub-sohbet-messages { flex: 1; overflow: auto; max-height: min(58vh, 520px); }
+.posta-hub-shell--sohbet .posta-hub-list--sohbet > ul {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.posta-hub-shell--sohbet .posta-hub-detail {
+  min-height: 0;
+  overflow: hidden;
+}
+.posta-hub-sohbet-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
 .posta-hub-msg-search { margin-bottom: 4px; }
 @media (max-width: 900px) {
   .posta-hub-shell--sohbet { grid-template-columns: 1fr; }
+  .posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet {
+    height: calc(100dvh - 180px);
+    min-height: 400px;
+  }
   .posta-hub-shell--sohbet-open .posta-hub-list { display: none; }
   .posta-hub-shell--sohbet-open .posta-hub-folders { display: none; }
-  .posta-hub-sohbet-messages { max-height: 45vh; }
 }
 .posta-hub-list-toolbar {
   display: flex;
@@ -15784,6 +15806,8 @@ input {
   flex-direction: column;
   padding: 0;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
   background: linear-gradient(180deg, #f9fcf8 0%, #fff 42%);
 }
 .posta-hub-screen--premium .posta-hub-list--sohbet .posta-hub-list ul {
@@ -15872,8 +15896,13 @@ input {
 .posta-hub-sohbet-panel {
   flex: 1;
   min-height: 0;
-  padding: 16px 20px 20px;
+  padding: 16px 20px 12px;
   gap: 12px;
+}
+.posta-hub-sohbet-header,
+.posta-hub-sohbet-search-wrap,
+.posta-hub-sohbet-typing {
+  flex-shrink: 0;
 }
 .posta-hub-sohbet-header {
   display: flex;
@@ -15930,15 +15959,18 @@ input {
   padding: 0 2px;
 }
 .posta-hub-screen--premium .posta-hub-sohbet-messages {
-  flex: 1;
-  min-height: 200px;
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: none;
   margin: 0;
   padding: 8px 4px 12px;
   gap: 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
   scroll-behavior: smooth;
   display: flex;
   flex-direction: column;
+  -webkit-overflow-scrolling: touch;
 }
 .posta-hub-screen--premium .posta-sohbet-msg {
   display: flex;
@@ -16066,13 +16098,12 @@ input {
   50% { opacity: 1; transform: translateX(2px); }
 }
 .posta-hub-screen--premium .posta-hub-sohbet-compose {
-  margin-top: auto;
+  flex-shrink: 0;
+  margin-top: 0;
   max-width: none;
-  padding-top: 8px;
+  padding: 8px 0 4px;
   border-top: 1px solid var(--posta-border-soft);
-  background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.92) 24%);
-  position: sticky;
-  bottom: 0;
+  background: #fff;
 }
 .posta-sohbet-compose-box {
   border: 1px solid var(--posta-border-soft);
@@ -16088,8 +16119,9 @@ input {
   font: inherit;
   font-size: 14px;
   line-height: 1.5;
-  resize: vertical;
-  min-height: 72px;
+  resize: none;
+  min-height: 64px;
+  max-height: 120px;
   background: transparent;
 }
 .posta-sohbet-compose-box textarea:focus {
@@ -16160,9 +16192,6 @@ input {
   font-size: 13px;
   color: var(--text-muted);
   line-height: 1.5;
-}
-.posta-hub-shell--sohbet .posta-hub-sohbet-messages {
-  max-height: min(62vh, 560px);
 }
 @media (max-width: 900px) {
   .posta-hub-sohbet-back {
