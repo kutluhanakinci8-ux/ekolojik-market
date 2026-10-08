@@ -242,7 +242,7 @@ Public API tenant çözümlemesi: `X-Ekolojik-Tenant` header veya embed snippet�
 
 - [x] **6a** — `data/tenant-mail/{tenantId}.json`, `GET/PUT /api/posta/tenant-mail`, IMAP sync tenant-aware (`tenantMailConfig.mjs`)
 - [x] **6b** — Giden SMTP / outbox tenant override (`tenantId` outbox + `sendViaEkolojikSmtp({ dataDir, tenantId })`)
-- [ ] **6c** — Onboarding adım 1’de tenant IMAP formu (şimdilik Ayarlar → E-posta)
+- [x] **6c** — Onboarding adım 1: mağaza SMTP/IMAP (platform .env seçeneği)
 
 ---
 

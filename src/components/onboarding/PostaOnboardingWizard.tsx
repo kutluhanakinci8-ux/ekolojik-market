@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { sendEmailTest } from '../../services/emailOutboxService';
 import { fetchPostaDeliverability } from '../../services/postaSettingsService';
+import { fetchTenantMailConfig, saveTenantMailConfig } from '../../services/postaTenantMailService';
 import { loadTenantId } from '../../storage/tenantSession';
 import {
   buildMessagingEmbedSnippet,
@@ -34,6 +35,10 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   const [testTo, setTestTo] = useState('');
   const [messagingConfig, setMessagingConfig] = useState<MessagingPublicConfigHub | null>(null);
   const [mailAliases, setMailAliases] = useState<string[]>([]);
+  const [usePlatformEnv, setUsePlatformEnv] = useState(true);
+  const [tenantImapHost, setTenantImapHost] = useState('');
+  const [tenantImapUser, setTenantImapUser] = useState('');
+  const [tenantSmtpFrom, setTenantSmtpFrom] = useState('');
 
   const reload = useCallback(async () => {
     const next = await fetchPostaOnboardingHub();
@@ -54,6 +59,14 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     void (async () => {
       const d = await fetchPostaDeliverability();
       if (d?.aliases?.length) setMailAliases(d.aliases);
+      const tm = await fetchTenantMailConfig();
+      const hubNow = await fetchPostaOnboardingHub();
+      if (tm?.ok) {
+        setUsePlatformEnv(tm.usePlatformEnv);
+        setTenantImapHost(tm.imap.host ?? '');
+        setTenantImapUser(tm.imap.user ?? '');
+        setTenantSmtpFrom(tm.smtp.from ?? hubNow?.onboarding.registrationEmail ?? '');
+      }
     })();
   }, [stepIndex]);
 
@@ -207,6 +220,43 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
                   siparis@ / fatura@ kurallarını ekle
                 </button>
               </div>
+              <label className="posta-onboarding-lead" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.9rem' }}>
+                <input type="checkbox" checked={usePlatformEnv} onChange={(e) => setUsePlatformEnv(e.target.checked)} />
+                Platform .env (paylaşımlı kutu)
+              </label>
+              {!usePlatformEnv && (
+                <div className="posta-onboarding-field">
+                  <input placeholder="IMAP host" value={tenantImapHost} onChange={(e) => setTenantImapHost(e.target.value)} />
+                  <input placeholder="IMAP kullanıcı" value={tenantImapUser} onChange={(e) => setTenantImapUser(e.target.value)} />
+                  <input placeholder="Gönderen From" value={tenantSmtpFrom} onChange={(e) => setTenantSmtpFrom(e.target.value)} />
+                </div>
+              )}
+              {!usePlatformEnv && (
+                <div className="posta-onboarding-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      const saved = await saveTenantMailConfig({
+                        usePlatformEnv: false,
+                        imap: { host: tenantImapHost.trim(), user: tenantImapUser.trim() },
+                        smtp: { from: tenantSmtpFrom.trim() || testTo.trim() },
+                      });
+                      setBusy(false);
+                      if (!saved) {
+                        setFlash('Mağaza posta ayarı kaydedilemedi.');
+                        return;
+                      }
+                      setFlash('Mağaza kutusu kaydedildi.');
+                      await reload();
+                    }}
+                  >
+                    Mağaza kutusunu kaydet
+                  </button>
+                </div>
+              )}
               <label className="posta-onboarding-field">
                 Test e-postası gönder
                 <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="ornek@firma.com" />
