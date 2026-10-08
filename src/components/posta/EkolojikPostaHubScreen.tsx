@@ -6,6 +6,7 @@ import {
   retryOutboxMessage,
   sendEmailTest,
 } from '../../services/emailOutboxService';
+import { postaAuthenticatedUrl, postaEventsStreamUrl } from '../../services/posHubFetch';
 import {
   archivePostaInboxItem,
   fetchComposeRecipientHints,
@@ -543,7 +544,7 @@ export function EkolojikPostaHubScreen({
     };
     setLiveSse('connecting');
     try {
-      es = new EventSource('/api/posta/events');
+      es = new EventSource(postaEventsStreamUrl());
       es.onopen = () => setLiveSse('open');
       es.addEventListener('unread', () => refreshLive());
       es.addEventListener('inbox', (ev) => {
@@ -1848,7 +1849,9 @@ export function EkolojikPostaHubScreen({
                   {selectedInbox.attachments.map((a) => (
                     <li key={a.id}>
                       <a
-                        href={`/api/posta/inbox/${encodeURIComponent(selectedInbox.id)}/attachment/${encodeURIComponent(a.id)}`}
+                        href={postaAuthenticatedUrl(
+                          `/api/posta/inbox/${encodeURIComponent(selectedInbox.id)}/attachment/${encodeURIComponent(a.id)}`,
+                        )}
                         target="_blank"
                         rel="noreferrer"
                       >

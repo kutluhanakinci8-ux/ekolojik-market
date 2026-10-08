@@ -52,6 +52,12 @@ import {
   assertPosApiAuth,
   issuePosApiTokenFromCredentials,
 } from './server/posApiAuth.mjs';
+import {
+  enforcePostaApiAccess,
+  requiresMessagingPosAuth,
+  requiresPostaPosAuth,
+} from './server/postaAccessAuth.mjs';
+import { logPostaAccessExport } from './server/postaAccessAudit.mjs';
 import { mergeStoreUserSecrets, sanitizeStoreSnapshotForClient } from './server/storeApiSanitize.mjs';
 import {
   buildOutboxCsv,
@@ -700,6 +706,23 @@ const server = createServer(async (req, res) => {
         res.end(mailTrackPixelResponse());
       }
       return;
+    }
+
+    if (requiresPostaPosAuth(pathname, req.method) || requiresMessagingPosAuth(pathname)) {
+      const tenantId = resolveTenantId(url);
+      const postaAuth = await enforcePostaApiAccess(req, res, url, DATA_DIR, tenantId);
+      if (!postaAuth) return;
+      if (
+        req.method === 'GET' &&
+        (pathname.includes('/export') || pathname.endsWith('.csv') || pathname.endsWith('.vcf'))
+      ) {
+        void logPostaAccessExport(DATA_DIR, {
+          userId: postaAuth.userId,
+          tenantId,
+          pathname,
+          ip: getRequestIp(req),
+        });
+      }
     }
 
     if (

@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posHubFetch } from './posHubFetch';
 import { posApiAuthHeaders } from './posApiAuth';
 
 function tenantQuery(): string {
@@ -40,13 +41,13 @@ export type TenantMailConfigHub = {
 };
 
 export async function fetchTenantMailConfig(): Promise<TenantMailConfigHub | null> {
-  const res = await fetch(`/api/posta/tenant-mail${tenantQuery()}`);
+  const res = await posHubFetch(`/api/posta/tenant-mail${tenantQuery()}`);
   if (!res.ok) return null;
   return (await res.json()) as TenantMailConfigHub;
 }
 
 export async function saveTenantMailConfig(patch: Record<string, unknown>): Promise<TenantMailConfigHub | null> {
-  const res = await fetch(`/api/posta/tenant-mail${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/tenant-mail${tenantQuery()}`, {
     method: 'PUT',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(patch),

@@ -113,6 +113,14 @@ async function securityGate() {
   });
   if (getDataAuthed.status === 401) pass('security', 'GET /api/data geçersiz token → 401');
   else fail('security', 'GET /api/data geçersiz token', `HTTP ${getDataAuthed.status}`);
+
+  const anonInbox = await http('GET', '/api/posta/inbox?folder=gelen&limit=1');
+  if (anonInbox.status === 401) pass('security', 'GET /api/posta/inbox anonim → 401');
+  else fail('security', 'GET /api/posta/inbox anonim', `HTTP ${anonInbox.status}`);
+
+  const anonThreads = await http('GET', '/api/messaging/threads?limit=1');
+  if (anonThreads.status === 401) pass('security', 'GET /api/messaging/threads anonim → 401');
+  else fail('security', 'GET /api/messaging/threads anonim', `HTTP ${anonThreads.status}`);
 }
 
 async function authAndDataGate() {
@@ -192,6 +200,11 @@ async function authAndDataGate() {
 
 async function postaMessagingGate(token) {
   console.log('\n=== 5. Posta & mesajlaşma API ===\n');
+  if (!token) {
+    warn('posta', 'token yok — posta/messaging GET atlandı');
+    return;
+  }
+  const authH = { Authorization: `Bearer ${token}` };
   const paths = [
     '/api/posta/unread-counts',
     '/api/posta/onboarding',
@@ -204,7 +217,7 @@ async function postaMessagingGate(token) {
   ];
   for (const path of paths) {
     try {
-      const r = await http('GET', path);
+      const r = await http('GET', path, { headers: authH });
       if (r.ok) pass('posta', `GET ${path.split('?')[0]}`, `HTTP ${r.status}`);
       else warn('posta', `GET ${path}`, `HTTP ${r.status}`);
     } catch (e) {

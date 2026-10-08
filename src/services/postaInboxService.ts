@@ -1,3 +1,5 @@
+import { posHubFetch } from './posHubFetch';
+
 export type PostaInboxItem = {
   id: string;
   kind: 'contact' | 'imap' | 'bill' | 'outbox' | 'imap-sent';
@@ -122,7 +124,7 @@ export async function fetchPostaInbox(
   if (query.hasAttachment) params.set('hasAttachment', '1');
   const cacheKey = inboxOfflineKey(folder, params);
   try {
-    const res = await fetch(`/api/posta/inbox?${params.toString()}`);
+    const res = await posHubFetch(`/api/posta/inbox?${params.toString()}`);
     const data = await res.json();
     if (data?.ok) saveInboxOffline(cacheKey, data);
     return data as {
@@ -159,12 +161,12 @@ export async function fetchPostaInbox(
 }
 
 export async function syncPostaInboxImap() {
-  const res = await fetch('/api/posta/inbox/sync', { method: 'POST' });
+  const res = await posHubFetch('/api/posta/inbox/sync', { method: 'POST' });
   return res.json() as Promise<{ ok: boolean; message?: string; error?: string; added?: number }>;
 }
 
 export async function markPostaInboxRead(payload: { id: string; kind: string; sourceId?: string }) {
-  const res = await fetch('/api/posta/inbox/mark-read', {
+  const res = await posHubFetch('/api/posta/inbox/mark-read', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -173,7 +175,7 @@ export async function markPostaInboxRead(payload: { id: string; kind: string; so
 }
 
 export async function archivePostaInboxItem(payload: { id: string; kind: string; sourceId?: string }) {
-  const res = await fetch('/api/posta/inbox/archive', {
+  const res = await posHubFetch('/api/posta/inbox/archive', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -182,19 +184,19 @@ export async function archivePostaInboxItem(payload: { id: string; kind: string;
 }
 
 export async function fetchPostaUnreadCounts() {
-  const res = await fetch('/api/posta/unread-counts');
+  const res = await posHubFetch('/api/posta/unread-counts');
   return res.json() as Promise<{ ok: boolean; total?: number; gelen?: number; fatura?: number }>;
 }
 
 export type MailTemplate = { id: string; label: string; subject: string; body: string };
 
 export async function fetchPostaTemplates() {
-  const res = await fetch('/api/posta/templates');
+  const res = await posHubFetch('/api/posta/templates');
   return res.json() as Promise<{ ok: boolean; templates?: MailTemplate[] }>;
 }
 
 export async function fetchComposeRecipientHints() {
-  const res = await fetch('/api/posta/compose-hints?limit=50');
+  const res = await posHubFetch('/api/posta/compose-hints?limit=50');
   return res.json() as Promise<{ ok: boolean; emails?: string[] }>;
 }
 
@@ -205,7 +207,7 @@ export async function patchPostaInboxFlags(payload: {
   trashed?: boolean;
   snoozedUntil?: string | null;
 }) {
-  const res = await fetch('/api/posta/inbox/flags', {
+  const res = await posHubFetch('/api/posta/inbox/flags', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -214,12 +216,12 @@ export async function patchPostaInboxFlags(payload: {
 }
 
 export async function fetchPostaComposeDrafts() {
-  const res = await fetch('/api/posta/drafts');
+  const res = await posHubFetch('/api/posta/drafts');
   return res.json() as Promise<{ ok: boolean; drafts?: PostaComposeDraft[]; error?: string }>;
 }
 
 export async function savePostaComposeDraft(draft: Partial<PostaComposeDraft> & { to?: string; subject?: string; body?: string }) {
-  const res = await fetch('/api/posta/drafts', {
+  const res = await posHubFetch('/api/posta/drafts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(draft),
@@ -228,7 +230,7 @@ export async function savePostaComposeDraft(draft: Partial<PostaComposeDraft> & 
 }
 
 export async function deletePostaComposeDraft(id: string) {
-  const res = await fetch(`/api/posta/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const res = await posHubFetch(`/api/posta/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' });
   return res.json() as Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -241,7 +243,7 @@ export type PostaStorageSummary = {
 };
 
 export async function fetchPostaStorage() {
-  const res = await fetch('/api/posta/storage');
+  const res = await posHubFetch('/api/posta/storage');
   return res.json() as Promise<{ ok: boolean; error?: string } & Partial<PostaStorageSummary>>;
 }
 
@@ -251,7 +253,7 @@ export async function batchPostaInboxAction(
   action: 'read' | 'archive' | 'spam' | 'trash',
   items: PostaInboxBatchItem[],
 ) {
-  const res = await fetch('/api/posta/inbox/batch', {
+  const res = await posHubFetch('/api/posta/inbox/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, items }),
@@ -260,7 +262,7 @@ export async function batchPostaInboxAction(
 }
 
 export async function markAllPostaInboxRead(folder: PostaInboxFolder = 'gelen') {
-  const res = await fetch('/api/posta/inbox/mark-all-read', {
+  const res = await posHubFetch('/api/posta/inbox/mark-all-read', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ folder }),
@@ -269,6 +271,6 @@ export async function markAllPostaInboxRead(folder: PostaInboxFolder = 'gelen') 
 }
 
 export async function fetchPostaSent(limit = 80) {
-  const res = await fetch(`/api/posta/sent?limit=${limit}`);
+  const res = await posHubFetch(`/api/posta/sent?limit=${limit}`);
   return res.json() as Promise<{ ok: boolean; items?: PostaInboxItem[]; imapConfigured?: boolean; error?: string }>;
 }

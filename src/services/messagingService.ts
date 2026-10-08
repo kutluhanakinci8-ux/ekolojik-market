@@ -1,3 +1,5 @@
+import { posHubFetch } from './posHubFetch';
+
 export type MessagingThread = {
   id: string;
   customerId: string;
@@ -63,7 +65,7 @@ export async function fetchMessagingThreads(params: {
   if (params.includeArchived) q.set('includeArchived', '1');
   if (params.tenant && params.tenant !== 'main') q.set('tenant', params.tenant);
   const qs = q.toString();
-  const res = await fetch(`/api/messaging/threads${qs ? `?${qs}` : ''}`);
+  const res = await posHubFetch(`/api/messaging/threads${qs ? `?${qs}` : ''}`);
   return res.json();
 }
 
@@ -77,7 +79,7 @@ export async function createMessagingThread(payload: {
   authorName?: string;
   tenant?: string;
 }): Promise<{ ok: boolean; thread?: MessagingThread; error?: string }> {
-  const res = await fetch(`/api/messaging/threads${tenantQuery(payload.tenant)}`, {
+  const res = await posHubFetch(`/api/messaging/threads${tenantQuery(payload.tenant)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -94,12 +96,12 @@ export async function fetchMessagingMessages(
   if (params?.q?.trim()) q.set('q', params.q.trim());
   if (params?.tenant && params.tenant !== 'main') q.set('tenant', params.tenant);
   const qs = q.toString();
-  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/messages${qs ? `?${qs}` : ''}`);
+  const res = await posHubFetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/messages${qs ? `?${qs}` : ''}`);
   return res.json();
 }
 
 export async function markMessagingThreadRead(threadId: string) {
-  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' });
+  const res = await posHubFetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' });
   return res.json() as Promise<{ ok: boolean }>;
 }
 
@@ -107,12 +109,12 @@ export async function fetchMessagingTyping(threadId: string): Promise<{
   ok: boolean;
   typing?: MessagingTypingState;
 }> {
-  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/typing`);
+  const res = await posHubFetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/typing`);
   return res.json();
 }
 
 export async function postMessagingTyping(threadId: string, active: boolean, party: 'staff' | 'customer' = 'staff') {
-  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/typing`, {
+  const res = await posHubFetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/typing`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ active, party }),
@@ -125,7 +127,7 @@ export async function markMessagingMessageRead(
   messageId: string,
   party: 'staff' | 'customer' = 'staff',
 ) {
-  const res = await fetch(
+  const res = await posHubFetch(
     `/api/messaging/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/read`,
     {
       method: 'POST',
@@ -140,7 +142,7 @@ export async function patchMessagingThreadFlags(
   threadId: string,
   flags: { pinned?: boolean; archived?: boolean; muted?: boolean },
 ) {
-  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/flags`, {
+  const res = await posHubFetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/flags`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(flags),
@@ -158,7 +160,7 @@ export async function postMessagingMessage(
     attachments?: Array<{ fileName: string; mimeType: string; dataBase64: string }>;
   },
 ): Promise<{ ok: boolean; message?: MessagingMessage; thread?: MessagingThread; error?: string }> {
-  const res = await fetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/messages${tenantQuery(payload.tenant)}`, {
+  const res = await posHubFetch(`/api/messaging/threads/${encodeURIComponent(threadId)}/messages${tenantQuery(payload.tenant)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

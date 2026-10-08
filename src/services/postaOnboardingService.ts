@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posHubFetch } from './posHubFetch';
 import { posApiAuthHeaders } from './posApiAuth';
 
 function tenantQuery(): string {
@@ -47,7 +48,7 @@ export type PostaOnboardingHub = {
 };
 
 export async function fetchPostaOnboardingHub(): Promise<PostaOnboardingHub | null> {
-  const res = await fetch(`/api/posta/onboarding${tenantQuery()}`);
+  const res = await posHubFetch(`/api/posta/onboarding${tenantQuery()}`);
   if (!res.ok) return null;
   return (await res.json()) as PostaOnboardingHub;
 }
@@ -57,7 +58,7 @@ export async function patchPostaOnboarding(payload: {
   steps?: Partial<Record<'mailHealth' | 'messagingEmbed' | 'postaTab', { done?: boolean; skipped?: boolean }>>;
   notes?: string;
 }): Promise<{ ok: boolean; onboarding?: PostaOnboardingState }> {
-  const res = await fetch(`/api/posta/onboarding${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding${tenantQuery()}`, {
     method: 'PATCH',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
@@ -67,7 +68,7 @@ export async function patchPostaOnboarding(payload: {
 }
 
 export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding?: PostaOnboardingState }> {
-  const res = await fetch(`/api/posta/onboarding/reopen${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding/reopen${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders(),
   });
@@ -76,7 +77,7 @@ export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding
 }
 
 export async function seedPostaOnboardingAliasRules(): Promise<{ ok: boolean; added?: unknown[] }> {
-  const res = await fetch(`/api/posta/onboarding/seed-alias-rules${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding/seed-alias-rules${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders(),
   });
@@ -88,7 +89,7 @@ export async function completePostaOnboarding(options?: {
   primaryOnly?: boolean;
   skipIncompleteSteps?: boolean;
 }): Promise<{ ok: boolean; onboarding?: PostaOnboardingState; grantCount?: number }> {
-  const res = await fetch(`/api/posta/onboarding/complete${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding/complete${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(options ?? {}),
@@ -120,13 +121,13 @@ export type MessagingPublicConfigHub = {
 };
 
 export async function fetchMessagingPublicConfig(): Promise<MessagingPublicConfigHub | null> {
-  const res = await fetch(`/api/messaging/public-config${tenantQuery()}`);
+  const res = await posHubFetch(`/api/messaging/public-config${tenantQuery()}`);
   if (!res.ok) return null;
   return (await res.json()) as MessagingPublicConfigHub;
 }
 
 export async function rotateMessagingPublicKey(): Promise<MessagingPublicConfigHub | null> {
-  const res = await fetch(`/api/messaging/public-config${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/messaging/public-config${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ rotate: true }),

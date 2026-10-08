@@ -16,6 +16,7 @@ import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './uti
 import { resolveTopNavHighlight } from './data/navigation';
 import type { AppPage } from './components/AppShell';
 import { fetchPostaUnreadCounts } from './services/postaInboxService';
+import { postaEventsStreamUrl } from './services/posHubFetch';
 import { PostaOnboardingWizard } from './components/onboarding/PostaOnboardingWizard';
 import { fetchPostaOnboardingHub } from './services/postaOnboardingService';
 import {
@@ -156,7 +157,7 @@ export function PosApp() {
     void poll();
     let es: EventSource | null = null;
     try {
-      es = new EventSource('/api/posta/events');
+      es = new EventSource(postaEventsStreamUrl());
       es.addEventListener('unread', (ev) => {
         try {
           const data = JSON.parse(String((ev as MessageEvent).data)) as { total?: number };
