@@ -15677,7 +15677,44 @@ input {
 }
 .posta-hub-shell--tam .posta-hub-list { max-width: 380px; }
 .posta-hub-shell--tam .posta-hub-detail { padding: 20px 24px; }
-.posta-hub-shell--sohbet { grid-template-columns: 200px minmax(260px, 0.9fr) minmax(360px, 1.4fr); }
+.posta-hub-shell--sohbet {
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+}
+.posta-hub-shell--sohbet-yaz {
+  grid-template-columns: 1fr;
+}
+.posta-hub-sohbet-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 12px 12px 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--posta-border-soft);
+  background: linear-gradient(180deg, #fafdfb 0%, #fff 100%);
+  box-shadow: 0 4px 14px rgba(27, 61, 26, 0.04);
+}
+.posta-hub-sohbet-strip-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--greenleaf-dark);
+  letter-spacing: -0.01em;
+}
+.posta-hub-sohbet-strip-meta {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.posta-hub-sohbet-compose-nav {
+  padding: 16px 20px 0;
+}
+.posta-hub-shell--sohbet .posta-hub-list {
+  border-right: 1px solid var(--posta-border-soft);
+}
 .posta-hub-sohbet-panel { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
 .posta-hub-sohbet-messages { flex: 1; overflow: auto; max-height: min(58vh, 520px); }
 .posta-hub-msg-search { margin-bottom: 4px; }

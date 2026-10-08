@@ -1243,9 +1243,12 @@ export function EkolojikPostaHubScreen({
 
       <div
         className={`posta-hub-shell${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${hubLayout === 'sohbet' ? ' posta-hub-shell--sohbet' : ''}${
+          hubLayout === 'sohbet' && folder === 'yaz' ? ' posta-hub-shell--sohbet-yaz' : ''
+        }${
           hubLayout === 'sohbet' && selectedThreadId && folder === 'mesajlar' ? ' posta-hub-shell--sohbet-open' : ''
         }`}
       >
+        {hubLayout !== 'sohbet' && (
         <aside className="posta-hub-folders" aria-label="Posta klasörleri">
           <button type="button" className="btn btn-primary posta-hub-compose" onClick={() => pickFolder('yaz')}>
             Yaz
@@ -1299,9 +1302,21 @@ export function EkolojikPostaHubScreen({
             </button>
           )}
         </aside>
+        )}
 
         {folder !== 'yaz' && (
           <section className={`posta-hub-list${folder === 'mesajlar' ? ' posta-hub-list--sohbet' : ''}`}>
+            {folder === 'mesajlar' && hubLayout === 'sohbet' && (
+              <div className="posta-hub-sohbet-strip">
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => pickFolder('yaz')}>
+                  Yaz
+                </button>
+                <span className="posta-hub-sohbet-strip-title">Müşteri mesajları</span>
+                <span className="posta-hub-sohbet-strip-meta" title="SMTP">
+                  {health?.smtpVerified ? 'SMTP hazır' : health?.smtpConfigured ? 'SMTP hata' : 'SMTP kapalı'}
+                </span>
+              </div>
+            )}
             <div className="posta-hub-list-head">
               <h2 className="posta-hub-list-title">{listTitle}</h2>
               {isInboxMailFolder(folder) && folder !== 'taslaklar' && (
@@ -1613,6 +1628,13 @@ export function EkolojikPostaHubScreen({
         )}
 
         <section className={`posta-hub-detail${folder === 'mesajlar' ? ' posta-hub-detail--sohbet' : ''}`}>
+          {folder === 'yaz' && hubLayout === 'sohbet' && (
+            <div className="posta-hub-sohbet-compose-nav">
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => pickFolder('mesajlar')}>
+                ← Müşteri mesajları
+              </button>
+            </div>
+          )}
           {folder === 'yaz' && (
             <PostaComposePanel
               ourEmails={ourMailAddresses}
