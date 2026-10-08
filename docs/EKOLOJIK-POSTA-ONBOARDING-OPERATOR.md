@@ -69,7 +69,9 @@ Eşik uyarısı: `EKOLOJIK_OUTBOX_FAILED_ALERT_THRESHOLD` (varsayılan 50) — b
 curl -sS -X POST 'https://ekolojikmarket.com.tr/api/posta/onboarding/seed-alias-rules'
 ```
 
-Sunucu env: `EKOLOJIK_MAIL_ALIASES=siparis@ekolojikmarket.com.tr,fatura@ekolojikmarket.com.tr` → `GET /api/posta/deliverability` listesinde görünür.
+Tenant alias: `settings.postaAliases` (kayıt/onboarding seed: `siparis@` / `fatura@` domain). Sunucu env: `EKOLOJIK_MAIL_ALIASES=…` yedek.
+
+DNS doğrulama (tenant From domain): `EKOLOJIK_VERIFY_TENANT=main EKOLOJIK_DNS_STRICT=1 bash scripts/sunucu-ekolojik-dns-mail-dogrula.sh`
 
 **Tenant özel kutu (Faz 6):** Ayarlar → E-posta → **Mağaza posta kutusu** — “Platform .env” kapatılıp mağaza **SMTP + IMAP** girilir (`data/tenant-mail/{tenantId}.json`). Giden test ve outbox ilgili `tenantId` ile gönderilir. `main` varsayılan olarak `.env` kullanır.
 

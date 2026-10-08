@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { sendEmailTest } from '../../services/emailOutboxService';
-import { fetchPostaDeliverability } from '../../services/postaSettingsService';
+import {
+  fetchPostaDeliverability,
+  seedPostaDeliverabilityAliases,
+  type PostaDeliverabilityHub,
+} from '../../services/postaSettingsService';
+import { PostaDnsChecklist } from '../posta/PostaDnsChecklist';
 import { fetchTenantMailConfig, saveTenantMailConfig } from '../../services/postaTenantMailService';
 import { loadTenantId } from '../../storage/tenantSession';
 import {
@@ -47,6 +52,7 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   );
   const [widgetTestOk, setWidgetTestOk] = useState(false);
   const [mailConnectionOk, setMailConnectionOk] = useState(false);
+  const [deliverability, setDeliverability] = useState<PostaDeliverabilityHub | null>(null);
   const [requireMailConnectionTest, setRequireMailConnectionTest] = useState(false);
   const widgetScriptLoaded = useRef(false);
 
@@ -72,6 +78,7 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     if (stepIndex !== 0) return;
     void (async () => {
       const d = await fetchPostaDeliverability();
+      if (d?.ok) setDeliverability(d);
       if (d?.aliases?.length) setMailAliases(d.aliases);
       const tm = await fetchTenantMailConfig();
       const hubNow = await fetchPostaOnboardingHub();
@@ -313,14 +320,44 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
                 </li>
               </ul>
               <p className="posta-onboarding-lead" style={{ fontSize: '0.9rem' }}>
-                Önerilen alias’lar (hosting veya <code>EKOLOJIK_MAIL_ALIASES</code>):{' '}
+                Önerilen alias’lar (mağaza ayarı, <code>EKOLOJIK_MAIL_ALIASES</code> veya domain):{' '}
                 {mailAliases.length ? mailAliases.join(', ') : 'siparis@, fatura@ → aynı IMAP kutusu'}
               </p>
               <div className="posta-onboarding-actions">
                 <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleSeedAliasRules()}>
                   siparis@ / fatura@ kurallarını ekle
                 </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    const r = await seedPostaDeliverabilityAliases();
+                    setBusy(false);
+                    if (r.deliverability?.ok) setDeliverability(r.deliverability);
+                    if (r.aliases?.length) setMailAliases(r.aliases);
+                    setFlash(r.ok ? 'Alias listesi mağazaya kaydedildi.' : 'Alias kaydı başarısız.');
+                  }}
+                >
+                  Alias listesini mağazaya yaz
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    const d = await fetchPostaDeliverability();
+                    setBusy(false);
+                    if (d?.ok) setDeliverability(d);
+                    if (d?.aliases?.length) setMailAliases(d.aliases);
+                  }}
+                >
+                  DNS durumunu yenile
+                </button>
               </div>
+              {deliverability?.ok ? <PostaDnsChecklist hub={deliverability} compact /> : null}
               <label className="posta-onboarding-lead" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.9rem' }}>
                 <input type="checkbox" checked={usePlatformEnv} onChange={(e) => setUsePlatformEnv(e.target.checked)} />
                 Platform .env (paylaşımlı kutu)

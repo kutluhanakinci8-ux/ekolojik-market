@@ -158,6 +158,15 @@ export type PostaOutboxAnalytics = {
   error?: string;
 };
 
+export type PostaDnsChecklistRow = {
+  id: string;
+  label: string;
+  recordName: string;
+  status: string;
+  current?: string | null;
+  suggested?: string | null;
+};
+
 export type PostaDeliverabilityHub = {
   ok: boolean;
   domain?: string;
@@ -166,6 +175,8 @@ export type PostaDeliverabilityHub = {
   replyTo?: string;
   opsEmail?: string;
   aliases?: string[];
+  aliasesSource?: 'tenant' | 'env' | 'generated';
+  tenantId?: string;
   smtp?: { configured: boolean; verified: boolean; host: string | null; error?: string | null };
   dns?: {
     spf: { status: string; value: string | null };
@@ -174,8 +185,24 @@ export type PostaDeliverabilityHub = {
     selector?: string;
   };
   suggestedRecords?: { spf: string; dmarc: string; dkimHint: string };
+  dnsChecklist?: PostaDnsChecklistRow[];
+  missingDns?: string[];
+  deliverabilityReady?: boolean;
   error?: string;
 };
+
+export async function seedPostaDeliverabilityAliases(): Promise<{
+  ok: boolean;
+  seeded?: boolean;
+  aliases?: string[];
+  deliverability?: PostaDeliverabilityHub;
+}> {
+  const res = await posHubFetch('/api/posta/deliverability/seed-aliases', {
+    method: 'POST',
+    headers: posApiAuthHeaders(),
+  });
+  return res.json();
+}
 
 export async function fetchPostaDeliverability(): Promise<PostaDeliverabilityHub> {
   const res = await posHubFetch('/api/posta/deliverability');

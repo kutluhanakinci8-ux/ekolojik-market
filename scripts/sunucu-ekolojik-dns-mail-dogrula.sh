@@ -2,8 +2,16 @@
 # Faz 5/6 — SPF / DMARC / DKIM TXT (dig; tam deliverability manuel test kalır)
 set -euo pipefail
 
-DOMAIN="${EKOLOJIK_MAIL_DOMAIN:-ekolojikmarket.com.tr}"
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
+DATA_DIR="${EKOLOJIK_DATA_DIR:-/var/www/market-pos/data}"
+TENANT="${EKOLOJIK_VERIFY_TENANT:-main}"
 STRICT="${EKOLOJIK_DNS_STRICT:-0}"
+
+DOMAIN="${EKOLOJIK_MAIL_DOMAIN:-}"
+if [[ -z "${DOMAIN}" ]] && [[ -f "${REPO_ROOT}/scripts/lib/ekolojik-tenant-mail-domain.mjs" ]]; then
+  DOMAIN="$(node "${REPO_ROOT}/scripts/lib/ekolojik-tenant-mail-domain.mjs" "${DATA_DIR}" "${TENANT}" 2>/dev/null || true)"
+fi
+DOMAIN="${DOMAIN:-ekolojikmarket.com.tr}"
 FAIL=0
 
 warn() { echo "UYARI: $*"; }
@@ -16,7 +24,7 @@ if ! command -v dig >/dev/null 2>&1; then
 fi
 
 echo "=== Ekolojik DNS mail (TXT) ==="
-echo "Alan: ${DOMAIN}"
+echo "Alan: ${DOMAIN} (tenant=${TENANT}, strict=${STRICT})"
 echo ""
 
 txt_records() {

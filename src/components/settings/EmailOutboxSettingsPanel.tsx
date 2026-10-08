@@ -15,6 +15,7 @@ import {
   downloadPostaContactCsv,
   downloadMessagingExportZip,
   fetchPostaDeliverability,
+  seedPostaDeliverabilityAliases,
   fetchPostaNotificationsMatrix,
   fetchPostaEngagementSummary,
   fetchPostaLiveMetrics,
@@ -42,6 +43,7 @@ import {
   saveTenantMailConfig,
   type TenantMailConfigHub,
 } from '../../services/postaTenantMailService';
+import { PostaDnsChecklist } from '../posta/PostaDnsChecklist';
 import {
   archiveFailedOutbox,
   fetchFailedOutboxList,
@@ -433,45 +435,39 @@ export function EmailOutboxSettingsPanel() {
               </p>
             </div>
           </div>
-          <div className="settings-stat-grid">
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">SPF</span>
-              <strong className={deliverability.dns?.spf.status === 'ok' ? 'is-ok' : ''}>
-                {deliverability.dns?.spf.status ?? '—'}
-              </strong>
-            </article>
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">DMARC</span>
-              <strong className={deliverability.dns?.dmarc.status === 'ok' ? 'is-ok' : ''}>
-                {deliverability.dns?.dmarc.status ?? '—'}
-              </strong>
-            </article>
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">DKIM</span>
-              <strong className={deliverability.dns?.dkim.status === 'ok' ? 'is-ok' : ''}>
-                {deliverability.dns?.dkim.status ?? '—'}
-              </strong>
-            </article>
-            <article className="settings-stat-card">
-              <span className="settings-stat-label">SMTP doğrulama</span>
-              <strong className={deliverability.smtp?.verified ? 'is-ok' : ''}>
-                {deliverability.smtp?.verified ? 'Hazır' : 'Eksik'}
-              </strong>
-            </article>
+          <PostaDnsChecklist hub={deliverability} />
+          <div className="settings-panel-actions" style={{ marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                const r = await seedPostaDeliverabilityAliases();
+                if (r.deliverability) setDeliverability(r.deliverability);
+                setFlash(r.ok ? `Alias: ${(r.aliases ?? []).join(', ') || 'zaten tanımlı'}` : 'Alias seed başarısız');
+                setLoading(false);
+              }}
+            >
+              siparis@ / fatura@ alias seed
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                const d = await fetchPostaDeliverability();
+                setDeliverability(d);
+                setLoading(false);
+              }}
+            >
+              DNS yeniden kontrol
+            </button>
           </div>
-          {deliverability.suggestedRecords && (
-            <ul className="settings-hint" style={{ listStyle: 'none', padding: 0 }}>
-              <li>
-                <code>SPF</code> {deliverability.suggestedRecords.spf}
-              </li>
-              <li>
-                <code>DMARC</code> {deliverability.suggestedRecords.dmarc}
-              </li>
-              <li>{deliverability.suggestedRecords.dkimHint}</li>
-            </ul>
-          )}
           <p className="settings-hint">
-            İsteğe bağlı alias: <code>EKOLOJIK_MAIL_ALIASES</code> (virgülle ayrılmış e-postalar)
+            Tenant alias: <code>settings.postaAliases</code> · sunucu: <code>EKOLOJIK_MAIL_ALIASES</code> · DNS script:{' '}
+            <code>EKOLOJIK_VERIFY_TENANT={deliverability.tenantId ?? 'main'}</code>
           </p>
         </>
       )}
