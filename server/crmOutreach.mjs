@@ -1,7 +1,7 @@
 import { sendEkolojikMail } from './emailOutboxProcessor.mjs';
 
 /** CRM e-posta — yalnızca Ekolojik Faz 1 outbox + SMTP */
-export async function sendCrmEmail(dataDir, { to, subject, body, fromName, idempotencyKey }) {
+export async function sendCrmEmail(dataDir, { to, subject, body, fromName, idempotencyKey, tenantId = 'main' }) {
   return sendEkolojikMail(dataDir, {
     to,
     subject,
@@ -9,5 +9,6 @@ export async function sendCrmEmail(dataDir, { to, subject, body, fromName, idemp
     fromName,
     idempotencyKey,
     source: 'crm',
+    tenantId,
   });
 }

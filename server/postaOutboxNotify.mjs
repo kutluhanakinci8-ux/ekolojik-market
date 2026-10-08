@@ -17,7 +17,8 @@ export async function maybeNotifyOutboxFailure(dataDir, message) {
     });
   }
 
-  const pres = await getEffectiveMailPresentation(dataDir);
+  const tenantId = message.tenantId || 'main';
+  const pres = await getEffectiveMailPresentation(dataDir, tenantId);
   const opsEmail = pres.opsEmail;
   if (
     opsEmail?.includes('@') &&
@@ -27,6 +28,7 @@ export async function maybeNotifyOutboxFailure(dataDir, message) {
     summary.ops = await sendEkolojikMail(dataDir, {
       to: opsEmail,
       subject: `[Outbox hata] ${message.subject ?? message.id}`,
+      tenantId,
       body: [
         'E-posta gönderimi kalıcı olarak başarısız (Ekolojik outbox)',
         '',

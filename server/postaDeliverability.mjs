@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { getEkolojikMailConfig, isEkolojikSmtpConfigured } from './ekolojikMailConfig.mjs';
+import { getEkolojikMailConfig } from './ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './ekolojikSmtp.mjs';
 import { getEffectiveMailPresentation } from './postaSettings.mjs';
+import { getTenantSmtpMailConfig, isTenantSmtpConfigured } from './tenantMailConfig.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,10 +35,11 @@ function statusFromTxt(txt, pattern) {
   return 'ok';
 }
 
-export async function getPostaDeliverabilityHub(dataDir) {
+export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
+  const pres = await getEffectiveMailPresentation(dataDir, tenantId);
   const domain =
     process.env.EKOLOJIK_MAIL_DOMAIN?.trim() ||
-    (getEkolojikMailConfig().from?.split('@')[1] ?? 'ekolojikmarket.com.tr');
+    (pres.from?.split('@')[1] ?? getEkolojikMailConfig().from?.split('@')[1] ?? 'ekolojikmarket.com.tr');
   const selector = process.env.EKOLOJIK_DKIM_SELECTOR?.trim() || 'ekolojik';
   const vpsIp = process.env.EKOLOJIK_VPS_PUBLIC_IP?.trim() || '168.231.109.27';
 
@@ -52,9 +54,11 @@ export async function getPostaDeliverabilityHub(dataDir) {
     }
   }
 
-  const pres = await getEffectiveMailPresentation(dataDir);
-  const smtpConfigured = isEkolojikSmtpConfigured();
-  const smtpVerify = smtpConfigured ? await verifyEkolojikSmtp() : { ok: false, error: 'SMTP yapılandırılmadı' };
+  const smtpConfigured = await isTenantSmtpConfigured(dataDir, tenantId);
+  const smtpVerify = smtpConfigured
+    ? await verifyEkolojikSmtp({ dataDir, tenantId })
+    : { ok: false, error: 'SMTP yapılandırılmadı' };
+  const mailCfg = await getTenantSmtpMailConfig(dataDir, tenantId);
 
   const suggested = {
     spf: `v=spf1 ip4:${vpsIp} a mx ~all`,
@@ -70,10 +74,11 @@ export async function getPostaDeliverabilityHub(dataDir) {
     replyTo: pres.replyTo,
     opsEmail: pres.opsEmail,
     aliases: parseAliasesFromEnv(),
+    tenantId,
     smtp: {
       configured: smtpConfigured,
       verified: Boolean(smtpVerify.ok),
-      host: getEkolojikMailConfig().smtpHost || null,
+      host: mailCfg.smtpHost || null,
       error: smtpVerify.error ?? null,
     },
     dns: {

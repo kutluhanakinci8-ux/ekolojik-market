@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getEkolojikImapConfig, getEkolojikMailConfig, isEkolojikImapConfigured, isEkolojikSmtpConfigured } from './ekolojikMailConfig.mjs';
+import { decryptTenantMailSecret, encryptTenantMailSecret } from './tenantMailSecrets.mjs';
 
 function configPath(dataDir, tenantId = 'main') {
   return join(dataDir, 'tenant-mail', `${tenantId}.json`);
@@ -10,7 +11,14 @@ const SECRET_MASK = '••••••••';
 
 async function readRaw(dataDir, tenantId) {
   try {
-    return JSON.parse(await readFile(configPath(dataDir, tenantId), 'utf8'));
+    const raw = JSON.parse(await readFile(configPath(dataDir, tenantId), 'utf8'));
+    if (raw?.smtp?.pass) {
+      raw.smtp.pass = await decryptTenantMailSecret(dataDir, raw.smtp.pass);
+    }
+    if (raw?.imap?.pass) {
+      raw.imap.pass = await decryptTenantMailSecret(dataDir, raw.imap.pass);
+    }
+    return raw;
   } catch {
     return null;
   }
@@ -87,7 +95,18 @@ export async function saveTenantMailConfig(dataDir, tenantId, patch = {}) {
     imap: mergeBlock(current.imap, patch.imap),
     updatedAt: now,
   };
-  await writeFile(configPath(dataDir, tenantId), JSON.stringify(next, null, 2), 'utf8');
+  const toPersist = {
+    ...next,
+    smtp: { ...next.smtp },
+    imap: { ...next.imap },
+  };
+  if (toPersist.smtp?.pass) {
+    toPersist.smtp.pass = await encryptTenantMailSecret(dataDir, toPersist.smtp.pass);
+  }
+  if (toPersist.imap?.pass) {
+    toPersist.imap.pass = await encryptTenantMailSecret(dataDir, toPersist.imap.pass);
+  }
+  await writeFile(configPath(dataDir, tenantId), JSON.stringify(toPersist, null, 2), 'utf8');
   return { ok: true, config: next };
 }
 

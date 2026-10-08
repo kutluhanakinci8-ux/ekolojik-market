@@ -24,7 +24,7 @@ function appendSignature(text, html, signatureHtml) {
 
 export function createDeliverMessage(dataDir) {
   return async function deliverMessage(message) {
-    const pres = await getEffectiveMailPresentation(dataDir);
+    const pres = await getEffectiveMailPresentation(dataDir, message.tenantId || 'main');
     let text = message.text;
     let html = message.html;
     if (pres.signatureHtml?.trim() && !message.signatureAppended) {
@@ -82,7 +82,7 @@ export async function sendEkolojikMail(dataDir, payload) {
     return { ok: false, error: 'Geçersiz e-posta adresi' };
   }
 
-  const pres = await getEffectiveMailPresentation(dataDir);
+  const pres = await getEffectiveMailPresentation(dataDir, tenantId);
   const effectiveFromName = fromName ?? pres.fromName;
   let textBody = body ?? '';
   let htmlBody = html;

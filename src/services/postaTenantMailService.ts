@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posApiAuthHeaders } from './posApiAuth';
 
 function tenantQuery(): string {
   const tenant = loadTenantId();
@@ -47,7 +48,7 @@ export async function fetchTenantMailConfig(): Promise<TenantMailConfigHub | nul
 export async function saveTenantMailConfig(patch: Record<string, unknown>): Promise<TenantMailConfigHub | null> {
   const res = await fetch(`/api/posta/tenant-mail${tenantQuery()}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(patch),
   });
   if (!res.ok) return null;

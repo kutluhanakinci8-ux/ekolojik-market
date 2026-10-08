@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posApiAuthHeaders } from './posApiAuth';
 
 export async function sendCrmEmailApi(payload: {
   to: string;
@@ -12,7 +13,7 @@ export async function sendCrmEmailApi(payload: {
     : `/api/crm/send-email?tenant=${encodeURIComponent(tenant)}`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   const data = await res.json() as { ok: boolean; error?: string; provider?: string; message?: string };

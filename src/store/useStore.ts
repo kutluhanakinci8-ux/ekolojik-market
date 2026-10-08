@@ -20,6 +20,7 @@ import { applyCatalogPricing } from '../utils/productPricing';
 import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
 import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
+import { clearPosApiToken, exchangePosApiToken } from '../services/posApiAuth';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
 import {
   loadAllImages,
@@ -2855,29 +2856,41 @@ export function useStore() {
     setLoginAuditLog((prev) => [record, ...prev].slice(0, MAX_LOGIN_AUDIT_ENTRIES));
   }, []);
 
-  const finalizeLogin = useCallback(async (user: PosUser, method: LoginMethod) => {
-    clearLoginLockout(user.username);
-    const sessionId = `S${Date.now()}`;
-    const session = buildAuthSession(user, sessionId);
-    lastTrackedPageRef.current = null;
-    saveAuthSession(session);
-    setAuthSession(session);
-    saveLastQuickUser(user.username);
-    await appendLoginAudit({
-      userId: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      success: true,
-      method,
-      sessionId,
-    });
-    logActivity(
-      session,
-      'login',
-      `${method === 'pin' ? 'PIN' : 'Şifre'} ile oturum başlatıldı`,
-      { method },
-    );
-  }, [appendLoginAudit, logActivity]);
+  const finalizeLogin = useCallback(
+    async (
+      user: PosUser,
+      method: LoginMethod,
+      credentials?: { password?: string; pin?: string },
+    ) => {
+      clearLoginLockout(user.username);
+      const sessionId = `S${Date.now()}`;
+      const session = buildAuthSession(user, sessionId);
+      lastTrackedPageRef.current = null;
+      saveAuthSession(session);
+      setAuthSession(session);
+      saveLastQuickUser(user.username);
+      await appendLoginAudit({
+        userId: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        success: true,
+        method,
+        sessionId,
+      });
+      logActivity(
+        session,
+        'login',
+        `${method === 'pin' ? 'PIN' : 'Şifre'} ile oturum başlatıldı`,
+        { method },
+      );
+      void exchangePosApiToken({
+        username: user.username,
+        password: credentials?.password,
+        pin: credentials?.pin,
+      });
+    },
+    [appendLoginAudit, logActivity],
+  );
 
   const refreshTenantData = useCallback(async (): Promise<void> => {
     const remote = await fetchStoreSnapshot();
@@ -2898,6 +2911,7 @@ export function useStore() {
     }
     lastTrackedPageRef.current = null;
     clearAuthSession();
+    clearPosApiToken();
     setAuthSession(null);
     setCart([]);
     clearSaleCustomer();
@@ -2960,7 +2974,7 @@ export function useStore() {
         }
       }
 
-      await finalizeLogin(user, 'password');
+      await finalizeLogin(user, 'password', { password });
       return { status: 'success' };
     } catch {
       return { status: 'error', message: 'Giriş sırasında bir hata oluştu. Sayfayı yenileyip tekrar deneyin.' };
@@ -3010,7 +3024,7 @@ export function useStore() {
         return { status: 'error', message: 'Kullanıcı adı veya PIN hatalı.' };
       }
 
-      await finalizeLogin(user, 'pin');
+      await finalizeLogin(user, 'pin', { pin });
       return { status: 'success' };
     } catch {
       return { status: 'error', message: 'PIN girişi sırasında bir hata oluştu.' };

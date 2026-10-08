@@ -7,16 +7,17 @@ export function isMessagingCustomerEmailEnabled() {
   return process.env.EKOLOJIK_MESSAGING_CUSTOMER_EMAIL === '1';
 }
 
-export async function notifyOnMessagingMessage(dataDir, { thread, message }) {
+export async function notifyOnMessagingMessage(dataDir, { thread, message, tenantId = 'main' }) {
   const summary = { ops: null, customer: null, opsSkipped: false, customerSkipped: false };
 
   if (message.direction === 'customer' && !thread.muted) {
-    const pres = await getEffectiveMailPresentation(dataDir);
+    const pres = await getEffectiveMailPresentation(dataDir, tenantId);
     const opsEmail = pres.opsEmail;
     if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'messaging'))) {
       summary.ops = await sendEkolojikMail(dataDir, {
         to: opsEmail,
         subject: `[Mesaj] ${thread.customerName} — ${thread.subject}`,
+        tenantId,
         body: [
           'Yeni müşteri yönünde mesaj (Ekolojik mesajlaşma Faz 3)',
           '',
@@ -63,6 +64,7 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message }) {
         html: tpl.html,
         idempotencyKey: `messaging:customer:${message.id}`,
         source: 'messaging-customer',
+        tenantId,
       });
     } else {
       summary.customerSkipped = true;

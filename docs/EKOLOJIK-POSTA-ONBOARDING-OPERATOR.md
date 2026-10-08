@@ -22,9 +22,15 @@ Günlük Posta kullanımı: [EKOLOJIK-POSTA-KULLANIM.md](./EKOLOJIK-POSTA-KULLAN
 
 - Yalnızca **admin** rolü.
 - `settings.postaOnboarding.status` **`completed`** veya **`dismissed`** değilse, `/app` girişinde tam ekran sihirbaz açılır.
-- **Mevcut mağazalar (main vb.):** deploy sonrası otomatik migrasyon → genelde `completed` (sihirbaz bir daha çıkmaz). Yeni **kayıt** tenant’ları sihirbazı tamamlar.
+- **Mevcut mağazalar (main vb.):** ilk `GET /api/posta/onboarding` veya deploy script `scripts/migrate-posta-onboarding.mjs` ile legacy migrasyon → genelde `completed`. Yeni **kayıt** tenant’ları sihirbazı tamamlar.
 
-**Sonra hatırlat:** `status: dismissed` — tekrar açmak için **Ayarlar → E-posta → Kurulumu yeniden aç** veya `POST /api/posta/onboarding/reopen`.
+**Sonra hatırlat:** `status: dismissed` — tekrar açmak için **Ayarlar → E-posta → Kurulumu yeniden aç** veya `POST /api/posta/onboarding/reopen` (yönetici API token gerekir).
+
+### Yönetim API token (güvenlik)
+
+Onboarding güncelleme, tenant-mail kaydı, messaging anahtar rotate ve CRM mail gönderimi sunucuda **yönetici Bearer token** ister (`POST /api/auth/pos-token` — POS giriş şifresi/PIN ile). Token, başarılı girişte otomatik alınır (`sessionStorage`). Deploy sonrası **bir kez çıkış yapıp tekrar giriş** yapın.
+
+Üretimde `EKOLOJIK_POS_API_SECRET` tanımlayın (yoksa `data/pos-api-secret` otomatik oluşur). Tenant IMAP/SMTP şifreleri `data/tenant-mail/*.json` içinde **şifreli** saklanır (sunucu secret ile).
 
 ---
 

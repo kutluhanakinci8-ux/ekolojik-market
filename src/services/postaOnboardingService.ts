@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posApiAuthHeaders } from './posApiAuth';
 
 function tenantQuery(): string {
   const tenant = loadTenantId();
@@ -58,7 +59,7 @@ export async function patchPostaOnboarding(payload: {
 }): Promise<{ ok: boolean; onboarding?: PostaOnboardingState }> {
   const res = await fetch(`/api/posta/onboarding${tenantQuery()}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   const data = (await res.json().catch(() => ({}))) as { ok?: boolean; onboarding?: PostaOnboardingState };
@@ -68,7 +69,7 @@ export async function patchPostaOnboarding(payload: {
 export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding?: PostaOnboardingState }> {
   const res = await fetch(`/api/posta/onboarding/reopen${tenantQuery()}`, {
     method: 'POST',
-    headers: { Accept: 'application/json' },
+    headers: posApiAuthHeaders(),
   });
   const data = (await res.json().catch(() => ({}))) as { ok?: boolean; onboarding?: PostaOnboardingState };
   return { ok: Boolean(res.ok && data.ok), onboarding: data.onboarding };
@@ -77,7 +78,7 @@ export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding
 export async function seedPostaOnboardingAliasRules(): Promise<{ ok: boolean; added?: unknown[] }> {
   const res = await fetch(`/api/posta/onboarding/seed-alias-rules${tenantQuery()}`, {
     method: 'POST',
-    headers: { Accept: 'application/json' },
+    headers: posApiAuthHeaders(),
   });
   const data = (await res.json().catch(() => ({}))) as { ok?: boolean; added?: unknown[] };
   return { ok: Boolean(res.ok && data.ok), added: data.added };
@@ -89,7 +90,7 @@ export async function completePostaOnboarding(options?: {
 }): Promise<{ ok: boolean; onboarding?: PostaOnboardingState; grantCount?: number }> {
   const res = await fetch(`/api/posta/onboarding/complete${tenantQuery()}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(options ?? {}),
   });
   const data = (await res.json().catch(() => ({}))) as {
@@ -127,7 +128,7 @@ export async function fetchMessagingPublicConfig(): Promise<MessagingPublicConfi
 export async function rotateMessagingPublicKey(): Promise<MessagingPublicConfigHub | null> {
   const res = await fetch(`/api/messaging/public-config${tenantQuery()}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ rotate: true }),
   });
   if (!res.ok) return null;

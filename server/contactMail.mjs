@@ -53,12 +53,12 @@ export function isContactAutoreplyEnabled() {
 }
 
 /** İletişim kaydı sonrası operatör bildirimi + isteğe bağlı müşteri otomatik yanıt */
-export async function sendContactNotifications(dataDir, record) {
+export async function sendContactNotifications(dataDir, record, tenantId = 'main') {
   if (!record?.id) {
     return { ok: false, error: 'Geçersiz iletişim kaydı' };
   }
 
-  const pres = await getEffectiveMailPresentation(dataDir);
+  const pres = await getEffectiveMailPresentation(dataDir, tenantId);
   const opsEmail = pres.opsEmail;
   const summary = { ops: null, autoreply: null, opsSkipped: false, autoreplySkipped: false };
 
@@ -69,6 +69,7 @@ export async function sendContactNotifications(dataDir, record) {
       body: formatOpsBody(record),
       idempotencyKey: `contact:ops:${record.id}`,
       source: 'contact-ops',
+      tenantId,
     });
   } else {
     summary.opsSkipped = true;
@@ -83,6 +84,7 @@ export async function sendContactNotifications(dataDir, record) {
       body: formatAutoreplyBody(record),
       idempotencyKey: `contact:reply:${record.id}`,
       source: 'contact-autoreply',
+      tenantId,
     });
   } else if (!isContactAutoreplyEnabled()) {
     summary.autoreplySkipped = true;

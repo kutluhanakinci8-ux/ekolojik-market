@@ -11,8 +11,8 @@ Bu belge, ürün tarafındaki eksikleri **faz faz** kapatmak için net mimari, v
 | Kayıt | `POST /api/auth/register` → `registerTenant` (`server/tenantAuth.mjs`) | Kayıt **Posta sekmesi**, **IMAP testi** veya **messaging widget** tetiklemez |
 | İlk admin sekmeleri | `allowedTabs` içinde `posta` **yok** (satır ~114) | Yeni tenant admin Posta menüsünü göremez |
 | Kayıt UI | `LandingRegister.tsx` → `/giris` + `registered: true` | İlk girişte kurulum sihirbazı yok |
-| E-posta | Sunucu `.env`: `EKOLOJIK_MAIL_*`, `EKOLOJIK_IMAP_*`; ayarlar `data/posta-mail-settings.json` | **Tenant bazlı** kutu yok; tek VPS kutusu (işletme kutusu) |
-| Mesajlaşma site | `GET /api/public/messaging/v1/*` + `EKOLOJIK_MESSAGING_PUBLIC_KEY` (global env) | Tenant’a özel anahtar / kurulum UI yok; `generateMessagingPublicKey()` var ama API’ye bağlı değil |
+| E-posta | Platform `.env` + `data/tenant-mail/{tenantId}.json` (Faz 6a–c); sunum `getEffectiveMailPresentation(dataDir, tenantId)` | Çok kiracılı tam izolasyon (CRM/contact notify) sürekli iyileştirme |
+| Mesajlaşma site | `GET/POST /api/messaging/public-config` + tenant `data/messaging/{tenantId}/public-config.json` | Widget snippet sihirbazda; POST rotate yönetici token ile korumalı |
 | Posta kuralları | `data/posta-rules/{tenantId}/rules.json` + varsayılan fatura kuralı | `siparis@` / `fatura@` için hazır kural şablonu onboarding’de önerilmiyor |
 | Alias env | `EKOLOJIK_MAIL_ALIASES` → `GET /api/posta/deliverability` | Operatör dokümantasyonu ve sihirbaz adımı eksik |
 

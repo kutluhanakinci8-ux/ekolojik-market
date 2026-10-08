@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getEkolojikMailConfig, getEkolojikOpsEmail } from './ekolojikMailConfig.mjs';
+import { getTenantSmtpMailConfig } from './tenantMailConfig.mjs';
 import {
   getPostaNotificationMatrixCatalog,
   legacyNotificationsFromMatrix,
@@ -84,15 +85,17 @@ export function getPostaNotificationsMatrixHub(settings) {
   };
 }
 
-export async function getEffectiveMailPresentation(dataDir) {
+export async function getEffectiveMailPresentation(dataDir, tenantId = 'main') {
   const env = getEkolojikMailConfig();
+  const tenantMail = await getTenantSmtpMailConfig(dataDir, tenantId);
   const saved = await getPostaMailSettings(dataDir);
   const envOps = getEkolojikOpsEmail();
+  const from = tenantMail.from?.includes('@') ? tenantMail.from : env.from;
   return {
-    smtpHost: env.smtpHost,
-    from: env.from,
-    fromName: saved.fromName || env.fromName,
-    replyTo: saved.replyTo || env.replyTo || env.from,
+    smtpHost: tenantMail.smtpHost || env.smtpHost,
+    from,
+    fromName: saved.fromName || tenantMail.fromName || env.fromName,
+    replyTo: saved.replyTo || tenantMail.replyTo || env.replyTo || from || env.from,
     opsEmail: saved.opsEmail?.includes('@') ? saved.opsEmail : envOps,
     signatureHtml: saved.signatureHtml,
     notifications: saved.notifications,
@@ -100,6 +103,7 @@ export async function getEffectiveMailPresentation(dataDir) {
     envFromName: env.fromName,
     envReplyTo: env.replyTo,
     envOpsEmail: envOps,
+    tenantId,
   };
 }
 

@@ -47,6 +47,7 @@ import {
   migrateLegacyPostaOnboarding,
   reopenPostaOnboardingState,
 } from './server/postaOnboarding.mjs';
+import { assertPosAdminApiAuth, issuePosApiTokenFromCredentials } from './server/posApiAuth.mjs';
 import {
   buildOutboxCsv,
   buildContactCsv,
@@ -256,9 +257,7 @@ async function readStoreData(tenantId = 'main') {
   let data = await readTenantStore(DATA_DIR, tenantId);
   if (!data) return null;
 
-  const { store: migrated, changed: migChanged } = migrateLegacyPostaOnboarding(data);
-  data = migrated;
-  let persist = migChanged;
+  let persist = false;
 
   if (data?.products?.length) {
     const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
@@ -270,6 +269,20 @@ async function readStoreData(tenantId = 'main') {
     await writeStoreData(data, tenantId);
   }
   return data;
+}
+
+/** Legacy posta onboarding — yalnızca ilk onboarding GET veya deploy script. */
+async function maybeMigrateLegacyPostaOnboardingStore(tenantId) {
+  let store = await readStoreData(tenantId);
+  if (!store || store.settings?.postaOnboardingLegacyMigratedAt) {
+    return store;
+  }
+  const { store: migrated, changed } = migrateLegacyPostaOnboarding(store);
+  if (changed) {
+    await writeStoreData(migrated, tenantId);
+    return migrated;
+  }
+  return store;
 }
 
 async function writeStoreData(data, tenantId = 'main') {
@@ -571,7 +584,30 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/auth/pos-token' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await issuePosApiTokenFromCredentials(DATA_DIR, tenantId, {
+          username: data?.username,
+          password: data?.password,
+          pin: data?.pin,
+        });
+        res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Token alınamadı',
+        }));
+      }
+      return;
+    }
+
     if (pathname === '/api/crm/send-email' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       try {
         const result = await sendCrmEmail(DATA_DIR, {
@@ -579,6 +615,7 @@ const server = createServer(async (req, res) => {
           subject: data?.subject ?? '',
           body: data?.body ?? '',
           fromName: data?.fromName,
+          tenantId,
         });
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
@@ -976,8 +1013,9 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/posta/deliverability' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
       try {
-        const result = await getPostaDeliverabilityHub(DATA_DIR);
+        const result = await getPostaDeliverabilityHub(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -1664,6 +1702,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/tenant-mail' && req.method === 'PUT') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       try {
         await saveTenantMailConfig(DATA_DIR, tenantId, data ?? {});
@@ -1680,7 +1719,7 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/posta/onboarding' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
       try {
-        let store = await readStoreData(tenantId);
+        let store = await maybeMigrateLegacyPostaOnboardingStore(tenantId);
         if (!store) {
           res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
@@ -1708,6 +1747,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/onboarding' && req.method === 'PATCH') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       try {
         let store = await readStoreData(tenantId);
@@ -1731,6 +1771,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/onboarding/reopen' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       try {
         let store = await readStoreData(tenantId);
         if (!store) {
@@ -1751,6 +1792,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/onboarding/seed-alias-rules' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       try {
         const result = await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1764,6 +1806,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/onboarding/complete' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       try {
         let store = await readStoreData(tenantId);
@@ -1813,6 +1856,8 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/posta/settings' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       try {
         const result = await savePostaMailSettings(DATA_DIR, data ?? {});
@@ -1992,6 +2037,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/messaging/public-config' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       try {
         const saved = await saveMessagingPublicConfig(DATA_DIR, tenantId, data ?? {});
@@ -2072,6 +2118,7 @@ const server = createServer(async (req, res) => {
             result.notifications = await notifyOnMessagingMessage(DATA_DIR, {
               thread: result.thread,
               message: result.message,
+              tenantId,
             });
           } catch (notifyError) {
             result.notifications = {
@@ -2219,6 +2266,7 @@ const server = createServer(async (req, res) => {
               result.notifications = await notifyOnMessagingMessage(DATA_DIR, {
                 thread: result.thread,
                 message: result.message,
+                tenantId,
               });
             } catch (notifyError) {
               result.notifications = {
@@ -2357,7 +2405,11 @@ const server = createServer(async (req, res) => {
             () => getPostaUnreadCounts(DATA_DIR, resolveTenantId(url)),
           );
           try {
-            result.notifications = await sendContactNotifications(DATA_DIR, result.contact);
+            result.notifications = await sendContactNotifications(
+              DATA_DIR,
+              result.contact,
+              resolveTenantId(url),
+            );
           } catch (mailError) {
             result.notifications = {
               ok: false,

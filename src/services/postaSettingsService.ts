@@ -1,3 +1,5 @@
+import { posApiAuthHeaders } from './posApiAuth';
+
 export type PostaNotificationPrefs = {
   contactOpsEmail: boolean;
   messagingOpsEmail: boolean;
@@ -68,7 +70,7 @@ export async function savePostaMailSettings(
 }> {
   const res = await fetch('/api/posta/settings', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(patch),
   });
   return res.json();

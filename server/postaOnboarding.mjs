@@ -1,4 +1,3 @@
-import { isEkolojikSmtpConfigured } from './ekolojikMailConfig.mjs';
 import { isTenantImapConfigured, getTenantSmtpMailConfig } from './tenantMailConfig.mjs';
 import { verifyEkolojikSmtp } from './ekolojikSmtp.mjs';
 import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
