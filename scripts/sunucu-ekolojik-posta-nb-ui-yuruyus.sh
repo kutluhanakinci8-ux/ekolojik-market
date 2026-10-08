@@ -34,3 +34,31 @@ GUIDE
 echo ""
 echo "--- API kapısı (otomatik) ---"
 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-nb-checklist-dogrula.sh" "${INSTALL_DIR}"
+
+echo ""
+echo "--- UI DOM smoke (Playwright, #1–3 / #18 / #25) ---"
+VIS_FAIL=0
+if ! node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
+  if [[ -f "${REPO_ROOT}/node_modules/playwright/package.json" ]]; then
+    (cd "${REPO_ROOT}" && npx playwright install chromium 2>/dev/null) || true
+  fi
+fi
+if node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
+  MINT_JSON="$(node "${REPO_ROOT}/scripts/lib/mint-posta-qa-token.mjs" "${INSTALL_DIR}/data" 2>/dev/null || true)"
+  if [[ -n "${MINT_JSON}" ]]; then
+    if EKOLOJIK_POS_QA_MINT_JSON="${MINT_JSON}" node "${REPO_ROOT}/scripts/posta-nb-ui-visual-smoke.mjs" "${BASE}"; then
+      echo "OK   görsel smoke"
+    else
+      echo "HATA görsel smoke"
+      VIS_FAIL=1
+    fi
+  else
+    echo "WARN mint yok — görsel smoke atlandı"
+  fi
+else
+  echo "WARN Playwright yok — npm i -D playwright && npx playwright install chromium"
+fi
+
+if [[ "${VIS_FAIL}" -ne 0 ]]; then
+  exit 1
+fi
