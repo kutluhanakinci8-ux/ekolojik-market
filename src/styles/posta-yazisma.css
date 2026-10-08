@@ -2,6 +2,20 @@
 
 .posta-yazisma-shell {
   --posta-yazisma-gutter: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.posta-yazisma-shell.posta-hub-shell--sohbet {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+
+.posta-yazisma-shell.posta-hub-shell--sohbet > .posta-yazisma-col,
+.posta-yazisma-shell.posta-hub-shell--sohbet > .posta-hub-detail {
+  min-width: 0;
 }
 
 .posta-yazisma-col {
@@ -227,8 +241,11 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
   gap: 8px;
   width: 100%;
+  overflow-x: hidden;
+  background: #fff;
 }
 
 .posta-yazisma-shell .posta-yazisma-chat-frame > .posta-hub-sohbet-header,
@@ -266,11 +283,24 @@
 .posta-yazisma-shell .posta-sohbet-msg {
   display: block;
   width: 100%;
+  max-width: 100%;
   margin: 0 0 8px;
   padding: 0;
   border: none;
   background: transparent;
   box-shadow: none;
+  min-width: 0;
+}
+
+.posta-yazisma-shell .posta-sohbet-msg.crm-msg--staff,
+.posta-yazisma-shell .posta-sohbet-msg.crm-msg--customer {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.posta-yazisma-shell .posta-sohbet-msg-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .posta-yazisma-shell .posta-sohbet-msg-avatar {

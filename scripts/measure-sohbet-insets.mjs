@@ -118,7 +118,9 @@ async function measureOpenThread(page) {
       search: pick('.posta-hub-sohbet-search-wrap'),
       messages: pick('.posta-hub-sohbet-messages'),
       compose: pick('.posta-hub-sohbet-compose'),
-      composeRelRight: composeRect ? round(innerRect.right - composeRect.right) : null,
+      composeRelRight: composeRect
+        ? Math.round((innerRect.right - composeRect.right) * 10) / 10
+        : null,
       bubbles,
     };
   });
@@ -241,6 +243,41 @@ async function main() {
   const uniqCompose = [...new Set(composeLefts.filter((x) => !Number.isNaN(x)))];
   console.log(`\nÖzet — header relLeft benzersiz: ${uniqHeader.join(', ')} (${uniqHeader.length})`);
   console.log(`Özet — compose relLeft benzersiz: ${uniqCompose.join(', ')} (${uniqCompose.length})`);
+
+  const layoutSnaps = [];
+  for (const name of ['Mehmet Kaya', 'Akis B Musteri', 'Zeynep Demir']) {
+    await page.locator('.posta-yazisma-thread-card', { hasText: name }).first().click();
+    await page.waitForTimeout(350);
+    layoutSnaps.push({
+      name,
+      ...(await page.evaluate(() => {
+        const shell = document.querySelector('.posta-yazisma-shell');
+        const col = document.querySelector('.posta-yazisma-col');
+        const detail = document.querySelector('.posta-hub-detail--sohbet');
+        const sr = shell?.getBoundingClientRect();
+        const cr = col?.getBoundingClientRect();
+        const dr = detail?.getBoundingClientRect();
+        return {
+          shellW: sr?.width,
+          colLeft: cr?.left,
+          detailW: dr?.width,
+          detailLeft: dr?.left,
+        };
+      })),
+    });
+  }
+  console.log('\n=== Konuşma değişince shell/kolon sabitliği ===');
+  for (const s of layoutSnaps) {
+    console.log(
+      `${s.name}: shellW=${round(s.shellW)} colLeft=${round(s.colLeft)} detailW=${round(s.detailW)} detailLeft=${round(s.detailLeft)}`,
+    );
+  }
+  const shellWs = [...new Set(layoutSnaps.map((s) => round(s.shellW)))];
+  const colLefts = [...new Set(layoutSnaps.map((s) => round(s.colLeft)))];
+  if (shellWs.length > 1 || colLefts.length > 1) {
+    console.error(`HATA: layout kayıyor — shellW: ${shellWs.join(', ')} colLeft: ${colLefts.join(', ')}`);
+    process.exitCode = 1;
+  }
 
   await browser.close();
 }
