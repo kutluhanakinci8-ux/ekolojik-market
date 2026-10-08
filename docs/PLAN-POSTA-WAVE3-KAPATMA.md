@@ -61,8 +61,10 @@ bash scripts/sunucu-ekolojik-posta-tam-kabul.sh /var/www/market-pos
 - [x] `docs/RAKIP-SKOR-KARTI.md` — %100
 - [x] GitHub Actions CI yeşil (`ci.yml`) — #35–#36
 - [x] NB UI yürüyüşü — API kapısı (`sunucu-ekolojik-posta-nb-ui-yuruyus.sh`, VPS 2026-10-08, #37)
-- [x] Görsel smoke (Playwright): `posta-nb-ui-visual-smoke.mjs` — #1–6, #10, #15, #18–18b, #20–22, #24–25 (VPS)
-- [ ] Operatör görsel kalanı (#7 SSE bekleme, #8–9 export UI, #11–14, #16–17, #19, #23): `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md`
+- [x] Görsel smoke (Playwright): #1–11, #13, #15–16, #18–19, #20–21, #24–25 (`posta-nb-ui-visual-smoke.mjs`)
+- [x] IMAP doğrulama script Faz 38 Bearer (`sunucu-ekolojik-imap-dogrula.sh`)
+- [x] Operatör otomatik kapı: `sunucu-ekolojik-posta-wave3-operator-kapi.sh`
+- [ ] Manuel POS (#12 konuşma/ilet, #14 toplu işlem, #17 offline): `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md`
 
 Posta smoke token: `scripts/lib/ekolojik-posta-qa-token.sh` — demo kullanıcılar, `EKOLOJIK_POS_QA_USER`/`PASSWORD`, `EKOLOJIK_POS_QA_TOKEN`, veya VPS’te `store.json` mint (`mint-posta-qa-token.mjs`).
 

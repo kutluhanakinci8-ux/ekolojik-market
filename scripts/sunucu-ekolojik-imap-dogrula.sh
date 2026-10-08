@@ -1,15 +1,30 @@
 #!/usr/bin/env bash
-# Faz 7 — Ekolojik IMAP doğrulama (Posta hub Gelen)
+# Faz 7 — Ekolojik IMAP doğrulama (Posta hub Gelen; Faz 38 Bearer)
 set -euo pipefail
 
 ROOT="${1:-/var/www/market-pos}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+export EKOLOJIK_REPO_ROOT="${REPO_ROOT}"
 BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT:-5180}}"
 
 echo "=== Ekolojik IMAP doğrulama (Faz 7) ==="
 echo "Kök: ${ROOT}"
 echo "API:  ${BASE_URL}"
 
-HEALTH="$(curl -fsS "${BASE_URL}/api/posta/imap/health" 2>/dev/null || true)"
+# shellcheck source=scripts/lib/ekolojik-posta-qa-token.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-qa-token.sh"
+EKOLOJIK_QA_DATA_DIR="${ROOT}/data"
+export EKOLOJIK_QA_DATA_DIR
+TOKEN=""
+if TOKEN="$(ekolojik_resolve_posta_qa_token "${BASE_URL}")"; then
+  echo "OK   Posta Bearer (${EKOLOJIK_POS_QA_TOKEN_USER:-qa})"
+else
+  echo "HATA: Posta token alınamadı — IMAP health Faz 38 auth gerekir"
+  exit 1
+fi
+
+HEALTH="$(curl -fsS -H "Authorization: Bearer ${TOKEN}" "${BASE_URL}/api/posta/imap/health" 2>/dev/null || true)"
 if [[ -z "${HEALTH}" ]]; then
   echo "HATA: /api/posta/imap/health yanıt vermedi"
   exit 1

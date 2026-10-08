@@ -3,14 +3,27 @@
 set -euo pipefail
 
 ROOT="${1:-/var/www/market-pos}"
-REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+export EKOLOJIK_REPO_ROOT="${REPO_ROOT}"
 BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT:-5180}}"
 TO="${EKOLOJIK_SMOKE_TO:-info@ekolojikmarket.com.tr}"
 STAMP="$(date -Iseconds)"
 
 echo "=== Ekolojik Posta Gelen smoke (Faz 7 kabul) ==="
 
-if ! curl -fsS "${BASE_URL}/api/posta/imap/health" | grep -q '"imapVerified":true'; then
+# shellcheck source=scripts/lib/ekolojik-posta-qa-token.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-qa-token.sh"
+EKOLOJIK_QA_DATA_DIR="${ROOT}/data"
+export EKOLOJIK_QA_DATA_DIR
+TOKEN=""
+if ! TOKEN="$(ekolojik_resolve_posta_qa_token "${BASE_URL}")"; then
+  echo "HATA: Posta Bearer gerekli (Faz 38)"
+  exit 1
+fi
+AUTH_H="Authorization: Bearer ${TOKEN}"
+
+if ! curl -fsS -H "${AUTH_H}" "${BASE_URL}/api/posta/imap/health" | grep -q '"imapVerified":true'; then
   echo "HATA: IMAP doğrulanmamış — önce sunucu-ekolojik-imap-vps-kur.sh --apply"
   exit 1
 fi
@@ -29,10 +42,10 @@ fi
 
 sleep 3
 
-SYNC="$(curl -fsS -X POST "${BASE_URL}/api/posta/inbox/sync" 2>/dev/null || true)"
+SYNC="$(curl -fsS -X POST -H "${AUTH_H}" "${BASE_URL}/api/posta/inbox/sync" 2>/dev/null || true)"
 echo "sync: ${SYNC}"
 
-INBOX="$(curl -fsS "${BASE_URL}/api/posta/inbox?folder=gelen&limit=20" 2>/dev/null || true)"
+INBOX="$(curl -fsS -H "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=20" 2>/dev/null || true)"
 echo "${INBOX}" | node -e "
 const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
 const subj=process.env.SUBJ;
