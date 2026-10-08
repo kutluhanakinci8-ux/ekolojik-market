@@ -19,13 +19,26 @@
   grid-template-columns: 340px minmax(0, 1fr);
 }
 
-.posta-yazisma-shell > .posta-hub-folders,
+.posta-yazisma-shell > .posta-hub-folders {
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .posta-yazisma-shell > .posta-yazisma-col,
 .posta-yazisma-shell > .posta-hub-detail {
   min-width: 0;
   min-height: 0;
   max-height: 100%;
   overflow: hidden;
+}
+
+.posta-yazisma-shell > .posta-hub-detail.posta-hub-detail--sohbet {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .posta-yazisma-shell.posta-hub-shell--sohbet > .posta-yazisma-col,
@@ -297,15 +310,18 @@
 }
 
 .posta-yazisma-shell .posta-hub-sohbet-messages {
-  flex: 1 1 auto;
+  display: block;
+  flex: 1 1 0;
+  height: 0;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   overflow-x: hidden;
   padding: 4px 0 8px;
   margin: 0;
   list-style: none;
   scrollbar-gutter: stable;
-  gap: 10px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .posta-yazisma-shell .posta-sohbet-msg {
