@@ -29,6 +29,7 @@ export const DEFAULT_USERS: PosUser[] = [
       'transactions',
       'customers',
       'cashier',
+      'posta',
       'settings',
     ],
     isActive: true,

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createDefaultPostaOnboarding } from './postaOnboarding.mjs';
 
 const DEFAULT_SETTINGS = {
   businessName: 'Ekolojik Market',
@@ -102,6 +103,7 @@ function createInitialStore({ businessName, adminName, username, passwordHash, e
       ...DEFAULT_SETTINGS,
       businessName,
       tenantMeta: { email, phone, plan, trialEndsAt: new Date(Date.now() + 14 * 86400000).toISOString() },
+      postaOnboarding: createDefaultPostaOnboarding(email),
     },
     priceType: 'partner',
     users: [
@@ -111,7 +113,18 @@ function createInitialStore({ businessName, adminName, username, passwordHash, e
         displayName: adminName,
         passwordHash,
         role: 'admin',
-        allowedTabs: ['dashboard', 'sales', 'stock', 'reports', 'accounting', 'transactions', 'customers', 'cashier', 'settings'],
+        allowedTabs: [
+          'dashboard',
+          'sales',
+          'stock',
+          'reports',
+          'accounting',
+          'transactions',
+          'customers',
+          'cashier',
+          'posta',
+          'settings',
+        ],
         isActive: true,
         isPrimaryAdmin: true,
         mustChangePassword: false,

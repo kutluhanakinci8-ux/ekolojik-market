@@ -40,6 +40,12 @@ import {
   getPostaNotificationsMatrixHub,
 } from './server/postaSettings.mjs';
 import {
+  ensurePostaOnboarding,
+  getPostaOnboardingHub,
+  patchPostaOnboardingState,
+  completePostaOnboarding,
+} from './server/postaOnboarding.mjs';
+import {
   buildOutboxCsv,
   buildContactCsv,
   buildMessagingExportZip,
@@ -1598,6 +1604,95 @@ const server = createServer(async (req, res) => {
             error: error instanceof Error ? error.message : 'IMAP hatası',
           }),
         );
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        let store = await readStoreData(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        if (!store.settings?.postaOnboarding) {
+          store = {
+            ...store,
+            settings: {
+              ...store.settings,
+              postaOnboarding: ensurePostaOnboarding(store.settings),
+            },
+          };
+          await writeStoreData(store, tenantId);
+        }
+        const hub = await getPostaOnboardingHub(store);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding' && req.method === 'PATCH') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        let store = await readStoreData(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        const { settings, onboarding } = patchPostaOnboardingState(store, data ?? {});
+        store = { ...store, settings, updatedAt: new Date().toISOString() };
+        await writeStoreData(store, tenantId);
+        const hub = await getPostaOnboardingHub(store);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, onboarding, summary: hub.summary }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding güncelleme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/complete' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        let store = await readStoreData(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        const result = completePostaOnboarding(store, {
+          primaryOnly: data?.primaryOnly !== false,
+          userIds: Array.isArray(data?.userIds) ? data.userIds : [],
+          skipIncompleteSteps: data?.skipIncompleteSteps === true,
+        });
+        store = {
+          ...store,
+          settings: result.settings,
+          users: result.users,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeStoreData(store, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            onboarding: result.onboarding,
+            grantCount: result.grantCount,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding tamamlama hatası' }));
       }
       return;
     }
