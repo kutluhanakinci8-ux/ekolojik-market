@@ -68,6 +68,7 @@ export async function enqueueEkolojikMail(
     references,
     attachments,
     signatureAppended,
+    tenantId = 'main',
   },
 ) {
   await ensureDirs(dataDir);
@@ -103,6 +104,7 @@ export async function enqueueEkolojikMail(
     lastError: null,
     sentAt: null,
     providerMessageId: null,
+    tenantId: String(tenantId || 'main'),
   };
 
   const filename = `${message.createdAt.replace(/[:.]/g, '-')}_${tag}_${id}.json`;

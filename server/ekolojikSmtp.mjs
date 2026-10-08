@@ -4,9 +4,9 @@ import {
   getEkolojikMailConfig,
   isEkolojikSmtpConfigured,
 } from './ekolojikMailConfig.mjs';
+import { getTenantSmtpMailConfig, isTenantSmtpConfigured } from './tenantMailConfig.mjs';
 
-let transporter;
-let transporterKey = '';
+const transporterCache = new Map();
 
 function isLocalSmtpRelay(c) {
   const h = (c.smtpHost || '').toLowerCase();
@@ -33,25 +33,42 @@ function buildTransportOptions(c) {
   return opts;
 }
 
-function getTransporter() {
-  if (!isEkolojikSmtpConfigured()) {
-    throw new Error('EKOLOJIK_SMTP_HOST ve EKOLOJIK_MAIL_FROM yapılandırılmalı');
+export function isSmtpMailConfigValid(c) {
+  return Boolean(c?.smtpHost && c?.from && String(c.from).includes('@'));
+}
+
+function transporterCacheKey(c) {
+  return `${c.smtpHost}:${c.smtpPort}:${c.smtpSecure}:${c.smtpUser || ''}`;
+}
+
+function getTransporterForConfig(c) {
+  if (!isSmtpMailConfigValid(c)) {
+    throw new Error('SMTP host ve geçerli From adresi gerekli');
   }
-  const c = getEkolojikMailConfig();
-  const key = `${c.smtpHost}:${c.smtpPort}:${c.smtpSecure}:${c.smtpUser || ''}`;
-  if (!transporter || transporterKey !== key) {
+  const key = transporterCacheKey(c);
+  let transporter = transporterCache.get(key);
+  if (!transporter) {
     transporter = nodemailer.createTransport(buildTransportOptions(c));
-    transporterKey = key;
+    transporterCache.set(key, transporter);
   }
   return transporter;
 }
 
-export async function verifyEkolojikSmtp() {
-  if (!isEkolojikSmtpConfigured()) {
+async function resolveMailConfig(dataDir, tenantId = 'main') {
+  if (dataDir) {
+    return getTenantSmtpMailConfig(dataDir, tenantId);
+  }
+  return getEkolojikMailConfig();
+}
+
+export async function verifyEkolojikSmtp({ dataDir, tenantId = 'main' } = {}) {
+  const configured = dataDir ? await isTenantSmtpConfigured(dataDir, tenantId) : isEkolojikSmtpConfigured();
+  if (!configured) {
     return { ok: false, error: 'SMTP yapılandırılmadı' };
   }
   try {
-    await getTransporter().verify();
+    const c = await resolveMailConfig(dataDir, tenantId);
+    await getTransporterForConfig(c).verify();
     return { ok: true };
   } catch (error) {
     return {
@@ -62,6 +79,8 @@ export async function verifyEkolojikSmtp() {
 }
 
 export async function sendViaEkolojikSmtp({
+  dataDir,
+  tenantId = 'main',
   to,
   cc,
   bcc,
@@ -74,7 +93,7 @@ export async function sendViaEkolojikSmtp({
   references,
   attachments,
 }) {
-  const c = getEkolojikMailConfig();
+  const c = await resolveMailConfig(dataDir, tenantId);
   const from = buildFromHeader(fromName || c.fromName, c.from);
   const reply = replyTo?.includes('@') ? replyTo : c.replyTo || undefined;
   const headers = {};
@@ -88,7 +107,7 @@ export async function sendViaEkolojikSmtp({
       contentType: a.mimeType || undefined,
     }));
 
-  const info = await getTransporter().sendMail({
+  const info = await getTransporterForConfig(c).sendMail({
     from,
     to,
     cc: cc?.trim() || undefined,
@@ -106,4 +125,4 @@ export async function sendViaEkolojikSmtp({
   };
 }
 
-export { isEkolojikSmtpConfigured };
+export { isEkolojikSmtpConfigured, isTenantSmtpConfigured };

@@ -90,7 +90,9 @@ import {
 import {
   getTenantMailConfigHub,
   getTenantImapConfig,
+  getTenantSmtpMailConfig,
   isTenantImapConfigured,
+  isTenantSmtpConfigured,
   saveTenantMailConfig,
 } from './server/tenantMailConfig.mjs';
 import { getPostaJmapLiteSession, queryPostaJmapLiteMailbox } from './server/postaJmapLite.mjs';
@@ -591,15 +593,17 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/email/health' && req.method === 'GET') {
-      const smtp = isEkolojikSmtpConfigured();
-      const verify = smtp ? await verifyEkolojikSmtp() : { ok: false, error: 'SMTP yapılandırılmadı' };
+      const tenantId = resolveTenantId(url);
+      const smtp = await isTenantSmtpConfigured(DATA_DIR, tenantId);
+      const verify = smtp ? await verifyEkolojikSmtp({ dataDir: DATA_DIR, tenantId }) : { ok: false, error: 'SMTP yapılandırılmadı' };
       const counts = await getOutboxCounts(DATA_DIR);
-      const cfg = getEkolojikMailConfig();
+      const cfg = await getTenantSmtpMailConfig(DATA_DIR, tenantId);
       const effective = await getEffectiveMailPresentation(DATA_DIR);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(
         JSON.stringify({
           ok: true,
+          tenantId,
           smtpConfigured: smtp,
           smtpVerified: verify.ok,
           smtpError: verify.error ?? null,
@@ -1917,6 +1921,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/email/test' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
       const data = await readRequestBody(req);
       const to = data?.to?.trim();
       if (!to?.includes('@')) {
@@ -1944,6 +1949,7 @@ const server = createServer(async (req, res) => {
           body: formatted.text,
           html: formatted.html,
           fromName: data?.fromName,
+          tenantId,
           idempotencyKey: `test:${to}:${Date.now()}`,
           source: 'posta-compose',
           inReplyTo: data?.inReplyTo?.trim() || undefined,

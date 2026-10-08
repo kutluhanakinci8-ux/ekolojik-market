@@ -93,6 +93,10 @@ export function EmailOutboxSettingsPanel() {
   const [tenantImapHost, setTenantImapHost] = useState('');
   const [tenantImapUser, setTenantImapUser] = useState('');
   const [tenantImapPass, setTenantImapPass] = useState('');
+  const [tenantSmtpHost, setTenantSmtpHost] = useState('');
+  const [tenantSmtpUser, setTenantSmtpUser] = useState('');
+  const [tenantSmtpPass, setTenantSmtpPass] = useState('');
+  const [tenantSmtpFrom, setTenantSmtpFrom] = useState('');
   const [tenantUsePlatformEnv, setTenantUsePlatformEnv] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -134,6 +138,10 @@ export function EmailOutboxSettingsPanel() {
       setTenantImapHost(tenantMailHub.imap.host ?? '');
       setTenantImapUser(tenantMailHub.imap.user ?? '');
       setTenantImapPass('');
+      setTenantSmtpHost(tenantMailHub.smtp.host ?? '');
+      setTenantSmtpUser(tenantMailHub.smtp.user ?? '');
+      setTenantSmtpPass('');
+      setTenantSmtpFrom(tenantMailHub.smtp.from ?? '');
     }
     if (notifyHub.ok) setNotifyMatrixHub(notifyHub);
     if (recent.ok && Array.isArray(recent.items)) {
@@ -195,7 +203,7 @@ export function EmailOutboxSettingsPanel() {
       <article className="settings-subpanel" style={{ marginBottom: 16 }}>
         <h3>Mağaza posta kutusu (Faz 6)</h3>
         <p className="settings-hint">
-          Varsayılan: sunucu <code>.env</code> (EKOLOJIK_IMAP_*). İşaret kaldırılırsa bu mağaza için özel IMAP kullanılır.
+          Varsayılan: sunucu <code>.env</code> (EKOLOJIK_SMTP_* / EKOLOJIK_IMAP_*). İşaret kaldırılırsa mağaza özel SMTP+IMAP kullanılır.
         </p>
         <label className="settings-hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
@@ -215,6 +223,16 @@ export function EmailOutboxSettingsPanel() {
               value={tenantImapPass}
               onChange={(e) => setTenantImapPass(e.target.value)}
             />
+            <strong style={{ fontSize: '0.85rem' }}>Giden (SMTP)</strong>
+            <input placeholder="SMTP host" value={tenantSmtpHost} onChange={(e) => setTenantSmtpHost(e.target.value)} />
+            <input placeholder="SMTP kullanıcı" value={tenantSmtpUser} onChange={(e) => setTenantSmtpUser(e.target.value)} />
+            <input
+              type="password"
+              placeholder="SMTP şifre (boş = değişmez)"
+              value={tenantSmtpPass}
+              onChange={(e) => setTenantSmtpPass(e.target.value)}
+            />
+            <input placeholder="Gönderen From (e-posta)" value={tenantSmtpFrom} onChange={(e) => setTenantSmtpFrom(e.target.value)} />
           </div>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
@@ -231,6 +249,12 @@ export function EmailOutboxSettingsPanel() {
                   user: tenantImapUser.trim(),
                   pass: tenantImapPass.trim() || undefined,
                 },
+                smtp: {
+                  host: tenantSmtpHost.trim(),
+                  user: tenantSmtpUser.trim(),
+                  pass: tenantSmtpPass.trim() || undefined,
+                  from: tenantSmtpFrom.trim(),
+                },
               });
               setLoading(false);
               if (!saved) {
@@ -238,16 +262,17 @@ export function EmailOutboxSettingsPanel() {
                 return;
               }
               setTenantMail(saved);
-              setFlash('Mağaza IMAP ayarı kaydedildi.');
+              setFlash('Mağaza SMTP/IMAP ayarı kaydedildi.');
               await refresh();
             }}
           >
-            Mağaza IMAP kaydet
+            Mağaza posta kaydet
           </button>
         </div>
         {tenantMail?.effective && (
           <p className="settings-hint">
-            Etkin IMAP: {tenantMail.effective.imapConfigured ? tenantMail.effective.imapUser || '—' : 'yapılandırılmadı'}
+            Etkin SMTP: {tenantMail.effective.smtpConfigured ? tenantMail.effective.smtpFrom || '—' : 'yok'} · IMAP:{' '}
+            {tenantMail.effective.imapConfigured ? tenantMail.effective.imapUser || '—' : 'yok'}
           </p>
         )}
       </article>

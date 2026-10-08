@@ -1,4 +1,4 @@
-import { sendViaEkolojikSmtp, isEkolojikSmtpConfigured } from './ekolojikSmtp.mjs';
+import { sendViaEkolojikSmtp, isEkolojikSmtpConfigured, isTenantSmtpConfigured } from './ekolojikSmtp.mjs';
 import {
   enqueueEkolojikMail,
   processPendingOutbox,
@@ -41,6 +41,8 @@ export function createDeliverMessage(dataDir) {
       html = wrapHtmlLinksForClickTracking(html, message.trackToken, base);
     }
     return sendViaEkolojikSmtp({
+      dataDir,
+      tenantId: message.tenantId || 'main',
       to: message.to,
       cc: message.cc,
       bcc: message.bcc,
@@ -74,6 +76,7 @@ export async function sendEkolojikMail(dataDir, payload) {
     inReplyTo,
     references,
     attachments,
+    tenantId = 'main',
   } = payload;
   if (!to?.includes('@')) {
     return { ok: false, error: 'Geçersiz e-posta adresi' };
@@ -115,9 +118,11 @@ export async function sendEkolojikMail(dataDir, payload) {
     references,
     attachments,
     signatureAppended: Boolean(pres.signatureHtml?.trim()),
+    tenantId,
   });
 
-  if (!isEkolojikSmtpConfigured()) {
+  const smtpReady = await isTenantSmtpConfigured(dataDir, tenantId);
+  if (!smtpReady) {
     return {
       ok: true,
       provider: 'ekolojik-outbox-queued',

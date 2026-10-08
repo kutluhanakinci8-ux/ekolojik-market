@@ -54,7 +54,9 @@ export function ensurePostaOnboarding(settings, registrationEmail) {
 async function buildMailHealthSummary(dataDir, tenantId) {
   const mailCfg = await getTenantSmtpMailConfig(dataDir, tenantId);
   const smtpConfigured = Boolean(mailCfg.smtpHost && mailCfg.from?.includes('@'));
-  const verify = smtpConfigured ? await verifyEkolojikSmtp() : { ok: false, error: 'SMTP yapılandırılmadı' };
+  const verify = smtpConfigured
+    ? await verifyEkolojikSmtp({ dataDir, tenantId })
+    : { ok: false, error: 'SMTP yapılandırılmadı' };
   const imapConfigured = await isTenantImapConfigured(dataDir, tenantId);
   return {
     smtpConfigured,

@@ -51,7 +51,7 @@ curl -sS -X POST 'https://ekolojikmarket.com.tr/api/posta/onboarding/seed-alias-
 
 Sunucu env: `EKOLOJIK_MAIL_ALIASES=siparis@ekolojikmarket.com.tr,fatura@ekolojikmarket.com.tr` → `GET /api/posta/deliverability` listesinde görünür.
 
-**Tenant özel kutu (Faz 6):** Ayarlar → E-posta → **Mağaza posta kutusu** — “Platform .env” kapatılıp mağaza IMAP girilir (`data/tenant-mail/{tenantId}.json`). `main` varsayılan olarak `.env` kullanır.
+**Tenant özel kutu (Faz 6):** Ayarlar → E-posta → **Mağaza posta kutusu** — “Platform .env” kapatılıp mağaza **SMTP + IMAP** girilir (`data/tenant-mail/{tenantId}.json`). Giden test ve outbox ilgili `tenantId` ile gönderilir. `main` varsayılan olarak `.env` kullanır.
 
 **VPS checklist (minimum):**
 

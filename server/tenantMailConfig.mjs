@@ -47,7 +47,7 @@ export async function getTenantMailConfigHub(dataDir, tenantId = 'main') {
       inboxAddress: imap.inboxAddress ?? '',
     },
     effective: {
-      smtpConfigured: usePlatformEnv ? isEkolojikSmtpConfigured() : Boolean((smtp.host || envMail.smtpHost) && (smtp.from || envMail.from)),
+      smtpConfigured: await isTenantSmtpConfigured(dataDir, tenantId),
       imapConfigured: await isTenantImapConfigured(dataDir, tenantId),
       smtpFrom: usePlatformEnv ? envMail.from : smtp.from || envMail.from,
       imapUser: usePlatformEnv ? envImap.imapUser : imap.user || envImap.imapUser,
@@ -111,6 +111,11 @@ export async function getTenantImapConfig(dataDir, tenantId = 'main') {
 export async function isTenantImapConfigured(dataDir, tenantId = 'main') {
   const c = await getTenantImapConfig(dataDir, tenantId);
   return Boolean(c.imapHost && c.imapUser && c.imapPassword);
+}
+
+export async function isTenantSmtpConfigured(dataDir, tenantId = 'main') {
+  const c = await getTenantSmtpMailConfig(dataDir, tenantId);
+  return Boolean(c.smtpHost && c.from?.includes('@'));
 }
 
 export async function getTenantSmtpMailConfig(dataDir, tenantId = 'main') {

@@ -1,3 +1,11 @@
+import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+
+function tenantQuery(): string {
+  const tenant = loadTenantId();
+  if (!tenant || tenant === DEFAULT_TENANT_ID) return '';
+  return `?tenant=${encodeURIComponent(tenant)}`;
+}
+
 export async function fetchEmailHealth(): Promise<{
   ok: boolean;
   smtpConfigured?: boolean;
@@ -12,7 +20,7 @@ export async function fetchEmailHealth(): Promise<{
   contactAutoreply?: boolean;
   counts?: { pending: number; sent: number; failed: number };
 }> {
-  const res = await fetch('/api/email/health');
+  const res = await fetch(`/api/email/health${tenantQuery()}`);
   return res.json();
 }
 
@@ -33,7 +41,7 @@ export async function sendEmailTest(payload: {
   references?: string;
   attachments?: EmailOutboundAttachment[];
 }): Promise<{ ok: boolean; error?: string; provider?: string; message?: string }> {
-  const res = await fetch('/api/email/test', {
+  const res = await fetch(`/api/email/test${tenantQuery()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
