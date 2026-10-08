@@ -1107,6 +1107,20 @@ export function EkolojikPostaHubScreen({
             </span>
           </h1>
         </div>
+        {postaStorage && (
+          <div className="posta-hub-hero-storage" role="status" aria-label="Posta depolama">
+            <div className="posta-hub-hero-storage-label">
+              Depolama {postaStorage.percent}% · Ek üst sınır{' '}
+              {Math.round(postaStorage.maxAttachmentBytes / (1024 * 1024))} MB
+            </div>
+            <div className="posta-hub-storage-track posta-hub-hero-storage-track">
+              <div
+                className={`posta-hub-storage-fill${postaStorage.percent >= 85 ? ' is-warn' : ''}`}
+                style={{ width: `${postaStorage.percent}%` }}
+              />
+            </div>
+          </div>
+        )}
         <div className="posta-hub-hero-actions">
           {pushConfig && (
             <div className="posta-hub-push-anchor" ref={pushPanelRef}>
@@ -1247,23 +1261,6 @@ export function EkolojikPostaHubScreen({
           Çevrimdışı — son kaydedilen gelen kutusu listesi gösteriliyor (salt okuma).
         </p>
       )}
-      {postaStorage && hubLayout !== 'sohbet' && (
-        <div className="posta-hub-meta-strip">
-          <div className="posta-hub-storage" role="status" aria-label="Posta depolama">
-            <div className="posta-hub-storage-label">
-              Depolama kullanımı {postaStorage.percent}% · Ek üst sınır{' '}
-              {Math.round(postaStorage.maxAttachmentBytes / (1024 * 1024))} MB
-            </div>
-            <div className="posta-hub-storage-track">
-              <div
-                className={`posta-hub-storage-fill${postaStorage.percent >= 85 ? ' is-warn' : ''}`}
-                style={{ width: `${postaStorage.percent}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       <div
         className={`posta-hub-shell${hubLayout === 'sohbet' ? ' posta-yazisma-shell posta-hub-shell--sohbet' : ''}${hubLayout === 'tam' ? ' posta-hub-shell--tam' : ''}${
           hubLayout === 'sohbet' && folder === 'yaz' ? ' posta-hub-shell--sohbet-yaz' : ''
