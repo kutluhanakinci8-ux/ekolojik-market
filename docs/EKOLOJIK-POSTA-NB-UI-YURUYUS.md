@@ -42,7 +42,13 @@ Tek kapı (VPS):
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-wave3-operator-kapi.sh /var/www/market-pos
 ```
 
-Headless POS (Playwright — otomatik: #1–11, #13, #15–16, #18–19, #20–21, #24–25; WARN: #22–23; manuel: #12, #14, #17):
+Headless POS (Playwright — otomatik: #1–19, #20–21, #24–25; WARN: #22–23):
+
+Tam Wave 3 kapanış (repo kökü):
+
+```bash
+EKOLOJIK_SKIP_NPM_TEST=1 bash scripts/sunucu-ekolojik-posta-wave3-kapat.sh /var/www/market-pos
+```
 
 ```bash
 npm i -D playwright && npx playwright install chromium

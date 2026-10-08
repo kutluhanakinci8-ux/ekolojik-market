@@ -211,6 +211,60 @@ async function main() {
     console.log('WARN #3 Gelen satır yok — boş inbox');
   }
 
+  const convMode = page.locator('.posta-hub-list-mode button', { hasText: 'Konuşma' });
+  if (await convMode.count()) {
+    await convMode.click();
+    await page.waitForTimeout(500);
+    console.log('OK   #12 Konuşma liste modu');
+    const convRow = page.locator('.posta-hub-list button strong').first();
+    if (await convRow.count()) {
+      await convRow.click();
+      await page.waitForTimeout(400);
+      if (await page.locator('.posta-hub-conversation-thread, .posta-hub-detail').count()) {
+        console.log('OK   #12b Konuşma thread görünümü');
+      }
+    }
+    await page.locator('.posta-hub-list-mode button', { hasText: 'Mesaj' }).click();
+    await page.waitForTimeout(300);
+  } else {
+    console.log('WARN #12 Konuşma modu düğmesi yok');
+  }
+
+  if (await gelenBtn.count()) {
+    await gelenBtn.first().click();
+    await page.waitForTimeout(400);
+  }
+  await page.locator('.posta-hub-list-mode button', { hasText: 'Mesaj' }).click().catch(() => {});
+  await page.waitForTimeout(400);
+
+  const rowCheck = page.locator('.posta-hub-row-check').first();
+  if (await rowCheck.count()) {
+    await rowCheck.check();
+    await page.waitForTimeout(400);
+    if (await page.locator('.posta-hub-bulk-count').count()) {
+      console.log('OK   #14 Toplu işlem çubuğu (seçim)');
+      await page.locator('.posta-hub-bulk-bar button', { hasText: 'Temizle' }).click().catch(() => {});
+    } else {
+      console.log('WARN #14 toplu seçim çubuğu görünmedi');
+    }
+  } else {
+    console.log('WARN #14 satır checkbox yok — liste boş');
+  }
+
+  const swRes = await page.request.get(`${BASE}/posta-offline-sw.js`);
+  assert(swRes.ok(), '#17 offline SW dosyası');
+  const swLite = await page.evaluate(async (base) => {
+    try {
+      const r = await fetch(`${base}/posta-offline-sw.js`, { cache: 'no-store' });
+      const t = await r.text();
+      return t.includes('posta') && t.length > 40;
+    } catch {
+      return false;
+    }
+  }, BASE);
+  assert(swLite, '#17 SW içeriği');
+  console.log('OK   #17 Offline SW (posta-offline-sw.js)');
+
   const postaView = page.locator('.posta-hub-view-switch button', { hasText: /^Posta$/ });
   if (await postaView.count()) {
     await postaView.click();

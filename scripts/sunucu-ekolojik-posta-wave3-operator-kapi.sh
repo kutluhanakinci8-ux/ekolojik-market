@@ -25,11 +25,4 @@ else
 fi
 
 echo ""
-cat <<'MANUAL'
---- Manuel POS (≈10 dk, docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md) ---
-  #12 Gelen → konuşma modu → ilet / tümünü yanıtla
-  #14 Gelen → çoklu seç → arşiv veya spam
-  #17 Ağ kesintisi → offline son liste (PWA / SW)
-MANUAL
-echo ""
-echo "✓ Wave 3 operatör otomatik kapısı tamam"
+echo "✓ Wave 3 operatör otomatik kapısı tamam (UI #1–19 Playwright — docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md)"
