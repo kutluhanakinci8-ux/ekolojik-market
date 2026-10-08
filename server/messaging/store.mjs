@@ -131,12 +131,15 @@ export async function createMessagingThread(dataDir, tenantId, payload) {
   const root = await ensureRoot(dataDir, tenantId);
   const threads = await readThreads(root);
   const now = new Date().toISOString();
+  const channel = String(payload.channel ?? 'web').trim().toLowerCase() || 'web';
   const thread = {
     id: `em-${randomUUID()}`,
     customerId,
     customerName,
     customerEmail: String(payload.customerEmail ?? '').trim() || null,
     subject: String(payload.subject ?? '').trim() || `Müşteri: ${customerName}`,
+    channel,
+    externalId: payload.externalId ? String(payload.externalId).trim() : null,
     status: 'open',
     createdAt: now,
     updatedAt: now,
@@ -228,6 +231,15 @@ export async function appendMessagingMessage(dataDir, tenantId, threadId, payloa
   }
   threads[idx] = thread;
   await writeThreads(root, threads);
+
+  if (direction === 'staff' && thread.channel && thread.channel !== 'web') {
+    try {
+      const { dispatchStaffMessageToExternalChannel } = await import('./omnichannel.mjs');
+      await dispatchStaffMessageToExternalChannel(dataDir, tenantId, thread, message);
+    } catch {
+      /* harici kanal opsiyonel */
+    }
+  }
 
   return { ok: true, thread, message };
 }

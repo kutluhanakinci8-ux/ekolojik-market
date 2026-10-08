@@ -1441,9 +1441,14 @@ export function EkolojikPostaHubScreen({
                     <span className="posta-yazisma-thread-body">
                       <span className="posta-yazisma-thread-top">
                         <span className="posta-yazisma-thread-top-title">
-                          <span className="posta-yazisma-thread-badges" aria-hidden={!t.pinned && !t.muted}>
+                          <span className="posta-yazisma-thread-badges" aria-hidden={!t.pinned && !t.muted && !t.channel}>
                             <span title={t.pinned ? 'Sabit' : undefined}>{t.pinned ? '📌' : ''}</span>
                             <span title={t.muted ? 'Sessiz' : undefined}>{t.muted ? '🔕' : ''}</span>
+                            {t.channel && t.channel !== 'web' && (
+                              <span className="posta-channel-badge" title={`Kanal: ${t.channel}`}>
+                                {t.channel === 'whatsapp' ? 'WA' : t.channel.toUpperCase()}
+                              </span>
+                            )}
                           </span>
                           <strong>{t.customerName}</strong>
                         </span>

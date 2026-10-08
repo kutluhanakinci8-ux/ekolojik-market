@@ -56,6 +56,11 @@ import {
   sendPostaPushTest,
   subscribePostaWebPush,
 } from '../../services/postaPushService';
+import {
+  fetchMessagingChannelsHub,
+  saveMessagingChannelsHub,
+  type MessagingChannelsHub,
+} from '../../services/messagingChannelsService';
 
 type OutboxRow = {
   id: string;
@@ -117,9 +122,12 @@ export function EmailOutboxSettingsPanel() {
   const [pushConfig, setPushConfig] = useState<Awaited<ReturnType<typeof fetchPostaPushConfig>> | null>(null);
   const [pushSubscribers, setPushSubscribers] = useState(0);
   const [pushBusy, setPushBusy] = useState(false);
+  const [channelsHub, setChannelsHub] = useState<MessagingChannelsHub | null>(null);
+  const [waVerifyToken, setWaVerifyToken] = useState('');
+  const [waDisplayPhone, setWaDisplayPhone] = useState('');
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub, failedHub, pushCfg, pushStatus] =
+    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub, failedHub, pushCfg, pushStatus, channels] =
       await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
@@ -137,6 +145,7 @@ export function EmailOutboxSettingsPanel() {
       fetchFailedOutboxList(120),
       fetchPostaPushConfig(),
       fetchPostaPushStatus(),
+      fetchMessagingChannelsHub(),
     ]);
     setHealth(h);
     setIsolation(iso);
@@ -175,6 +184,10 @@ export function EmailOutboxSettingsPanel() {
     }
     if (pushCfg?.ok) setPushConfig(pushCfg);
     if (pushStatus?.ok) setPushSubscribers(pushStatus.subscribers ?? 0);
+    if (channels?.ok) {
+      setChannelsHub(channels);
+      setWaDisplayPhone(channels.whatsapp?.displayPhone ?? '');
+    }
   }, []);
 
   useEffect(() => {
@@ -978,6 +991,59 @@ export function EmailOutboxSettingsPanel() {
         Ayarlar → Bildirimler’den site iznini verin. Sunucuda{' '}
         <code>EKOLOJIK_PUSH_VAPID_PUBLIC_KEY</code> / <code>PRIVATE_KEY</code> tanımlı olmalı (
         <code>web-push generate-vapid-keys</code>).
+      </p>
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>Omnichannel — WhatsApp (Cloud API)</h3>
+          <p>
+            Webhook: <code>{channelsHub?.whatsapp?.webhookPath ?? '/api/webhooks/messaging/whatsapp'}</code>
+            {channelsHub?.whatsapp?.webhookUrlHint ?? ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={loading || !channelsHub?.whatsapp?.configured}
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const result = await saveMessagingChannelsHub({
+                whatsapp: {
+                  enabled: true,
+                  displayPhone: waDisplayPhone || null,
+                  verifyToken: waVerifyToken || undefined,
+                },
+              });
+              if (result.ok) {
+                setChannelsHub(result);
+                setFlash('WhatsApp kanalı kaydedildi');
+              } else {
+                setFlash(result.error ?? 'Kayıt başarısız');
+              }
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          WhatsApp’ı etkinleştir
+        </button>
+      </div>
+      <p className="settings-hint">
+        Sunucu env: <code>EKOLOJIK_WHATSAPP_ACCESS_TOKEN</code>, <code>EKOLOJIK_WHATSAPP_PHONE_NUMBER_ID</code>,{' '}
+        <code>EKOLOJIK_WHATSAPP_VERIFY_TOKEN</code>. Meta webhook doğrulaması GET ile yapılır.
+      </p>
+      <label className="settings-field">
+        <span>Görünen işletme hattı (opsiyonel)</span>
+        <input value={waDisplayPhone} onChange={(e) => setWaDisplayPhone(e.target.value)} placeholder="+90…" />
+      </label>
+      <label className="settings-field">
+        <span>Verify token (tenant özel, boş = env)</span>
+        <input value={waVerifyToken} onChange={(e) => setWaVerifyToken(e.target.value)} placeholder="meta-verify-token" />
+      </label>
+      <p className="settings-hint">
+        Durum: {channelsHub?.whatsapp?.configured ? 'Graph API hazır' : 'env eksik'} ·{' '}
+        {channelsHub?.whatsapp?.enabled ? 'kanal açık' : 'kanal kapalı'}
       </p>
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>

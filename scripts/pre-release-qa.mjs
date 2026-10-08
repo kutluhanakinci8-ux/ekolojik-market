@@ -220,6 +220,7 @@ async function postaMessagingGate(token) {
     '/api/posta/tenant-mail',
     '/api/posta/deliverability',
     '/api/messaging/public-config',
+    '/api/messaging/channels',
     '/api/messaging/threads?limit=3',
     '/api/posta/inbox?folder=gelen&limit=2',
     '/api/posta/outbox/failed?limit=5',

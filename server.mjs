@@ -143,6 +143,11 @@ import {
 } from './server/postaPublicMail.mjs';
 import { attachPostaWebSocketGateway, getPostaWsGatewayMetrics } from './server/postaWsGateway.mjs';
 import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
+import {
+  getMessagingChannelsHub,
+  saveMessagingChannelsHub,
+} from './server/messaging/channelConfig.mjs';
+import { handleChannelWebhook } from './server/integrations/channelWebhook.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
 import { readMessagingAttachment } from './server/messaging/attachments.mjs';
 import {
@@ -780,6 +785,65 @@ const server = createServer(async (req, res) => {
         res.end(mailTrackPixelResponse());
       }
       return;
+    }
+
+    const channelWebhookMatch = pathname.match(/^\/api\/webhooks\/messaging\/([^/]+)$/);
+    if (channelWebhookMatch) {
+      const channelId = decodeURIComponent(channelWebhookMatch[1]);
+      const tenantId = resolveTenantId(url);
+      if (req.method === 'GET' || req.method === 'POST') {
+        const body = req.method === 'POST' ? await readRequestBody(req) : null;
+        try {
+          const result = await handleChannelWebhook(channelId, {
+            dataDir: DATA_DIR,
+            tenantId,
+            method: req.method,
+            query: url.searchParams,
+            body,
+          });
+          if (result.challenge != null) {
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end(String(result.challenge));
+            return;
+          }
+          if (req.method === 'POST' && Array.isArray(result.results)) {
+            for (const row of result.results) {
+              if (!row?.ok || !row.thread || !row.message) continue;
+              notifyMessagingRealtime(tenantId, 'message', {
+                threadId: row.thread.id,
+                messageId: row.message.id,
+                direction: 'customer',
+                messageAt: row.message.createdAt,
+              });
+              void notifyPostaLiveInbox(
+                DATA_DIR,
+                tenantId,
+                {
+                  channel: 'messaging',
+                  threadId: row.thread.id,
+                  messageId: row.message.id,
+                  direction: 'customer',
+                  messageAt: row.message.createdAt,
+                  sourceId: row.message.id,
+                },
+                () => getPostaUnreadCounts(DATA_DIR, tenantId),
+              );
+              void notifyOnMessagingMessage(DATA_DIR, {
+                thread: row.thread,
+                message: row.message,
+                tenantId,
+              }).catch(() => undefined);
+            }
+          }
+          const status = result.status ?? (result.ok ? 200 : 400);
+          res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Webhook hatası' }));
+        }
+        return;
+      }
     }
 
     if (requiresPostaPosAuth(pathname, req.method) || requiresMessagingPosAuth(pathname)) {
@@ -2319,6 +2383,34 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Widget test hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/channels' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getMessagingChannelsHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kanal hub hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/channels' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await saveMessagingChannelsHub(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kanal kayıt hatası' }));
       }
       return;
     }
