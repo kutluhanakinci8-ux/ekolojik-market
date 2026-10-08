@@ -3,6 +3,7 @@ import { appendCustomerTrackingNotice } from '../postaCustomerEmailCompliance.mj
 import { getEffectiveMailPresentation, shouldSendPostaNotification } from '../postaSettings.mjs';
 import { recordPostaHubAlert } from '../postaHubAlerts.mjs';
 import { buildMessagingCustomerSummaryEmail } from '../mailTemplates.mjs';
+import { buildPortalUrlForThread, enrichCustomerMailWithPortalUrl } from './customerPortal.mjs';
 
 export function isMessagingCustomerEmailEnabled() {
   return process.env.EKOLOJIK_MESSAGING_CUSTOMER_EMAIL === '1';
@@ -52,12 +53,17 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message, tenan
   if (message.direction === 'staff' && isMessagingCustomerEmailEnabled() && !thread.muted) {
     const to = thread.customerEmail?.trim();
     if (to?.includes('@')) {
-      const tpl = buildMessagingCustomerSummaryEmail({
+      let tpl = buildMessagingCustomerSummaryEmail({
         customerName: thread.customerName,
         subject: thread.subject,
         bodyText: message.bodyText,
         threadId: thread.id,
       });
+      const origin = String(process.env.EKOLOJIK_PUBLIC_ORIGIN ?? '').trim();
+      if (origin) {
+        const portalUrl = await buildPortalUrlForThread(dataDir, tenantId, thread, origin);
+        tpl = enrichCustomerMailWithPortalUrl(tpl, portalUrl);
+      }
       const withNotice = await appendCustomerTrackingNotice(dataDir, tenantId, {
         text: tpl.text,
         html: tpl.html,
