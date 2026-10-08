@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   appendMessagingMessage,
   createMessagingThread,
@@ -7,25 +7,31 @@ import {
   markMessagingThreadCustomerRead,
 } from './store.mjs';
 import { getMessagingTyping, setMessagingTyping } from './realtime.mjs';
+import { isMessagingPublicApiConfigured, resolveEffectiveMessagingPublicKey } from './publicConfig.mjs';
 
-export function getMessagingPublicCapabilities() {
+export async function getMessagingPublicCapabilities(dataDir, tenantId = 'main') {
+  const configured = await isMessagingPublicApiConfigured(dataDir, tenantId);
+  const resolved = await resolveEffectiveMessagingPublicKey(dataDir, tenantId);
   return {
     ok: true,
     version: 1,
     apiPrefix: '/api/public/messaging/v1',
     auth: 'x-ekolojik-messaging-key or Authorization Bearer',
-    configured: Boolean(resolvePublicMessagingKey()),
+    tenantId,
+    configured,
+    keySource: resolved.source,
   };
 }
 
-function resolvePublicMessagingKey() {
-  return process.env.EKOLOJIK_MESSAGING_PUBLIC_KEY?.trim() || '';
-}
-
-export function assertMessagingPublicAuth(req) {
-  const expected = resolvePublicMessagingKey();
+export async function assertMessagingPublicAuth(req, dataDir, tenantId = 'main') {
+  const resolved = await resolveEffectiveMessagingPublicKey(dataDir, tenantId);
+  const expected = resolved.key;
   if (!expected) {
-    return { ok: false, status: 503, error: 'Public messaging API kapalı (EKOLOJIK_MESSAGING_PUBLIC_KEY)' };
+    return {
+      ok: false,
+      status: 503,
+      error: 'Public messaging API kapalı (tenant anahtarı veya EKOLOJIK_MESSAGING_PUBLIC_KEY)',
+    };
   }
   const header =
     req.headers['x-ekolojik-messaging-key'] ||
@@ -36,14 +42,19 @@ export function assertMessagingPublicAuth(req) {
   return { ok: true };
 }
 
-export function mintCustomerThreadToken(threadId, customerId) {
-  const secret = resolvePublicMessagingKey() || 'dev';
+async function secretForTenant(dataDir, tenantId) {
+  const resolved = await resolveEffectiveMessagingPublicKey(dataDir, tenantId);
+  return resolved.key || 'dev';
+}
+
+export async function mintCustomerThreadToken(dataDir, tenantId, threadId, customerId) {
+  const secret = await secretForTenant(dataDir, tenantId);
   const payload = `${threadId}:${customerId}`;
   const sig = createHash('sha256').update(`${secret}:${payload}`).digest('hex').slice(0, 24);
   return `${Buffer.from(payload, 'utf8').toString('base64url')}.${sig}`;
 }
 
-export function parseCustomerThreadToken(token) {
+export async function parseCustomerThreadToken(dataDir, tenantId, token) {
   const raw = String(token ?? '').trim();
   const [body, sig] = raw.split('.');
   if (!body || !sig) return { ok: false, error: 'Geçersiz token' };
@@ -51,7 +62,8 @@ export function parseCustomerThreadToken(token) {
     const decoded = Buffer.from(body, 'base64url').toString('utf8');
     const [threadId, customerId] = decoded.split(':');
     if (!threadId || !customerId) return { ok: false, error: 'Token içeriği hatalı' };
-    const expected = mintCustomerThreadToken(threadId, customerId).split('.')[1];
+    const full = await mintCustomerThreadToken(dataDir, tenantId, threadId, customerId);
+    const expected = full.split('.')[1];
     if (sig !== expected) return { ok: false, error: 'Token imzası geçersiz' };
     return { ok: true, threadId, customerId };
   } catch {
@@ -76,7 +88,7 @@ export async function publicCreateThread(dataDir, tenantId, payload) {
     ok: true,
     thread: result.thread,
     message: result.message ?? null,
-    customerToken: mintCustomerThreadToken(result.thread.id, customerId),
+    customerToken: await mintCustomerThreadToken(dataDir, tenantId, result.thread.id, customerId),
   };
 }
 
@@ -114,6 +126,4 @@ export async function publicTyping(dataDir, tenantId, threadId, customerId, acti
   return { ok: true, typing: setMessagingTyping(tenantId, threadId, 'customer', Boolean(active)) };
 }
 
-export function generateMessagingPublicKey() {
-  return randomBytes(24).toString('base64url');
-}
+export { generateMessagingPublicKey } from './publicConfig.mjs';

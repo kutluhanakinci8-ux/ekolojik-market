@@ -1,6 +1,6 @@
 import { isEkolojikImapConfigured, isEkolojikSmtpConfigured } from './ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './ekolojikSmtp.mjs';
-import { getMessagingPublicCapabilities } from './messaging/publicApi.mjs';
+import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
 
 export const POSTA_ONBOARDING_VERSION = 1;
 
@@ -66,11 +66,11 @@ function findPrimaryAdmin(users) {
   return users.find((u) => u.isPrimaryAdmin && u.isActive !== false) ?? users.find((u) => u.role === 'admin' && u.isActive !== false) ?? null;
 }
 
-export async function getPostaOnboardingHub(store) {
+export async function getPostaOnboardingHub(dataDir, tenantId, store) {
   const settings = store?.settings ?? {};
   const onboarding = ensurePostaOnboarding(settings);
   const mailHealth = await buildMailHealthSummary();
-  const messaging = getMessagingPublicCapabilities();
+  const publicApiConfigured = await isMessagingPublicApiConfigured(dataDir, tenantId);
   const users = Array.isArray(store?.users) ? store.users : [];
   const primaryAdmin = findPrimaryAdmin(users);
   const postaTabGranted = users.some((u) => u.isActive !== false && u.allowedTabs?.includes('posta'));
@@ -81,8 +81,8 @@ export async function getPostaOnboardingHub(store) {
     summary: {
       mailHealth,
       messaging: {
-        publicApiConfigured: Boolean(messaging.configured),
-        apiPrefix: messaging.apiPrefix,
+        publicApiConfigured,
+        apiPrefix: '/api/public/messaging/v1',
       },
       postaTabGranted,
       primaryAdminUserId: primaryAdmin?.id ?? null,

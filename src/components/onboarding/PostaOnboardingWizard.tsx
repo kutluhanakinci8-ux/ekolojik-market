@@ -4,8 +4,11 @@ import { loadTenantId } from '../../storage/tenantSession';
 import {
   buildMessagingEmbedSnippet,
   completePostaOnboarding,
+  fetchMessagingPublicConfig,
   fetchPostaOnboardingHub,
   patchPostaOnboarding,
+  rotateMessagingPublicKey,
+  type MessagingPublicConfigHub,
   type PostaOnboardingHub,
 } from '../../services/postaOnboardingService';
 import type { useStore } from '../../store/useStore';
@@ -27,6 +30,7 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [testTo, setTestTo] = useState('');
+  const [messagingConfig, setMessagingConfig] = useState<MessagingPublicConfigHub | null>(null);
 
   const reload = useCallback(async () => {
     const next = await fetchPostaOnboardingHub();
@@ -41,6 +45,14 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (stepIndex !== 1) return;
+    void (async () => {
+      const cfg = await fetchMessagingPublicConfig();
+      if (cfg) setMessagingConfig(cfg);
+    })();
+  }, [stepIndex]);
 
   const step = STEPS[stepIndex];
   const onboarding = hub?.onboarding;
@@ -111,7 +123,24 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   }
 
   const tenantId = loadTenantId();
-  const embedSnippet = buildMessagingEmbedSnippet(tenantId);
+  const apiKeyForEmbed =
+    messagingConfig?.publicKey ||
+    (messagingConfig?.effectiveSource === 'env' ? '(sunucu .env EKOLOJIK_MESSAGING_PUBLIC_KEY)' : '');
+  const embedSnippet = buildMessagingEmbedSnippet(tenantId, messagingConfig?.publicKey ?? '');
+
+  const handleRotateKey = async () => {
+    setBusy(true);
+    setFlash(null);
+    const cfg = await rotateMessagingPublicKey();
+    setBusy(false);
+    if (!cfg) {
+      setFlash('Anahtar oluşturulamadı.');
+      return;
+    }
+    setMessagingConfig(cfg);
+    setFlash('Yeni API anahtarı oluşturuldu — embed kodunu güncelleyin.');
+    await reload();
+  };
 
   return (
     <div className="posta-onboarding-backdrop" role="dialog" aria-modal="true" aria-labelledby="posta-onboarding-title">
@@ -166,13 +195,45 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
                 Müşteriler sitenizden yazabilir; mesajlar POS <strong>Posta → Müşteri mesajları</strong> altında görünür.
               </p>
               <p className={`posta-onboarding-status ${summary.messaging.publicApiConfigured ? 'ok' : 'warn'}`}>
-                Public API: {summary.messaging.publicApiConfigured ? 'Açık' : 'Kapalı — sunucuda EKOLOJIK_MESSAGING_PUBLIC_KEY tanımlanmalı'}
+                Public API:{' '}
+                {summary.messaging.publicApiConfigured
+                  ? messagingConfig?.hasTenantKey
+                    ? `Mağaza anahtarı (${messagingConfig.publicKeyMasked})`
+                    : messagingConfig?.effectiveSource === 'env'
+                      ? 'Sunucu genel anahtarı (.env)'
+                      : 'Açık'
+                  : 'Kapalı — anahtar oluşturun veya .env tanımlayın'}
               </p>
+              {!messagingConfig?.configured && (
+                <div className="posta-onboarding-actions">
+                  <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleRotateKey()}>
+                    Mağaza API anahtarı oluştur
+                  </button>
+                </div>
+              )}
+              {messagingConfig?.hasTenantKey && (
+                <p className="posta-onboarding-lead">
+                  API anahtarı: <code>{messagingConfig.publicKey}</code>
+                </p>
+              )}
+              {messagingConfig?.effectiveSource === 'env' && !messagingConfig.hasTenantKey && (
+                <p className="posta-onboarding-lead">
+                  Bu sunucu <code>EKOLOJIK_MESSAGING_PUBLIC_KEY</code> kullanıyor; embed’de o değeri yazın veya mağazaya özel anahtar oluşturun.
+                </p>
+              )}
               <label className="posta-onboarding-field">
-                Site embed örneği (anahtarı VPS .env’den alın)
-                <textarea readOnly rows={6} value={embedSnippet} onFocus={(e) => e.target.select()} />
+                Site embed örneği
+                <textarea readOnly rows={7} value={embedSnippet} onFocus={(e) => e.target.select()} />
               </label>
+              {apiKeyForEmbed && !messagingConfig?.publicKey && (
+                <p className="posta-onboarding-lead" style={{ fontSize: '0.85rem' }}>Anahtar: {apiKeyForEmbed}</p>
+              )}
               <div className="posta-onboarding-actions">
+                {messagingConfig?.hasTenantKey && (
+                  <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleRotateKey()}>
+                    Anahtarı yenile
+                  </button>
+                )}
                 <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void patchStep('messagingEmbed', { done: true })}>
                   Kodu kopyaladım / devam
                 </button>

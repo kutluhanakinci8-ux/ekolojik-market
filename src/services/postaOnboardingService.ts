@@ -86,14 +86,47 @@ export async function completePostaOnboarding(options?: {
   };
 }
 
-export function buildMessagingEmbedSnippet(tenantId: string): string {
+export type MessagingPublicConfigHub = {
+  ok: boolean;
+  tenantId: string;
+  enabled: boolean;
+  hasTenantKey: boolean;
+  publicKey: string;
+  publicKeyMasked: string;
+  effectiveSource: 'tenant' | 'env' | null;
+  configured: boolean;
+  rotatedAt: string | null;
+  apiPrefix: string;
+  authHeader: string;
+};
+
+export async function fetchMessagingPublicConfig(): Promise<MessagingPublicConfigHub | null> {
+  const res = await fetch(`/api/messaging/public-config${tenantQuery()}`);
+  if (!res.ok) return null;
+  return (await res.json()) as MessagingPublicConfigHub;
+}
+
+export async function rotateMessagingPublicKey(): Promise<MessagingPublicConfigHub | null> {
+  const res = await fetch(`/api/messaging/public-config${tenantQuery()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ rotate: true }),
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as MessagingPublicConfigHub;
+}
+
+export function buildMessagingEmbedSnippet(tenantId: string, apiKey: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ekolojikmarket.com.tr';
-  return `<!-- Ekolojik müşteri mesajlaşma (sunucuda EKOLOJIK_MESSAGING_PUBLIC_KEY gerekir) -->
+  const key = apiKey || 'API_ANAHTARI';
+  const tenantQs = tenantId && tenantId !== 'main' ? `?tenant=${encodeURIComponent(tenantId)}` : '';
+  return `<!-- Ekolojik müşteri mesajlaşma -->
 <script>
   window.EkolojikMessaging = {
     tenantId: '${tenantId}',
     apiBase: '${origin}/api/public/messaging/v1',
-    apiKey: 'SUNUCU_ANAHTARI'
+    apiKey: '${key}',
+    tenantQuery: '${tenantQs}'
   };
 </script>`;
 }

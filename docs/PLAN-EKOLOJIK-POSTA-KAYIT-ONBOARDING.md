@@ -255,7 +255,7 @@ Bu faz **ürün planı dışı**; onboarding şeması `mailHealth` adımına “
 - [x] **0** — `postaOnboarding` şeması + `registerTenant` seed + kayıtta `posta` sekmesi (politika B)
 - [x] **1** — `GET/PATCH /api/posta/onboarding` + `POST …/complete` (`server/postaOnboarding.mjs`)
 - [x] **2** — `PostaOnboardingWizard` + `PosApp` gate (Faz 2 — temel UI)
-- [ ] **2b** — `messaging/public-config` + tenant key (opsiyonel env fallback)
+- [x] **2b** — `GET/POST /api/messaging/public-config` + tenant key (`data/messaging/{tenant}/public-config.json`, env fallback)
 - [ ] **3** — `allowedTabs` politikası (B) + `defaultUsers` / migration
 - [ ] **4** — operatör dokümanları
 - [ ] **5** — onboarding’de alias + varsayılan kural şablonları

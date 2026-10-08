@@ -81,6 +81,10 @@ import {
   publicPostMessage,
   publicTyping,
 } from './server/messaging/publicApi.mjs';
+import {
+  getMessagingPublicConfigHub,
+  saveMessagingPublicConfig,
+} from './server/messaging/publicConfig.mjs';
 import { getPostaJmapLiteSession, queryPostaJmapLiteMailbox } from './server/postaJmapLite.mjs';
 import {
   deletePostaCalDavLiteEvent,
@@ -1070,19 +1074,26 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/public/messaging/v1/capabilities' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(getMessagingPublicCapabilities()));
+      const tenantId = resolveTenantId(url);
+      try {
+        const caps = await getMessagingPublicCapabilities(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(caps));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Capabilities hatası' }));
+      }
       return;
     }
 
     if (pathname === '/api/public/messaging/v1/threads' && req.method === 'POST') {
-      const auth = assertMessagingPublicAuth(req);
+      const tenantId = resolveTenantId(url);
+      const auth = await assertMessagingPublicAuth(req, DATA_DIR, tenantId);
       if (!auth.ok) {
         res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(auth));
         return;
       }
-      const tenantId = resolveTenantId(url);
       const data = await readRequestBody(req);
       try {
         const result = await publicCreateThread(DATA_DIR, tenantId, data ?? {});
@@ -1096,14 +1107,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
       const token = url.searchParams.get('token')?.trim() || '';
-      const parsed = parseCustomerThreadToken(token);
+      const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
         res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(parsed));
         return;
       }
-      const tenantId = resolveTenantId(url);
       try {
         const result = await publicListMessages(DATA_DIR, tenantId, parsed.threadId, parsed.customerId);
         res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1117,14 +1128,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
       const token = url.searchParams.get('token')?.trim() || '';
-      const parsed = parseCustomerThreadToken(token);
+      const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
         res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(parsed));
         return;
       }
-      const tenantId = resolveTenantId(url);
       const data = await readRequestBody(req);
       try {
         const result = await publicPostMessage(DATA_DIR, tenantId, parsed.threadId, parsed.customerId, data ?? {});
@@ -1157,14 +1168,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/public/messaging/v1/threads/typing' && (req.method === 'GET' || req.method === 'POST')) {
+      const tenantId = resolveTenantId(url);
       const token = url.searchParams.get('token')?.trim() || '';
-      const parsed = parseCustomerThreadToken(token);
+      const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
         res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(parsed));
         return;
       }
-      const tenantId = resolveTenantId(url);
       try {
         if (req.method === 'POST') {
           const data = await readRequestBody(req);
@@ -1627,7 +1638,7 @@ const server = createServer(async (req, res) => {
           };
           await writeStoreData(store, tenantId);
         }
-        const hub = await getPostaOnboardingHub(store);
+        const hub = await getPostaOnboardingHub(DATA_DIR, tenantId, store);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(hub));
       } catch (error) {
@@ -1650,7 +1661,7 @@ const server = createServer(async (req, res) => {
         const { settings, onboarding } = patchPostaOnboardingState(store, data ?? {});
         store = { ...store, settings, updatedAt: new Date().toISOString() };
         await writeStoreData(store, tenantId);
-        const hub = await getPostaOnboardingHub(store);
+        const hub = await getPostaOnboardingHub(DATA_DIR, tenantId, store);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, onboarding, summary: hub.summary }));
       } catch (error) {
@@ -1873,14 +1884,49 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/messaging/public-config' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const hub = await getMessagingPublicConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Public config hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/public-config' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const saved = await saveMessagingPublicConfig(DATA_DIR, tenantId, data ?? {});
+        const hub = await getMessagingPublicConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...hub, rotate: saved.ok }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Public config kayıt hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/messaging/capabilities' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(
-        JSON.stringify({
-          ...getMessagingRealtimeCapabilities(),
-          public: getMessagingPublicCapabilities(),
-        }),
-      );
+      const tenantId = resolveTenantId(url);
+      try {
+        const publicCaps = await getMessagingPublicCapabilities(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ...getMessagingRealtimeCapabilities(),
+            public: publicCaps,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Capabilities hatası' }));
+      }
       return;
     }
 
