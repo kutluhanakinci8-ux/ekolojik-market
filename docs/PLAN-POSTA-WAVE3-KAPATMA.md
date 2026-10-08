@@ -56,7 +56,7 @@ bash scripts/sunucu-ekolojik-posta-tam-kabul.sh /var/www/market-pos
 
 - [x] `main` merge (#23–#33 + #34) — 2026-10-08
 - [x] VPS deploy `main` + `pre-release-qa` 0 FAIL
-- [ ] `sunucu-ekolojik-posta-parite-dogrula.sh` — `EKOLOJIK_POS_QA_TOKEN` veya Posta yetkili kullanıcı
+- [x] `sunucu-ekolojik-posta-parite-dogrula.sh` — VPS mint / QA token (#35, 2026-10-08)
 - [x] `docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md` — tüm ✓
 - [x] `docs/RAKIP-SKOR-KARTI.md` — %100
 - [ ] GitHub Actions CI yeşil (`ci.yml`)
