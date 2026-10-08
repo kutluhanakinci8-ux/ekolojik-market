@@ -38,15 +38,30 @@ export async function registerTenant(payload: RegisterPayload): Promise<Register
   return data;
 }
 
-export async function submitContactForm(payload: ContactPayload): Promise<{ ok: boolean; message?: string }> {
+export async function submitContactForm(payload: ContactPayload): Promise<{
+  ok: boolean;
+  message?: string;
+  portalUrl?: string;
+  reference?: string;
+}> {
   const res = await fetch('/api/contact', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(payload),
   });
-  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    message?: string;
+    portalUrl?: string;
+    reference?: string;
+  };
   if (!res.ok) {
     return { ok: false, message: data.message || 'Mesaj gönderilemedi.' };
   }
-  return { ok: true, message: data.message || 'Mesajınız alındı. En kısa sürede dönüş yapacağız.' };
+  return {
+    ok: true,
+    message: data.message || 'Mesajınız alındı. En kısa sürede dönüş yapacağız.',
+    portalUrl: data.portalUrl,
+    reference: data.reference,
+  };
 }

@@ -149,6 +149,13 @@ import {
 } from './server/messaging/channelConfig.mjs';
 import { getMessagingBotHub, saveMessagingBotHub } from './server/messaging/botConfig.mjs';
 import { getMessagingSlaMetrics } from './server/messaging/sla.mjs';
+import {
+  getPortalSession,
+  linkContactFormToMessagingThread,
+  lookupPortalSessionByContact,
+  notifyCustomerThreadStatusEmail,
+  resolvePublicPortalOrigin,
+} from './server/messaging/customerPortal.mjs';
 import { handleChannelWebhook } from './server/integrations/channelWebhook.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
 import { readMessagingAttachment } from './server/messaging/attachments.mjs';
@@ -1538,6 +1545,65 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/public/messaging/v1/portal/session' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const token = url.searchParams.get('token')?.trim() || '';
+      try {
+        const result = await getPortalSession(DATA_DIR, tenantId, token);
+        res.writeHead(result.ok ? 200 : 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Portal oturumu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/portal/lookup' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await lookupPortalSessionByContact(DATA_DIR, tenantId, data ?? {}, {
+          origin: resolvePublicPortalOrigin(req),
+        });
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Portal arama hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/portal/open' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const auth = await assertMessagingPublicAuth(req, DATA_DIR, tenantId);
+      if (!auth.ok) {
+        res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(auth));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const result = await publicCreateThread(DATA_DIR, tenantId, data ?? {});
+        if (result.ok && result.thread && result.customerToken) {
+          result.portalUrl = `${resolvePublicPortalOrigin(req)}/portal/mesajlar?${new URLSearchParams({
+            token: result.customerToken,
+            ...(tenantId !== 'main' ? { tenant: tenantId } : {}),
+          }).toString()}`;
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Portal açılış hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/public/messaging/v1/threads/typing' && (req.method === 'GET' || req.method === 'POST')) {
       const tenantId = resolveTenantId(url);
       if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
@@ -2590,6 +2656,7 @@ const server = createServer(async (req, res) => {
       if (sub === 'flags' && threadId && req.method === 'POST') {
         const data = await readRequestBody(req);
         try {
+          const before = await getMessagingThread(DATA_DIR, tenantId, threadId);
           const result = await patchMessagingThread(DATA_DIR, tenantId, threadId, {
             pinned: data?.pinned,
             archived: data?.archived,
@@ -2598,6 +2665,30 @@ const server = createServer(async (req, res) => {
             assignedUserId: data?.assignedUserId,
             botHandoff: data?.botHandoff,
           });
+          if (
+            result.ok &&
+            result.thread &&
+            data?.status != null &&
+            before.ok &&
+            before.thread?.status !== result.thread.status
+          ) {
+            try {
+              result.statusNotification = await notifyCustomerThreadStatusEmail(
+                DATA_DIR,
+                tenantId,
+                result.thread,
+                {
+                  previousStatus: before.thread.status,
+                  origin: resolvePublicPortalOrigin(req),
+                },
+              );
+            } catch (statusErr) {
+              result.statusNotification = {
+                ok: false,
+                error: statusErr instanceof Error ? statusErr.message : 'Durum bildirimi hatası',
+              };
+            }
+          }
           res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));
         } catch (error) {
@@ -2804,24 +2895,35 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/contact' && req.method === 'POST') {
       const data = await readRequestBody(req);
       try {
+        const tenantId = resolveTenantId(url);
         const result = await saveContactMessage(DATA_DIR, data ?? {});
         if (result.ok && result.contact) {
+          let portalUrl;
+          try {
+            const link = await linkContactFormToMessagingThread(DATA_DIR, tenantId, result.contact, {
+              origin: resolvePublicPortalOrigin(req),
+            });
+            if (link.ok) portalUrl = link.portalUrl;
+          } catch {
+            /* messaging bridge opsiyonel */
+          }
           void notifyPostaLiveInbox(
             DATA_DIR,
-            resolveTenantId(url),
+            tenantId,
             {
               channel: 'contact',
               contactId: result.contact.id,
               messageAt: result.contact.createdAt ?? new Date().toISOString(),
               sourceId: result.contact.id,
             },
-            () => getPostaUnreadCounts(DATA_DIR, resolveTenantId(url)),
+            () => getPostaUnreadCounts(DATA_DIR, tenantId),
           );
           try {
             result.notifications = await sendContactNotifications(
               DATA_DIR,
               result.contact,
-              resolveTenantId(url),
+              tenantId,
+              { portalUrl },
             );
           } catch (mailError) {
             result.notifications = {
@@ -2829,6 +2931,8 @@ const server = createServer(async (req, res) => {
               error: mailError instanceof Error ? mailError.message : 'Posta kuyruğu hatası',
             };
           }
+          if (portalUrl) result.portalUrl = portalUrl;
+          result.reference = result.contact.id;
           delete result.contact;
         }
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
