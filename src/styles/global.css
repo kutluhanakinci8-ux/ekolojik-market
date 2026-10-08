@@ -16855,3 +16855,127 @@ input {
   padding: 12px var(--sohbet-pad);
   box-sizing: border-box;
 }
+
+/* Posta kayıt sonrası kurulum sihirbazı */
+.posta-onboarding-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.posta-onboarding-card {
+  width: min(560px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  background: var(--surface-elevated, #fff);
+  border-radius: 16px;
+  padding: 28px 28px 20px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+}
+.posta-onboarding-head h1 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+}
+.posta-onboarding-head p {
+  margin: 0;
+  color: var(--text-muted, #64748b);
+  font-size: 0.95rem;
+}
+.posta-onboarding-steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 20px 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.posta-onboarding-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted, #94a3b8);
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+.posta-onboarding-steps li.is-active {
+  background: #0f766e;
+  color: #fff;
+}
+.posta-onboarding-steps li.is-done {
+  color: #0f766e;
+}
+.posta-onboarding-steps__num {
+  font-weight: 700;
+}
+.posta-onboarding-lead {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+.posta-onboarding-checklist {
+  margin: 0 0 16px;
+  padding-left: 1.2rem;
+}
+.posta-onboarding-checklist li.ok {
+  color: #047857;
+}
+.posta-onboarding-checklist li.warn {
+  color: #b45309;
+}
+.posta-onboarding-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+.posta-onboarding-field input,
+.posta-onboarding-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+.posta-onboarding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.posta-onboarding-status.ok {
+  color: #047857;
+  margin-bottom: 12px;
+}
+.posta-onboarding-status.warn {
+  color: #b45309;
+  margin-bottom: 12px;
+}
+.posta-onboarding-flash {
+  margin: 12px 0 0;
+  color: #b45309;
+  font-size: 0.9rem;
+}
+.posta-onboarding-foot {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+}
+.posta-onboarding-link {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}

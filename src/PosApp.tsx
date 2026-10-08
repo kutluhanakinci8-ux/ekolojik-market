@@ -16,6 +16,8 @@ import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './uti
 import { resolveTopNavHighlight } from './data/navigation';
 import type { AppPage } from './components/AppShell';
 import { fetchPostaUnreadCounts } from './services/postaInboxService';
+import { PostaOnboardingWizard } from './components/onboarding/PostaOnboardingWizard';
+import { fetchPostaOnboardingHub } from './services/postaOnboardingService';
 
 function renderPage(
   page: AppPage,
@@ -67,6 +69,7 @@ export function PosApp() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState<AppPage>('sales');
   const [postaUnread, setPostaUnread] = useState(0);
+  const [postaOnboardingOpen, setPostaOnboardingOpen] = useState(false);
   const deepLinkCustomerId = searchParams.get('customerId')?.trim() || null;
   const viewPosta = searchParams.get('view') === 'posta' || Boolean(deepLinkCustomerId);
 
@@ -104,6 +107,22 @@ export function PosApp() {
   useEffect(() => {
     setCurrencyDisplaySettings(store.settings.currency);
   }, [store.settings.currency]);
+
+  useEffect(() => {
+    if (!store.authSession || store.authSession.role !== 'admin') return;
+    let cancelled = false;
+    (async () => {
+      const hub = await fetchPostaOnboardingHub();
+      if (cancelled || !hub) return;
+      const status = hub.onboarding.status;
+      if (status !== 'completed' && status !== 'dismissed') {
+        setPostaOnboardingOpen(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [store.authSession?.userId]);
 
   useEffect(() => {
     if (!store.authSession?.allowedTabs.includes('posta')) return;
@@ -152,6 +171,15 @@ export function PosApp() {
 
   if (store.authSession.mustChangePassword) {
     return <ChangePasswordModal store={store} />;
+  }
+
+  if (postaOnboardingOpen) {
+    return (
+      <PostaOnboardingWizard
+        store={store}
+        onFinished={() => setPostaOnboardingOpen(false)}
+      />
+    );
   }
 
   const allowedTabs = store.authSession.allowedTabs;
