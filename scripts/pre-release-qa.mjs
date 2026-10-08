@@ -249,6 +249,18 @@ async function postaMessagingGate(token) {
     } else {
       warn('posta', 'deliverability dnsChecklist', `HTTP ${deliv.status}`);
     }
+    const jmapMb = await http('GET', '/api/posta/jmap-lite/Mailbox/query', { headers: h });
+    if (jmapMb.ok && Array.isArray(jmapMb.json?.mailboxes)) {
+      pass('posta', 'jmap-lite Mailbox/query');
+    } else {
+      warn('posta', 'jmap-lite Mailbox/query', `HTTP ${jmapMb.status}`);
+    }
+    const jmapEq = await http('GET', '/api/posta/jmap-lite/Email/query?folder=gelen&limit=2', { headers: h });
+    if (jmapEq.ok && jmapEq.json?.method === 'Email/query') {
+      pass('posta', 'jmap-lite Email/query');
+    } else {
+      warn('posta', 'jmap-lite Email/query', `HTTP ${jmapEq.status}`);
+    }
     const rot = await http('POST', '/api/messaging/public-config', { headers: h, body: { rotate: false } });
     if (rot.status === 401) warn('posta', 'POST messaging config', '401 — admin gerekli');
     else if (rot.ok) pass('posta', 'POST messaging/public-config (admin)');
