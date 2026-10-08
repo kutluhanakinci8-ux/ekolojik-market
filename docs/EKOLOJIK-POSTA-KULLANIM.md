@@ -72,6 +72,8 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 | Değişken | Açıklama |
 |----------|----------|
 | `EKOLOJIK_MAIL_TRACK=1` | Giden HTML’de açılma pikseli (varsayılan kapalı) |
+| Hub engagement şeridi | Track açıkken Posta başlığında özet; detay **Ayarlar → E-posta** |
+| KVKK izleme metni | Ayarlar → müşteri otomatik e-posta bilgilendirme (iletişim + mesaj özet maili) |
 | `EKOLOJIK_POSTA_AI=1` | Compose AI öneri |
 | `EKOLOJIK_IMAP_WRITE=1` | Spam/çöp bayraklarında IMAP MOVE |
 | JMAP lite smoke | `npm run test:jmap-lite` (opsiyonel `EKOLOJIK_VERIFY_BASE_URL`) |

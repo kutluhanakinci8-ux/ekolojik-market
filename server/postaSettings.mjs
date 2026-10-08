@@ -31,6 +31,8 @@ function normalizeSavedSettings(raw) {
     replyTo: raw.replyTo ?? null,
     opsEmail: raw.opsEmail ?? null,
     signatureHtml: String(raw.signatureHtml ?? ''),
+    customerTrackingNoticeEnabled: raw.customerTrackingNoticeEnabled !== false,
+    customerTrackingNoticeText: String(raw.customerTrackingNoticeText ?? ''),
     notifications: legacyNotificationsFromMatrix(notificationMatrix),
     notificationMatrix,
     updatedAt: raw.updatedAt ?? null,
@@ -44,6 +46,8 @@ function defaultGlobalSettings() {
     replyTo: null,
     opsEmail: null,
     signatureHtml: '',
+    customerTrackingNoticeEnabled: true,
+    customerTrackingNoticeText: '',
     notifications: { ...DEFAULT_NOTIFICATIONS },
     notificationMatrix,
     updatedAt: null,
@@ -77,6 +81,14 @@ function mergeTenantPostaMail(globalSettings, tenantRaw) {
         : globalSettings.opsEmail,
     signatureHtml:
       tenantRaw.signatureHtml !== undefined ? String(tenantRaw.signatureHtml ?? '') : globalSettings.signatureHtml,
+    customerTrackingNoticeEnabled:
+      tenantRaw.customerTrackingNoticeEnabled !== undefined
+        ? Boolean(tenantRaw.customerTrackingNoticeEnabled)
+        : globalSettings.customerTrackingNoticeEnabled,
+    customerTrackingNoticeText:
+      tenantRaw.customerTrackingNoticeText !== undefined
+        ? String(tenantRaw.customerTrackingNoticeText ?? '')
+        : globalSettings.customerTrackingNoticeText,
     notifications,
     notificationMatrix,
     updatedAt: tenantRaw.updatedAt ?? globalSettings.updatedAt,
@@ -117,6 +129,14 @@ function applyPostaMailPatch(current, patch) {
     replyTo: patch.replyTo !== undefined ? String(patch.replyTo ?? '').trim() || null : current.replyTo,
     opsEmail: patch.opsEmail !== undefined ? String(patch.opsEmail ?? '').trim() || null : current.opsEmail,
     signatureHtml: patch.signatureHtml !== undefined ? String(patch.signatureHtml ?? '') : current.signatureHtml,
+    customerTrackingNoticeEnabled:
+      patch.customerTrackingNoticeEnabled !== undefined
+        ? Boolean(patch.customerTrackingNoticeEnabled)
+        : current.customerTrackingNoticeEnabled,
+    customerTrackingNoticeText:
+      patch.customerTrackingNoticeText !== undefined
+        ? String(patch.customerTrackingNoticeText ?? '')
+        : current.customerTrackingNoticeText,
     notifications,
     notificationMatrix,
     updatedAt: new Date().toISOString(),

@@ -62,13 +62,14 @@ export function wrapHtmlLinksForClickTracking(html, trackToken, baseUrl) {
   });
 }
 
-export async function recordMailClick(dataDir, token, { url, ip } = {}) {
+export async function recordMailClick(dataDir, token, { url, ip, tenantId } = {}) {
   if (!token?.trim()) return { ok: false };
   const row = {
     token,
     url: url ?? null,
     at: new Date().toISOString(),
     ip: ip ?? null,
+    tenantId: tenantId ? safeTenantId(tenantId) : undefined,
   };
   await appendRow(dataDir, 'clicks.jsonl', row);
   await fireEngagementWebhook('click', row);
@@ -82,6 +83,7 @@ export async function recordEngagementBounce(dataDir, payload) {
     subject: payload.subject ?? null,
     error: payload.error ?? null,
     source: payload.source ?? null,
+    tenantId: payload.tenantId ? safeTenantId(payload.tenantId) : 'main',
     at: new Date().toISOString(),
   };
   await appendRow(dataDir, 'bounces.jsonl', row);
@@ -114,19 +116,37 @@ function inWindow(row, sinceMs) {
   return Number.isFinite(t) && t >= sinceMs;
 }
 
-export async function getPostaEngagementSummary(dataDir, { days = 14 } = {}) {
+function safeTenantId(tenantId) {
+  const raw = String(tenantId || 'main').trim() || 'main';
+  return raw.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function matchesTenant(row, tenantId) {
+  const want = safeTenantId(tenantId);
+  const got = row.tenantId ? safeTenantId(row.tenantId) : 'main';
+  return got === want;
+}
+
+export async function getPostaEngagementSummary(dataDir, { days = 14, tenantId = 'main' } = {}) {
   const windowDays = Math.min(Math.max(Number(days) || 14, 1), 90);
   const since = Date.now() - windowDays * 86400000;
 
-  const opens = (await readJsonlFile(opensPath(dataDir))).filter((r) => inWindow(r, since));
-  const clicks = (await readJsonlFile(clicksPath(dataDir))).filter((r) => inWindow(r, since));
-  const bounces = (await readJsonlFile(bouncesPath(dataDir))).filter((r) => inWindow(r, since));
+  const opens = (await readJsonlFile(opensPath(dataDir)))
+    .filter((r) => inWindow(r, since))
+    .filter((r) => matchesTenant(r, tenantId));
+  const clicks = (await readJsonlFile(clicksPath(dataDir)))
+    .filter((r) => inWindow(r, since))
+    .filter((r) => matchesTenant(r, tenantId));
+  const bounces = (await readJsonlFile(bouncesPath(dataDir)))
+    .filter((r) => inWindow(r, since))
+    .filter((r) => matchesTenant(r, tenantId));
 
   const uniqueOpenTokens = new Set(opens.map((r) => r.token).filter(Boolean));
   const uniqueClickTokens = new Set(clicks.map((r) => r.token).filter(Boolean));
 
   return {
     ok: true,
+    tenantId: safeTenantId(tenantId),
     windowDays,
     mailTrackEnabled: isMailTrackEnabled(),
     clickTrackEnabled: isClickTrackEnabled(),
@@ -152,21 +172,22 @@ function csvEscape(value) {
   return s;
 }
 
-export async function buildPostaEngagementCsv(dataDir, { type = 'combined', days = 90 } = {}) {
+export async function buildPostaEngagementCsv(dataDir, { type = 'combined', days = 90, tenantId = 'main' } = {}) {
   const windowDays = Math.min(Math.max(Number(days) || 90, 1), 365);
   const since = Date.now() - windowDays * 86400000;
-  const filter = (rows) => rows.filter((r) => inWindow(r, since));
+  const filter = (rows) =>
+    rows.filter((r) => inWindow(r, since)).filter((r) => matchesTenant(r, tenantId));
 
   const opens = filter(await readJsonlFile(opensPath(dataDir), 10000));
   const clicks = filter(await readJsonlFile(clicksPath(dataDir), 10000));
   const bounces = filter(await readJsonlFile(bouncesPath(dataDir), 10000));
 
-  const lines = ['type,at,token,outboxId,to,subject,url,error,ip'];
+  const lines = ['type,at,tenantId,token,outboxId,to,subject,url,error,ip'];
 
   if (type === 'opens' || type === 'combined') {
     for (const r of opens) {
       lines.push(
-        ['open', r.at, r.token, '', '', '', '', '', r.ip]
+        ['open', r.at, r.tenantId ?? 'main', r.token, '', '', '', '', r.ip]
           .map(csvEscape)
           .join(','),
       );
@@ -175,7 +196,7 @@ export async function buildPostaEngagementCsv(dataDir, { type = 'combined', days
   if (type === 'clicks' || type === 'combined') {
     for (const r of clicks) {
       lines.push(
-        ['click', r.at, r.token, '', '', '', r.url, '', r.ip]
+        ['click', r.at, r.tenantId ?? 'main', r.token, '', '', '', r.url, '', r.ip]
           .map(csvEscape)
           .join(','),
       );
@@ -184,7 +205,7 @@ export async function buildPostaEngagementCsv(dataDir, { type = 'combined', days
   if (type === 'bounces' || type === 'combined') {
     for (const r of bounces) {
       lines.push(
-        ['bounce', r.at, '', r.outboxId, r.to, r.subject, '', r.error, '']
+        ['bounce', r.at, r.tenantId ?? 'main', '', r.outboxId, r.to, r.subject, '', r.error, '']
           .map(csvEscape)
           .join(','),
       );

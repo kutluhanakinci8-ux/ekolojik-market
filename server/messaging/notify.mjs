@@ -1,4 +1,5 @@
 import { sendEkolojikMail } from '../emailOutboxProcessor.mjs';
+import { appendCustomerTrackingNotice } from '../postaCustomerEmailCompliance.mjs';
 import { getEffectiveMailPresentation, shouldSendPostaNotification } from '../postaSettings.mjs';
 import { recordPostaHubAlert } from '../postaHubAlerts.mjs';
 import { buildMessagingCustomerSummaryEmail } from '../mailTemplates.mjs';
@@ -57,11 +58,15 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message, tenan
         bodyText: message.bodyText,
         threadId: thread.id,
       });
+      const withNotice = await appendCustomerTrackingNotice(dataDir, tenantId, {
+        text: tpl.text,
+        html: tpl.html,
+      });
       summary.customer = await sendEkolojikMail(dataDir, {
         to,
         subject: tpl.subject,
-        body: tpl.text,
-        html: tpl.html,
+        body: withNotice.text,
+        html: withNotice.html,
         idempotencyKey: `messaging:customer:${message.id}`,
         source: 'messaging-customer',
         tenantId,

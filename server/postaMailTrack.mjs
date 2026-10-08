@@ -40,6 +40,7 @@ export async function recordMailOpen(dataDir, token, meta = {}) {
     token,
     at: new Date().toISOString(),
     ...meta,
+    tenantId: meta.tenantId ?? undefined,
   });
   await appendFile(trackLogPath(dataDir), `${line}\n`, 'utf8');
   try {

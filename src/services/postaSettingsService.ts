@@ -30,6 +30,8 @@ export type PostaMailSettings = {
   replyTo: string | null;
   opsEmail: string | null;
   signatureHtml: string;
+  customerTrackingNoticeEnabled?: boolean;
+  customerTrackingNoticeText?: string;
   notifications: PostaNotificationPrefs;
   notificationMatrix?: PostaNotificationMatrix;
   updatedAt: string | null;
@@ -221,6 +223,7 @@ export async function fetchPostaOutboxAnalytics(days = 14): Promise<PostaOutboxA
 
 export type PostaEngagementSummary = {
   ok: boolean;
+  tenantId?: string;
   windowDays?: number;
   mailTrackEnabled?: boolean;
   clickTrackEnabled?: boolean;

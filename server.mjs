@@ -737,7 +737,19 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
-        await recordMailClick(DATA_DIR, postaClickMatch[1], { url: target, ip: getRequestIp(req) });
+        let clickTenant = 'main';
+        try {
+          const { findOutboxMessageByTrackToken } = await import('./server/emailOutbox.mjs');
+          const hit = await findOutboxMessageByTrackToken(DATA_DIR, postaClickMatch[1]);
+          if (hit?.message?.tenantId) clickTenant = hit.message.tenantId;
+        } catch {
+          /* ignore */
+        }
+        await recordMailClick(DATA_DIR, postaClickMatch[1], {
+          url: target,
+          ip: getRequestIp(req),
+          tenantId: clickTenant,
+        });
       } catch {
         /* yine de yönlendir */
       }
@@ -749,7 +761,15 @@ const server = createServer(async (req, res) => {
     const postaTrackMatch = pathname.match(/^\/api\/posta\/track\/open\/([a-f0-9]+)\.gif$/i);
     if (postaTrackMatch && req.method === 'GET') {
       try {
-        await recordMailOpen(DATA_DIR, postaTrackMatch[1], { ip: getRequestIp(req) });
+        let openTenant = 'main';
+        try {
+          const { findOutboxMessageByTrackToken } = await import('./server/emailOutbox.mjs');
+          const hit = await findOutboxMessageByTrackToken(DATA_DIR, postaTrackMatch[1]);
+          if (hit?.message?.tenantId) openTenant = hit.message.tenantId;
+        } catch {
+          /* ignore */
+        }
+        await recordMailOpen(DATA_DIR, postaTrackMatch[1], { ip: getRequestIp(req), tenantId: openTenant });
         res.writeHead(200, {
           'Content-Type': 'image/gif',
           'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -1047,9 +1067,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/posta/engagement/summary' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
       const days = Number(url.searchParams.get('days') || 14);
       try {
-        const result = await getPostaEngagementSummary(DATA_DIR, { days });
+        const result = await getPostaEngagementSummary(DATA_DIR, { days, tenantId });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -1060,10 +1081,11 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/posta/engagement/export.csv' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
       const type = url.searchParams.get('type')?.trim() || 'combined';
       const days = Number(url.searchParams.get('days') || 90);
       try {
-        const result = await buildPostaEngagementCsv(DATA_DIR, { type, days });
+        const result = await buildPostaEngagementCsv(DATA_DIR, { type, days, tenantId });
         if (!result.ok) {
           res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));

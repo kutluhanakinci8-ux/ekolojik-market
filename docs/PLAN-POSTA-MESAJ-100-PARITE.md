@@ -269,7 +269,7 @@ bash scripts/ekolojik-posta-faz-kapat.sh "Faz NN (100)" cursor/posta-fazNN-100-f
 [x] Faz 44 — Tenant mail E2E
 [x] Faz 45 — JMAP/klasör
 [x] Faz 46 — CalDAV + push
-[ ] Faz 47 — Engagement KVKK
+[x] Faz 47 — Engagement KVKK
 [ ] Faz 48 — Omnichannel
 [ ] Faz 49 — Bot + SLA
 [ ] Faz 50 — Müşteri portal
