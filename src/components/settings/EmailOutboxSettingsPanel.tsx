@@ -31,6 +31,12 @@ import {
   type PostaLiveMetrics,
   type PostaOutboxAnalytics,
 } from '../../services/postaSettingsService';
+import {
+  fetchPostaOnboardingHub,
+  reopenPostaOnboarding,
+  seedPostaOnboardingAliasRules,
+} from '../../services/postaOnboardingService';
+import { signalPostaOnboardingOpen } from '../../storage/postaOnboardingSession';
 
 type OutboxRow = {
   id: string;
@@ -77,9 +83,11 @@ export function EmailOutboxSettingsPanel() {
   const [deliverability, setDeliverability] = useState<PostaDeliverabilityHub | null>(null);
   const [notifyMatrixHub, setNotifyMatrixHub] = useState<PostaNotificationMatrixHub | null>(null);
   const [liveMetrics, setLiveMetrics] = useState<PostaLiveMetrics | null>(null);
+  const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub] = await Promise.all([
+    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub] =
+      await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
       fetchEkolojikIsolationReport(),
@@ -91,6 +99,7 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaRules(),
       fetchPostaDeliverability(),
       fetchPostaNotificationsMatrix(),
+      fetchPostaOnboardingHub(),
     ]);
     setHealth(h);
     setIsolation(iso);
@@ -107,6 +116,7 @@ export function EmailOutboxSettingsPanel() {
     if (live.ok) setLiveMetrics(live);
     if (rules.ok && rules.rules) setPostaRules(rules.rules);
     if (deliv.ok) setDeliverability(deliv);
+    setOnboardingStatus(onboardingHub?.onboarding?.status ?? null);
     if (notifyHub.ok) setNotifyMatrixHub(notifyHub);
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
@@ -163,6 +173,59 @@ export function EmailOutboxSettingsPanel() {
       </div>
 
       {flash && <p className="settings-flash">{flash}</p>}
+
+      <article className="settings-subpanel" style={{ marginBottom: 16 }}>
+        <h3>Posta kurulum sihirbazı</h3>
+        <p className="settings-hint">
+          Kayıt sonrası 3 adım (e-posta testi, mesajlaşma anahtarı, Posta sekmesi). Durum:{' '}
+          <strong>{onboardingStatus ?? '—'}</strong>
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              const result = await reopenPostaOnboarding();
+              setLoading(false);
+              if (!result.ok) {
+                setFlash('Kurulum yeniden açılamadı.');
+                return;
+              }
+              signalPostaOnboardingOpen();
+              setOnboardingStatus(result.onboarding?.status ?? 'in_progress');
+              setFlash('Kurulum sihirbazı açıldı.');
+            }}
+          >
+            Kurulumu yeniden aç
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              const result = await seedPostaOnboardingAliasRules();
+              setLoading(false);
+              setFlash(
+                result.ok
+                  ? result.added?.length
+                    ? `${result.added.length} alias kuralı eklendi.`
+                    : 'Alias kuralları zaten tanımlı.'
+                  : 'Kurallar eklenemedi.',
+              );
+              await refresh();
+            }}
+          >
+            siparis@ / fatura@ kuralları
+          </button>
+        </div>
+        <p className="settings-hint">
+          Rehber: <code>docs/EKOLOJIK-POSTA-ONBOARDING-OPERATOR.md</code> (VPS env:{' '}
+          <code>EKOLOJIK_MAIL_ALIASES</code>, <code>EKOLOJIK_MESSAGING_PUBLIC_KEY</code>)
+        </p>
+      </article>
 
       <div className="settings-stat-grid">
         <article className="settings-stat-card">

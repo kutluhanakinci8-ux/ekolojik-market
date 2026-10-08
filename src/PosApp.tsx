@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { setCurrencyDisplaySettings } from './utils/format';
 import { AppShell } from './components/AppShell';
@@ -18,6 +18,11 @@ import type { AppPage } from './components/AppShell';
 import { fetchPostaUnreadCounts } from './services/postaInboxService';
 import { PostaOnboardingWizard } from './components/onboarding/PostaOnboardingWizard';
 import { fetchPostaOnboardingHub } from './services/postaOnboardingService';
+import {
+  clearPostaOnboardingForce,
+  POSTA_ONBOARDING_REQUEST_EVENT,
+  shouldForcePostaOnboardingOpen,
+} from './storage/postaOnboardingSession';
 
 function renderPage(
   page: AppPage,
@@ -108,21 +113,31 @@ export function PosApp() {
     setCurrencyDisplaySettings(store.settings.currency);
   }, [store.settings.currency]);
 
-  useEffect(() => {
+  const evaluatePostaOnboardingGate = useCallback(async () => {
     if (!store.authSession || store.authSession.role !== 'admin') return;
-    let cancelled = false;
-    (async () => {
-      const hub = await fetchPostaOnboardingHub();
-      if (cancelled || !hub) return;
-      const status = hub.onboarding.status;
-      if (status !== 'completed' && status !== 'dismissed') {
-        setPostaOnboardingOpen(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
+    if (shouldForcePostaOnboardingOpen()) {
+      setPostaOnboardingOpen(true);
+      return;
+    }
+    const hub = await fetchPostaOnboardingHub();
+    if (!hub) return;
+    const status = hub.onboarding.status;
+    if (status !== 'completed' && status !== 'dismissed') {
+      setPostaOnboardingOpen(true);
+    }
+  }, [store.authSession]);
+
+  useEffect(() => {
+    void evaluatePostaOnboardingGate();
+  }, [evaluatePostaOnboardingGate]);
+
+  useEffect(() => {
+    const onRequest = () => {
+      void evaluatePostaOnboardingGate();
     };
-  }, [store.authSession?.userId]);
+    window.addEventListener(POSTA_ONBOARDING_REQUEST_EVENT, onRequest);
+    return () => window.removeEventListener(POSTA_ONBOARDING_REQUEST_EVENT, onRequest);
+  }, [evaluatePostaOnboardingGate]);
 
   useEffect(() => {
     if (!store.authSession?.allowedTabs.includes('posta')) return;
@@ -177,7 +192,10 @@ export function PosApp() {
     return (
       <PostaOnboardingWizard
         store={store}
-        onFinished={() => setPostaOnboardingOpen(false)}
+        onFinished={() => {
+          clearPostaOnboardingForce();
+          setPostaOnboardingOpen(false);
+        }}
       />
     );
   }

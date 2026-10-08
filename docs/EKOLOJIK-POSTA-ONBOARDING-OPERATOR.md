@@ -24,7 +24,7 @@ Günlük Posta kullanımı: [EKOLOJIK-POSTA-KULLANIM.md](./EKOLOJIK-POSTA-KULLAN
 - `settings.postaOnboarding.status` **`completed`** veya **`dismissed`** değilse, `/app` girişinde tam ekran sihirbaz açılır.
 - **Mevcut mağazalar (main vb.):** deploy sonrası otomatik migrasyon → genelde `completed` (sihirbaz bir daha çıkmaz). Yeni **kayıt** tenant’ları sihirbazı tamamlar.
 
-**Sonra hatırlat:** `status: dismissed` — Ayarlar üzerinden kurulumu yeniden başlatmak için API veya destek (ileride UI).
+**Sonra hatırlat:** `status: dismissed` — tekrar açmak için **Ayarlar → E-posta → Kurulumu yeniden aç** veya `POST /api/posta/onboarding/reopen`.
 
 ---
 

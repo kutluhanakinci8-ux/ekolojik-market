@@ -65,6 +65,15 @@ export async function patchPostaOnboarding(payload: {
   return { ok: Boolean(res.ok && data.ok !== false), onboarding: data.onboarding };
 }
 
+export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding?: PostaOnboardingState }> {
+  const res = await fetch(`/api/posta/onboarding/reopen${tenantQuery()}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  });
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; onboarding?: PostaOnboardingState };
+  return { ok: Boolean(res.ok && data.ok), onboarding: data.onboarding };
+}
+
 export async function seedPostaOnboardingAliasRules(): Promise<{ ok: boolean; added?: unknown[] }> {
   const res = await fetch(`/api/posta/onboarding/seed-alias-rules${tenantQuery()}`, {
     method: 'POST',

@@ -45,6 +45,7 @@ import {
   patchPostaOnboardingState,
   completePostaOnboarding,
   migrateLegacyPostaOnboarding,
+  reopenPostaOnboardingState,
 } from './server/postaOnboarding.mjs';
 import {
   buildOutboxCsv,
@@ -1683,6 +1684,26 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding güncelleme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/reopen' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      try {
+        let store = await readStoreData(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        const { store: next, onboarding } = reopenPostaOnboardingState(store);
+        await writeStoreData({ ...next, updatedAt: new Date().toISOString() }, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, onboarding }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Yeniden açılamadı' }));
       }
       return;
     }

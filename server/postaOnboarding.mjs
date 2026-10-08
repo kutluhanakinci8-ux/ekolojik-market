@@ -228,6 +228,24 @@ export function completePostaOnboarding(store, options = {}) {
  * Mevcut mağazalar (Faz 3): tüm adminlere posta sekmesi + onboarding tamamlandı.
  * Yeni kayıtlar (registrationEmail dolu, henüz tamamlanmamış) otomatik tamamlanmaz — sihirbaz kalır.
  */
+/** Ayarlar → kurulumu yeniden aç (adımlar korunur, completedAt sıfırlanır). */
+export function reopenPostaOnboardingState(store) {
+  const settings = { ...(store?.settings ?? {}) };
+  const current = ensurePostaOnboarding(settings);
+  const now = new Date().toISOString();
+  settings.postaOnboarding = {
+    ...current,
+    status: 'in_progress',
+    startedAt: current.startedAt || now,
+    completedAt: null,
+    notes: current.notes,
+  };
+  return {
+    store: { ...store, settings, updatedAt: now },
+    onboarding: settings.postaOnboarding,
+  };
+}
+
 export function migrateLegacyPostaOnboarding(store) {
   if (!store || typeof store !== 'object') {
     return { store, changed: false };
