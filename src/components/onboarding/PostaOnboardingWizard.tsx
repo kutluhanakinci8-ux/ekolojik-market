@@ -13,6 +13,7 @@ import {
   saveMessagingAllowedOrigins,
   seedPostaOnboardingAliasRules,
   testMessagingWidgetSmoke,
+  verifyOnboardingMailConnection,
   type MessagingPublicConfigHub,
   type PostaOnboardingHub,
 } from '../../services/postaOnboardingService';
@@ -45,7 +46,13 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     typeof window !== 'undefined' ? window.location.origin : 'https://example.com',
   );
   const [widgetTestOk, setWidgetTestOk] = useState(false);
+  const [mailConnectionOk, setMailConnectionOk] = useState(false);
+  const [requireMailConnectionTest, setRequireMailConnectionTest] = useState(false);
   const widgetScriptLoaded = useRef(false);
+
+  useEffect(() => {
+    void patchPostaOnboarding({ status: 'in_progress' });
+  }, []);
 
   const reload = useCallback(async () => {
     const next = await fetchPostaOnboardingHub();
@@ -172,10 +179,33 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     setFlash(count ? `${count} kural eklendi (siparis@ / fatura@).` : 'Kurallar zaten tanımlı.');
   };
 
+  const handleVerifyMailConnection = async () => {
+    setBusy(true);
+    setFlash(null);
+    const result = await verifyOnboardingMailConnection();
+    setBusy(false);
+    await reload();
+    if (!result.ok) {
+      setMailConnectionOk(false);
+      setFlash(
+        result.smtpError || result.imapError
+          ? `Bağlantı: SMTP ${result.smtpVerified ? 'OK' : '—'}, IMAP ${result.imapVerified ? 'OK' : '—'}`
+          : 'SMTP veya IMAP doğrulaması başarısız — ayarları kontrol edin.',
+      );
+      return;
+    }
+    setMailConnectionOk(true);
+    setFlash('SMTP/IMAP bağlantı testi başarılı.');
+  };
+
   const handleTestMail = async () => {
     const to = testTo.trim();
     if (!to.includes('@')) {
       setFlash('Geçerli bir test e-posta adresi girin.');
+      return;
+    }
+    if (requireMailConnectionTest && !mailConnectionOk && !hub?.summary?.mailHealth.smtpVerified) {
+      setFlash('Önce “Bağlantıyı test et” ile SMTP/IMAP doğrulaması yapın veya zorunluluğu kapatın.');
       return;
     }
     setBusy(true);
@@ -227,6 +257,11 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     }
     setWidgetTestOk(true);
     setFlash('Widget testi OK — POS Posta → Müşteri mesajlarında test yazışmasını görebilirsiniz.');
+    await patchPostaOnboarding({
+      status: 'in_progress',
+      steps: { messagingEmbed: { done: true } },
+    });
+    await reload();
     const cfg = await fetchMessagingPublicConfig();
     if (cfg) setMessagingConfig(cfg);
   };
@@ -323,6 +358,20 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
                   </button>
                 </div>
               )}
+              <label className="posta-onboarding-lead" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.9rem' }}>
+                <input
+                  type="checkbox"
+                  checked={requireMailConnectionTest}
+                  onChange={(e) => setRequireMailConnectionTest(e.target.checked)}
+                />
+                Devam etmeden önce SMTP/IMAP bağlantı testi zorunlu
+              </label>
+              <div className="posta-onboarding-actions">
+                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleVerifyMailConnection()}>
+                  Bağlantıyı test et
+                </button>
+                {mailConnectionOk && <span className="posta-onboarding-status ok">Bağlantı OK</span>}
+              </div>
               <label className="posta-onboarding-field">
                 Test e-postası gönder
                 <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="ornek@firma.com" />

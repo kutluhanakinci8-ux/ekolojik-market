@@ -1,5 +1,6 @@
-import { isTenantImapConfigured, getTenantSmtpMailConfig } from './tenantMailConfig.mjs';
+import { isTenantImapConfigured, getTenantSmtpMailConfig, getTenantImapConfig } from './tenantMailConfig.mjs';
 import { verifyEkolojikSmtp } from './ekolojikSmtp.mjs';
+import { verifyImapMailbox } from './billEmailImap.mjs';
 import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
 
 export const POSTA_ONBOARDING_VERSION = 1;
@@ -47,6 +48,30 @@ export function ensurePostaOnboarding(settings, registrationEmail) {
     registrationEmail:
       String(base.registrationEmail ?? registrationEmail ?? settings?.tenantMeta?.email ?? '').trim().toLowerCase(),
     notes: String(base.notes ?? ''),
+  };
+}
+
+export async function verifyPostaOnboardingMailConnection(dataDir, tenantId) {
+  const mailHealth = await buildMailHealthSummary(dataDir, tenantId);
+  let imapVerified = false;
+  let imapError = null;
+  if (mailHealth.imapConfigured) {
+    try {
+      const cfg = await getTenantImapConfig(dataDir, tenantId);
+      const verify = await verifyImapMailbox(cfg);
+      imapVerified = Boolean(verify.ok);
+      imapError = verify.message ?? verify.error ?? null;
+    } catch (error) {
+      imapError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const ok = Boolean(mailHealth.smtpVerified) || imapVerified;
+  return {
+    ok,
+    ...mailHealth,
+    imapVerified,
+    imapError,
+    testedAt: new Date().toISOString(),
   };
 }
 

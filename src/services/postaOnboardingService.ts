@@ -76,6 +76,26 @@ export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding
   return { ok: Boolean(res.ok && data.ok), onboarding: data.onboarding };
 }
 
+export type PostaOnboardingMailVerify = {
+  ok: boolean;
+  smtpConfigured?: boolean;
+  smtpVerified?: boolean;
+  smtpError?: string | null;
+  imapConfigured?: boolean;
+  imapVerified?: boolean;
+  imapError?: string | null;
+  testedAt?: string;
+  error?: string;
+};
+
+export async function verifyOnboardingMailConnection(): Promise<PostaOnboardingMailVerify> {
+  const res = await posHubFetch(`/api/posta/onboarding/verify-connection${tenantQuery()}`, {
+    method: 'POST',
+    headers: posApiAuthHeaders(),
+  });
+  return (await res.json()) as PostaOnboardingMailVerify;
+}
+
 export async function seedPostaOnboardingAliasRules(): Promise<{ ok: boolean; added?: unknown[] }> {
   const res = await posHubFetch(`/api/posta/onboarding/seed-alias-rules${tenantQuery()}`, {
     method: 'POST',

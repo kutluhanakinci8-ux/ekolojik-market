@@ -123,6 +123,10 @@ export function PosApp() {
     const hub = await fetchPostaOnboardingHub();
     if (!hub) return;
     const status = hub.onboarding.status;
+    if (status === 'pending' || status === 'in_progress') {
+      setPostaOnboardingOpen(true);
+      return;
+    }
     if (status !== 'completed' && status !== 'dismissed') {
       setPostaOnboardingOpen(true);
     }

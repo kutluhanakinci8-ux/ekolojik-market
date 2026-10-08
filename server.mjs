@@ -56,6 +56,7 @@ import {
   completePostaOnboarding,
   migrateLegacyPostaOnboarding,
   reopenPostaOnboardingState,
+  verifyPostaOnboardingMailConnection,
 } from './server/postaOnboarding.mjs';
 import {
   assertPosAdminApiAuth,
@@ -1919,6 +1920,20 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Yeniden açılamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/verify-connection' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const result = await verifyPostaOnboardingMailConnection(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bağlantı testi hatası' }));
       }
       return;
     }

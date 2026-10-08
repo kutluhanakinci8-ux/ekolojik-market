@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { Store } from '../store/useStore';
 import { formatBusinessBrand } from '../utils/format';
 import { loadLastQuickUser } from '../storage/quickLogin';
@@ -11,9 +12,16 @@ interface LoginScreenProps {
 type LoginMode = 'password' | 'pin';
 
 export function LoginScreen({ store }: LoginScreenProps) {
+  const location = useLocation();
+  const registerState = location.state as {
+    registered?: boolean;
+    message?: string;
+    username?: string;
+    postaSetup?: boolean;
+  } | null;
   const lastQuickUser = loadLastQuickUser();
   const [mode, setMode] = useState<LoginMode>(lastQuickUser ? 'pin' : 'password');
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(registerState?.username ?? '');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [pendingTotpUserId, setPendingTotpUserId] = useState<string | null>(null);
@@ -71,6 +79,12 @@ export function LoginScreen({ store }: LoginScreenProps) {
           <span className="login-logo" aria-hidden>🌿</span>
           <h1>{formatBusinessBrand(store.settings.businessName)}</h1>
           <p>{mode === 'pin' ? 'Kasiyer PIN ile hızlı giriş' : 'Kullanıcı adı ve şifrenizle giriş yapın'}</p>
+          {registerState?.registered && registerState.message && (
+            <p className="login-register-hint" role="status" style={{ marginTop: '0.75rem', fontSize: '0.9rem' }}>
+              {registerState.message}
+              {registerState.postaSetup ? ' Posta kurulumu girişten sonra başlar.' : ''}
+            </p>
+          )}
         </div>
 
         {mode === 'pin' && !pendingTotpUserId ? (
