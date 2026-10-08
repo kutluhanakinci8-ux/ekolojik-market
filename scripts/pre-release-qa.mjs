@@ -243,6 +243,12 @@ async function postaMessagingGate(token) {
     } else {
       warn('posta', 'outbox analytics failureBreakdown', `HTTP ${analytics.status}`);
     }
+    const deliv = await http('GET', '/api/posta/deliverability', { headers: h });
+    if (deliv.ok && Array.isArray(deliv.json?.dnsChecklist) && deliv.json?.domain) {
+      pass('posta', 'deliverability dnsChecklist');
+    } else {
+      warn('posta', 'deliverability dnsChecklist', `HTTP ${deliv.status}`);
+    }
     const rot = await http('POST', '/api/messaging/public-config', { headers: h, body: { rotate: false } });
     if (rot.status === 401) warn('posta', 'POST messaging config', '401 — admin gerekli');
     else if (rot.ok) pass('posta', 'POST messaging/public-config (admin)');

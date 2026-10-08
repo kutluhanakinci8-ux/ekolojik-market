@@ -198,7 +198,7 @@ import {
   savePostaRules,
 } from './server/postaRules.mjs';
 import { getPostaOutboxAnalytics } from './server/postaOutboxAnalytics.mjs';
-import { getPostaDeliverabilityHub } from './server/postaDeliverability.mjs';
+import { getPostaDeliverabilityHub, seedTenantPostaAliases } from './server/postaDeliverability.mjs';
 import { suggestPostaCompose, isPostaAiEnabled } from './server/postaAiCompose.mjs';
 import { recordMailOpen, mailTrackPixelResponse } from './server/postaMailTrack.mjs';
 import {
@@ -1154,6 +1154,21 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/deliverability/seed-aliases' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const seeded = await seedTenantPostaAliases(DATA_DIR, tenantId);
+        const hub = await getPostaDeliverabilityHub(DATA_DIR, tenantId);
+        res.writeHead(seeded.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...seeded, deliverability: hub }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Alias seed hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/live/capabilities' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(getPostaLiveCapabilities()));
@@ -1942,9 +1957,10 @@ const server = createServer(async (req, res) => {
       const tenantId = resolveTenantId(url);
       if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       try {
+        const aliasSeed = await seedTenantPostaAliases(DATA_DIR, tenantId);
         const result = await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify({ ...result, postaAliases: aliasSeed }));
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural eklenemedi' }));

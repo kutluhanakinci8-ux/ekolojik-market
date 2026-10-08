@@ -4,6 +4,7 @@ import { getEkolojikMailConfig } from './ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './ekolojikSmtp.mjs';
 import { getEffectiveMailPresentation } from './postaSettings.mjs';
 import { getTenantSmtpMailConfig, isTenantSmtpConfigured } from './tenantMailConfig.mjs';
+import { readTenantStore, writeTenantStore } from './tenantAuth.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -29,27 +30,112 @@ function parseAliasesFromEnv() {
     .filter((s) => s.includes('@'));
 }
 
+function normalizeAliasList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((s) => String(s).trim().toLowerCase()).filter((s) => s.includes('@'));
+}
+
+export function defaultAliasesForDomain(domain) {
+  const d = String(domain ?? '').trim().toLowerCase();
+  if (!d) return [];
+  return [`siparis@${d}`, `fatura@${d}`];
+}
+
+function domainFromEmail(email) {
+  const part = String(email ?? '').split('@')[1];
+  return part?.trim().toLowerCase() || '';
+}
+
+function resolveMailDomain(pres) {
+  const fromDomain = domainFromEmail(pres.from);
+  if (fromDomain) return fromDomain;
+  const envDomain = process.env.EKOLOJIK_MAIL_DOMAIN?.trim();
+  if (envDomain) return envDomain;
+  return getEkolojikMailConfig().from?.split('@')[1]?.trim().toLowerCase() || 'ekolojikmarket.com.tr';
+}
+
 function statusFromTxt(txt, pattern) {
   if (!txt?.trim()) return 'missing';
   if (pattern && !pattern.test(txt)) return 'warn';
   return 'ok';
 }
 
+async function resolveTenantAliases(dataDir, tenantId, domain) {
+  const store = await readTenantStore(dataDir, tenantId);
+  const fromSettings = normalizeAliasList(store?.settings?.postaAliases);
+  if (fromSettings.length) {
+    return { aliases: fromSettings, source: 'tenant' };
+  }
+  const env = parseAliasesFromEnv();
+  if (env.length) {
+    return { aliases: env, source: 'env' };
+  }
+  return { aliases: defaultAliasesForDomain(domain), source: 'generated' };
+}
+
+export async function seedTenantPostaAliases(dataDir, tenantId = 'main') {
+  const store = await readTenantStore(dataDir, tenantId);
+  if (!store) return { ok: false, error: 'Mağaza bulunamadı' };
+  const existing = normalizeAliasList(store.settings?.postaAliases);
+  if (existing.length) {
+    return { ok: true, seeded: false, aliases: existing };
+  }
+  const pres = await getEffectiveMailPresentation(dataDir, tenantId);
+  const domain = resolveMailDomain(pres);
+  const aliases = defaultAliasesForDomain(domain);
+  const settings = { ...(store.settings ?? {}), postaAliases: aliases };
+  const next = { ...store, settings, updatedAt: new Date().toISOString() };
+  await writeTenantStore(dataDir, tenantId, next);
+  return { ok: true, seeded: true, aliases };
+}
+
+function buildDnsChecklist(domain, pres, vpsIp, selector, dns) {
+  const suggestedSpf = `v=spf1 ip4:${vpsIp} a mx ~all`;
+  const suggestedDmarc = `v=DMARC1; p=none; rua=mailto:${pres.opsEmail || pres.from || `postmaster@${domain}`}`;
+  const dkimName = `${selector}._domainkey.${domain}`;
+  return [
+    {
+      id: 'spf',
+      label: 'SPF',
+      recordName: domain,
+      status: dns.spf.status,
+      current: dns.spf.value,
+      suggested: suggestedSpf,
+    },
+    {
+      id: 'dmarc',
+      label: 'DMARC',
+      recordName: `_dmarc.${domain}`,
+      status: dns.dmarc.status,
+      current: dns.dmarc.value,
+      suggested: suggestedDmarc,
+    },
+    {
+      id: 'dkim',
+      label: 'DKIM',
+      recordName: dkimName,
+      status: dns.dkim.status,
+      current: dns.dkim.value,
+      suggested: `Hosting panelinde TXT: ${dkimName} (OpenDKIM veya sağlayıcı DKIM)`,
+    },
+  ];
+}
+
 export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
   const pres = await getEffectiveMailPresentation(dataDir, tenantId);
-  const domain =
-    process.env.EKOLOJIK_MAIL_DOMAIN?.trim() ||
-    (pres.from?.split('@')[1] ?? getEkolojikMailConfig().from?.split('@')[1] ?? 'ekolojikmarket.com.tr');
+  const domain = resolveMailDomain(pres);
   const selector = process.env.EKOLOJIK_DKIM_SELECTOR?.trim() || 'ekolojik';
   const vpsIp = process.env.EKOLOJIK_VPS_PUBLIC_IP?.trim() || '168.231.109.27';
 
   const spfTxt = await digTxt(domain);
   const dmarcTxt = await digTxt(`_dmarc.${domain}`);
   let dkimTxt = '';
+  let dkimSelectorUsed = selector;
   for (const sel of [selector, 'default', 'mail', 'dkim', 'selector1']) {
     const d = await digTxt(`${sel}._domainkey.${domain}`);
     if (/v=DKIM1/i.test(d)) {
       dkimTxt = d;
+      dkimSelectorUsed = sel;
       break;
     }
   }
@@ -60,11 +146,27 @@ export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
     : { ok: false, error: 'SMTP yapılandırılmadı' };
   const mailCfg = await getTenantSmtpMailConfig(dataDir, tenantId);
 
-  const suggested = {
+  const { aliases, source: aliasesSource } = await resolveTenantAliases(dataDir, tenantId, domain);
+
+  const dns = {
+    spf: { status: statusFromTxt(spfTxt, /v=spf1/i), value: spfTxt || null },
+    dmarc: { status: statusFromTxt(dmarcTxt, /v=DMARC1/i), value: dmarcTxt || null },
+    dkim: {
+      status: statusFromTxt(dkimTxt, /v=DKIM1/i),
+      value: dkimTxt ? `${dkimTxt.slice(0, 120)}…` : null,
+    },
+    selector: dkimSelectorUsed,
+  };
+
+  const suggestedRecords = {
     spf: `v=spf1 ip4:${vpsIp} a mx ~all`,
     dmarc: `v=DMARC1; p=none; rua=mailto:${pres.opsEmail || pres.from}`,
-    dkimHint: `Panel/hosting: ${selector}._domainkey.${domain} (OpenDKIM veya sağlayıcı DKIM)`,
+    dkimHint: `Panel/hosting: ${dkimSelectorUsed}._domainkey.${domain} (OpenDKIM veya sağlayıcı DKIM)`,
   };
+
+  const dnsChecklist = buildDnsChecklist(domain, pres, vpsIp, dkimSelectorUsed, dns);
+  const missingDns = dnsChecklist.filter((r) => r.status !== 'ok').map((r) => r.id);
+  const deliverabilityReady = missingDns.length === 0 && Boolean(smtpVerify.ok);
 
   return {
     ok: true,
@@ -73,7 +175,8 @@ export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
     fromName: pres.fromName,
     replyTo: pres.replyTo,
     opsEmail: pres.opsEmail,
-    aliases: parseAliasesFromEnv(),
+    aliases,
+    aliasesSource,
     tenantId,
     smtp: {
       configured: smtpConfigured,
@@ -81,13 +184,11 @@ export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
       host: mailCfg.smtpHost || null,
       error: smtpVerify.error ?? null,
     },
-    dns: {
-      spf: { status: statusFromTxt(spfTxt, /v=spf1/i), value: spfTxt || null },
-      dmarc: { status: statusFromTxt(dmarcTxt, /v=DMARC1/i), value: dmarcTxt || null },
-      dkim: { status: statusFromTxt(dkimTxt, /v=DKIM1/i), value: dkimTxt ? `${dkimTxt.slice(0, 120)}…` : null },
-      selector,
-    },
-    suggestedRecords: suggested,
-    nbParity: 'PM-3/PM-7 deliverability hub (POS uyarlaması)',
+    dns,
+    suggestedRecords,
+    dnsChecklist,
+    missingDns,
+    deliverabilityReady,
+    nbParity: 'PM-3/PM-7 deliverability hub (tenant From domain, Faz 43)',
   };
 }
