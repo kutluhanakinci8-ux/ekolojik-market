@@ -39,7 +39,9 @@ echo ""
 echo "--- UI DOM smoke (Playwright, #1–6 / #10 / #15–25 kısmi) ---"
 VIS_FAIL=0
 if ! node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
-  if [[ -f "${REPO_ROOT}/node_modules/playwright/package.json" ]]; then
+  if [[ -f "${REPO_ROOT}/package.json" ]]; then
+    echo "==> Playwright bağımlılığı (dev)..."
+    (cd "${REPO_ROOT}" && npm install --include=dev 2>/dev/null | tail -3) || true
     (cd "${REPO_ROOT}" && npx playwright install chromium 2>/dev/null) || true
   fi
 fi
