@@ -1,5 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
-import { loadPosApiToken, posApiAuthHeaders } from './posApiAuth';
+import { loadPosApiToken, posApiAuthHeaders, posApiFetch } from './posApiAuth';
 
 /** Posta / mesajlaşma hub API — tenant query + POS Bearer token */
 export function withTenantQuery(path: string): string {
@@ -14,7 +14,7 @@ export async function posHubFetch(path: string, init: RequestInit = {}): Promise
     init.headers && typeof init.headers === 'object' && !(init.headers instanceof Headers)
       ? (init.headers as Record<string, string>)
       : undefined;
-  return fetch(withTenantQuery(path), {
+  return posApiFetch(withTenantQuery(path), {
     ...init,
     headers: posApiAuthHeaders(extra),
   });

@@ -60,7 +60,9 @@ import {
 import {
   assertPosAdminApiAuth,
   assertPosApiAuth,
+  extractBearerToken,
   issuePosApiTokenFromCredentials,
+  refreshPosApiTokenFromBearer,
 } from './server/posApiAuth.mjs';
 import {
   enforcePostaApiAccess,
@@ -638,6 +640,23 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({
           ok: false,
           message: error instanceof Error ? error.message : 'Token alınamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/pos-token/refresh' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const token = extractBearerToken(req);
+      try {
+        const result = await refreshPosApiTokenFromBearer(DATA_DIR, token, tenantId);
+        res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Token yenilenemedi',
         }));
       }
       return;

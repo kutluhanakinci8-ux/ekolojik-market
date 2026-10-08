@@ -20,7 +20,13 @@ import { applyCatalogPricing } from '../utils/productPricing';
 import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
 import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
-import { clearPosApiToken, exchangePosApiToken, loadPosApiToken } from '../services/posApiAuth';
+import {
+  clearPosApiToken,
+  exchangePosApiToken,
+  loadPosApiToken,
+  startPosApiTokenRefreshScheduler,
+  stopPosApiTokenRefreshScheduler,
+} from '../services/posApiAuth';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
 import {
   loadAllImages,
@@ -1117,6 +1123,15 @@ export function useStore() {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
   }, [buildCurrentSnapshot, syncReady]);
+
+  useEffect(() => {
+    if (authSession && loadPosApiToken()) {
+      startPosApiTokenRefreshScheduler();
+    } else {
+      stopPosApiTokenRefreshScheduler();
+    }
+    return () => stopPosApiTokenRefreshScheduler();
+  }, [authSession]);
 
   useEffect(() => {
     if (!authSession) return;
@@ -2928,6 +2943,7 @@ export function useStore() {
     lastTrackedPageRef.current = null;
     clearAuthSession();
     clearPosApiToken();
+    stopPosApiTokenRefreshScheduler();
     setAuthSession(null);
     setCart([]);
     clearSaleCustomer();

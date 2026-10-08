@@ -155,7 +155,16 @@ async function authAndDataGate() {
     return null;
   }
 
-  const authH = { Authorization: `Bearer ${token}` };
+  let authH = { Authorization: `Bearer ${token}` };
+
+  const refresh = await http('POST', '/api/auth/pos-token/refresh', { headers: authH });
+  if (refresh.ok && refresh.json?.ok && refresh.json.token) {
+    pass('auth', 'POST /api/auth/pos-token/refresh');
+    token = refresh.json.token;
+    authH = { Authorization: `Bearer ${token}` };
+  } else {
+    fail('auth', 'POST /api/auth/pos-token/refresh', `HTTP ${refresh.status}`);
+  }
   const snap = await http('GET', '/api/data', { headers: authH });
   if (!snap.ok) {
     fail('auth', 'GET /api/data token ile', `HTTP ${snap.status}`);

@@ -264,7 +264,7 @@ bash scripts/ekolojik-posta-faz-kapat.sh "Faz NN (100)" cursor/posta-fazNN-100-f
 [x] Faz 39 — Outbox ops
 [x] Faz 40 — Widget
 [ ] Faz 41 — Kayıt otomasyon
-[ ] Faz 42 — Token refresh
+[x] Faz 42 — Token refresh
 [ ] Faz 43 — Tenant DNS
 [ ] Faz 44 — Tenant mail E2E
 [ ] Faz 45 — JMAP/klasör
