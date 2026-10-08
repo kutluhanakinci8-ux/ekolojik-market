@@ -15330,6 +15330,15 @@ input {
 .module-screen.posta-hub-screen.posta-hub-screen--premium {
   padding: 8px var(--posta-yazisma-gutter) 16px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+.app-shell > .module-screen.posta-hub-screen.posta-hub-screen--premium {
+  flex: 1 1 0%;
+  min-height: 0;
 }
 .module-screen.posta-hub-screen.posta-hub-screen--premium.posta-hub-screen--sohbet-focus {
   max-width: none;
@@ -15339,11 +15348,30 @@ input {
   margin-left: 0;
   margin-right: 0;
 }
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-hero,
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-meta-strip,
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .settings-flash,
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-smtp-warn,
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-offline-hint {
+  flex-shrink: 0;
+}
 .module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-shell {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  min-height: 0;
+  flex: 1 1 0%;
+  height: 100%;
+  max-height: 100%;
   box-sizing: border-box;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-shell > .posta-hub-folders,
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-shell > .posta-hub-list,
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-shell > .posta-hub-detail {
+  min-height: 0;
+  min-width: 0;
 }
 .posta-hub-hero {
   align-items: center;
@@ -15560,6 +15588,38 @@ input {
   border-right: 1px solid var(--posta-border-soft);
   overflow: auto;
   background: #fcfefb;
+}
+.posta-hub-screen--premium .posta-hub-folders {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.posta-hub-screen--premium .posta-hub-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #fcfefb;
+}
+.posta-hub-screen--premium .posta-hub-list-head {
+  flex-shrink: 0;
+}
+.posta-hub-screen--premium .posta-hub-list > ul {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.posta-hub-screen--premium .posta-hub-detail:not(.posta-hub-detail--sohbet) {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .posta-hub-list-title {
   font-size: 15px;
