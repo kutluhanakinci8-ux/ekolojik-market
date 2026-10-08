@@ -7,6 +7,8 @@ dist/
 .DS_Store
 data/*.json
 !data/.gitkeep
+data/messaging/
+data/posta-live/
 .qa-tmp-data/
 .qa-server-data/
 docs/PRE-RELEASE-QA-REPORT.json
