@@ -1,0 +1,270 @@
+/* Müşteri yazışmaları — posta-hub-list stillerinden bağımsız, tek kenar boşluğu */
+
+.posta-yazisma-col {
+  --posta-yazisma-pad: 16px;
+  padding: 12px var(--posta-yazisma-pad) 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: #fcfefb;
+  border-right: 1px solid rgba(45, 107, 40, 0.14);
+}
+
+.posta-yazisma-col .posta-hub-sohbet-strip {
+  margin: 0 0 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.posta-yazisma-col-head {
+  margin: 0 0 8px;
+  padding: 0;
+  width: 100%;
+  display: block;
+}
+
+.posta-yazisma-col-title {
+  margin: 0 0 6px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.posta-yazisma-col-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.posta-yazisma-col-toolbar .posta-hub-search,
+.posta-yazisma-col-toolbar > .btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.posta-yazisma-threads {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.posta-yazisma-thread {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  list-style: none;
+}
+
+.posta-yazisma-thread-card {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(27, 61, 26, 0.04);
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.posta-yazisma-thread-card:hover {
+  border-color: rgba(45, 107, 40, 0.14);
+  box-shadow: 0 6px 16px rgba(27, 61, 26, 0.06);
+}
+
+.posta-yazisma-thread-card.is-active {
+  background: linear-gradient(90deg, #eef9ec 0%, #fff 100%);
+  border-color: rgba(45, 107, 40, 0.22);
+  box-shadow: 0 8px 20px rgba(45, 107, 40, 0.1);
+}
+
+.posta-yazisma-thread-card.is-unread {
+  box-shadow: inset 3px 0 0 var(--greenleaf), 0 1px 2px rgba(27, 61, 26, 0.04);
+}
+
+.posta-yazisma-thread-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--greenleaf-dark);
+  background: linear-gradient(145deg, #eef9ec 0%, #fff 100%);
+  border: 1px solid rgba(45, 107, 40, 0.14);
+}
+
+.posta-yazisma-thread-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.posta-yazisma-thread-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.posta-yazisma-thread-top-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.posta-yazisma-thread-top-title strong {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.posta-yazisma-thread-top time {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+.posta-yazisma-thread-badges {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 2.35em;
+  gap: 2px;
+  justify-content: flex-start;
+}
+
+.posta-yazisma-thread-badges span {
+  width: 1.1em;
+  text-align: center;
+  font-size: 0.92em;
+  line-height: 1;
+}
+
+.posta-yazisma-thread-subject {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--greenleaf-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.posta-yazisma-thread-preview {
+  font-size: 11px;
+  font-style: normal;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.posta-yazisma-shell .posta-hub-shell--sohbet {
+  min-height: 0;
+}
+
+.posta-hub-shell--sohbet .posta-yazisma-col {
+  min-height: 0;
+}
+
+/* Konuşma paneli — aynı yatay çizgi */
+.posta-yazisma-chat-frame {
+  --posta-yazisma-pad: 16px;
+  padding: 14px var(--posta-yazisma-pad) 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 10px;
+  width: 100%;
+}
+
+.posta-yazisma-chat-frame > * {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
+}
+
+.posta-yazisma-chat-frame .posta-hub-sohbet-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.posta-yazisma-chat-frame .posta-sohbet-msg {
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.posta-yazisma-chat-frame .posta-sohbet-msg-avatar {
+  display: none;
+}
+
+.posta-yazisma-chat-frame .posta-sohbet-msg-body {
+  max-width: 72%;
+  margin: 0;
+}
+
+.posta-yazisma-chat-frame .crm-msg--customer .posta-sohbet-msg-body {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.posta-yazisma-chat-frame .crm-msg--staff .posta-sohbet-msg-body {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.posta-yazisma-chat-frame .posta-hub-sohbet-compose,
+.posta-yazisma-chat-frame .posta-hub-thread-compose {
+  max-width: none;
+  flex-shrink: 0;
+}

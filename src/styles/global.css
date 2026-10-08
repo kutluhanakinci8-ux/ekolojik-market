@@ -15955,7 +15955,8 @@ input {
   .module-screen.posta-hub-screen--sohbet-focus {
     padding: 6px 10px 4px;
   }
-  .posta-hub-shell--sohbet-open .posta-hub-list { display: none; }
+  .posta-hub-shell--sohbet-open .posta-hub-list,
+  .posta-hub-shell--sohbet-open .posta-yazisma-col { display: none; }
   .posta-hub-shell--sohbet-open .posta-hub-folders { display: none; }
 }
 .posta-hub-list-toolbar {

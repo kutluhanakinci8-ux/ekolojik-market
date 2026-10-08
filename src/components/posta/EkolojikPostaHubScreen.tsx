@@ -1315,9 +1315,9 @@ export function EkolojikPostaHubScreen({
         </aside>
         )}
 
-        {folder !== 'yaz' && (
-          <section className={`posta-hub-list${folder === 'mesajlar' ? ' posta-hub-list--sohbet' : ''}`}>
-            {folder === 'mesajlar' && hubLayout === 'sohbet' && (
+        {folder === 'mesajlar' && (
+          <section className="posta-yazisma-col" aria-label={listTitle}>
+            {hubLayout === 'sohbet' && (
               <div className="posta-hub-sohbet-strip">
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => pickFolder('yaz')}>
                   Yaz
@@ -1328,6 +1328,81 @@ export function EkolojikPostaHubScreen({
                 </span>
               </div>
             )}
+            <div className="posta-yazisma-col-head">
+              <h2 className="posta-yazisma-col-title">{listTitle}</h2>
+              <div className="posta-yazisma-col-toolbar">
+                <input
+                  className="posta-hub-search"
+                  type="search"
+                  placeholder="Yazışma ara…"
+                  value={threadSearchQ}
+                  onChange={(e) => setThreadSearchQ(e.target.value)}
+                />
+                <div className="posta-hub-filter-chips">
+                  <button
+                    type="button"
+                    className={!threadShowArchived ? 'active' : ''}
+                    onClick={() => setThreadShowArchived(false)}
+                  >
+                    Aktif
+                  </button>
+                  <button
+                    type="button"
+                    className={threadShowArchived ? 'active' : ''}
+                    onClick={() => setThreadShowArchived(true)}
+                  >
+                    Arşiv
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => {
+                    setNewThreadCustomerId(customersForMessaging[0]?.id ?? '');
+                    setShowNewThreadModal(true);
+                  }}
+                >
+                  Yeni yazışma
+                </button>
+              </div>
+            </div>
+            <ul className="posta-yazisma-threads">
+              {threads.length === 0 && <li className="posta-hub-empty">Thread yok</li>}
+              {threads.map((t) => (
+                <li key={t.id} className="posta-yazisma-thread">
+                  <button
+                    type="button"
+                    className={`posta-yazisma-thread-card${selectedThreadId === t.id ? ' is-active' : ''}${
+                      t.lastMessageDirection === 'customer' ? ' is-unread' : ''
+                    }`}
+                    onClick={() => setSelectedThreadId(t.id)}
+                  >
+                    <span className="posta-yazisma-thread-avatar" aria-hidden="true">
+                      {messagingInitials(t.customerName)}
+                    </span>
+                    <span className="posta-yazisma-thread-body">
+                      <span className="posta-yazisma-thread-top">
+                        <span className="posta-yazisma-thread-top-title">
+                          <span className="posta-yazisma-thread-badges" aria-hidden={!t.pinned && !t.muted}>
+                            <span title={t.pinned ? 'Sabit' : undefined}>{t.pinned ? '📌' : ''}</span>
+                            <span title={t.muted ? 'Sessiz' : undefined}>{t.muted ? '🔕' : ''}</span>
+                          </span>
+                          <strong>{t.customerName}</strong>
+                        </span>
+                        <time dateTime={t.lastMessageAt}>{formatMessagingTime(t.lastMessageAt)}</time>
+                      </span>
+                      <span className="posta-yazisma-thread-subject">{t.subject}</span>
+                      <em className="posta-yazisma-thread-preview">{t.lastMessagePreview}</em>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {folder !== 'yaz' && folder !== 'mesajlar' && (
+          <section className="posta-hub-list">
             <div className="posta-hub-list-head">
               <h2 className="posta-hub-list-title">{listTitle}</h2>
               {isInboxMailFolder(folder) && folder !== 'taslaklar' && (
@@ -1407,43 +1482,6 @@ export function EkolojikPostaHubScreen({
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-              {folder === 'mesajlar' && (
-                <div className="posta-hub-list-toolbar">
-                  <input
-                    className="posta-hub-search"
-                    type="search"
-                    placeholder="Yazışma ara…"
-                    value={threadSearchQ}
-                    onChange={(e) => setThreadSearchQ(e.target.value)}
-                  />
-                  <div className="posta-hub-filter-chips">
-                    <button
-                      type="button"
-                      className={!threadShowArchived ? 'active' : ''}
-                      onClick={() => setThreadShowArchived(false)}
-                    >
-                      Aktif
-                    </button>
-                    <button
-                      type="button"
-                      className={threadShowArchived ? 'active' : ''}
-                      onClick={() => setThreadShowArchived(true)}
-                    >
-                      Arşiv
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline"
-                    onClick={() => {
-                      setNewThreadCustomerId(customersForMessaging[0]?.id ?? '');
-                      setShowNewThreadModal(true);
-                    }}
-                  >
-                    Yeni yazışma
-                  </button>
                 </div>
               )}
             </div>
@@ -1584,42 +1622,6 @@ export function EkolojikPostaHubScreen({
                                 : 'Etkinlik'}
                         </em>
                       </div>
-                    </button>
-                  </li>
-                ))}
-
-              {folder === 'mesajlar' && threads.length === 0 && <li className="posta-hub-empty">Thread yok</li>}
-              {folder === 'mesajlar' &&
-                threads.map((t) => (
-                  <li key={t.id} className="posta-hub-thread-item">
-                    <button
-                      type="button"
-                      className={`posta-hub-thread-btn${selectedThreadId === t.id ? ' is-active' : ''}${
-                        t.lastMessageDirection === 'customer' ? ' is-unread' : ''
-                      }`}
-                      onClick={() => setSelectedThreadId(t.id)}
-                    >
-                      <span className="posta-hub-thread-avatar" aria-hidden="true">
-                        {messagingInitials(t.customerName)}
-                      </span>
-                      <span className="posta-hub-thread-body">
-                        <span className="posta-hub-thread-top">
-                          <span className="posta-hub-thread-top-title">
-                            <span className="posta-hub-thread-badges" aria-hidden={!t.pinned && !t.muted}>
-                              <span className="posta-hub-thread-pin" title={t.pinned ? 'Sabit' : undefined}>
-                                {t.pinned ? '📌' : ''}
-                              </span>
-                              <span className="posta-hub-thread-mute" title={t.muted ? 'Sessiz' : undefined}>
-                                {t.muted ? '🔕' : ''}
-                              </span>
-                            </span>
-                            <strong>{t.customerName}</strong>
-                          </span>
-                          <time dateTime={t.lastMessageAt}>{formatMessagingTime(t.lastMessageAt)}</time>
-                        </span>
-                        <span className="posta-hub-thread-subject">{t.subject}</span>
-                        <em className="posta-hub-thread-preview">{t.lastMessagePreview}</em>
-                      </span>
                     </button>
                   </li>
                 ))}
@@ -1835,7 +1837,7 @@ export function EkolojikPostaHubScreen({
 
           {folder === 'mesajlar' && selectedThreadId && (
             <div className="posta-hub-sohbet-panel">
-              <div className="posta-hub-sohbet-inner">
+              <div className="posta-yazisma-chat-frame">
               <header className="posta-hub-sohbet-header">
                 <div className="posta-hub-sohbet-header-main">
                   {hubLayout === 'sohbet' && (
