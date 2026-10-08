@@ -15571,7 +15571,7 @@ input {
   border-color: rgba(45, 107, 40, 0.22);
   box-shadow: 0 8px 20px rgba(45, 107, 40, 0.1);
 }
-.posta-hub-list li button.is-unread {
+.posta-hub-list li button.is-unread:not(.posta-hub-thread-btn) {
   font-weight: 700;
   border-left: 3px solid var(--greenleaf);
 }
@@ -16653,3 +16653,86 @@ input {
 .cart-park-btn { margin-top: 8px; }
 .cart-shortcut-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0 0; text-align: center; }
 .btn-payment.split { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; }
+
+/* Yazışmalar listesi — tek kenar boşluğu, hepsi aynı hizada */
+.posta-hub-list.posta-hub-list--sohbet {
+  --yazisma-pad: 16px;
+  padding: 12px var(--yazisma-pad) 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.posta-hub-list.posta-hub-list--sohbet > .posta-hub-sohbet-strip,
+.posta-hub-list.posta-hub-list--sohbet > .posta-hub-list-head,
+.posta-hub-list.posta-hub-list--sohbet > ul {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+}
+.posta-hub-list.posta-hub-list--sohbet > .posta-hub-list-head {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+.posta-hub-list.posta-hub-list--sohbet > .posta-hub-list-head .posta-hub-list-title {
+  margin: 0 0 6px;
+}
+.posta-hub-list.posta-hub-list--sohbet > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.posta-hub-list.posta-hub-list--sohbet > ul > li {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.posta-hub-list.posta-hub-list--sohbet .posta-hub-thread-btn {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-left: none;
+}
+.posta-hub-list.posta-hub-list--sohbet .posta-hub-list-toolbar {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+.posta-hub-list.posta-hub-list--sohbet .posta-hub-search,
+.posta-hub-list.posta-hub-list--sohbet .posta-hub-list-toolbar > .btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Sohbet paneli — başlık, arama, mesaj, gönder aynı çizgi */
+.posta-hub-detail--sohbet .posta-hub-sohbet-inner {
+  --sohbet-pad: 16px;
+  padding: 14px var(--sohbet-pad) 12px;
+  box-sizing: border-box;
+}
+.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-header,
+.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-search-wrap,
+.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-messages,
+.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-compose,
+.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-typing {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
+}
