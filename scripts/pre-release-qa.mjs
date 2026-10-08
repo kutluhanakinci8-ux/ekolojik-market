@@ -121,6 +121,26 @@ async function securityGate() {
   const anonThreads = await http('GET', '/api/messaging/threads?limit=1');
   if (anonThreads.status === 401) pass('security', 'GET /api/messaging/threads anonim → 401');
   else fail('security', 'GET /api/messaging/threads anonim', `HTTP ${anonThreads.status}`);
+
+  const anonSla = await http('GET', '/api/messaging/sla');
+  if (anonSla.status === 401) pass('security', 'GET /api/messaging/sla anonim → 401');
+  else fail('security', 'GET /api/messaging/sla anonim', `HTTP ${anonSla.status}`);
+
+  const anonOutboxCsv = await http('GET', '/api/posta/export/outbox.csv');
+  if (anonOutboxCsv.status === 401) pass('security', 'GET export/outbox.csv anonim → 401');
+  else fail('security', 'GET export/outbox.csv anonim', `HTTP ${anonOutboxCsv.status}`);
+
+  const anonContactCsv = await http('GET', '/api/posta/export/contact.csv');
+  if (anonContactCsv.status === 401) pass('security', 'GET export/contact.csv anonim → 401');
+  else fail('security', 'GET export/contact.csv anonim', `HTTP ${anonContactCsv.status}`);
+
+  const anonOutboxAnalytics = await http('GET', '/api/posta/outbox/analytics?days=7');
+  if (anonOutboxAnalytics.status === 401) pass('security', 'GET outbox/analytics anonim → 401');
+  else fail('security', 'GET outbox/analytics anonim', `HTTP ${anonOutboxAnalytics.status}`);
+
+  const anonPortal = await http('GET', '/api/public/messaging/v1/portal/session?token=invalid');
+  if (anonPortal.status === 401) pass('security', 'GET portal/session geçersiz token → 401');
+  else warn('security', 'GET portal/session geçersiz token', `HTTP ${anonPortal.status}`);
 }
 
 async function authAndDataGate() {
@@ -221,6 +241,8 @@ async function postaMessagingGate(token) {
     '/api/posta/deliverability',
     '/api/messaging/public-config',
     '/api/messaging/channels',
+    '/api/messaging/bot-config',
+    '/api/messaging/sla?days=7',
     '/api/messaging/threads?limit=3',
     '/api/posta/inbox?folder=gelen&limit=2',
     '/api/posta/outbox/failed?limit=5',
@@ -321,8 +343,21 @@ async function integrationGate() {
   else warn('integration', 'POST /api/contact', `HTTP ${contact.status}`);
 }
 
+async function waveModuleSmokeGate() {
+  console.log('\n=== 8. Wave modül smoke (yerel) ===\n');
+  const scripts = [
+    'scripts/faz49-bot-sla-smoke.mjs',
+    'scripts/faz50-portal-smoke.mjs',
+  ];
+  for (const rel of scripts) {
+    const r = await run('node', [rel]);
+    if (r.code === 0) pass('smoke', rel.replace('scripts/', ''));
+    else fail('smoke', rel, r.out.slice(-300));
+  }
+}
+
 async function localOutboxStructure() {
-  console.log('\n=== 8. Outbox yapı (yerel modül) ===\n');
+  console.log('\n=== 9. Outbox yapı (yerel modül) ===\n');
   const tmp = join(REPO, '.qa-tmp-data');
   await mkdir(tmp, { recursive: true });
   const { enqueueEkolojikMail, getOutboxCounts, processPendingOutbox } = await import('../server/emailOutbox.mjs');
@@ -363,6 +398,7 @@ async function main() {
   } else {
     warn('run', 'Canlı API testleri atlandı — sunucu ayakta değil');
   }
+  await waveModuleSmokeGate();
   await localOutboxStructure();
 
   console.log('\n=== ÖZET ===\n');

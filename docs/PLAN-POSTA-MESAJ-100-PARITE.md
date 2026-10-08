@@ -273,7 +273,7 @@ bash scripts/ekolojik-posta-faz-kapat.sh "Faz NN (100)" cursor/posta-fazNN-100-f
 [x] Faz 48 — Omnichannel
 [x] Faz 49 — Bot + SLA
 [x] Faz 50 — Müşteri portal
-[ ] Faz 51 — CI
+[x] Faz 51 — CI
 [ ] Faz 52 — %100 kapanış
 ```
 
