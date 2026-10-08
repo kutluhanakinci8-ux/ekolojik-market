@@ -50,19 +50,18 @@ if (!j.smtpVerified) process.exit(3);
   }
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-posta-qa-token.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-qa-token.sh"
 POSTA_TOKEN=""
-for pair in "yonetici:yonetici123" "kasiyer:kasiyer123" "admin:admin123"; do
-  user="${pair%%:*}"
-  pass="${pair#*:}"
-  POSTA_TOKEN="$(curl -fsS -X POST "${BASE_URL}/api/auth/pos-token" \
-    -H 'Content-Type: application/json' \
-    -d "{\"username\":\"${user}\",\"password\":\"${pass}\"}" 2>/dev/null \
-    | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);if(j.ok&&j.token)process.stdout.write(j.token);}catch{}});" || true)"
-  if [[ -n "${POSTA_TOKEN}" ]]; then
-    ok "pos-token (${user})"
-    break
-  fi
-done
+EKOLOJIK_POS_QA_TOKEN_USER=""
+EKOLOJIK_QA_DATA_DIR="${ROOT}/data"
+export EKOLOJIK_QA_DATA_DIR
+if POSTA_TOKEN="$(ekolojik_resolve_posta_qa_token "${BASE_URL}")"; then
+  ok "pos-token (${EKOLOJIK_POS_QA_TOKEN_USER:-qa}) + Posta API"
+else
+  POSTA_TOKEN=""
+fi
 
 if [[ "${EKOLOJIK_POS_POSTA_AUTH:-1}" != "0" ]]; then
   anon_code="$(curl -sS -o /dev/null -w '%{http_code}' "${BASE_URL}/api/posta/inbox?folder=gelen&limit=1" 2>/dev/null || echo 000)"
@@ -74,7 +73,7 @@ if [[ "${EKOLOJIK_POS_POSTA_AUTH:-1}" != "0" ]]; then
 fi
 
 if [[ -z "${POSTA_TOKEN}" && "${EKOLOJIK_POS_POSTA_AUTH:-1}" != "0" ]]; then
-  bad "pos-token alınamadı — Posta API Bearer gerekli (Faz 38)"
+  bad "Posta Bearer alınamadı — EKOLOJIK_POS_QA_TOKEN, EKOLOJIK_POS_QA_USER/PASSWORD, veya admin posta sekmesi + migrate-posta-onboarding"
 fi
 
 CURL_AUTH=()

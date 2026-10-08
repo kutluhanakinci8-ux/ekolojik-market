@@ -39,19 +39,17 @@ check 38b "Messaging threads anonim korumalı" bash -c "[[ $(http_code '${BASE_U
 check 38c "Portal session geçersiz token" bash -c "[[ $(http_code '${BASE_URL}/api/public/messaging/v1/portal/session?token=bad') == '401' ]]"
 check 50 "Public messaging capabilities" curl_ok "${BASE_URL}/api/public/messaging/v1/capabilities" '"apiPrefix"'
 
-TOKEN="${EKOLOJIK_POS_QA_TOKEN:-}"
-if [[ -z "${TOKEN}" ]]; then
-  for cred in "yonetici:yonetici123" "kasiyer:kasiyer123" "admin:admin123"; do
-    user="${cred%%:*}"
-    pass="${cred#*:}"
-    resp="$(curl -fsS -X POST "${BASE_URL}/api/auth/pos-token" \
-      -H 'Content-Type: application/json' \
-      -d "{\"username\":\"${user}\",\"password\":\"${pass}\"}" 2>/dev/null || true)"
-    if echo "${resp}" | grep -q '"token"'; then
-      TOKEN="$(echo "${resp}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
-      break
-    fi
-  done
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-posta-qa-token.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-qa-token.sh"
+TOKEN=""
+EKOLOJIK_POS_QA_TOKEN_USER=""
+EKOLOJIK_QA_DATA_DIR="${ROOT}/data"
+export EKOLOJIK_QA_DATA_DIR
+if TOKEN="$(ekolojik_resolve_posta_qa_token "${BASE_URL}")"; then
+  echo "OK   #auth pos-token (${EKOLOJIK_POS_QA_TOKEN_USER:-qa}) Posta yetkili"
+else
+  TOKEN=""
 fi
 
 if [[ -n "${TOKEN}" ]]; then

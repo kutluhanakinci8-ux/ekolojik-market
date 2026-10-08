@@ -54,9 +54,14 @@ bash scripts/sunucu-ekolojik-posta-tam-kabul.sh /var/www/market-pos
 
 ## 5. Kapanış kontrol listesi
 
-- [ ] `docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md` — tüm ✓
-- [ ] `docs/RAKIP-SKOR-KARTI.md` — %100
+- [x] `main` merge (#23–#33 + #34) — 2026-10-08
+- [x] VPS deploy `main` + `pre-release-qa` 0 FAIL
+- [ ] `sunucu-ekolojik-posta-parite-dogrula.sh` — `EKOLOJIK_POS_QA_TOKEN` veya Posta yetkili kullanıcı
+- [x] `docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md` — tüm ✓
+- [x] `docs/RAKIP-SKOR-KARTI.md` — %100
 - [ ] GitHub Actions CI yeşil (`ci.yml`)
 - [ ] Operatör UI yürüyüşü: `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md` (~30 dk)
+
+Posta smoke token: `scripts/lib/ekolojik-posta-qa-token.sh` — demo kullanıcılar, `EKOLOJIK_POS_QA_USER`/`PASSWORD`, `EKOLOJIK_POS_QA_TOKEN`, veya VPS’te `store.json` mint (`mint-posta-qa-token.mjs`).
 
 *Wave 3 plan: `docs/PLAN-POSTA-MESAJ-100-PARITE.md` — tamamlandı.*
