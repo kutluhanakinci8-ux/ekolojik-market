@@ -36,6 +36,14 @@ Otomatik (VPS):
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-ui-yuruyus.sh
 ```
 
+Headless POS (Playwright — #1–3, #18 Sohbet hizası, #25 portal; tam liste için yukarıdaki manuel tablo):
+
+```bash
+npm i -D playwright && npx playwright install chromium
+MINT_JSON="$(node scripts/lib/mint-posta-qa-token.mjs /var/www/market-pos/data)"
+EKOLOJIK_POS_QA_MINT_JSON="$MINT_JSON" node scripts/posta-nb-ui-visual-smoke.mjs http://127.0.0.1:5180
+```
+
 API-only:
 
 ```bash
