@@ -15580,6 +15580,11 @@ input {
 .posta-hub-detail-buttons { display: flex; gap: 8px; }
 .posta-hub-detail-body--html { white-space: normal; font-size: 13px; line-height: 1.5; }
 .posta-hub-thread-compose { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.posta-hub-thread-compose.posta-hub-sohbet-compose {
+  max-width: none;
+  width: 100%;
+  margin-top: 0;
+}
 .posta-hub-sent-status { text-transform: uppercase; font-size: 10px; color: var(--text-muted); }
 .posta-hub-list strong { display: block; font-size: 13px; }
 .posta-hub-list span, .posta-hub-list em { display: block; font-size: 11px; color: var(--text-muted); }
@@ -15773,12 +15778,32 @@ input {
 .posta-hub-shell--sohbet-yaz {
   grid-template-columns: 1fr;
 }
+.posta-hub-list--sohbet {
+  --lista-inset: 18px;
+}
+.posta-hub-list--sohbet .posta-hub-sohbet-strip {
+  margin-left: var(--lista-inset);
+  margin-right: var(--lista-inset);
+}
+.posta-hub-list--sohbet .posta-hub-list-head {
+  margin-left: var(--lista-inset);
+  margin-right: var(--lista-inset);
+}
+.posta-hub-list--sohbet .posta-hub-list-toolbar {
+  padding-left: var(--lista-inset);
+  padding-right: var(--lista-inset);
+  box-sizing: border-box;
+}
+.posta-hub-screen--premium .posta-hub-list--sohbet > ul {
+  padding-left: var(--lista-inset);
+  padding-right: var(--lista-inset);
+}
 .posta-hub-sohbet-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 12px;
-  margin: 12px 12px 0;
+  margin: 12px 0 0;
   padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid var(--posta-border-soft);
@@ -15818,16 +15843,7 @@ input {
   min-height: 0;
   overflow: hidden;
 }
-.posta-hub-sohbet-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 0;
-  flex: 1;
-  height: 100%;
-  overflow: hidden;
-}
-.posta-hub-msg-search { margin-bottom: 4px; }
+.posta-hub-msg-search { margin-bottom: 0; width: 100%; }
 @media (max-width: 900px) {
   .posta-hub-shell--sohbet { grid-template-columns: 1fr; }
   .module-screen.posta-hub-screen--sohbet-focus {
@@ -15984,11 +16000,28 @@ input {
   box-shadow: 0 0 0 2px rgba(81, 184, 72, 0.35);
 }
 .posta-hub-sohbet-panel {
+  --sohbet-inset: 18px;
+  --sohbet-msg-max: min(82%, 640px);
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding: 10px 16px 8px;
-  gap: 8px;
+  height: 100%;
+  gap: 10px;
   overflow: hidden;
+  padding: 12px var(--sohbet-inset) 10px;
+  box-sizing: border-box;
+}
+.posta-hub-sohbet-panel > .posta-hub-sohbet-header,
+.posta-hub-sohbet-panel > .posta-hub-sohbet-search-wrap,
+.posta-hub-sohbet-panel > .posta-hub-sohbet-typing,
+.posta-hub-sohbet-panel > .posta-hub-sohbet-messages,
+.posta-hub-sohbet-panel > .posta-hub-sohbet-compose {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
 }
 .posta-hub-sohbet-header,
 .posta-hub-sohbet-search-wrap,
@@ -16040,22 +16073,22 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: min(520px, 100%);
+  max-width: 100%;
 }
 .posta-hub-sohbet-toolbar {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 .posta-hub-sohbet-search-wrap {
-  padding: 0 2px;
+  padding: 0;
 }
 .posta-hub-screen--premium .posta-hub-sohbet-messages {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
   margin: 0;
-  padding: 8px 4px 12px;
-  gap: 14px;
+  padding: 6px 0 10px;
+  gap: 12px;
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
@@ -16067,7 +16100,8 @@ input {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  max-width: 88%;
+  max-width: var(--sohbet-msg-max, min(82%, 640px));
+  width: fit-content;
   border: none;
   background: transparent;
   box-shadow: none;
@@ -16078,10 +16112,12 @@ input {
   align-self: flex-end;
   flex-direction: row-reverse;
   margin-left: auto;
+  margin-right: 0;
 }
 .posta-hub-screen--premium .crm-msg--customer.posta-sohbet-msg {
   align-self: flex-start;
   margin-right: auto;
+  margin-left: 0;
 }
 .posta-sohbet-msg-avatar {
   width: 32px;
@@ -16192,9 +16228,9 @@ input {
   flex-shrink: 0;
   margin-top: 0;
   max-width: none;
-  padding: 8px 0 4px;
+  padding: 10px 0 0;
   border-top: 1px solid var(--posta-border-soft);
-  background: #fff;
+  background: transparent;
 }
 .posta-sohbet-compose-box {
   border: 1px solid var(--posta-border-soft);
@@ -16265,8 +16301,8 @@ input {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 48px 24px;
-  margin: 20px;
+  padding: 48px 18px;
+  margin: 12px 18px;
   border-radius: 16px;
   border: 1px dashed var(--posta-border-soft);
   background: linear-gradient(180deg, #fafdfb 0%, #fff 100%);
