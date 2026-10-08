@@ -10,6 +10,8 @@
 
 **Yeni amaç:** Bu belgedeki `lertaPlatformBridge` **üretimde kullanılmaz** (`LERTA_PLATFORM_BRIDGE=0` varsayılan).
 
+**Ekolojik kayıt sonrası Posta / mesajlaşma kurulumu (POS sihirbazı, tenant messaging anahtarı, IMAP işletme kutusu):** [EKOLOJIK-POSTA-ONBOARDING-OPERATOR.md](./EKOLOJIK-POSTA-ONBOARDING-OPERATOR.md).
+
 ## Nakliye Borsası — kaynak modüller
 
 | Bileşen | Repo yolu |
