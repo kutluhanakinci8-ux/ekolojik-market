@@ -22,6 +22,13 @@
 | 16 | Kurallar / analitik | **Ayarlar → E-posta** Faz 20 paneli |
 | 17 | Offline salt okuma | Ağ kes → son gelen listesi (SW + localStorage) |
 | 18 | Sohbet tam | **Sohbet** görünüm + `?customerId=` CRM |
+| 19 | Güvenlik | Anonim `/api/posta/inbox` → 401; export CSV token ile |
+| 20 | Widget | `/widget/messaging.js` + public messaging key (Ayarlar) |
+| 21 | DNS / deliverability | Ayarlar → tenant DNS checklist |
+| 22 | Engagement | Hub üst şerit (açılma/tıklama/bounce) |
+| 23 | Omnichannel | WA rozeti + kanal ayarları |
+| 24 | Bot / SLA | Thread durum + atama; SLA şeridi |
+| 25 | Müşteri portal | `/portal/mesajlar` veya iletişim formu portal linki |
 
 Otomatik (VPS):
 

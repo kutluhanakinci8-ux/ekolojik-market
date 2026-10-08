@@ -22,6 +22,13 @@ cat <<'GUIDE'
 8 | Ayarlar → E-posta → gönderen adı, ops, imza kayıtlı
 9 | Ayarlar → outbox CSV indir; mesajlaşma ZIP (panel veya API export)
 10| Ayarlar → Sistem → Faz 5 ayrım kontrolü yeşil; bridge kapalı
+19| Wave3: anon export 401; token ile CSV
+20| Widget + public messaging (onboarding)
+21| DNS checklist (deliverability)
+22| Engagement şeridi (hub)
+23| WA kanal rozeti + ayarlar
+24| Thread durum/atama + SLA şeridi
+25| /portal/mesajlar veya iletişim portal linki
 GUIDE
 
 echo ""

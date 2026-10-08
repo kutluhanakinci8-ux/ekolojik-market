@@ -24,7 +24,8 @@
     "test:faz50": "node scripts/faz50-portal-smoke.mjs",
     "test": "node scripts/run-unit-tests.mjs && node scripts/run-wave-smokes.mjs",
     "test:qa": "node scripts/pre-release-qa.mjs",
-    "test:ci": "node scripts/ci-with-server.mjs"
+    "test:ci": "node scripts/ci-with-server.mjs",
+    "test:faz52": "node scripts/faz52-closure-smoke.mjs"
   },
   "dependencies": {
     "imapflow": "^1.7.8",
