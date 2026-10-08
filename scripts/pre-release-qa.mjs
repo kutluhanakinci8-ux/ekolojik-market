@@ -261,6 +261,18 @@ async function postaMessagingGate(token) {
     } else {
       warn('posta', 'jmap-lite Email/query', `HTTP ${jmapEq.status}`);
     }
+    const cardDav = await http('GET', '/api/posta/carddav-lite/principal', { headers: h });
+    if (cardDav.ok && cardDav.json?.importPath) {
+      pass('posta', 'carddav-lite principal');
+    } else {
+      warn('posta', 'carddav-lite principal', `HTTP ${cardDav.status}`);
+    }
+    const wsMet = await http('GET', '/api/posta/ws/metrics', { headers: h });
+    if (wsMet.ok && wsMet.json?.ws?.path) {
+      pass('posta', 'ws metrics');
+    } else {
+      warn('posta', 'ws metrics', `HTTP ${wsMet.status}`);
+    }
     const rot = await http('POST', '/api/messaging/public-config', { headers: h, body: { rotate: false } });
     if (rot.status === 401) warn('posta', 'POST messaging config', '401 — admin gerekli');
     else if (rot.ok) pass('posta', 'POST messaging/public-config (admin)');

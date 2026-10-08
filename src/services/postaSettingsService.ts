@@ -261,6 +261,12 @@ export type PostaLiveMetrics = {
     unreadPollMs: number;
     retryMs: number;
   };
+  ws?: {
+    path: string;
+    connectedClients: number;
+    lastBroadcastAt: string | null;
+    broadcastCount: number;
+  };
   deliveryLatency?: {
     sampleCount: number;
     avgMs: number | null;

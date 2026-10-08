@@ -50,6 +50,12 @@ import {
   requeueFailedOutbox,
   type FailedOutboxRow,
 } from '../../services/postaOutboxOpsService';
+import {
+  fetchPostaPushConfig,
+  fetchPostaPushStatus,
+  sendPostaPushTest,
+  subscribePostaWebPush,
+} from '../../services/postaPushService';
 
 type OutboxRow = {
   id: string;
@@ -108,9 +114,12 @@ export function EmailOutboxSettingsPanel() {
   const [tenantUsePlatformEnv, setTenantUsePlatformEnv] = useState(true);
   const [failedRows, setFailedRows] = useState<FailedOutboxRow[]>([]);
   const [selectedFailedIds, setSelectedFailedIds] = useState<Set<string>>(() => new Set());
+  const [pushConfig, setPushConfig] = useState<Awaited<ReturnType<typeof fetchPostaPushConfig>> | null>(null);
+  const [pushSubscribers, setPushSubscribers] = useState(0);
+  const [pushBusy, setPushBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub, failedHub] =
+    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub, failedHub, pushCfg, pushStatus] =
       await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
@@ -126,6 +135,8 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaOnboardingHub(),
       fetchTenantMailConfig(),
       fetchFailedOutboxList(120),
+      fetchPostaPushConfig(),
+      fetchPostaPushStatus(),
     ]);
     setHealth(h);
     setIsolation(iso);
@@ -162,6 +173,8 @@ export function EmailOutboxSettingsPanel() {
       setFailedRows(failedHub.items);
       setSelectedFailedIds(new Set());
     }
+    if (pushCfg?.ok) setPushConfig(pushCfg);
+    if (pushStatus?.ok) setPushSubscribers(pushStatus.subscribers ?? 0);
   }, []);
 
   useEffect(() => {
@@ -869,8 +882,77 @@ export function EmailOutboxSettingsPanel() {
             <span className="settings-stat-label">SSE revizyon</span>
             <strong>{liveMetrics.sse?.revision ?? 0}</strong>
           </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">WebSocket istemci</span>
+            <strong>{liveMetrics.ws?.connectedClients ?? 0}</strong>
+            <span className="settings-hint">{liveMetrics.ws?.path ?? '/api/posta/ws'}</span>
+          </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">WS mesaj gecikmesi (p50)</span>
+            <strong>
+              {liveMetrics.deliveryLatency?.byChannel?.['ws-messaging']?.p50Ms != null
+                ? `${liveMetrics.deliveryLatency.byChannel['ws-messaging'].p50Ms} ms`
+                : '—'}
+            </strong>
+          </article>
         </div>
       )}
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>PWA push (masaüstü / iOS)</h3>
+          <p>
+            VAPID: {pushConfig?.configured ? 'yapılandırıldı' : 'eksik'} · abone cihaz: {pushSubscribers}
+          </p>
+        </div>
+        <div className="settings-panel-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={pushBusy || !pushConfig?.configured || !pushConfig.publicKey}
+            onClick={async () => {
+              if (!pushConfig?.publicKey) return;
+              setPushBusy(true);
+              try {
+                const sub = await subscribePostaWebPush(pushConfig.publicKey);
+                setFlash(sub.ok ? 'Push aboneliği kaydedildi' : sub.error ?? 'Abonelik başarısız');
+                const st = await fetchPostaPushStatus();
+                if (st.ok) setPushSubscribers(st.subscribers ?? 0);
+              } finally {
+                setPushBusy(false);
+              }
+            }}
+          >
+            Bildirimleri aç
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={pushBusy || !pushConfig?.configured}
+            onClick={async () => {
+              setPushBusy(true);
+              try {
+                const result = await sendPostaPushTest();
+                setFlash(
+                  result.ok
+                    ? `Test push gönderildi (${result.sent ?? 0} cihaz)`
+                    : result.error ?? 'Test başarısız',
+                );
+              } finally {
+                setPushBusy(false);
+              }
+            }}
+          >
+            Test bildirimi gönder
+          </button>
+        </div>
+      </div>
+      <p className="settings-hint">
+        <strong>iOS (PWA):</strong> Safari → Paylaş → Ana Ekrana Ekle; sonra POS’u ana ekrandan açın. iOS 16.4+ için
+        Ayarlar → Bildirimler’den site iznini verin. Sunucuda{' '}
+        <code>EKOLOJIK_PUSH_VAPID_PUBLIC_KEY</code> / <code>PRIVATE_KEY</code> tanımlı olmalı (
+        <code>web-push generate-vapid-keys</code>).
+      </p>
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
         <div>

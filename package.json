@@ -16,7 +16,8 @@
     "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs",
     "test:tenant-mail": "node scripts/e2e-tenant-mail.mjs",
     "test:jmap-lite": "node scripts/jmap-lite-smoke.mjs",
-    "test:imap-move": "node scripts/posta-imap-move-regression.mjs"
+    "test:imap-move": "node scripts/posta-imap-move-regression.mjs",
+    "test:faz46": "node scripts/faz46-caldav-push-smoke.mjs"
   },
   "dependencies": {
     "imapflow": "^1.7.8",

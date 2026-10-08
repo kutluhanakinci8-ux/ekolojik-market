@@ -3,11 +3,23 @@ import { listPostaCalendar, upsertPostaCalendarEvent, deletePostaCalendarEvent }
 export function getPostaCalDavLitePrincipal() {
   return {
     ok: true,
-    version: 1,
-    note: 'ICS + REST köprüsü; tam CardDAV/CalDAV sunucu değil',
+    version: 2,
+    note: 'ICS abonelik + REST iki yön köprüsü; tam CalDAV sunucu değil',
     calendarHome: '/api/posta/caldav-lite/events',
     supported: ['VEVENT'],
+    readOnly: false,
+    methods: ['GET', 'POST', 'DELETE'],
+    icsSubscribePath: '/api/posta/calendar/feed.ics',
+    icsExportPath: '/api/posta/calendar/export.ics',
   };
+}
+
+export async function getPostaCalDavLiteEvent(dataDir, tenantId, eventId) {
+  const listed = await listPostaCalDavLiteEvents(dataDir, tenantId);
+  if (!listed.ok) return listed;
+  const hit = (listed.events ?? []).find((e) => e.uid === eventId);
+  if (!hit) return { ok: false, error: 'Etkinlik bulunamadı' };
+  return { ok: true, event: hit };
 }
 
 export async function listPostaCalDavLiteEvents(dataDir, tenantId) {

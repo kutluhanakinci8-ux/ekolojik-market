@@ -67,8 +67,21 @@ export async function addMailToPostaCalendar(payload: {
 export type PostaCalendarSyncHub = {
   ok: boolean;
   mode?: string;
-  caldav?: { supported: boolean; note?: string };
-  carddav?: { supported: boolean; vcardExportPath?: string; vcardExportUrl?: string };
+  caldav?: {
+    supported: boolean;
+    mode?: string;
+    principalPath?: string;
+    eventsPath?: string;
+    note?: string;
+  };
+  carddav?: {
+    supported: boolean;
+    mode?: string;
+    principalPath?: string;
+    vcardExportPath?: string;
+    vcardExportUrl?: string;
+    vcardImportPath?: string;
+  };
   ics?: {
     exportPath?: string;
     exportUrl?: string;
