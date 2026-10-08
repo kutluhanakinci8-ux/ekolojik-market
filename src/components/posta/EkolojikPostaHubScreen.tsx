@@ -1318,9 +1318,7 @@ export function EkolojikPostaHubScreen({
         {folder !== 'yaz' && (
           <section className={`posta-hub-list${folder === 'mesajlar' ? ' posta-hub-list--sohbet' : ''}`}>
             <div
-              className={`posta-hub-list-rail${
-                folder === 'mesajlar' && hubLayout === 'sohbet' ? ' posta-hub-list-rail--sohbet' : ''
-              }`}
+              className={`posta-hub-list-rail${folder === 'mesajlar' ? ' posta-hub-list-rail--sohbet' : ''}`}
             >
             {folder === 'mesajlar' && hubLayout === 'sohbet' && (
               <div className="posta-hub-sohbet-strip">
