@@ -16351,6 +16351,10 @@ input {
 .posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg .posta-sohbet-msg-meta {
   justify-content: flex-end;
 }
+.posta-sohbet-msg--bot .posta-sohbet-msg-body {
+  opacity: 0.92;
+  font-style: italic;
+}
 .posta-hub-screen--premium .crm-msg--customer.posta-sohbet-msg .posta-sohbet-msg-body {
   margin-right: auto;
   margin-left: 0;
