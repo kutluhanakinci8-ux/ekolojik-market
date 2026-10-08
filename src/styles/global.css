@@ -15329,6 +15329,10 @@ input {
 }
 .module-screen.posta-hub-screen.posta-hub-screen--premium {
   padding: 8px var(--posta-yazisma-gutter) 16px;
+  box-sizing: border-box;
+}
+.module-screen.posta-hub-screen.posta-hub-screen--premium.posta-hub-screen--sohbet-focus {
+  max-width: none;
 }
 .module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-shell,
 .module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-hero {
@@ -15673,6 +15677,11 @@ input {
 .app-shell > .module-screen.posta-hub-screen--sohbet-focus {
   flex: 1 1 0%;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
 }
 .module-screen.posta-hub-screen--sohbet-focus {
   overflow: hidden;
@@ -15682,8 +15691,13 @@ input {
   padding: 8px var(--posta-yazisma-gutter, 16px) 6px;
   padding-bottom: 6px;
   min-height: 0;
-  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 0%;
   max-height: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 .module-screen.posta-hub-screen--sohbet-focus > .posta-hub-hero,
 .module-screen.posta-hub-screen--sohbet-focus > .settings-flash,
