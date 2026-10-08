@@ -1,4 +1,4 @@
-/* Posta sol klasör menüsü — tek gutter, simetrik kenarlar (scrollbar-gutter yok) */
+/* Posta sol klasör menüsü — orta kolon liste kartları ile aynı gutter ve kart modeli */
 
 .posta-hub-screen--premium .posta-hub-folders {
   --posta-klasor-gutter: var(--posta-yazisma-gutter, 16px);
@@ -18,19 +18,32 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding: 12px var(--posta-klasor-gutter) 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
+  padding: 12px 0 10px;
   box-sizing: border-box;
 }
 
-.posta-hub-screen--premium .posta-klasor-scroll > .posta-hub-folder-group {
-  margin: 10px 0 2px;
-  padding: 0 var(--posta-klasor-row-pad-x);
+.posta-hub-screen--premium .posta-klasor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--posta-klasor-gutter);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   width: 100%;
   box-sizing: border-box;
+}
+
+.posta-hub-screen--premium .posta-klasor-list > li {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.posta-hub-screen--premium .posta-klasor-list > li.posta-hub-folder-group {
+  margin: 4px 0 0;
+  padding: 0 var(--posta-klasor-row-pad-x);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -38,13 +51,17 @@
   color: rgba(45, 107, 40, 0.65);
 }
 
-.posta-hub-screen--premium .posta-klasor-scroll > .posta-hub-folder-group:first-of-type {
+.posta-hub-screen--premium .posta-klasor-list > li.posta-hub-folder-group:first-of-type {
   margin-top: 0;
 }
 
-.posta-hub-screen--premium .posta-klasor-scroll > .posta-hub-compose {
+.posta-hub-screen--premium .posta-klasor-compose-li {
+  margin-bottom: 4px;
+}
+
+.posta-hub-screen--premium .posta-klasor-list .posta-hub-compose {
   width: 100%;
-  margin: 0 0 8px;
+  margin: 0;
   padding: 10px var(--posta-klasor-row-pad-x);
   border-radius: 12px;
   font-size: 13px;
@@ -53,18 +70,38 @@
   box-shadow: 0 8px 20px rgba(45, 145, 41, 0.22);
 }
 
-.posta-hub-screen--premium .posta-klasor-scroll > button:not(.posta-hub-compose) {
+/* Orta kolon .posta-hub-list li button ile aynı kart */
+.posta-hub-screen--premium .posta-klasor-list .posta-klasor-btn:not(.posta-hub-compose) {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   width: 100%;
   margin: 0;
-  padding: 10px var(--posta-klasor-row-pad-x);
+  padding: 12px var(--posta-klasor-row-pad-x);
+  border: 1px solid transparent;
   border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  box-sizing: border-box;
+  color: var(--text-muted);
   text-align: left;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(27, 61, 26, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.posta-hub-screen--premium .posta-klasor-list .posta-klasor-btn:not(.posta-hub-compose):hover {
+  border-color: var(--posta-border-soft);
+  color: var(--greenleaf-dark);
+  box-shadow: 0 6px 16px rgba(27, 61, 26, 0.06);
+}
+
+.posta-hub-screen--premium .posta-klasor-list .posta-klasor-btn:not(.posta-hub-compose).active {
+  background: linear-gradient(90deg, #eef9ec 0%, #fff 100%);
+  color: var(--greenleaf-dark);
+  border-color: rgba(45, 107, 40, 0.22);
+  box-shadow: 0 8px 20px rgba(45, 107, 40, 0.1);
 }
 
 .posta-hub-screen--premium .posta-hub-folders > .posta-hub-folder-meta {
@@ -90,13 +127,19 @@
   justify-content: center;
 }
 
-/* Orta kolon (gelen kutusu vb.) — klasör ile aynı 16px yatay gutter */
+/* Orta kolon — klasör listesi ile aynı 16px yatay gutter */
 .posta-hub-screen--premium .posta-hub-list-head {
   margin: 12px var(--posta-yazisma-gutter, 16px) 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.posta-hub-screen--premium .posta-hub-list-head .posta-hub-list-toolbar {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .posta-hub-screen--premium .posta-hub-list > ul {
-  padding-left: var(--posta-yazisma-gutter, 16px);
-  padding-right: var(--posta-yazisma-gutter, 16px);
+  padding: 8px var(--posta-yazisma-gutter, 16px);
   scrollbar-gutter: auto;
 }

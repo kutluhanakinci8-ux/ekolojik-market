@@ -38,21 +38,28 @@ async function measureFolders(page) {
     if (!aside) return { error: 'no aside' };
     const asideRect = aside.getBoundingClientRect();
     const asideCs = getComputedStyle(aside);
+    const list = aside.querySelector('.posta-klasor-list');
     const scroll = aside.querySelector('.posta-klasor-scroll');
-    const nodes = scroll ? [...scroll.children] : [...aside.children];
+    const nodes = list
+      ? [...list.querySelectorAll(':scope > li')]
+      : scroll
+        ? [...scroll.children]
+        : [...aside.children];
     const rows = nodes.map((el) => {
-      const r = el.getBoundingClientRect();
-      const cs = getComputedStyle(el);
+      const btn = el.tagName === 'BUTTON' ? el : el.querySelector('button');
+      const target = btn || el;
+      const r = target.getBoundingClientRect();
+      const cs = getComputedStyle(target);
       const label =
-        el.tagName === 'BUTTON'
-          ? el.textContent?.trim()
+        target.tagName === 'BUTTON'
+          ? target.textContent?.trim()
           : el.classList.contains('posta-hub-folder-group')
             ? `§ ${el.textContent?.trim()}`
             : el.querySelector('small')?.textContent?.trim() || el.className;
       return {
         label,
-        tag: el.tagName,
-        className: el.className.slice(0, 60),
+        tag: target.tagName,
+        className: target.className.slice(0, 60),
         left: r.left,
         right: r.right,
         width: r.width,
