@@ -60,7 +60,8 @@ bash scripts/sunucu-ekolojik-posta-tam-kabul.sh /var/www/market-pos
 - [x] `docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md` — tüm ✓
 - [x] `docs/RAKIP-SKOR-KARTI.md` — %100
 - [x] GitHub Actions CI yeşil (`ci.yml`) — #35–#36
-- [ ] Operatör UI yürüyüşü: `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md` (API kapısı: `sunucu-ekolojik-posta-nb-ui-yuruyus.sh`; POS görsel adımlar manuel)
+- [x] NB UI yürüyüşü — API kapısı (`sunucu-ekolojik-posta-nb-ui-yuruyus.sh`, VPS 2026-10-08, #37)
+- [ ] Operatör görsel yürüyüş (POS ekran #1–25): `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md` (~30 dk, manuel)
 
 Posta smoke token: `scripts/lib/ekolojik-posta-qa-token.sh` — demo kullanıcılar, `EKOLOJIK_POS_QA_USER`/`PASSWORD`, `EKOLOJIK_POS_QA_TOKEN`, veya VPS’te `store.json` mint (`mint-posta-qa-token.mjs`).
 
