@@ -46,11 +46,18 @@ export async function enforcePostaApiAccess(req, res, url, dataDir, tenantId) {
     return false;
   }
 
-  const rl = checkRateLimit(`posta:${ip}:${verified.payload.userId}`, { limit: 180, windowMs: 60_000 });
-  if (!rl.ok) {
-    res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: false, error: 'Çok fazla istek — lütfen bekleyin' }));
-    return false;
+  const loopback =
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === '::ffff:127.0.0.1' ||
+    ip.endsWith('127.0.0.1');
+  if (!loopback) {
+    const rl = checkRateLimit(`posta:${ip}:${verified.payload.userId}`, { limit: 180, windowMs: 60_000 });
+    if (!rl.ok) {
+      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'Çok fazla istek — lütfen bekleyin' }));
+      return false;
+    }
   }
 
   const store = await readTenantStore(dataDir, tenantId);

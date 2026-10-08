@@ -3,6 +3,9 @@
 set -euo pipefail
 
 ROOT="${1:-/var/www/market-pos}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+export EKOLOJIK_REPO_ROOT="${REPO_ROOT}"
 BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT:-5180}}"
 FAIL=0
 
@@ -23,11 +26,17 @@ curl_ok() {
 }
 
 curl_ok_auth() {
-  curl -fsS -H "$1" "$2" | grep -q "$3"
+  # Büyük CSV/ZIP yanıtlarında grep erken çıkınca curl SIGPIPE (23) vermesin
+  curl -fsS -H "$1" "$2" 2>/dev/null | head -c 16384 | grep -q "$3"
 }
 
 http_code() {
-  curl -s -o /dev/null -w "%{http_code}" "$1"
+  curl -s -o /dev/null -w "%{http_code}" "$1" 2>/dev/null || echo 000
+}
+
+expect_http() {
+  local url="$1" want="$2"
+  [[ "$(http_code "${url}")" == "${want}" ]]
 }
 
 echo "=== Ekolojik Posta NB checklist (API) ==="
@@ -36,14 +45,12 @@ echo ""
 
 check 10 "Bağımsız altyapı" curl_ok "${BASE_URL}/api/system/ekolojik-isolation" '"ok":true'
 check 7b "E-posta health" curl_ok "${BASE_URL}/api/email/health" '"ok":true'
-check 7 "SSE endpoint" bash -c "curl -fsS -N --max-time 5 '${BASE_URL}/api/posta/events' 2>/dev/null | head -c 8 | grep -q ."
 check 40w "Widget statik" bash -c "curl -fsS '${BASE_URL}/widget/messaging.js' | head -c 40 | grep -q ."
-check 38a "Export anonim korumalı" bash -c "[[ $(http_code '${BASE_URL}/api/posta/export/outbox.csv') == '401' ]]"
-check 38b "Messaging threads anonim korumalı" bash -c "[[ $(http_code '${BASE_URL}/api/messaging/threads?limit=1') == '401' ]]"
-check 38c "Portal session geçersiz token" bash -c "[[ $(http_code '${BASE_URL}/api/public/messaging/v1/portal/session?token=bad') == '401' ]]"
+check 38a "Export anonim korumalı" expect_http "${BASE_URL}/api/posta/export/outbox.csv" 401
+check 38b "Messaging threads anonim korumalı" expect_http "${BASE_URL}/api/messaging/threads?limit=1" 401
+check 38c "Portal session geçersiz token" expect_http "${BASE_URL}/api/public/messaging/v1/portal/session?token=bad" 401
 check 50 "Public messaging capabilities" curl_ok "${BASE_URL}/api/public/messaging/v1/capabilities" '"apiPrefix"'
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/ekolojik-posta-qa-token.sh
 source "${SCRIPT_DIR}/lib/ekolojik-posta-qa-token.sh"
 TOKEN=""
@@ -57,6 +64,13 @@ else
 fi
 
 if [[ -n "${TOKEN}" ]]; then
+  SSE_URL="${BASE_URL}/api/posta/events?access_token=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "${TOKEN}")"
+  check 7 "SSE endpoint (Faz 38 token)" bash -c "curl -fsS -N --max-time 6 '${SSE_URL}' 2>/dev/null | head -c 24 | grep -qE 'retry:|event:'"
+else
+  check 7s "SSE anonim korumalı" expect_http "${BASE_URL}/api/posta/events" 401
+fi
+
+if [[ -n "${TOKEN}" ]]; then
   AUTH_H="Authorization: Bearer ${TOKEN}"
   check 1 "Nav badge — unread API" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/unread-counts" '"ok":true'
   check 2 "Hub API — inbox" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=3" '"ok":true'
@@ -66,7 +80,7 @@ if [[ -n "${TOKEN}" ]]; then
   check 5 "Müşteri mesajları" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/threads?limit=5" '"ok":true'
   check 6 "Gönderilen / outbox" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
   check 8 "Posta ayarları" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/settings" '"ok":true'
-  check 9 "Export CSV (auth)" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" 'alici;konu'
+  check 9 "Export CSV (auth)" bash -c 'curl -fsS -H "$1" "$2" -o /tmp/ek-nb-outbox.csv && head -1 /tmp/ek-nb-outbox.csv | grep -q "alici"' _ "${AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv"
   check 49 "Messaging SLA" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/sla?days=7" '"ok":true'
   check 49b "Bot config hub" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/bot-config" '"bot"'
 else
