@@ -36,7 +36,7 @@ echo "--- API kapısı (otomatik) ---"
 bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-nb-checklist-dogrula.sh" "${INSTALL_DIR}"
 
 echo ""
-echo "--- UI DOM smoke (Playwright, #1–3 / #18 / #25) ---"
+echo "--- UI DOM smoke (Playwright, #1–6 / #10 / #15–25 kısmi) ---"
 VIS_FAIL=0
 if ! node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
   if [[ -f "${REPO_ROOT}/node_modules/playwright/package.json" ]]; then
