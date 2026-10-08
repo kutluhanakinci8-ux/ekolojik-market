@@ -28,11 +28,24 @@ export function applyPostaFlagsToItem(item, flagsMap) {
   const snoozedUntil = f.snoozedUntil ?? null;
   const snoozeActive = snoozedUntil && Date.parse(snoozedUntil) > Date.now();
   const labels = Array.isArray(f.labels) ? f.labels.filter(Boolean) : [];
+  let spam = Boolean(f.spam);
+  let trashed = Boolean(f.trashed);
+  const serverFolder = String(item.imapFolder ?? item.raw?.imapFolder ?? '').toLowerCase();
+  const isImap = item.kind === 'imap' || item.kind === 'imap-sent';
+  if (isImap && serverFolder) {
+    if (serverFolder === 'junk') spam = true;
+    else if (serverFolder === 'trash') trashed = true;
+    else if (serverFolder === 'inbox') {
+      if (f.spam !== true) spam = false;
+      if (f.trashed !== true) trashed = false;
+    }
+  }
   return {
     ...item,
+    serverFolder: isImap && serverFolder ? serverFolder : item.serverFolder,
     starred: Boolean(f.starred),
-    spam: Boolean(f.spam),
-    trashed: Boolean(f.trashed),
+    spam,
+    trashed,
     snoozedUntil,
     snoozeActive,
     labels,

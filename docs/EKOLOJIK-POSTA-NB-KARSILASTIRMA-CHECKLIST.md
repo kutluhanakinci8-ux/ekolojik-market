@@ -23,8 +23,8 @@ Referans: Nakliye Borsası Lerta Posta + Mesajlaşma. Ekolojik: **aynı UX**, ay
 
 | # | NB | Ekolojik hedef | Faz |
 |---|----|----------------|-----|
-| 13 | IMAP Sent/Junk/Trash/Drafts | Klasör sync + MOVE | 14 |
-| 14 | Konuşma görünümü | Thread gruplama | 15 |
+| 13 | IMAP Sent/Junk/Trash/Drafts | Klasör sync + MOVE | 14 ✓ (Faz 45 regression) |
+| 14 | Konuşma görünümü | Thread gruplama | 15 ✓ |
 | 15 | Arama / filtre | inbox search API | 15 |
 | 16 | CC/BCC, ilet, ekli giden | Compose tam | 16 |
 | 17 | Kişiler defteri | CRUD + vCard | 17 |

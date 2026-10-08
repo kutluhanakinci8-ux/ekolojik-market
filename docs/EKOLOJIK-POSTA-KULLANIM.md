@@ -20,7 +20,9 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 
 ### Gelen ve IMAP
 
+- **Tam webmail / Dovecot JMAP yok** — okuma ve klasörler POS **Posta hub** ve salt okunur **JMAP lite** köprüsü (`GET /api/posta/jmap-lite/*`) üzerinden; gönderim hub **Yaz** ve outbox ile yapılır.
 - **IMAP yenile**: yapılandırılmışsa kutuyu senkronize eder (Gelen, Gönderilen, Spam, Çöp, Taslaklar).
+- Mesaj detayında **Sunucu klasörü** (inbox / sent / junk / trash / drafts), IMAP bayraklarıyla uyumlu gösterilir.
 - **Konuşma** modu: aynı konuya ait yanıtlar tek zincirde.
 - **Toplu işlem**: satır seç → okundu / arşiv / spam / çöp; **Tümünü okundu işaretle**.
 - **Depolama çubuğu**: ek + inbox JSON kullanım yüzdesi.
@@ -61,6 +63,7 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 | `EKOLOJIK_MAIL_TRACK=1` | Giden HTML’de açılma pikseli (varsayılan kapalı) |
 | `EKOLOJIK_POSTA_AI=1` | Compose AI öneri |
 | `EKOLOJIK_IMAP_WRITE=1` | Spam/çöp bayraklarında IMAP MOVE |
+| JMAP lite smoke | `npm run test:jmap-lite` (opsiyonel `EKOLOJIK_VERIFY_BASE_URL`) |
 
 ## VPS doğrulama (tek komut)
 

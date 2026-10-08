@@ -1839,6 +1839,11 @@ export function EkolojikPostaHubScreen({
                 {KIND_LABEL[selectedInbox.kind]} · {selectedInbox.fromName || selectedInbox.from} ·{' '}
                 {selectedInbox.at ? new Date(selectedInbox.at).toLocaleString('tr-TR') : ''}
               </p>
+              {selectedInbox.serverFolder && (
+                <p className="posta-hub-detail-meta">
+                  Sunucu klasörü: <code>{selectedInbox.serverFolder}</code>
+                </p>
+              )}
               {selectedInbox.kind === 'bill' && selectedInbox.amount != null && (
                 <p className="posta-hub-detail-meta">
                   Tutar: {selectedInbox.amount} · Vade: {selectedInbox.dueDate ?? '—'}
