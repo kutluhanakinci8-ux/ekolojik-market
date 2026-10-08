@@ -9,7 +9,8 @@ export async function maybeNotifyOutboxFailure(dataDir, message) {
 
   const summary = { ops: null, hub: null, skipped: false };
 
-  if (await shouldSendPostaNotification(dataDir, 'outbox_failed', 'inAppHub')) {
+  const tenantId = message.tenantId || 'main';
+  if (await shouldSendPostaNotification(dataDir, 'outbox_failed', 'inAppHub', tenantId)) {
     summary.hub = await recordPostaHubAlert(dataDir, {
       event: 'outbox_failed',
       outboxId: message.id,
@@ -20,12 +21,11 @@ export async function maybeNotifyOutboxFailure(dataDir, message) {
     });
   }
 
-  const tenantId = message.tenantId || 'main';
   const pres = await getEffectiveMailPresentation(dataDir, tenantId);
   const opsEmail = pres.opsEmail;
   if (
     opsEmail?.includes('@') &&
-    (await shouldSendPostaNotification(dataDir, 'outbox_failed', 'opsEmail'))
+    (await shouldSendPostaNotification(dataDir, 'outbox_failed', 'opsEmail', tenantId))
   ) {
     const { sendEkolojikMail } = await import('./emailOutboxProcessor.mjs');
     summary.ops = await sendEkolojikMail(dataDir, {
@@ -75,7 +75,7 @@ export async function maybeAlertOutboxFailedThreshold(dataDir, tenantId = 'main'
   const pres = await getEffectiveMailPresentation(dataDir, tenantId);
   const opsEmail = pres.opsEmail;
   if (!opsEmail?.includes('@')) return { skipped: true, reason: 'no_ops_email', failedTotal };
-  if (!(await shouldSendPostaNotification(dataDir, 'outbox_failed', 'opsEmail'))) {
+  if (!(await shouldSendPostaNotification(dataDir, 'outbox_failed', 'opsEmail', tenantId))) {
     return { skipped: true, reason: 'matrix_disabled', failedTotal };
   }
 

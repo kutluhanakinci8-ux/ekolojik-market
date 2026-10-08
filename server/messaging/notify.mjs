@@ -13,7 +13,7 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message, tenan
   if (message.direction === 'customer' && !thread.muted) {
     const pres = await getEffectiveMailPresentation(dataDir, tenantId);
     const opsEmail = pres.opsEmail;
-    if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'messaging'))) {
+    if (opsEmail?.includes('@') && (await shouldSendPostaNotification(dataDir, 'messaging', 'opsEmail', tenantId))) {
       summary.ops = await sendEkolojikMail(dataDir, {
         to: opsEmail,
         subject: `[Mesaj] ${thread.customerName} — ${thread.subject}`,
@@ -36,7 +36,7 @@ export async function notifyOnMessagingMessage(dataDir, { thread, message, tenan
       summary.opsSkipped = true;
     }
 
-    if (await shouldSendPostaNotification(dataDir, 'messaging', 'inAppHub')) {
+    if (await shouldSendPostaNotification(dataDir, 'messaging', 'inAppHub', tenantId)) {
       await recordPostaHubAlert(dataDir, {
         event: 'messaging',
         threadId: thread.id,

@@ -1439,8 +1439,9 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/posta/notifications/matrix' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
       try {
-        const settings = await getPostaMailSettings(DATA_DIR);
+        const settings = await getPostaMailSettings(DATA_DIR, tenantId);
         const result = getPostaNotificationsMatrixHub(settings);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
@@ -2007,9 +2008,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/posta/settings' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
       try {
-        const settings = await getPostaMailSettings(DATA_DIR);
-        const effective = await getEffectiveMailPresentation(DATA_DIR);
+        const settings = await getPostaMailSettings(DATA_DIR, tenantId);
+        const effective = await getEffectiveMailPresentation(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, settings, effective }));
       } catch (error) {
@@ -2024,7 +2026,7 @@ const server = createServer(async (req, res) => {
       if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       try {
-        const result = await savePostaMailSettings(DATA_DIR, data ?? {});
+        const result = await savePostaMailSettings(DATA_DIR, data ?? {}, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {

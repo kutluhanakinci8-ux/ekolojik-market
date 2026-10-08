@@ -15,6 +15,16 @@ function safeTenantId(tenantId) {
   return raw.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
+/** Idempotency anahtarını kiracıya göre ayır (Faz 44). */
+export function idempotencyKeyForTenant(tenantId, rawKey) {
+  const tid = safeTenantId(tenantId);
+  const k = String(rawKey ?? '').trim();
+  if (!k) return `${tid}::`;
+  const prefix = `${tid}::`;
+  if (k.startsWith(prefix)) return k;
+  return `${prefix}${k}`;
+}
+
 function dirPending(root) {
   return join(root, 'pending');
 }
@@ -153,7 +163,10 @@ export async function enqueueEkolojikMail(
   },
 ) {
   await ensureDirs(dataDir, tenantId);
-  const key = idempotencyKey?.trim() || `ekolojik:${source}:${to}:${subject}:${Date.now()}`;
+  const key = idempotencyKeyForTenant(
+    tenantId,
+    idempotencyKey?.trim() || `ekolojik:${source}:${to}:${subject}:${Date.now()}`,
+  );
   const existing = await findOutboxByIdempotency(dataDir, key);
   if (existing) {
     return { ok: true, duplicate: true, message: existing };
@@ -280,10 +293,36 @@ function isReady(message) {
   return Number.isFinite(next) && next <= Date.now();
 }
 
+/** Kiracılar arasında adil sıra: her turda her tenant’tan en fazla bir iş. */
+function interleavePendingLocations(locations) {
+  const buckets = new Map();
+  for (const loc of locations) {
+    const tid = loc.tenantId || 'main';
+    if (!buckets.has(tid)) buckets.set(tid, []);
+    buckets.get(tid).push(loc);
+  }
+  for (const arr of buckets.values()) {
+    arr.sort((a, b) => a.file.localeCompare(b.file));
+  }
+  const tenantIds = [...buckets.keys()].sort();
+  const order = [];
+  let round = true;
+  while (round) {
+    round = false;
+    for (const tid of tenantIds) {
+      const queue = buckets.get(tid);
+      if (queue?.length) {
+        order.push(queue.shift());
+        round = true;
+      }
+    }
+  }
+  return order;
+}
+
 export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {}) {
   const root = await ensureDirs(dataDir);
-  const locations = await collectJsonFilesInState(root, 'pending');
-  locations.sort((a, b) => a.file.localeCompare(b.file));
+  const locations = interleavePendingLocations(await collectJsonFilesInState(root, 'pending'));
   const results = { processed: 0, sent: 0, failed: 0, deferred: 0 };
 
   for (const loc of locations) {
