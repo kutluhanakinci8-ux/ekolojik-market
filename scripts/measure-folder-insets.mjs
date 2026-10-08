@@ -38,8 +38,8 @@ async function measureFolders(page) {
     if (!aside) return { error: 'no aside' };
     const asideRect = aside.getBoundingClientRect();
     const asideCs = getComputedStyle(aside);
-    const list = aside.querySelector('.posta-klasor-list');
-    const scroll = aside.querySelector('.posta-klasor-scroll');
+    const list = aside.querySelector('.posta-klasor-rail .posta-yazisma-threads');
+    const scroll = aside.querySelector('.posta-klasor-rail');
     const nodes = list
       ? [...list.querySelectorAll(':scope > li')]
       : scroll
