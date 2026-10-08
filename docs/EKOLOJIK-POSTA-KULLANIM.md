@@ -80,6 +80,14 @@ DNS panel kayıtları yayınlandıktan sonra:
 EKOLOJIK_DNS_STRICT=1 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-dns-mail-dogrula.sh
 ```
 
+## İşletme posta kutusu (önemli)
+
+- **Kayıt / ayarlardaki e-posta** işletmenin **iletişim ve bildirim** adresidir; kişisel Gmail/Outlook hesabınız değildir.
+- **Posta → Gelen** kutusu, sunucuda yapılandırılmış **ortak işletme hesabıdır** (ör. `info@ekolojikmarket.com.tr` veya hosting IMAP kullanıcısı). Yetkili personel aynı kutuyu POS üzerinden görür.
+- Müşteri **Sohbet** (Müşteri mesajları), e-posta kutusundan bağımsızdır; web sitesi widget’ı isteğe bağlıdır (`/api/public/messaging/v1`).
+
+Kayıt sonrası kurulum planı: `docs/PLAN-EKOLOJIK-POSTA-KAYIT-ONBOARDING.md`.
+
 Prod kapatma: `bash scripts/sunucu-ekolojik-posta-prod-kapat.sh`  
 Haftalık otomatik: `bash scripts/sunucu-ekolojik-posta-parite-cron-kur.sh` (root, bir kez)  
 Parite özeti: `docs/EKOLOJIK-POSTA-PARITE-TAMAMLANDI.md`  
