@@ -261,7 +261,7 @@ bash scripts/ekolojik-posta-faz-kapat.sh "Faz NN (100)" cursor/posta-fazNN-100-f
 ```
 [x] Faz 0 — Kararlar dokümanı onaylandı (`docs/POSTA-MESAJ-100-KARARLAR.md`)
 [x] Faz 38 — Posta GET/export auth
-[ ] Faz 39 — Outbox ops
+[x] Faz 39 — Outbox ops
 [ ] Faz 40 — Widget
 [ ] Faz 41 — Kayıt otomasyon
 [ ] Faz 42 — Token refresh

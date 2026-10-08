@@ -27,7 +27,17 @@ import {
 } from './server/ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
 import { verifyImapMailbox } from './server/billEmailImap.mjs';
-import { getOutboxCounts, listRecentOutbox, listMergedRecentOutbox, requeueFailedOutboxMessage, findOutboxMessageById } from './server/emailOutbox.mjs';
+import {
+  getOutboxCounts,
+  listRecentOutbox,
+  listMergedRecentOutbox,
+  requeueFailedOutboxMessage,
+  findOutboxMessageById,
+  listFailedOutboxMessages,
+  bulkRequeueFailedOutbox,
+  archiveFailedOutboxMessages,
+} from './server/emailOutbox.mjs';
+import { maybeAlertOutboxFailedThreshold } from './server/postaOutboxNotify.mjs';
 import {
   createDeliverMessage,
   processPendingOutbox,
@@ -1029,13 +1039,67 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/outbox/analytics' && req.method === 'GET') {
       const days = Number(url.searchParams.get('days') || 14);
+      const tenantId = resolveTenantId(url);
       try {
-        const result = await getPostaOutboxAnalytics(DATA_DIR, { days });
+        const result = await getPostaOutboxAnalytics(DATA_DIR, { days, tenantId });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Analitik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 100);
+      try {
+        const items = await listFailedOutboxMessages(DATA_DIR, { tenantId, limit });
+        const counts = await getOutboxCounts(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, counts, items, total: items.length }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Failed listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed/requeue' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const data = await readRequestBody(req);
+        const result = await bulkRequeueFailedOutbox(DATA_DIR, {
+          tenantId,
+          ids: Array.isArray(data?.ids) ? data.ids : [],
+          all: Boolean(data?.all),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Requeue hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed/archive' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const data = await readRequestBody(req);
+        const result = await archiveFailedOutboxMessages(DATA_DIR, {
+          tenantId,
+          ids: Array.isArray(data?.ids) ? data.ids : [],
+          all: Boolean(data?.all),
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv hatası' }));
       }
       return;
     }
@@ -2533,10 +2597,16 @@ const server = createServer(async (req, res) => {
 const OUTBOX_DRAIN_MS = 30_000;
 setInterval(() => {
   if (!isEkolojikSmtpConfigured()) return;
-  processPendingOutbox(DATA_DIR, deliverMessage, { limit: 15 }).catch((error) => {
-    console.warn('email-outbox drain:', error instanceof Error ? error.message : error);
-  });
+  processPendingOutbox(DATA_DIR, deliverMessage, { limit: 15 })
+    .then(() => maybeAlertOutboxFailedThreshold(DATA_DIR, 'main'))
+    .catch((error) => {
+      console.warn('email-outbox drain:', error instanceof Error ? error.message : error);
+    });
 }, OUTBOX_DRAIN_MS);
+
+setTimeout(() => {
+  maybeAlertOutboxFailedThreshold(DATA_DIR, 'main').catch(() => {});
+}, 120_000);
 
 const RETENTION_MS = 24 * 60 * 60 * 1000;
 const runRetention = () => {

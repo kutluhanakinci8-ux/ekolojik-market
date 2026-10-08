@@ -144,7 +144,16 @@ export type PostaOutboxAnalytics = {
     successRatePercent: number | null;
   };
   byDay?: { date: string; sent: number; failed: number }[];
-  recentErrors?: { id: string; to: string; subject: string; at?: string; error?: string }[];
+  recentErrors?: {
+    id: string;
+    to: string;
+    subject: string;
+    at?: string;
+    error?: string;
+    errorClass?: string;
+  }[];
+  failureBreakdown?: { id: string; label: string; count: number; sample?: string | null }[];
+  failedAlertThreshold?: number;
   mailTrackEnabled?: boolean;
   error?: string;
 };

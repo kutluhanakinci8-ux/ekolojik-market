@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { createMailTrackToken, isMailTrackEnabled } from './postaMailTrack.mjs';
@@ -381,4 +381,121 @@ export async function requeueFailedOutboxMessage(dataDir, id) {
   await writeFile(dest, JSON.stringify(message, null, 2), 'utf8');
   await unlink(join(hit.dir, hit.file));
   return { ok: true, message };
+}
+
+export function classifyOutboxLastError(error) {
+  const s = String(error ?? '').toLowerCase();
+  if (!s.trim()) return 'unknown';
+  if (/535|534|authentication|auth failed|credentials|invalid login|password/i.test(s)) return 'smtp_auth';
+  if (/timeout|timed out|etimedout/i.test(s)) return 'timeout';
+  if (/enotfound|econnrefused|econnreset|network|getaddrinfo|unreachable/i.test(s)) return 'network';
+  if (/550|554|551|553|mailbox unavailable|recipient|user unknown|does not exist/i.test(s)) return 'recipient';
+  if (/421|452|quota|storage|mailbox full/i.test(s)) return 'mailbox_full';
+  if (/tls|ssl|certificate|starttls/i.test(s)) return 'tls';
+  return 'other';
+}
+
+async function listFailedLocations(dataDir, tenantId) {
+  const root = outboxRoot(dataDir);
+  await migrateLegacyFlatOutbox(root);
+  let locs = await collectJsonFilesInState(root, 'failed');
+  if (tenantId) {
+    const tid = safeTenantId(tenantId);
+    locs = locs.filter((l) => l.tenantId === tid);
+  }
+  return locs;
+}
+
+export async function listFailedOutboxMessages(dataDir, { tenantId, limit = 100 } = {}) {
+  const max = Math.min(Math.max(Number(limit) || 100, 1), 500);
+  const locs = await listFailedLocations(dataDir, tenantId);
+  const rows = [];
+  for (const loc of locs) {
+    const raw = await readFile(join(loc.dir, loc.file), 'utf8');
+    const msg = JSON.parse(raw);
+    rows.push({
+      ...msg,
+      folder: 'failed',
+      tenantId: msg.tenantId ?? loc.tenantId,
+      errorClass: classifyOutboxLastError(msg.lastError),
+    });
+  }
+  rows.sort((a, b) => Date.parse(b.sentAt || b.createdAt || 0) - Date.parse(a.sentAt || b.createdAt || 0));
+  return rows.slice(0, max);
+}
+
+export async function bulkRequeueFailedOutbox(dataDir, { ids = [], tenantId, all = false } = {}) {
+  const results = { ok: true, requeued: 0, errors: [] };
+  let targetIds = ids.filter(Boolean);
+  if (all) {
+    const failed = await listFailedOutboxMessages(dataDir, { tenantId, limit: 500 });
+    targetIds = failed.map((r) => r.id);
+  }
+  if (!targetIds.length) {
+    return { ok: false, error: 'ids veya all=true gerekli', requeued: 0, errors: [] };
+  }
+  for (const id of targetIds) {
+    const hit = await findOutboxMessageById(dataDir, id);
+    if (!hit) {
+      results.errors.push({ id, error: 'Bulunamadı' });
+      continue;
+    }
+    if (tenantId && safeTenantId(hit.message.tenantId) !== safeTenantId(tenantId)) {
+      results.errors.push({ id, error: 'Tenant uyuşmuyor' });
+      continue;
+    }
+    const r = await requeueFailedOutboxMessage(dataDir, id);
+    if (r.ok) results.requeued += 1;
+    else results.errors.push({ id, error: r.error ?? 'Requeue başarısız' });
+  }
+  return results;
+}
+
+async function filterFailedLocationsByIds(locs, ids) {
+  const idSet = new Set(ids);
+  const out = [];
+  for (const loc of locs) {
+    const msg = JSON.parse(await readFile(join(loc.dir, loc.file), 'utf8'));
+    if (idSet.has(msg.id)) out.push(loc);
+  }
+  return out;
+}
+
+/** failed/*.json → failed/archive/{tenantId}/ */
+export async function archiveFailedOutboxMessages(dataDir, { tenantId, ids = [], all = false } = {}) {
+  if (!all && (!ids || ids.length === 0)) {
+    return { ok: false, error: 'Arşiv için id listesi veya all=true gerekli' };
+  }
+  const root = outboxRoot(dataDir);
+  await migrateLegacyFlatOutbox(root);
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  let locs = await listFailedLocations(dataDir, tenantId);
+  if (!all) locs = await filterFailedLocationsByIds(locs, ids);
+  let archived = 0;
+  for (const loc of locs) {
+    const archiveDir = join(dirFailed(root), 'archive', loc.tenantId);
+    await mkdir(archiveDir, { recursive: true });
+    const src = join(loc.dir, loc.file);
+    const dest = join(archiveDir, `${stamp}-${loc.file}`);
+    await rename(src, dest);
+    archived += 1;
+  }
+  return { ok: true, archived };
+}
+
+export async function readOutboxStateMessages(dataDir, state, { tenantId, limit = 400 } = {}) {
+  const root = outboxRoot(dataDir);
+  await migrateLegacyFlatOutbox(root);
+  let locs = await collectJsonFilesInState(root, state);
+  if (tenantId) {
+    const tid = safeTenantId(tenantId);
+    locs = locs.filter((l) => l.tenantId === tid);
+  }
+  const rows = [];
+  for (const loc of locs) {
+    const msg = JSON.parse(await readFile(join(loc.dir, loc.file), 'utf8'));
+    rows.push({ ...msg, folder: state, tenantId: msg.tenantId ?? loc.tenantId });
+  }
+  rows.sort((a, b) => Date.parse(b.sentAt || b.createdAt || 0) - Date.parse(a.sentAt || b.createdAt || 0));
+  return rows.slice(0, Math.min(Math.max(limit, 1), 2000));
 }

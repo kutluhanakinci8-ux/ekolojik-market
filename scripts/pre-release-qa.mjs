@@ -213,6 +213,7 @@ async function postaMessagingGate(token) {
     '/api/messaging/public-config',
     '/api/messaging/threads?limit=3',
     '/api/posta/inbox?folder=gelen&limit=2',
+    '/api/posta/outbox/failed?limit=5',
     '/api/system/ekolojik-isolation',
   ];
   for (const path of paths) {
@@ -227,6 +228,12 @@ async function postaMessagingGate(token) {
 
   if (token) {
     const h = { Authorization: `Bearer ${token}` };
+    const analytics = await http('GET', '/api/posta/outbox/analytics?days=7', { headers: h });
+    if (analytics.ok && Array.isArray(analytics.json?.failureBreakdown)) {
+      pass('posta', 'outbox analytics failureBreakdown');
+    } else {
+      warn('posta', 'outbox analytics failureBreakdown', `HTTP ${analytics.status}`);
+    }
     const rot = await http('POST', '/api/messaging/public-config', { headers: h, body: { rotate: false } });
     if (rot.status === 401) warn('posta', 'POST messaging config', '401 — admin gerekli');
     else if (rot.ok) pass('posta', 'POST messaging/public-config (admin)');
