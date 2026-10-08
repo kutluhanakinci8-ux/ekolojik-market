@@ -1,8 +1,11 @@
-/* Müşteri yazışmaları — posta-hub-list stillerinden bağımsız, tek kenar boşluğu */
+/* Müşteri yazışmaları — tek gutter (--posta-yazisma-gutter), çakışan posta-hub-list kurallarından bağımsız */
+
+.posta-yazisma-shell {
+  --posta-yazisma-gutter: 16px;
+}
 
 .posta-yazisma-col {
-  --posta-yazisma-pad: 16px;
-  padding: 12px var(--posta-yazisma-pad) 10px;
+  padding: 12px var(--posta-yazisma-gutter) 10px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -51,7 +54,7 @@
 
 .posta-yazisma-threads {
   list-style: none;
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   padding: 0 0 6px;
   width: 100%;
   flex: 1 1 auto;
@@ -61,7 +64,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: 8px;
+  scrollbar-gutter: stable;
 }
 
 .posta-yazisma-thread {
@@ -70,6 +74,7 @@
   width: 100%;
   max-width: 100%;
   list-style: none;
+  flex: 0 0 auto;
 }
 
 .posta-yazisma-thread-card {
@@ -195,7 +200,7 @@
   margin: 0;
 }
 
-.posta-yazisma-shell .posta-hub-shell--sohbet {
+.posta-yazisma-shell.posta-hub-shell--sohbet {
   min-height: 0;
 }
 
@@ -203,68 +208,110 @@
   min-height: 0;
 }
 
-/* Konuşma paneli — aynı yatay çizgi */
+/* Konuşma paneli — sol/sağ kolonla aynı gutter */
+.posta-yazisma-shell .posta-hub-sohbet-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 .posta-yazisma-chat-frame {
-  --posta-yazisma-pad: 16px;
-  padding: 14px var(--posta-yazisma-pad) 12px;
+  padding: 12px var(--posta-yazisma-gutter) 12px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 
-.posta-yazisma-chat-frame > * {
+.posta-yazisma-shell .posta-yazisma-chat-frame > .posta-hub-sohbet-header,
+.posta-yazisma-shell .posta-yazisma-chat-frame > .posta-hub-sohbet-search-wrap,
+.posta-yazisma-shell .posta-yazisma-chat-frame > .posta-hub-sohbet-messages,
+.posta-yazisma-shell .posta-yazisma-chat-frame > .posta-hub-sohbet-compose,
+.posta-yazisma-shell .posta-yazisma-chat-frame > .posta-hub-sohbet-typing,
+.posta-yazisma-shell .posta-yazisma-chat-frame > .posta-hub-typing-hint {
   width: 100%;
-  max-width: 100%;
+  max-width: none;
   margin-left: 0;
   margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
   box-sizing: border-box;
 }
 
-.posta-yazisma-chat-frame .posta-hub-sohbet-messages {
+.posta-yazisma-shell .posta-hub-sohbet-header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--posta-border-soft);
+}
+
+.posta-yazisma-shell .posta-hub-sohbet-messages {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0;
+  padding: 4px 0 8px;
   margin: 0;
   list-style: none;
+  scrollbar-gutter: stable;
+  gap: 10px;
 }
 
-.posta-yazisma-chat-frame .posta-sohbet-msg {
+.posta-yazisma-shell .posta-sohbet-msg {
   display: block;
   width: 100%;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   padding: 0;
   border: none;
   background: transparent;
   box-shadow: none;
 }
 
-.posta-yazisma-chat-frame .posta-sohbet-msg-avatar {
+.posta-yazisma-shell .posta-sohbet-msg-avatar {
   display: none;
 }
 
-.posta-yazisma-chat-frame .posta-sohbet-msg-body {
+.posta-yazisma-shell .posta-sohbet-msg-body {
   max-width: 72%;
   margin: 0;
 }
 
-.posta-yazisma-chat-frame .crm-msg--customer .posta-sohbet-msg-body {
+.posta-yazisma-shell .crm-msg--customer .posta-sohbet-msg-body {
   margin-right: auto;
   margin-left: 0;
 }
 
-.posta-yazisma-chat-frame .crm-msg--staff .posta-sohbet-msg-body {
+.posta-yazisma-shell .crm-msg--staff .posta-sohbet-msg-body {
   margin-left: auto;
   margin-right: 0;
 }
 
-.posta-yazisma-chat-frame .posta-hub-sohbet-compose,
-.posta-yazisma-chat-frame .posta-hub-thread-compose {
+.posta-yazisma-shell .posta-hub-thread-compose,
+.posta-yazisma-shell .posta-hub-sohbet-compose {
+  width: 100%;
   max-width: none;
   flex-shrink: 0;
+  margin: 0;
+  padding: 8px 0 0;
+}
+
+.posta-yazisma-shell .posta-sohbet-compose-box {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.posta-yazisma-shell .posta-hub-msg-search {
+  margin-bottom: 0;
+}
+
+.posta-yazisma-shell .posta-hub-detail--sohbet .posta-hub-sohbet-empty {
+  margin: 12px var(--posta-yazisma-gutter);
+  padding: 48px var(--posta-yazisma-gutter);
 }

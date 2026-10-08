@@ -15323,8 +15323,17 @@ input {
   --posta-surface-muted: #f6faf5;
   --posta-border-soft: rgba(45, 107, 40, 0.14);
   --posta-shadow: 0 20px 50px rgba(27, 61, 26, 0.08), 0 4px 14px rgba(27, 61, 26, 0.04);
+  --posta-yazisma-gutter: 16px;
   max-width: 1480px;
   margin: 0 auto;
+}
+.module-screen.posta-hub-screen.posta-hub-screen--premium {
+  padding: 8px var(--posta-yazisma-gutter) 16px;
+}
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-shell,
+.module-screen.posta-hub-screen.posta-hub-screen--premium > .posta-hub-hero {
+  margin-left: 0;
+  margin-right: 0;
 }
 .posta-hub-hero {
   align-items: center;
@@ -15664,7 +15673,7 @@ input {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 8px 16px 6px;
+  padding: 8px var(--posta-yazisma-gutter, 16px) 6px;
   padding-bottom: 6px;
   min-height: 0;
   flex: 1 1 auto;
@@ -15676,14 +15685,18 @@ input {
 .module-screen.posta-hub-screen--sohbet-focus > .posta-hub-offline-hint {
   flex-shrink: 0;
 }
+.module-screen.posta-hub-screen--sohbet-focus {
+  --posta-yazisma-gutter: 16px;
+}
 .module-screen.posta-hub-screen--sohbet-focus > .posta-hub-shell {
   flex: 1 1 auto;
   min-height: 0;
-  margin: 0 16px 0;
+  margin-left: 0;
+  margin-right: 0;
 }
 .posta-hub-screen--sohbet-focus .posta-hub-hero {
   margin-bottom: 8px;
-  padding: 12px 16px;
+  padding: 12px var(--posta-yazisma-gutter, 16px);
 }
 .posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet {
   min-height: 0;
@@ -15783,7 +15796,7 @@ input {
   grid-template-columns: 176px minmax(240px, 0.75fr) minmax(480px, 2.25fr);
 }
 .posta-hub-shell--tam .posta-hub-list { max-width: 380px; }
-.posta-hub-shell--tam .posta-hub-detail { padding: 20px 24px; }
+.posta-hub-shell--tam .posta-hub-detail:not(.posta-hub-detail--sohbet) { padding: 20px 24px; }
 .posta-hub-shell--sohbet {
   grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
 }
@@ -16720,31 +16733,9 @@ input {
   box-sizing: border-box;
 }
 
-/* Sohbet paneli — başlık, arama, mesaj, gönder aynı çizgi (tek 16px inset) */
-.posta-hub-detail--sohbet .posta-hub-sohbet-inner,
-.posta-hub-detail--sohbet .posta-yazisma-chat-frame {
+/* Sohbet paneli inset — posta-yazisma.css (.posta-yazisma-shell) kaynak; legacy inner sınıfı */
+.posta-hub-detail--sohbet .posta-hub-sohbet-inner {
   --sohbet-pad: 16px;
-  padding: 14px var(--sohbet-pad) 12px;
+  padding: 12px var(--sohbet-pad);
   box-sizing: border-box;
-}
-.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-header,
-.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-search-wrap,
-.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-messages,
-.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-compose,
-.posta-hub-detail--sohbet .posta-hub-sohbet-inner > .posta-hub-sohbet-typing,
-.posta-hub-detail--sohbet .posta-yazisma-chat-frame > .posta-hub-sohbet-header,
-.posta-hub-detail--sohbet .posta-yazisma-chat-frame > .posta-hub-sohbet-search-wrap,
-.posta-hub-detail--sohbet .posta-yazisma-chat-frame > .posta-hub-sohbet-messages,
-.posta-hub-detail--sohbet .posta-yazisma-chat-frame > .posta-hub-sohbet-compose,
-.posta-hub-detail--sohbet .posta-yazisma-chat-frame > .posta-hub-sohbet-typing,
-.posta-hub-detail--sohbet .posta-yazisma-chat-frame > .posta-hub-typing-hint {
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  margin-right: 0;
-  box-sizing: border-box;
-}
-.posta-hub-detail--sohbet .posta-hub-sohbet-empty {
-  margin: 12px 16px;
-  padding: 48px 16px;
 }

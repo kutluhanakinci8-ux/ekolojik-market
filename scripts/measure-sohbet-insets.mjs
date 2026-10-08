@@ -109,6 +109,8 @@ async function measureOpenThread(page) {
         maxWidth: cs?.maxWidth ?? null,
       };
     });
+    const composeEl = inner.querySelector('.posta-hub-sohbet-compose');
+    const composeRect = composeEl?.getBoundingClientRect();
     return {
       innerPad: csInner.padding,
       innerRel: { left: innerRect.left, width: innerRect.width },
@@ -116,7 +118,25 @@ async function measureOpenThread(page) {
       search: pick('.posta-hub-sohbet-search-wrap'),
       messages: pick('.posta-hub-sohbet-messages'),
       compose: pick('.posta-hub-sohbet-compose'),
+      composeRelRight: composeRect ? round(innerRect.right - composeRect.right) : null,
       bubbles,
+    };
+  });
+}
+
+async function measureSearchInCol(page) {
+  return page.evaluate(() => {
+    const search = document.querySelector('.posta-yazisma-col .posta-hub-search');
+    const frame = document.querySelector('.posta-yazisma-chat-frame');
+    const frameSearch = frame?.querySelector('.posta-hub-search');
+    const pick = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return Math.round(r.left * 10) / 10;
+    };
+    return {
+      listSearchLeft: pick(search),
+      chatSearchLeft: pick(frameSearch),
     };
   });
 }
@@ -125,12 +145,27 @@ async function openSohbet(page) {
   await page.goto(`${BASE}/app`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.locator('nav.app-topbar-tabs button', { hasText: 'Posta' }).click();
   await page.waitForTimeout(800);
+  const postaTab = page.locator('.posta-hub-view-switch button', { hasText: /^Posta$/ });
+  if (await postaTab.count()) {
+    await postaTab.click();
+    await page.waitForTimeout(500);
+  }
+  const beforeTab = await measureSearchInCol(page).catch(() => null);
   const sohbetTab = page.locator('.posta-hub-view-switch button', { hasText: 'Sohbet' });
   if (await sohbetTab.count()) {
     await sohbetTab.click();
     await page.waitForTimeout(600);
   }
   await page.waitForSelector('.posta-yazisma-thread-card', { timeout: 20000 });
+  const afterTab = await measureSearchInCol(page);
+  if (beforeTab?.listSearchLeft != null) {
+    console.log(
+      `\n=== Posta → Sohbet sekme geçişi (liste arama sol, px) ===\n  önce: ${beforeTab.listSearchLeft} | sonra: ${afterTab.listSearchLeft}`,
+    );
+  }
+  console.log(
+    `=== Kolon hizası (liste arama vs konuşma arama, px) ===\n  liste: ${afterTab.listSearchLeft} | konuşma: ${afterTab.chatSearchLeft}`,
+  );
 }
 
 async function main() {
@@ -195,7 +230,7 @@ async function main() {
     const msg = tm.messages?.relLeft;
     console.log(`\n${tm.name}`);
     console.log(`  inner padding: ${tm.innerPad}`);
-    console.log(`  header/search/messages/compose relLeft: ${h}, ${s}, ${msg}, ${c}`);
+    console.log(`  header/search/messages/compose relLeft: ${h}, ${s}, ${msg}, ${c} | compose Δsağ: ${tm.composeRelRight}`);
     const relLefts = (tm.bubbles || []).map((b) => `${b.dir}:${round(b.relLeft)}`);
     console.log(`  ilk balonlar relLeft: ${relLefts.join(' | ')}`);
   }
