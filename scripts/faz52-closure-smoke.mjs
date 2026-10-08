@@ -9,6 +9,8 @@ const mustExist = [
   'docs/EKOLOJIK-POSTA-NB-KARSILASTIRMA-CHECKLIST.md',
   'docs/EKOLOJIK-POSTA-PARITE-TAMAMLANDI.md',
   'scripts/sunucu-ekolojik-posta-wave3-dogrula.sh',
+  'scripts/sunucu-ekolojik-posta-wave3-kapat.sh',
+  'docs/PLAN-POSTA-WAVE3-KAPATMA.md',
   'scripts/sunucu-ekolojik-posta-tam-kabul.sh',
   '.github/workflows/ci.yml',
 ];

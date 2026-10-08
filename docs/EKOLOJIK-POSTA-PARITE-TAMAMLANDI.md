@@ -31,6 +31,8 @@ bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh
 | Manuel haftalık | `bash scripts/sunucu-ekolojik-posta-haftalik-dogrula.sh` |
 | Tam kabul (tek komut) | `bash scripts/sunucu-ekolojik-posta-tam-kabul.sh` |
 | Wave 3 kapısı | `bash scripts/sunucu-ekolojik-posta-wave3-dogrula.sh` |
+| Wave 3 kapanış (merge öncesi) | `bash scripts/sunucu-ekolojik-posta-wave3-kapat.sh` |
+| main merge rehberi | `docs/PLAN-POSTA-WAVE3-KAPATMA.md` |
 | Tam kabul (adım adım) | `EKOLOJIK_SKIP_E2E=1 bash scripts/sunucu-ekolojik-posta-kabul-sira.sh` |
 | DNS strict (panel sonrası) | `EKOLOJIK_DNS_STRICT=1 bash scripts/sunucu-ekolojik-dns-mail-dogrula.sh` |
 | Günlük yedek | `scripts/sunucu-ekolojik-data-yedek-cron-kur.sh` |
