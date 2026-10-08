@@ -1,9 +1,84 @@
-/** Basit RFC822 gövde çıkarımı (Posta hub okuma paneli) */
+/** Basit RFC822 gövde çıkarımı (Posta hub okuma paneli) — UTF-8 / charset destekli */
 
-function decodeQuotedPrintable(input) {
-  return input
-    .replace(/=\r?\n/g, '')
-    .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+function parseCharset(contentType) {
+  const m = String(contentType ?? '').match(/charset=["']?([^"'\s;]+)/i);
+  if (!m) return 'utf-8';
+  return m[1].trim().toLowerCase().replace(/^utf8$/, 'utf-8');
+}
+
+function decodeBuffer(buf, charset) {
+  const c = parseCharset(charset);
+  if (c === 'utf-8' || c === 'us-ascii' || c === 'ascii') {
+    return buf.toString('utf8');
+  }
+  if (c === 'iso-8859-9' || c === 'windows-1254' || c === 'latin5') {
+    return buf.toString('latin1');
+  }
+  if (c === 'iso-8859-1' || c === 'latin1' || c === 'windows-1252') {
+    return buf.toString('latin1');
+  }
+  try {
+    return buf.toString('utf8');
+  } catch {
+    return buf.toString('latin1');
+  }
+}
+
+function quotedPrintableToBuffer(input) {
+  const bytes = [];
+  const str = String(input ?? '').replace(/=\r?\n/g, '');
+  for (let i = 0; i < str.length; i += 1) {
+    if (str[i] === '=' && i + 2 < str.length) {
+      const hex = str.slice(i + 1, i + 3);
+      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
+        bytes.push(parseInt(hex, 16));
+        i += 2;
+        continue;
+      }
+    }
+    bytes.push(str.charCodeAt(i) & 0xff);
+  }
+  return Buffer.from(bytes);
+}
+
+function decodeQuotedPrintable(input, charset = 'utf-8') {
+  return decodeBuffer(quotedPrintableToBuffer(input), charset);
+}
+
+function decodeTransferBody(body, encoding, charset) {
+  const enc = String(encoding ?? '').toLowerCase();
+  const raw = String(body ?? '');
+  if (enc.includes('base64')) {
+    const cleaned = raw.replace(/\s/g, '');
+    try {
+      return decodeBuffer(Buffer.from(cleaned, 'base64'), charset);
+    } catch {
+      return raw;
+    }
+  }
+  if (enc.includes('quoted-printable')) {
+    return decodeQuotedPrintable(raw, charset);
+  }
+  return decodeBuffer(Buffer.from(raw, 'latin1'), charset);
+}
+
+/** UTF-8 baytları Latin-1 sanılarak kaydedilmiş metin (mÃ¼ÅŸteri → müşteri) */
+export function repairUtf8Mojibake(str) {
+  if (!str || typeof str !== 'string') return str;
+  if (!/Ã|Ä|Å|â€™|â€œ|â€/.test(str)) return str;
+  try {
+    const repaired = Buffer.from(str, 'latin1').toString('utf8');
+    if (repaired.includes('\uFFFD')) return str;
+    if (/[ğüşöçıİĞÜŞÖÇ]/.test(repaired)) return repaired;
+    if (repaired.length < str.length && /[a-zA-Z0-9]/.test(repaired)) return repaired;
+  } catch {
+    /* ignore */
+  }
+  return str;
+}
+
+function normalizeMailText(str) {
+  return repairUtf8Mojibake(String(str ?? '').replace(/\0/g, '').trim());
 }
 
 function stripHtml(html) {
@@ -28,12 +103,27 @@ function parseHeaders(raw) {
   return headers;
 }
 
+function decodePartBody(part, subHeaders) {
+  const bodyStart = part.search(/\r?\n\r?\n/);
+  if (bodyStart < 0) return '';
+  const body = part.slice(bodyStart).replace(/^\r?\n\r?\n/, '');
+  const charset = parseCharset(subHeaders['content-type']);
+  const encoding = subHeaders['content-transfer-encoding'] ?? '';
+  return decodeTransferBody(body, encoding, charset);
+}
+
 function extractPart(raw, contentType) {
   const ct = contentType.toLowerCase();
   const boundaryMatch = raw.match(/boundary="?([^"\r\n;]+)"?/i);
   if (!boundaryMatch) {
-    if (ct.includes('text/html')) return { html: decodeQuotedPrintable(raw) };
-    return { text: decodeQuotedPrintable(raw) };
+    const headers = parseHeaders(raw);
+    const charset = parseCharset(headers['content-type'] || contentType);
+    const encoding = headers['content-transfer-encoding'] ?? '';
+    const bodyStart = raw.search(/\r?\n\r?\n/);
+    const body = bodyStart >= 0 ? raw.slice(bodyStart).replace(/^\r?\n\r?\n/, '') : raw;
+    const decoded = decodeTransferBody(body, encoding, charset);
+    if (ct.includes('text/html')) return { html: decoded };
+    return { text: decoded };
   }
   const boundary = boundaryMatch[1];
   const parts = raw.split(new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:--)?`, 'g'));
@@ -43,14 +133,9 @@ function extractPart(raw, contentType) {
     if (!part.trim() || part.trim() === '--') continue;
     const subHeaders = parseHeaders(part);
     const subType = (subHeaders['content-type'] ?? '').toLowerCase();
-    const bodyStart = part.search(/\r?\n\r?\n/);
-    if (bodyStart < 0) continue;
-    let body = part.slice(bodyStart).replace(/^\r?\n\r?\n/, '');
-    if (subHeaders['content-transfer-encoding']?.toLowerCase().includes('quoted-printable')) {
-      body = decodeQuotedPrintable(body);
-    }
-    if (subType.includes('text/plain') && !text) text = body.trim();
-    if (subType.includes('text/html') && !html) html = body.trim();
+    const decoded = decodePartBody(part, subHeaders);
+    if (subType.includes('text/plain') && !text) text = decoded.trim();
+    if (subType.includes('text/html') && !html) html = decoded.trim();
   }
   return { text, html };
 }
@@ -65,6 +150,7 @@ export function parseMailBody(rawSource) {
   const bodyStart = raw.search(/\r?\n\r?\n/);
   const bodyRaw = bodyStart >= 0 ? raw.slice(bodyStart).replace(/^\r?\n\r?\n/, '') : raw;
   const contentType = headers['content-type'] ?? 'text/plain';
+  const charset = parseCharset(contentType);
   const encoding = headers['content-transfer-encoding'] ?? '';
 
   let text = '';
@@ -75,13 +161,9 @@ export function parseMailBody(rawSource) {
     text = parts.text ?? '';
     html = parts.html ?? '';
   } else if (contentType.toLowerCase().includes('text/html')) {
-    html = encoding.toLowerCase().includes('quoted-printable')
-      ? decodeQuotedPrintable(bodyRaw)
-      : bodyRaw;
+    html = decodeTransferBody(bodyRaw, encoding, charset);
   } else {
-    text = encoding.toLowerCase().includes('quoted-printable')
-      ? decodeQuotedPrintable(bodyRaw)
-      : bodyRaw;
+    text = decodeTransferBody(bodyRaw, encoding, charset);
   }
 
   if (!text && html) text = stripHtml(html);
@@ -90,9 +172,9 @@ export function parseMailBody(rawSource) {
     text = stripHtml(text);
   }
 
-  text = text.replace(/\0/g, '').trim();
-  html = html.replace(/\0/g, '').trim();
-  const snippet = (text || stripHtml(html)).replace(/\s+/g, ' ').slice(0, 240);
+  text = normalizeMailText(text);
+  html = normalizeMailText(html);
+  const snippet = normalizeMailText((text || stripHtml(html)).replace(/\s+/g, ' ').slice(0, 240));
 
   return { text, html, snippet };
 }
@@ -123,7 +205,7 @@ export function parseMailAttachments(rawSource) {
     let body = part.slice(bodyStart).replace(/^\r?\n\r?\n/, '');
     const enc = headers['content-transfer-encoding']?.toLowerCase() ?? '';
     if (enc.includes('quoted-printable')) {
-      body = decodeQuotedPrintable(body);
+      body = decodeQuotedPrintable(body, parseCharset(subType));
     }
     const b64 = body.replace(/\r?\n/g, '').replace(/\s/g, '');
     let buf;
@@ -134,7 +216,7 @@ export function parseMailAttachments(rawSource) {
     }
     if (buf.length < 1 || buf.length > 8 * 1024 * 1024) continue;
     out.push({
-      fileName,
+      fileName: repairUtf8Mojibake(fileName),
       mimeType: subType.split(';')[0] || 'application/octet-stream',
       dataBase64: buf.toString('base64'),
       size: buf.length,

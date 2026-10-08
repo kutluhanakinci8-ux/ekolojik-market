@@ -6,7 +6,18 @@ import {
 import { resolvePostaImapMailboxes } from './postaImapMailboxes.mjs';
 import { applyImapMoveForFlags } from './postaImapActions.mjs';
 import { listMergedRecentOutbox } from './emailOutbox.mjs';
-import { parseMailBody } from './mailBodyParse.mjs';
+import { parseMailBody, repairUtf8Mojibake } from './mailBodyParse.mjs';
+
+function fixMailTextFields(row) {
+  if (!row || typeof row !== 'object') return row;
+  return {
+    ...row,
+    subject: repairUtf8Mojibake(row.subject),
+    snippet: repairUtf8Mojibake(row.snippet),
+    bodyText: repairUtf8Mojibake(row.bodyText),
+    bodyHtml: repairUtf8Mojibake(row.bodyHtml),
+  };
+}
 import { listBillEmailInbox, messageDedupeKey } from './billEmailInboxStore.mjs';
 import {
   listPostaImapMessages,
@@ -93,6 +104,7 @@ function toUnifiedContact(row) {
 }
 
 function toUnifiedImap(row) {
+  const fixed = fixMailTextFields(row);
   return {
     id: row.id,
     kind: 'imap',
@@ -101,12 +113,12 @@ function toUnifiedImap(row) {
     from: row.from,
     fromName: row.from,
     to: row.to,
-    subject: row.subject || '(konu yok)',
-    preview: row.snippet || row.bodyText?.slice(0, 240) || '',
+    subject: fixed.subject || '(konu yok)',
+    preview: fixed.snippet || fixed.bodyText?.slice(0, 240) || '',
     unread: isUnread(row),
     archived: Boolean(row.archivedAt),
-    bodyText: row.bodyText ?? '',
-    bodyHtml: row.bodyHtml ?? '',
+    bodyText: fixed.bodyText ?? '',
+    bodyHtml: fixed.bodyHtml ?? '',
     messageId: row.messageId ?? null,
     inReplyTo: row.inReplyTo ?? null,
     references: row.references ?? null,
@@ -117,6 +129,7 @@ function toUnifiedImap(row) {
 }
 
 function toUnifiedBill(row) {
+  const fixed = fixMailTextFields(row);
   return {
     id: row.id,
     kind: 'bill',
@@ -125,12 +138,12 @@ function toUnifiedBill(row) {
     from: row.from,
     fromName: row.sourceLabel || row.from,
     to: row.to,
-    subject: row.subject || 'Fatura e-postası',
-    preview: row.snippet || '',
+    subject: fixed.subject || 'Fatura e-postası',
+    preview: fixed.snippet || '',
     unread: isUnread(row),
     archived: Boolean(row.archivedAt),
-    bodyText: row.bodyText || row.snippet || '',
-    bodyHtml: row.bodyHtml ?? '',
+    bodyText: fixed.bodyText || fixed.snippet || '',
+    bodyHtml: fixed.bodyHtml ?? '',
     amount: row.amount,
     dueDate: row.dueDate,
     matched: row.matched,
