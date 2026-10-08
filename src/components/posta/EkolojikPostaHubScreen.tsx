@@ -1317,6 +1317,11 @@ export function EkolojikPostaHubScreen({
 
         {folder !== 'yaz' && (
           <section className={`posta-hub-list${folder === 'mesajlar' ? ' posta-hub-list--sohbet' : ''}`}>
+            <div
+              className={`posta-hub-list-rail${
+                folder === 'mesajlar' && hubLayout === 'sohbet' ? ' posta-hub-list-rail--sohbet' : ''
+              }`}
+            >
             {folder === 'mesajlar' && hubLayout === 'sohbet' && (
               <div className="posta-hub-sohbet-strip">
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => pickFolder('yaz')}>
@@ -1635,6 +1640,7 @@ export function EkolojikPostaHubScreen({
                   </li>
                 ))}
             </ul>
+            </div>
           </section>
         )}
 
