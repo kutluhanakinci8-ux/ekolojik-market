@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { createMailTrackToken, isMailTrackEnabled } from './postaMailTrack.mjs';
@@ -8,6 +8,11 @@ const RETRY_SECONDS = [60, 120, 300];
 
 function outboxRoot(dataDir) {
   return join(dataDir, 'email-outbox');
+}
+
+function safeTenantId(tenantId) {
+  const raw = String(tenantId || 'main').trim() || 'main';
+  return raw.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
 function dirPending(root) {
@@ -20,11 +25,60 @@ function dirFailed(root) {
   return join(root, 'failed');
 }
 
-async function ensureDirs(dataDir) {
+function dirPendingTenant(root, tenantId) {
+  return join(dirPending(root), safeTenantId(tenantId));
+}
+function dirSentTenant(root, tenantId) {
+  return join(dirSent(root), safeTenantId(tenantId));
+}
+function dirFailedTenant(root, tenantId) {
+  return join(dirFailed(root), safeTenantId(tenantId));
+}
+
+let legacyOutboxMigrated = false;
+
+/** Eski düz pending/sent/failed/*.json → alt klasör {tenantId}/ */
+async function migrateLegacyFlatOutbox(root) {
+  if (legacyOutboxMigrated) return;
+  legacyOutboxMigrated = true;
+  for (const sub of ['pending', 'sent', 'failed']) {
+    const base = join(root, sub);
+    let entries;
+    try {
+      entries = await readdir(base, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const ent of entries) {
+      if (!ent.isFile() || !ent.name.endsWith('.json')) continue;
+      const full = join(base, ent.name);
+      let raw;
+      try {
+        raw = await readFile(full, 'utf8');
+      } catch {
+        continue;
+      }
+      let msg;
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      const tid = safeTenantId(msg.tenantId);
+      const destDir = join(base, tid);
+      await mkdir(destDir, { recursive: true });
+      await writeFile(join(destDir, ent.name), raw, 'utf8');
+      await unlink(full);
+    }
+  }
+}
+
+async function ensureDirs(dataDir, tenantId = 'main') {
   const root = outboxRoot(dataDir);
-  await mkdir(dirPending(root), { recursive: true });
-  await mkdir(dirSent(root), { recursive: true });
-  await mkdir(dirFailed(root), { recursive: true });
+  await mkdir(dirPendingTenant(root, tenantId), { recursive: true });
+  await mkdir(dirSentTenant(root, tenantId), { recursive: true });
+  await mkdir(dirFailedTenant(root, tenantId), { recursive: true });
+  await migrateLegacyFlatOutbox(root);
   return root;
 }
 
@@ -32,21 +86,48 @@ function hashIdempotency(key) {
   return createHash('sha256').update(key).digest('hex').slice(0, 24);
 }
 
+async function collectJsonFilesInState(root, state) {
+  const base = join(root, state);
+  const hits = [];
+  let entries;
+  try {
+    entries = await readdir(base, { withFileTypes: true });
+  } catch {
+    return hits;
+  }
+  for (const ent of entries) {
+    if (ent.isFile() && ent.name.endsWith('.json')) {
+      hits.push({ file: ent.name, dir: base, tenantId: 'main' });
+      continue;
+    }
+    if (!ent.isDirectory()) continue;
+    const tenantDir = join(base, ent.name);
+    let files;
+    try {
+      files = await readdir(tenantDir);
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      if (f.endsWith('.json')) {
+        hits.push({ file: f, dir: tenantDir, tenantId: ent.name });
+      }
+    }
+  }
+  return hits;
+}
+
 export async function findOutboxByIdempotency(dataDir, idempotencyKey) {
   if (!idempotencyKey?.trim()) return null;
   const root = outboxRoot(dataDir);
+  await migrateLegacyFlatOutbox(root);
   const tag = hashIdempotency(idempotencyKey.trim());
   for (const sub of ['pending', 'sent', 'failed']) {
-    const dir = join(root, sub);
-    try {
-      const files = await readdir(dir);
-      const hit = files.find((f) => f.includes(tag));
-      if (hit) {
-        const raw = await readFile(join(dir, hit), 'utf8');
-        return JSON.parse(raw);
-      }
-    } catch {
-      /* missing dir */
+    const locations = await collectJsonFilesInState(root, sub);
+    const hit = locations.find((loc) => loc.file.includes(tag));
+    if (hit) {
+      const raw = await readFile(join(hit.dir, hit.file), 'utf8');
+      return JSON.parse(raw);
     }
   }
   return null;
@@ -71,7 +152,7 @@ export async function enqueueEkolojikMail(
     tenantId = 'main',
   },
 ) {
-  await ensureDirs(dataDir);
+  await ensureDirs(dataDir, tenantId);
   const key = idempotencyKey?.trim() || `ekolojik:${source}:${to}:${subject}:${Date.now()}`;
   const existing = await findOutboxByIdempotency(dataDir, key);
   if (existing) {
@@ -104,11 +185,12 @@ export async function enqueueEkolojikMail(
     lastError: null,
     sentAt: null,
     providerMessageId: null,
-    tenantId: String(tenantId || 'main'),
+    tenantId: safeTenantId(tenantId),
   };
 
   const filename = `${message.createdAt.replace(/[:.]/g, '-')}_${tag}_${id}.json`;
-  const path = join(dirPending(outboxRoot(dataDir)), filename);
+  const root = outboxRoot(dataDir);
+  const path = join(dirPendingTenant(root, message.tenantId), filename);
   await writeFile(path, JSON.stringify(message, null, 2), 'utf8');
   return { ok: true, duplicate: false, message, file: filename };
 }
@@ -131,11 +213,34 @@ async function listDirJson(dir, limit) {
   }
 }
 
+async function listStateJsonAllTenants(root, state, limit) {
+  const base = join(root, state);
+  await migrateLegacyFlatOutbox(root);
+  const perTenant = Math.max(limit, 10);
+  const rows = [];
+  let entries;
+  try {
+    entries = await readdir(base, { withFileTypes: true });
+  } catch {
+    return rows;
+  }
+  for (const ent of entries) {
+    if (ent.isFile() && ent.name.endsWith('.json')) {
+      const raw = await readFile(join(base, ent.name), 'utf8');
+      rows.push(JSON.parse(raw));
+      continue;
+    }
+    if (!ent.isDirectory()) continue;
+    rows.push(...(await listDirJson(join(base, ent.name), perTenant)));
+  }
+  return rows.slice(0, limit);
+}
+
 export async function listRecentOutbox(dataDir, limit = 50) {
   const root = outboxRoot(dataDir);
-  const pending = await listDirJson(dirPending(root), limit);
-  const sent = await listDirJson(dirSent(root), limit);
-  const failed = await listDirJson(dirFailed(root), limit);
+  const pending = await listStateJsonAllTenants(root, 'pending', limit);
+  const sent = await listStateJsonAllTenants(root, 'sent', limit);
+  const failed = await listStateJsonAllTenants(root, 'failed', limit);
   return { pending, sent, failed };
 }
 
@@ -157,17 +262,15 @@ export async function listMergedRecentOutbox(dataDir, limit = 50) {
 
 export async function getOutboxCounts(dataDir) {
   const root = outboxRoot(dataDir);
-  async function count(sub) {
-    try {
-      return (await readdir(join(root, sub))).filter((f) => f.endsWith('.json')).length;
-    } catch {
-      return 0;
-    }
+  await migrateLegacyFlatOutbox(root);
+  async function countState(state) {
+    const locations = await collectJsonFilesInState(root, state);
+    return locations.length;
   }
   return {
-    pending: await count('pending'),
-    sent: await count('sent'),
-    failed: await count('failed'),
+    pending: await countState('pending'),
+    sent: await countState('sent'),
+    failed: await countState('failed'),
   };
 }
 
@@ -179,13 +282,13 @@ function isReady(message) {
 
 export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {}) {
   const root = await ensureDirs(dataDir);
-  const pendingDir = dirPending(root);
-  const files = (await readdir(pendingDir)).filter((f) => f.endsWith('.json')).sort();
+  const locations = await collectJsonFilesInState(root, 'pending');
+  locations.sort((a, b) => a.file.localeCompare(b.file));
   const results = { processed: 0, sent: 0, failed: 0, deferred: 0 };
 
-  for (const file of files) {
+  for (const loc of locations) {
     if (results.processed >= limit) break;
-    const full = join(pendingDir, file);
+    const full = join(loc.dir, loc.file);
     const message = JSON.parse(await readFile(full, 'utf8'));
     if (!isReady(message)) {
       results.deferred += 1;
@@ -193,15 +296,15 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
     }
 
     results.processed += 1;
+    const tid = safeTenantId(message.tenantId);
     try {
       const sent = await sendFn(message);
       message.status = 'sent';
       message.sentAt = new Date().toISOString();
       message.providerMessageId = sent.messageId ?? null;
       message.lastError = null;
-      const dest = join(dirSent(root), file);
+      const dest = join(dirSentTenant(root, tid), loc.file);
       await writeFile(dest, JSON.stringify(message, null, 2), 'utf8');
-      const { unlink } = await import('node:fs/promises');
       await unlink(full);
       results.sent += 1;
     } catch (error) {
@@ -209,9 +312,8 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
       message.lastError = error instanceof Error ? error.message : String(error);
       if (message.attempts >= message.maxAttempts) {
         message.status = 'failed';
-        const dest = join(dirFailed(root), file);
+        const dest = join(dirFailedTenant(root, tid), loc.file);
         await writeFile(dest, JSON.stringify(message, null, 2), 'utf8');
-        const { unlink } = await import('node:fs/promises');
         await unlink(full);
         results.failed += 1;
         try {
@@ -247,20 +349,15 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
 export async function findOutboxMessageById(dataDir, id) {
   if (!id?.trim()) return null;
   const root = outboxRoot(dataDir);
+  await migrateLegacyFlatOutbox(root);
   for (const sub of ['pending', 'sent', 'failed']) {
-    const dir = join(root, sub);
-    try {
-      const files = await readdir(dir);
-      for (const f of files) {
-        if (!f.endsWith('.json')) continue;
-        const raw = await readFile(join(dir, f), 'utf8');
-        const msg = JSON.parse(raw);
-        if (msg.id === id) {
-          return { message: msg, folder: sub, file: f };
-        }
+    const locations = await collectJsonFilesInState(root, sub);
+    for (const loc of locations) {
+      const raw = await readFile(join(loc.dir, loc.file), 'utf8');
+      const msg = JSON.parse(raw);
+      if (msg.id === id) {
+        return { message: msg, folder: sub, file: loc.file, tenantId: loc.tenantId, dir: loc.dir };
       }
-    } catch {
-      /* skip */
     }
   }
   return null;
@@ -275,13 +372,13 @@ export async function requeueFailedOutboxMessage(dataDir, id) {
   }
   const root = outboxRoot(dataDir);
   const message = hit.message;
+  const tid = safeTenantId(message.tenantId);
   message.status = 'pending';
   message.attempts = 0;
   message.lastError = null;
   message.nextAttemptAt = new Date().toISOString();
-  const dest = join(dirPending(root), hit.file);
+  const dest = join(dirPendingTenant(root, tid), hit.file);
   await writeFile(dest, JSON.stringify(message, null, 2), 'utf8');
-  const { unlink } = await import('node:fs/promises');
-  await unlink(join(dirFailed(root), hit.file));
+  await unlink(join(hit.dir, hit.file));
   return { ok: true, message };
 }

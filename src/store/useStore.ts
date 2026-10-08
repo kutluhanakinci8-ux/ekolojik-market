@@ -938,7 +938,7 @@ export function useStore() {
 
       if (cancelled) return;
 
-      if (remote && hasPersistedStoreData(remote)) {
+      if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
         const remoteUsers = (remote.users ?? []).map((user) => normalizeUser(user as unknown as Record<string, unknown>));
         const localUsers = loadUsers();
         const mergedUsers = mergeUserLists(remoteUsers, localUsers);
@@ -2894,13 +2894,18 @@ export function useStore() {
         `${method === 'pin' ? 'PIN' : 'Şifre'} ile oturum başlatıldı`,
         { method },
       );
-      void exchangePosApiToken({
+      await exchangePosApiToken({
         username: user.username,
         password: credentials?.password,
         pin: credentials?.pin,
       });
+      const remote = await fetchStoreSnapshot();
+      if (remote) {
+        applySnapshot(remote);
+        setSyncStatus('synced');
+      }
     },
-    [appendLoginAudit, logActivity],
+    [appendLoginAudit, logActivity, applySnapshot],
   );
 
   const refreshTenantData = useCallback(async (): Promise<void> => {

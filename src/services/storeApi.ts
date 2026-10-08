@@ -11,7 +11,10 @@ function apiUrl(): string {
 
 export async function fetchStoreSnapshot(): Promise<PersistedStoreSnapshot | null> {
   try {
-    const res = await fetch(apiUrl(), { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(apiUrl(), {
+      headers: posApiAuthHeaders(),
+      signal: AbortSignal.timeout(5000),
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as PersistedStoreSnapshot | Record<string, never>;
     if (!data || !data.updatedAt) return null;

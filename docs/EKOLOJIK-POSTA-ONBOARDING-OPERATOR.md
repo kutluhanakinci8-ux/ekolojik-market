@@ -32,7 +32,9 @@ Onboarding güncelleme, tenant-mail kaydı, messaging anahtar rotate ve CRM mail
 
 Üretimde `EKOLOJIK_POS_API_SECRET` tanımlayın (yoksa `data/pos-api-secret` otomatik oluşur). Tenant IMAP/SMTP şifreleri `data/tenant-mail/*.json` içinde **şifreli** saklanır (sunucu secret ile).
 
-`PUT /api/data` (mağaza senkronu) geçerli POS token ister; `GET /api/data` kullanıcı şifre hash'lerini döndürmez — giriş sunucu token veya yerel önbellek ile doğrulanır.
+`GET` ve `PUT /api/data` geçerli POS token ister; yanıt kullanıcı şifre hash'lerini içermez — giriş sonrası token ile senkron çalışır.
+
+E-posta outbox dosyaları `data/email-outbox/{pending|sent|failed}/{tenantId}/` altında tutulur (eski düz dosyalar ilk işlemde taşınır).
 
 ---
 

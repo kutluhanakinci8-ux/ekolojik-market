@@ -42,7 +42,6 @@ export function LandingLogin() {
 
     const resolvedTenant = tenantId.trim() || DEFAULT_TENANT_ID;
     saveTenantId(resolvedTenant);
-    await store.refreshTenantData();
 
     try {
       const result = await store.login(

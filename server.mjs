@@ -2434,6 +2434,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/data' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readStoreData(tenantId);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(sanitizeStoreSnapshotForClient(data ?? {})));
