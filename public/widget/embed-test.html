@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Ekolojik widget embed testi</title>
+  </head>
+  <body>
+    <h1>Harici site simülasyonu</h1>
+    <p>Bu sayfayı kendi alan adınızda barındırın; tenant CORS allowlist’ine bu kökeni ekleyin.</p>
+    <!-- API_ANAHTARI ve tenantId değerlerini doldurun -->
+    <script src="/widget/messaging.js" defer></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        EkolojikMessaging.init({
+          tenantId: 'main',
+          apiKey: 'API_ANAHTARI',
+          apiBase: window.location.origin + '/api/public/messaging/v1',
+        });
+      });
+    </script>
+  </body>
+</html>

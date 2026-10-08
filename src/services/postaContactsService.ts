@@ -1,3 +1,5 @@
+import { posHubFetch, postaAuthenticatedUrl } from './posHubFetch';
+
 export type PostaContact = {
   id: string;
   email: string;
@@ -15,12 +17,12 @@ export type PostaContact = {
 export async function fetchPostaContacts(q = '', limit = 120) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (q.trim()) params.set('q', q.trim());
-  const res = await fetch(`/api/posta/contacts?${params.toString()}`);
+  const res = await posHubFetch(`/api/posta/contacts?${params.toString()}`);
   return res.json() as Promise<{ ok: boolean; contacts?: PostaContact[]; error?: string }>;
 }
 
 export async function savePostaContact(payload: Partial<PostaContact> & { name?: string; email?: string }) {
-  const res = await fetch('/api/posta/contacts', {
+  const res = await posHubFetch('/api/posta/contacts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -29,12 +31,12 @@ export async function savePostaContact(payload: Partial<PostaContact> & { name?:
 }
 
 export async function deletePostaContact(id: string) {
-  const res = await fetch(`/api/posta/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const res = await posHubFetch(`/api/posta/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' });
   return res.json() as Promise<{ ok: boolean; error?: string }>;
 }
 
 export async function importPostaContacts(text: string, format: 'vcf' | 'csv' = 'vcf') {
-  const res = await fetch('/api/posta/contacts/import', {
+  const res = await posHubFetch('/api/posta/contacts/import', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, format }),
@@ -43,5 +45,5 @@ export async function importPostaContacts(text: string, format: 'vcf' | 'csv' = 
 }
 
 export function postaContactsExportVcfUrl() {
-  return '/api/posta/contacts/export.vcf';
+  return postaAuthenticatedUrl('/api/posta/contacts/export.vcf');
 }

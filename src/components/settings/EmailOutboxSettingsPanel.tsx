@@ -42,6 +42,12 @@ import {
   saveTenantMailConfig,
   type TenantMailConfigHub,
 } from '../../services/postaTenantMailService';
+import {
+  archiveFailedOutbox,
+  fetchFailedOutboxList,
+  requeueFailedOutbox,
+  type FailedOutboxRow,
+} from '../../services/postaOutboxOpsService';
 
 type OutboxRow = {
   id: string;
@@ -98,9 +104,11 @@ export function EmailOutboxSettingsPanel() {
   const [tenantSmtpPass, setTenantSmtpPass] = useState('');
   const [tenantSmtpFrom, setTenantSmtpFrom] = useState('');
   const [tenantUsePlatformEnv, setTenantUsePlatformEnv] = useState(true);
+  const [failedRows, setFailedRows] = useState<FailedOutboxRow[]>([]);
+  const [selectedFailedIds, setSelectedFailedIds] = useState<Set<string>>(() => new Set());
 
   const refresh = useCallback(async () => {
-    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub] =
+    const [h, recent, iso, ret, posta, analytics, engagement, live, rules, deliv, notifyHub, onboardingHub, tenantMailHub, failedHub] =
       await Promise.all([
       fetchEmailHealth(),
       fetchRecentOutbox(50),
@@ -115,6 +123,7 @@ export function EmailOutboxSettingsPanel() {
       fetchPostaNotificationsMatrix(),
       fetchPostaOnboardingHub(),
       fetchTenantMailConfig(),
+      fetchFailedOutboxList(120),
     ]);
     setHealth(h);
     setIsolation(iso);
@@ -147,6 +156,10 @@ export function EmailOutboxSettingsPanel() {
     if (recent.ok && Array.isArray(recent.items)) {
       setOutboxRows(recent.items as OutboxRow[]);
     }
+    if (failedHub.ok && Array.isArray(failedHub.items)) {
+      setFailedRows(failedHub.items);
+      setSelectedFailedIds(new Set());
+    }
   }, []);
 
   useEffect(() => {
@@ -168,6 +181,47 @@ export function EmailOutboxSettingsPanel() {
       } else {
         setFlash(result.error ?? 'Test başarısız');
       }
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleFailedSelect = (id: string) => {
+    setSelectedFailedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const runFailedRequeue = async (all = false) => {
+    setLoading(true);
+    setFlash(null);
+    try {
+      const ids = all ? undefined : [...selectedFailedIds];
+      const result = await requeueFailedOutbox({ ids, all });
+      if (result.ok) {
+        setFlash(`Yeniden kuyruk: ${result.requeued ?? 0} kayıt${result.errors?.length ? ` (${result.errors.length} hata)` : ''}`);
+      } else {
+        setFlash(result.error ?? 'Requeue başarısız');
+      }
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runFailedArchive = async () => {
+    if (!selectedFailedIds.size) {
+      setFlash('Arşiv için satır seçin');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await archiveFailedOutbox({ ids: [...selectedFailedIds] });
+      setFlash(result.ok ? `${result.archived ?? 0} kayıt arşivlendi` : result.error ?? 'Arşiv başarısız');
       await refresh();
     } finally {
       setLoading(false);
@@ -762,8 +816,22 @@ export function EmailOutboxSettingsPanel() {
             <span className="settings-stat-label">Açılma pikseli</span>
             <strong>{outboxAnalytics.mailTrackEnabled ? 'Açık' : 'Kapalı'}</strong>
           </article>
+          <article className="settings-stat-card">
+            <span className="settings-stat-label">Failed uyarı eşiği</span>
+            <strong>{outboxAnalytics.failedAlertThreshold ?? 50}</strong>
+          </article>
         </div>
       )}
+      {outboxAnalytics?.failureBreakdown?.length ? (
+        <ul className="settings-hint" style={{ marginTop: '0.5rem' }}>
+          {outboxAnalytics.failureBreakdown.map((row) => (
+            <li key={row.id}>
+              {row.label}: <strong>{row.count}</strong>
+              {row.sample ? ` — ${row.sample.slice(0, 80)}` : ''}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <p className="settings-hint">
         İsteğe bağlı: <code>EKOLOJIK_MAIL_TRACK=1</code> (açılma + tıklama),{' '}
         <code>EKOLOJIK_MAIL_CLICK_TRACK=1</code> (yalnızca tıklama),{' '}
@@ -1045,6 +1113,68 @@ export function EmailOutboxSettingsPanel() {
           ))}
         </ul>
       )}
+
+      <div className="settings-panel-head" style={{ marginTop: '1.5rem' }}>
+        <div>
+          <h3>Başarısız gönderimler (Faz 39)</h3>
+          <p>
+            Toplam failed (sunucu): <strong className={(health?.counts?.failed ?? 0) > 0 ? 'is-warn' : ''}>
+              {health?.counts?.failed ?? 0}
+            </strong>
+            · listede {failedRows.length}
+          </p>
+        </div>
+        <div className="settings-panel-actions">
+          <button type="button" className="btn btn-sm btn-outline" disabled={loading || !selectedFailedIds.size} onClick={() => void runFailedRequeue(false)}>
+            Seçilenleri yeniden dene
+          </button>
+          <button type="button" className="btn btn-sm btn-outline" disabled={loading || !failedRows.length} onClick={() => void runFailedRequeue(true)}>
+            Tümünü yeniden dene
+          </button>
+          <button type="button" className="btn btn-sm btn-outline" disabled={loading || !selectedFailedIds.size} onClick={() => void runFailedArchive()}>
+            Seçilenleri arşivle
+          </button>
+        </div>
+      </div>
+      <div className="module-table-wrap" style={{ overflowX: 'auto', marginBottom: '1.25rem' }}>
+        <table className="module-table module-table--wide">
+          <thead>
+            <tr>
+              <th />
+              <th>Tarih</th>
+              <th>Alıcı</th>
+              <th>Konu</th>
+              <th>Sınıf</th>
+              <th>Hata</th>
+            </tr>
+          </thead>
+          <tbody>
+            {failedRows.length === 0 ? (
+              <tr>
+                <td colSpan={6}>Başarısız kayıt yok</td>
+              </tr>
+            ) : (
+              failedRows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedFailedIds.has(row.id)}
+                      onChange={() => toggleFailedSelect(row.id)}
+                      aria-label={`Seç ${row.id}`}
+                    />
+                  </td>
+                  <td>{formatWhen(row)}</td>
+                  <td>{row.to}</td>
+                  <td>{row.subject}</td>
+                  <td>{row.errorClass ?? '—'}</td>
+                  <td title={row.lastError ?? undefined}>{(row.lastError ?? '—').slice(0, 72)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div className="settings-panel-head" style={{ marginTop: '1.5rem' }}>
         <div>

@@ -50,7 +50,39 @@ if (!j.smtpVerified) process.exit(3);
   }
 fi
 
-if curl -fsS "${BASE_URL}/api/posta/imap/health" -o /tmp/ek-imap-health.json 2>/dev/null; then
+POSTA_TOKEN=""
+for pair in "yonetici:yonetici123" "kasiyer:kasiyer123" "admin:admin123"; do
+  user="${pair%%:*}"
+  pass="${pair#*:}"
+  POSTA_TOKEN="$(curl -fsS -X POST "${BASE_URL}/api/auth/pos-token" \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"${user}\",\"password\":\"${pass}\"}" 2>/dev/null \
+    | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const j=JSON.parse(s);if(j.ok&&j.token)process.stdout.write(j.token);}catch{}});" || true)"
+  if [[ -n "${POSTA_TOKEN}" ]]; then
+    ok "pos-token (${user})"
+    break
+  fi
+done
+
+if [[ "${EKOLOJIK_POS_POSTA_AUTH:-1}" != "0" ]]; then
+  anon_code="$(curl -sS -o /dev/null -w '%{http_code}' "${BASE_URL}/api/posta/inbox?folder=gelen&limit=1" 2>/dev/null || echo 000)"
+  if [[ "${anon_code}" == "401" ]]; then
+    ok "anon GET /api/posta/inbox → 401 (Faz 38)"
+  else
+    bad "anon GET /api/posta/inbox beklenen 401, gelen ${anon_code}"
+  fi
+fi
+
+if [[ -z "${POSTA_TOKEN}" && "${EKOLOJIK_POS_POSTA_AUTH:-1}" != "0" ]]; then
+  bad "pos-token alınamadı — Posta API Bearer gerekli (Faz 38)"
+fi
+
+CURL_AUTH=()
+if [[ -n "${POSTA_TOKEN}" ]]; then
+  CURL_AUTH=(-H "Authorization: Bearer ${POSTA_TOKEN}")
+fi
+
+if curl -fsS "${CURL_AUTH[@]}" "${BASE_URL}/api/posta/imap/health" -o /tmp/ek-imap-health.json 2>/dev/null; then
   node -e "
 const j=require('/tmp/ek-imap-health.json');
 if (j.imapConfigured && j.imapVerified) process.exit(0);
@@ -89,21 +121,21 @@ for path in \
   "/api/posta/compose-hints?limit=5" \
   "/api/messaging/threads?limit=5" \
   "/api/system/ekolojik-isolation"; do
-  if curl -fsS "${BASE_URL}${path}" -o "/tmp/ek-posta-check.json" 2>/dev/null; then
+  if curl -fsS "${CURL_AUTH[@]}" "${BASE_URL}${path}" -o "/tmp/ek-posta-check.json" 2>/dev/null; then
     ok "GET ${path}"
   else
     bad "GET ${path} başarısız"
   fi
 done
 
-if curl -fsS "${BASE_URL}/api/posta/export/outbox.csv" -o /tmp/ek-outbox.csv 2>/dev/null; then
+if curl -fsS "${CURL_AUTH[@]}" "${BASE_URL}/api/posta/export/outbox.csv" -o /tmp/ek-outbox.csv 2>/dev/null; then
   lines=$(wc -l < /tmp/ek-outbox.csv || echo 0)
   ok "export outbox.csv (${lines} satır)"
 else
   bad "GET /api/posta/export/outbox.csv"
 fi
 
-if curl -fsS "${BASE_URL}/api/messaging/export" -o /tmp/ek-msg-export.bin 2>/dev/null; then
+if curl -fsS "${CURL_AUTH[@]}" "${BASE_URL}/api/messaging/export" -o /tmp/ek-msg-export.bin 2>/dev/null; then
   size=$(wc -c < /tmp/ek-msg-export.bin || echo 0)
   ok "export messaging (${size} bayt)"
 else
@@ -111,7 +143,11 @@ else
 fi
 
 # SSE: retry + unread veya ping (5 sn)
-SSE_HEAD="$(timeout 5 curl -fsS -N "${BASE_URL}/api/posta/events" 2>/dev/null | head -n 8 || true)"
+SSE_URL="${BASE_URL}/api/posta/events"
+if [[ -n "${POSTA_TOKEN}" ]]; then
+  SSE_URL="${SSE_URL}?access_token=$(node -e "process.stdout.write(encodeURIComponent(process.argv[1]))" "${POSTA_TOKEN}")"
+fi
+SSE_HEAD="$(timeout 5 curl -fsS -N "${SSE_URL}" 2>/dev/null | head -n 8 || true)"
 if echo "$SSE_HEAD" | grep -q '^retry:' && echo "$SSE_HEAD" | grep -qE '^event:( unread| ping)'; then
   ok "SSE /api/posta/events (retry + event)"
 elif echo "$SSE_HEAD" | grep -q '^event:'; then
@@ -120,7 +156,7 @@ else
   warn "SSE kısa test — bağlantı veya proxy SSE'yi kesiyor olabilir"
 fi
 
-if curl -fsS "${BASE_URL}/api/posta/live/capabilities" -o /tmp/ek-posta-live-cap.json 2>/dev/null; then
+if curl -fsS "${CURL_AUTH[@]}" "${BASE_URL}/api/posta/live/capabilities" -o /tmp/ek-posta-live-cap.json 2>/dev/null; then
   if node -e "const d=require('/tmp/ek-posta-live-cap.json'); process.exit(d.ok&&d.events?.includes('ping')?0:1)"; then
     ok "GET /api/posta/live/capabilities"
   else

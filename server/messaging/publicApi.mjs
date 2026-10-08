@@ -127,3 +127,20 @@ export async function publicTyping(dataDir, tenantId, threadId, customerId, acti
 }
 
 export { generateMessagingPublicKey } from './publicConfig.mjs';
+
+/** Onboarding / admin smoke — public API ile thread açar */
+export async function smokeTestMessagingWidget(dataDir, tenantId = 'main') {
+  const configured = await isMessagingPublicApiConfigured(dataDir, tenantId);
+  if (!configured) {
+    return { ok: false, error: 'Public messaging anahtarı yapılandırılmadı' };
+  }
+  const stamp = Date.now();
+  return publicCreateThread(dataDir, tenantId, {
+    customerId: `widget-smoke-${stamp}`,
+    customerName: 'Widget test',
+    customerEmail: null,
+    subject: 'Widget bağlantı testi',
+    initialMessage: 'Otomatik onboarding widget testi — bu mesajı POS Sohbet’te görebilirsiniz.',
+    authorName: 'Widget test',
+  });
+}

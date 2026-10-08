@@ -16,6 +16,7 @@ import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './uti
 import { resolveTopNavHighlight } from './data/navigation';
 import type { AppPage } from './components/AppShell';
 import { fetchPostaUnreadCounts } from './services/postaInboxService';
+import { postaEventsStreamUrl } from './services/posHubFetch';
 import { PostaOnboardingWizard } from './components/onboarding/PostaOnboardingWizard';
 import { fetchPostaOnboardingHub } from './services/postaOnboardingService';
 import {
@@ -122,6 +123,10 @@ export function PosApp() {
     const hub = await fetchPostaOnboardingHub();
     if (!hub) return;
     const status = hub.onboarding.status;
+    if (status === 'pending' || status === 'in_progress') {
+      setPostaOnboardingOpen(true);
+      return;
+    }
     if (status !== 'completed' && status !== 'dismissed') {
       setPostaOnboardingOpen(true);
     }
@@ -156,7 +161,7 @@ export function PosApp() {
     void poll();
     let es: EventSource | null = null;
     try {
-      es = new EventSource('/api/posta/events');
+      es = new EventSource(postaEventsStreamUrl());
       es.addEventListener('unread', (ev) => {
         try {
           const data = JSON.parse(String((ev as MessageEvent).data)) as { total?: number };

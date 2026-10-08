@@ -5,6 +5,8 @@ import { readTenantStore } from './tenantAuth.mjs';
 
 const TOKEN_VERSION = 'v1';
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+/** Süresi dolmuş token ile yenileme (ağ gecikmesi) */
+export const TOKEN_REFRESH_GRACE_MS = 30 * 60 * 1000;
 
 function hashPassword(password) {
   return createHash('sha256').update(password).digest('hex');
@@ -54,7 +56,12 @@ export async function createPosApiToken(dataDir, { tenantId, userId, role }) {
   return `${TOKEN_VERSION}.${payloadB64}.${sig}`;
 }
 
-export async function verifyPosApiToken(dataDir, token, expectedTenantId, { requireAdmin = false } = {}) {
+export async function verifyPosApiToken(
+  dataDir,
+  token,
+  expectedTenantId,
+  { requireAdmin = false, refreshGraceMs = 0 } = {},
+) {
   if (!token?.trim()) {
     return { ok: false, status: 401, error: 'Oturum token gerekli (POS girişi yapın)' };
   }
@@ -82,8 +89,12 @@ export async function verifyPosApiToken(dataDir, token, expectedTenantId, { requ
     return { ok: false, status: 401, error: 'Geçersiz token içeriği' };
   }
 
-  if (!payload.exp || payload.exp < Date.now()) {
-    return { ok: false, status: 401, error: 'Token süresi doldu — tekrar giriş yapın' };
+  const now = Date.now();
+  if (!payload.exp || payload.exp < now) {
+    const grace = Math.max(0, Number(refreshGraceMs) || 0);
+    if (!(grace > 0 && payload.exp && payload.exp + grace >= now)) {
+      return { ok: false, status: 401, error: 'Token süresi doldu — tekrar giriş yapın' };
+    }
   }
   if (expectedTenantId && payload.tenantId !== expectedTenantId) {
     return { ok: false, status: 403, error: 'Token bu mağaza için geçerli değil' };
@@ -147,10 +158,42 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
     userId: user.id,
     role: user.role,
   });
+  const exp = Date.now() + TOKEN_TTL_MS;
   return {
     ok: true,
     token,
     expiresInSec: Math.floor(TOKEN_TTL_MS / 1000),
+    expiresAt: new Date(exp).toISOString(),
+    role: user.role,
+    userId: user.id,
+  };
+}
+
+export async function refreshPosApiTokenFromBearer(dataDir, token, tenantId) {
+  const verified = await verifyPosApiToken(dataDir, token, tenantId, {
+    refreshGraceMs: TOKEN_REFRESH_GRACE_MS,
+  });
+  if (!verified.ok) {
+    return { ok: false, status: verified.status ?? 401, message: verified.error };
+  }
+
+  const store = await readTenantStore(dataDir, tenantId);
+  const user = store?.users?.find((u) => u.id === verified.payload.userId);
+  if (!user || user.isActive === false) {
+    return { ok: false, status: 401, message: 'Kullanıcı artık aktif değil' };
+  }
+
+  const newToken = await createPosApiToken(dataDir, {
+    tenantId,
+    userId: user.id,
+    role: user.role,
+  });
+  const exp = Date.now() + TOKEN_TTL_MS;
+  return {
+    ok: true,
+    token: newToken,
+    expiresInSec: Math.floor(TOKEN_TTL_MS / 1000),
+    expiresAt: new Date(exp).toISOString(),
     role: user.role,
     userId: user.id,
   };

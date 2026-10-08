@@ -55,7 +55,10 @@ export function LandingRegister() {
       state: {
         registered: true,
         username: result.username ?? username,
-        message: 'Hesabınız oluşturuldu. Giriş yapabilirsiniz.',
+        message:
+          result.message ??
+          'Hesabınız oluşturuldu. İlk girişte Posta ve e-posta kurulum sihirbazı açılacaktır.',
+        postaSetup: true,
       },
     });
   };
@@ -66,6 +69,10 @@ export function LandingRegister() {
         <div className="landing-auth-head">
           <h1>Ücretsiz Deneme Başlat</h1>
           <p>14 gün boyunca tüm özellikleri deneyin — sıfırdan mağaza kurulumu</p>
+          <p className="landing-auth-hint" style={{ marginTop: '0.75rem', fontSize: '0.9rem', opacity: 0.9 }}>
+            Kayıt sonrası yönetici ilk girişte <strong>Posta kurulum sihirbazı</strong> ile SMTP/IMAP, müşteri mesaj widget’ı ve
+            Posta sekmesi yetkisini adım adım tamamlar.
+          </p>
         </div>
 
         <form className="landing-form-grid" onSubmit={handleSubmit}>

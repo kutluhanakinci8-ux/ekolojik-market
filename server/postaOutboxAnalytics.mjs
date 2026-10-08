@@ -1,27 +1,15 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { getOutboxCounts } from './emailOutbox.mjs';
+import { getOutboxCounts, readOutboxStateMessages, classifyOutboxLastError } from './emailOutbox.mjs';
 
-function outboxRoot(dataDir) {
-  return join(dataDir, 'email-outbox');
-}
-
-async function readJsonDir(dir, limit = 300) {
-  try {
-    const files = (await readdir(dir))
-      .filter((f) => f.endsWith('.json'))
-      .sort()
-      .reverse()
-      .slice(0, limit);
-    const rows = [];
-    for (const f of files) {
-      rows.push(JSON.parse(await readFile(join(dir, f), 'utf8')));
-    }
-    return rows;
-  } catch {
-    return [];
-  }
-}
+const ERROR_CLASS_LABELS = {
+  smtp_auth: 'SMTP kimlik doğrulama',
+  timeout: 'Zaman aşımı',
+  network: 'Ağ / bağlantı',
+  recipient: 'Alıcı / mailbox',
+  mailbox_full: 'Kota / dolu',
+  tls: 'TLS / sertifika',
+  other: 'Diğer',
+  unknown: 'Bilinmeyen',
+};
 
 function dayKey(iso) {
   const d = Date.parse(iso ?? '');
@@ -29,15 +17,31 @@ function dayKey(iso) {
   return new Date(d).toISOString().slice(0, 10);
 }
 
-export async function getPostaOutboxAnalytics(dataDir, { days = 14 } = {}) {
-  const root = outboxRoot(dataDir);
-  const sent = await readJsonDir(join(root, 'sent'), 400);
-  const failed = await readJsonDir(join(root, 'failed'), 200);
-  const pending = await readJsonDir(join(root, 'pending'), 100);
-  const counts = await getOutboxCounts(dataDir);
+function summarizeFailureClasses(failedRows) {
+  const byClass = {};
+  for (const row of failedRows) {
+    const key = classifyOutboxLastError(row.lastError);
+    if (!byClass[key]) {
+      byClass[key] = { id: key, label: ERROR_CLASS_LABELS[key] ?? key, count: 0, sample: null };
+    }
+    byClass[key].count += 1;
+    if (!byClass[key].sample && row.lastError) {
+      byClass[key].sample = String(row.lastError).slice(0, 200);
+    }
+  }
+  return Object.values(byClass).sort((a, b) => b.count - a.count);
+}
 
+export async function getPostaOutboxAnalytics(dataDir, { days = 14, tenantId } = {}) {
   const windowDays = Math.min(Math.max(Number(days) || 14, 1), 90);
   const since = Date.now() - windowDays * 86400000;
+
+  const [sent, failed, pending, counts] = await Promise.all([
+    readOutboxStateMessages(dataDir, 'sent', { tenantId, limit: 800 }),
+    readOutboxStateMessages(dataDir, 'failed', { tenantId, limit: 800 }),
+    readOutboxStateMessages(dataDir, 'pending', { tenantId, limit: 200 }),
+    getOutboxCounts(dataDir),
+  ]);
 
   const inWindow = (row) => {
     const t = Date.parse(row.sentAt || row.createdAt || 0);
@@ -59,17 +63,21 @@ export async function getPostaOutboxAnalytics(dataDir, { days = 14 } = {}) {
   }
 
   const recentErrors = failed
-    .slice(0, 8)
+    .slice(0, 12)
     .map((r) => ({
       id: r.id,
       to: r.to,
       subject: r.subject,
       at: r.sentAt || r.createdAt,
       error: r.lastError,
+      errorClass: classifyOutboxLastError(r.lastError),
     }));
+
+  const failureBreakdown = summarizeFailureClasses(failed);
 
   return {
     ok: true,
+    tenantId: tenantId ?? null,
     windowDays,
     counts,
     window: {
@@ -81,6 +89,8 @@ export async function getPostaOutboxAnalytics(dataDir, { days = 14 } = {}) {
     pendingSample: pending.length,
     byDay: Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date)),
     recentErrors,
+    failureBreakdown,
     mailTrackEnabled: String(process.env.EKOLOJIK_MAIL_TRACK ?? '').trim() === '1',
+    failedAlertThreshold: Number(process.env.EKOLOJIK_OUTBOX_FAILED_ALERT_THRESHOLD || 50),
   };
 }

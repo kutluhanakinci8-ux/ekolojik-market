@@ -13,6 +13,8 @@ export interface RegisterResult {
   message?: string;
   tenantId?: string;
   username?: string;
+  postaOnboardingStatus?: string;
+  registrationEmail?: string;
 }
 
 export interface ContactPayload {

@@ -113,6 +113,14 @@ async function securityGate() {
   });
   if (getDataAuthed.status === 401) pass('security', 'GET /api/data geçersiz token → 401');
   else fail('security', 'GET /api/data geçersiz token', `HTTP ${getDataAuthed.status}`);
+
+  const anonInbox = await http('GET', '/api/posta/inbox?folder=gelen&limit=1');
+  if (anonInbox.status === 401) pass('security', 'GET /api/posta/inbox anonim → 401');
+  else fail('security', 'GET /api/posta/inbox anonim', `HTTP ${anonInbox.status}`);
+
+  const anonThreads = await http('GET', '/api/messaging/threads?limit=1');
+  if (anonThreads.status === 401) pass('security', 'GET /api/messaging/threads anonim → 401');
+  else fail('security', 'GET /api/messaging/threads anonim', `HTTP ${anonThreads.status}`);
 }
 
 async function authAndDataGate() {
@@ -147,7 +155,16 @@ async function authAndDataGate() {
     return null;
   }
 
-  const authH = { Authorization: `Bearer ${token}` };
+  let authH = { Authorization: `Bearer ${token}` };
+
+  const refresh = await http('POST', '/api/auth/pos-token/refresh', { headers: authH });
+  if (refresh.ok && refresh.json?.ok && refresh.json.token) {
+    pass('auth', 'POST /api/auth/pos-token/refresh');
+    token = refresh.json.token;
+    authH = { Authorization: `Bearer ${token}` };
+  } else {
+    fail('auth', 'POST /api/auth/pos-token/refresh', `HTTP ${refresh.status}`);
+  }
   const snap = await http('GET', '/api/data', { headers: authH });
   if (!snap.ok) {
     fail('auth', 'GET /api/data token ile', `HTTP ${snap.status}`);
@@ -192,6 +209,11 @@ async function authAndDataGate() {
 
 async function postaMessagingGate(token) {
   console.log('\n=== 5. Posta & mesajlaşma API ===\n');
+  if (!token) {
+    warn('posta', 'token yok — posta/messaging GET atlandı');
+    return;
+  }
+  const authH = { Authorization: `Bearer ${token}` };
   const paths = [
     '/api/posta/unread-counts',
     '/api/posta/onboarding',
@@ -200,11 +222,12 @@ async function postaMessagingGate(token) {
     '/api/messaging/public-config',
     '/api/messaging/threads?limit=3',
     '/api/posta/inbox?folder=gelen&limit=2',
+    '/api/posta/outbox/failed?limit=5',
     '/api/system/ekolojik-isolation',
   ];
   for (const path of paths) {
     try {
-      const r = await http('GET', path);
+      const r = await http('GET', path, { headers: authH });
       if (r.ok) pass('posta', `GET ${path.split('?')[0]}`, `HTTP ${r.status}`);
       else warn('posta', `GET ${path}`, `HTTP ${r.status}`);
     } catch (e) {
@@ -214,6 +237,12 @@ async function postaMessagingGate(token) {
 
   if (token) {
     const h = { Authorization: `Bearer ${token}` };
+    const analytics = await http('GET', '/api/posta/outbox/analytics?days=7', { headers: h });
+    if (analytics.ok && Array.isArray(analytics.json?.failureBreakdown)) {
+      pass('posta', 'outbox analytics failureBreakdown');
+    } else {
+      warn('posta', 'outbox analytics failureBreakdown', `HTTP ${analytics.status}`);
+    }
     const rot = await http('POST', '/api/messaging/public-config', { headers: h, body: { rotate: false } });
     if (rot.status === 401) warn('posta', 'POST messaging config', '401 — admin gerekli');
     else if (rot.ok) pass('posta', 'POST messaging/public-config (admin)');
@@ -221,8 +250,24 @@ async function postaMessagingGate(token) {
   }
 }
 
+async function widgetStaticGate() {
+  console.log('\n=== 6. Widget statik ===\n');
+  try {
+    const r = await http('GET', '/widget/messaging.js');
+    if (r.status === 200 && r.json?._raw?.includes('EkolojikMessaging')) {
+      pass('widget', 'GET /widget/messaging.js');
+    } else if (r.status === 200) {
+      pass('widget', 'GET /widget/messaging.js', '200');
+    } else {
+      fail('widget', 'GET /widget/messaging.js', `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    fail('widget', '/widget/messaging.js', e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function integrationGate() {
-  console.log('\n=== 6. Entegrasyon / yapı ===\n');
+  console.log('\n=== 7. Entegrasyon / yapı ===\n');
   const iso = await http('GET', '/api/system/ekolojik-isolation');
   if (iso.ok && (iso.json?.ok === true || iso.json?.checks)) {
     pass('integration', 'ekolojik-isolation', `HTTP ${iso.status}`);
@@ -240,7 +285,7 @@ async function integrationGate() {
 }
 
 async function localOutboxStructure() {
-  console.log('\n=== 7. Outbox yapı (yerel modül) ===\n');
+  console.log('\n=== 8. Outbox yapı (yerel modül) ===\n');
   const tmp = join(REPO, '.qa-tmp-data');
   await mkdir(tmp, { recursive: true });
   const { enqueueEkolojikMail, getOutboxCounts, processPendingOutbox } = await import('../server/emailOutbox.mjs');
@@ -276,6 +321,7 @@ async function main() {
     await securityGate();
     const token = await authAndDataGate();
     await postaMessagingGate(token);
+    await widgetStaticGate();
     await integrationGate();
   } else {
     warn('run', 'Canlı API testleri atlandı — sunucu ayakta değil');

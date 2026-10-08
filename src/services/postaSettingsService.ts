@@ -1,4 +1,5 @@
 import { posApiAuthHeaders } from './posApiAuth';
+import { posHubFetch, postaAuthenticatedUrl } from './posHubFetch';
 
 export type PostaNotificationPrefs = {
   contactOpsEmail: boolean;
@@ -54,7 +55,7 @@ export async function fetchPostaMailSettings(): Promise<{
   effective?: PostaEffectiveMail;
   error?: string;
 }> {
-  const res = await fetch('/api/posta/settings');
+  const res = await posHubFetch('/api/posta/settings');
   return res.json();
 }
 
@@ -68,7 +69,7 @@ export async function savePostaMailSettings(
   settings?: PostaMailSettings;
   error?: string;
 }> {
-  const res = await fetch('/api/posta/settings', {
+  const res = await posHubFetch('/api/posta/settings', {
     method: 'PUT',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(patch),
@@ -90,7 +91,7 @@ export async function downloadPostaOutboxCsv(from?: string, to?: string) {
   if (from?.trim()) params.set('from', from.trim());
   if (to?.trim()) params.set('to', to.trim());
   const qs = params.toString();
-  const res = await fetch(`/api/posta/export/outbox.csv${qs ? `?${qs}` : ''}`);
+  const res = await posHubFetch(`/api/posta/export/outbox.csv${qs ? `?${qs}` : ''}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { error?: string }).error ?? 'Outbox export başarısız');
@@ -104,7 +105,7 @@ export async function downloadPostaContactCsv(from?: string, to?: string) {
   if (from?.trim()) params.set('from', from.trim());
   if (to?.trim()) params.set('to', to.trim());
   const qs = params.toString();
-  const res = await fetch(`/api/posta/export/contact.csv${qs ? `?${qs}` : ''}`);
+  const res = await posHubFetch(`/api/posta/export/contact.csv${qs ? `?${qs}` : ''}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { error?: string }).error ?? 'İletişim export başarısız');
@@ -143,7 +144,16 @@ export type PostaOutboxAnalytics = {
     successRatePercent: number | null;
   };
   byDay?: { date: string; sent: number; failed: number }[];
-  recentErrors?: { id: string; to: string; subject: string; at?: string; error?: string }[];
+  recentErrors?: {
+    id: string;
+    to: string;
+    subject: string;
+    at?: string;
+    error?: string;
+    errorClass?: string;
+  }[];
+  failureBreakdown?: { id: string; label: string; count: number; sample?: string | null }[];
+  failedAlertThreshold?: number;
   mailTrackEnabled?: boolean;
   error?: string;
 };
@@ -168,17 +178,17 @@ export type PostaDeliverabilityHub = {
 };
 
 export async function fetchPostaDeliverability(): Promise<PostaDeliverabilityHub> {
-  const res = await fetch('/api/posta/deliverability');
+  const res = await posHubFetch('/api/posta/deliverability');
   return res.json();
 }
 
 export async function fetchPostaNotificationsMatrix(): Promise<PostaNotificationMatrixHub> {
-  const res = await fetch('/api/posta/notifications/matrix');
+  const res = await posHubFetch('/api/posta/notifications/matrix');
   return res.json();
 }
 
 export async function fetchPostaOutboxAnalytics(days = 14): Promise<PostaOutboxAnalytics> {
-  const res = await fetch(`/api/posta/outbox/analytics?days=${days}`);
+  const res = await posHubFetch(`/api/posta/outbox/analytics?days=${days}`);
   return res.json();
 }
 
@@ -199,7 +209,7 @@ export type PostaEngagementSummary = {
 };
 
 export async function fetchPostaEngagementSummary(days = 14): Promise<PostaEngagementSummary> {
-  const res = await fetch(`/api/posta/engagement/summary?days=${days}`);
+  const res = await posHubFetch(`/api/posta/engagement/summary?days=${days}`);
   return res.json();
 }
 
@@ -239,29 +249,29 @@ export type PostaLiveMetrics = {
 };
 
 export async function fetchPostaLiveCapabilities(): Promise<PostaLiveCapabilities> {
-  const res = await fetch('/api/posta/live/capabilities');
+  const res = await posHubFetch('/api/posta/live/capabilities');
   return res.json();
 }
 
 export async function fetchPostaLiveMetrics(days = 7): Promise<PostaLiveMetrics> {
-  const res = await fetch(`/api/posta/live/metrics?days=${days}`);
+  const res = await posHubFetch(`/api/posta/live/metrics?days=${days}`);
   return res.json();
 }
 
 export function downloadPostaEngagementCsv(type: 'combined' | 'opens' | 'clicks' | 'bounces' = 'combined', days = 90) {
   const params = new URLSearchParams({ type, days: String(days) });
-  window.open(`/api/posta/engagement/export.csv?${params}`, '_blank', 'noopener,noreferrer');
+  window.open(postaAuthenticatedUrl(`/api/posta/engagement/export.csv?${params}`), '_blank', 'noopener,noreferrer');
 }
 
 export async function fetchPostaRules(): Promise<{ ok: boolean; rules?: PostaInboxRule[]; error?: string }> {
-  const res = await fetch('/api/posta/rules');
+  const res = await posHubFetch('/api/posta/rules');
   return res.json();
 }
 
 export async function savePostaInboxRules(
   rules: PostaInboxRule[],
 ): Promise<{ ok: boolean; rules?: PostaInboxRule[]; error?: string }> {
-  const res = await fetch('/api/posta/rules', {
+  const res = await posHubFetch('/api/posta/rules', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rules }),
@@ -274,7 +284,7 @@ export async function fetchPostaAiSuggest(payload: {
   body?: string;
   tone?: string;
 }): Promise<{ ok: boolean; suggestion?: string; provider?: string; error?: string; aiEnabled?: boolean }> {
-  const res = await fetch('/api/posta/compose/ai-suggest', {
+  const res = await posHubFetch('/api/posta/compose/ai-suggest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -283,7 +293,7 @@ export async function fetchPostaAiSuggest(payload: {
 }
 
 export async function downloadMessagingExportZip() {
-  const res = await fetch('/api/messaging/export');
+  const res = await posHubFetch('/api/messaging/export');
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { error?: string }).error ?? 'Mesaj export başarısız');

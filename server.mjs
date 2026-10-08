@@ -27,7 +27,17 @@ import {
 } from './server/ekolojikMailConfig.mjs';
 import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
 import { verifyImapMailbox } from './server/billEmailImap.mjs';
-import { getOutboxCounts, listRecentOutbox, listMergedRecentOutbox, requeueFailedOutboxMessage, findOutboxMessageById } from './server/emailOutbox.mjs';
+import {
+  getOutboxCounts,
+  listRecentOutbox,
+  listMergedRecentOutbox,
+  requeueFailedOutboxMessage,
+  findOutboxMessageById,
+  listFailedOutboxMessages,
+  bulkRequeueFailedOutbox,
+  archiveFailedOutboxMessages,
+} from './server/emailOutbox.mjs';
+import { maybeAlertOutboxFailedThreshold } from './server/postaOutboxNotify.mjs';
 import {
   createDeliverMessage,
   processPendingOutbox,
@@ -46,12 +56,21 @@ import {
   completePostaOnboarding,
   migrateLegacyPostaOnboarding,
   reopenPostaOnboardingState,
+  verifyPostaOnboardingMailConnection,
 } from './server/postaOnboarding.mjs';
 import {
   assertPosAdminApiAuth,
   assertPosApiAuth,
+  extractBearerToken,
   issuePosApiTokenFromCredentials,
+  refreshPosApiTokenFromBearer,
 } from './server/posApiAuth.mjs';
+import {
+  enforcePostaApiAccess,
+  requiresMessagingPosAuth,
+  requiresPostaPosAuth,
+} from './server/postaAccessAuth.mjs';
+import { logPostaAccessExport } from './server/postaAccessAudit.mjs';
 import { mergeStoreUserSecrets, sanitizeStoreSnapshotForClient } from './server/storeApiSanitize.mjs';
 import {
   buildOutboxCsv,
@@ -88,7 +107,9 @@ import {
   publicListMessages,
   publicPostMessage,
   publicTyping,
+  smokeTestMessagingWidget,
 } from './server/messaging/publicApi.mjs';
+import { writeMessagingCorsHeaders } from './server/messaging/publicCors.mjs';
 import {
   getMessagingPublicConfigHub,
   saveMessagingPublicConfig,
@@ -256,6 +277,21 @@ async function serveFile(path, res) {
 function resolveTenantId(url) {
   const tenant = url.searchParams.get('tenant')?.trim();
   return tenant && tenant !== 'main' ? tenant : 'main';
+}
+
+async function publicMessagingCorsGuard(req, res, tenantId) {
+  const cors = await writeMessagingCorsHeaders(req, res, DATA_DIR, tenantId);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(cors.ok ? 204 : cors.status ?? 403);
+    res.end();
+    return false;
+  }
+  if (!cors.ok && req.headers.origin) {
+    res.writeHead(cors.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: cors.error }));
+    return false;
+  }
+  return true;
 }
 
 async function readStoreData(tenantId = 'main') {
@@ -610,6 +646,23 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/auth/pos-token/refresh' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const token = extractBearerToken(req);
+      try {
+        const result = await refreshPosApiTokenFromBearer(DATA_DIR, token, tenantId);
+        res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Token yenilenemedi',
+        }));
+      }
+      return;
+    }
+
     if (pathname === '/api/crm/send-email' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
@@ -700,6 +753,23 @@ const server = createServer(async (req, res) => {
         res.end(mailTrackPixelResponse());
       }
       return;
+    }
+
+    if (requiresPostaPosAuth(pathname, req.method) || requiresMessagingPosAuth(pathname)) {
+      const tenantId = resolveTenantId(url);
+      const postaAuth = await enforcePostaApiAccess(req, res, url, DATA_DIR, tenantId);
+      if (!postaAuth) return;
+      if (
+        req.method === 'GET' &&
+        (pathname.includes('/export') || pathname.endsWith('.csv') || pathname.endsWith('.vcf'))
+      ) {
+        void logPostaAccessExport(DATA_DIR, {
+          userId: postaAuth.userId,
+          tenantId,
+          pathname,
+          ip: getRequestIp(req),
+        });
+      }
     }
 
     if (
@@ -1006,13 +1076,67 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/posta/outbox/analytics' && req.method === 'GET') {
       const days = Number(url.searchParams.get('days') || 14);
+      const tenantId = resolveTenantId(url);
       try {
-        const result = await getPostaOutboxAnalytics(DATA_DIR, { days });
+        const result = await getPostaOutboxAnalytics(DATA_DIR, { days, tenantId });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Analitik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 100);
+      try {
+        const items = await listFailedOutboxMessages(DATA_DIR, { tenantId, limit });
+        const counts = await getOutboxCounts(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, counts, items, total: items.length }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Failed listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed/requeue' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const data = await readRequestBody(req);
+        const result = await bulkRequeueFailedOutbox(DATA_DIR, {
+          tenantId,
+          ids: Array.isArray(data?.ids) ? data.ids : [],
+          all: Boolean(data?.all),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Requeue hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed/archive' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const data = await readRequestBody(req);
+        const result = await archiveFailedOutboxMessages(DATA_DIR, {
+          tenantId,
+          ids: Array.isArray(data?.ids) ? data.ids : [],
+          all: Boolean(data?.all),
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv hatası' }));
       }
       return;
     }
@@ -1145,6 +1269,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/capabilities' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       try {
         const caps = await getMessagingPublicCapabilities(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1158,6 +1283,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const auth = await assertMessagingPublicAuth(req, DATA_DIR, tenantId);
       if (!auth.ok) {
         res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1178,6 +1304,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const token = url.searchParams.get('token')?.trim() || '';
       const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
@@ -1199,6 +1326,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const token = url.searchParams.get('token')?.trim() || '';
       const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
@@ -1239,6 +1367,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/public/messaging/v1/threads/typing' && (req.method === 'GET' || req.method === 'POST')) {
       const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
       const token = url.searchParams.get('token')?.trim() || '';
       const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
       if (!parsed.ok) {
@@ -1795,6 +1924,20 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/onboarding/verify-connection' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const result = await verifyPostaOnboardingMailConnection(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bağlantı testi hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/onboarding/seed-alias-rules' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
@@ -2052,6 +2195,20 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Public config kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/widget-test' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const result = await smokeTestMessagingWidget(DATA_DIR, tenantId);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Widget test hatası' }));
       }
       return;
     }
@@ -2492,6 +2649,23 @@ const server = createServer(async (req, res) => {
 
     if (pathname.endsWith('/')) pathname += 'index.html';
 
+    if (pathname === '/widget/messaging.js') {
+      const widgetPath = join(DIST, 'widget', 'messaging.js');
+      try {
+        const data = await readFile(widgetPath);
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+        });
+        res.end(data);
+        return;
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('widget/messaging.js bulunamadı — npm run build');
+        return;
+      }
+    }
+
     const filePath = join(DIST, pathname);
     const fileStat = await stat(filePath).catch(() => null);
 
@@ -2510,10 +2684,16 @@ const server = createServer(async (req, res) => {
 const OUTBOX_DRAIN_MS = 30_000;
 setInterval(() => {
   if (!isEkolojikSmtpConfigured()) return;
-  processPendingOutbox(DATA_DIR, deliverMessage, { limit: 15 }).catch((error) => {
-    console.warn('email-outbox drain:', error instanceof Error ? error.message : error);
-  });
+  processPendingOutbox(DATA_DIR, deliverMessage, { limit: 15 })
+    .then(() => maybeAlertOutboxFailedThreshold(DATA_DIR, 'main'))
+    .catch((error) => {
+      console.warn('email-outbox drain:', error instanceof Error ? error.message : error);
+    });
 }, OUTBOX_DRAIN_MS);
+
+setTimeout(() => {
+  maybeAlertOutboxFailedThreshold(DATA_DIR, 'main').catch(() => {});
+}, 120_000);
 
 const RETENTION_MS = 24 * 60 * 60 * 1000;
 const runRetention = () => {

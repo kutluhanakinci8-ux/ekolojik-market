@@ -1,3 +1,5 @@
+import { posHubFetch, postaAuthenticatedUrl } from './posHubFetch';
+
 export type PostaCalendarEvent = {
   id: string;
   kind: 'payment' | 'manual' | 'mail' | 'snooze' | string;
@@ -12,7 +14,7 @@ export type PostaCalendarEvent = {
 };
 
 export async function fetchPostaCalendar(limit = 120) {
-  const res = await fetch(`/api/posta/calendar?limit=${limit}`);
+  const res = await posHubFetch(`/api/posta/calendar?limit=${limit}`);
   return res.json() as Promise<{ ok: boolean; events?: PostaCalendarEvent[]; error?: string }>;
 }
 
@@ -24,7 +26,7 @@ export async function savePostaCalendarEvent(payload: {
   kind?: string;
   mailId?: string;
 }) {
-  const res = await fetch('/api/posta/calendar', {
+  const res = await posHubFetch('/api/posta/calendar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -33,14 +35,14 @@ export async function savePostaCalendarEvent(payload: {
 }
 
 export async function deletePostaCalendarEvent(id: string) {
-  const res = await fetch(`/api/posta/calendar/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const res = await posHubFetch(`/api/posta/calendar/${encodeURIComponent(id)}`, { method: 'DELETE' });
   return res.json() as Promise<{ ok: boolean; error?: string }>;
 }
 
 export async function syncPostaPaymentReminders(
   reminders: Array<{ id: string; title: string; dueDate: string; amount?: number; notes?: string }>,
 ) {
-  const res = await fetch('/api/posta/calendar/sync-payments', {
+  const res = await posHubFetch('/api/posta/calendar/sync-payments', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reminders }),
@@ -54,7 +56,7 @@ export async function addMailToPostaCalendar(payload: {
   date?: string;
   notes?: string;
 }) {
-  const res = await fetch('/api/posta/calendar/from-mail', {
+  const res = await posHubFetch('/api/posta/calendar/from-mail', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -80,15 +82,15 @@ export type PostaCalendarSyncHub = {
 };
 
 export async function fetchPostaCalendarSyncHub() {
-  const res = await fetch('/api/posta/calendar/sync');
+  const res = await posHubFetch('/api/posta/calendar/sync');
   return res.json() as Promise<PostaCalendarSyncHub>;
 }
 
 export async function rotatePostaCalendarSyncToken() {
-  const res = await fetch('/api/posta/calendar/sync/rotate-token', { method: 'POST' });
+  const res = await posHubFetch('/api/posta/calendar/sync/rotate-token', { method: 'POST' });
   return res.json() as Promise<{ ok: boolean; hub?: PostaCalendarSyncHub; error?: string }>;
 }
 
 export function downloadPostaCalendarIcsExport() {
-  window.open('/api/posta/calendar/export.ics', '_blank', 'noopener,noreferrer');
+  window.open(postaAuthenticatedUrl('/api/posta/calendar/export.ics'), '_blank', 'noopener,noreferrer');
 }

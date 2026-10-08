@@ -18,9 +18,12 @@ async function readConfigFile(dataDir, tenantId) {
       publicKey: String(raw.publicKey ?? '').trim(),
       rotatedAt: raw.rotatedAt ?? null,
       createdAt: raw.createdAt ?? null,
+      allowedOrigins: Array.isArray(raw.allowedOrigins)
+        ? raw.allowedOrigins.map((o) => String(o).trim()).filter(Boolean)
+        : [],
     };
   } catch {
-    return { enabled: true, publicKey: '', rotatedAt: null, createdAt: null };
+    return { enabled: true, publicKey: '', rotatedAt: null, createdAt: null, allowedOrigins: [] };
   }
 }
 
@@ -64,6 +67,8 @@ export async function getMessagingPublicConfigHub(dataDir, tenantId = 'main') {
     rotatedAt: file.rotatedAt,
     apiPrefix: '/api/public/messaging/v1',
     authHeader: 'x-ekolojik-messaging-key',
+    allowedOrigins: file.allowedOrigins ?? [],
+    widgetScriptUrl: '/widget/messaging.js',
   };
 }
 
@@ -86,12 +91,20 @@ export async function saveMessagingPublicConfig(dataDir, tenantId, patch = {}) {
 
   const enabled = patch.enabled !== undefined ? Boolean(patch.enabled) : current.enabled;
 
+  let allowedOrigins = current.allowedOrigins ?? [];
+  if (patch.allowedOrigins !== undefined) {
+    allowedOrigins = Array.isArray(patch.allowedOrigins)
+      ? patch.allowedOrigins.map((o) => String(o).trim()).filter(Boolean)
+      : [];
+  }
+
   const next = {
     enabled,
     publicKey,
     rotatedAt,
     createdAt: current.createdAt || now,
     updatedAt: now,
+    allowedOrigins,
   };
   await writeFile(configPath(dataDir, tenantId), JSON.stringify(next, null, 2), 'utf8');
   return { ok: true, config: next };

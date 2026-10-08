@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posHubFetch } from './posHubFetch';
 import { posApiAuthHeaders } from './posApiAuth';
 
 function tenantQuery(): string {
@@ -47,7 +48,7 @@ export type PostaOnboardingHub = {
 };
 
 export async function fetchPostaOnboardingHub(): Promise<PostaOnboardingHub | null> {
-  const res = await fetch(`/api/posta/onboarding${tenantQuery()}`);
+  const res = await posHubFetch(`/api/posta/onboarding${tenantQuery()}`);
   if (!res.ok) return null;
   return (await res.json()) as PostaOnboardingHub;
 }
@@ -57,7 +58,7 @@ export async function patchPostaOnboarding(payload: {
   steps?: Partial<Record<'mailHealth' | 'messagingEmbed' | 'postaTab', { done?: boolean; skipped?: boolean }>>;
   notes?: string;
 }): Promise<{ ok: boolean; onboarding?: PostaOnboardingState }> {
-  const res = await fetch(`/api/posta/onboarding${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding${tenantQuery()}`, {
     method: 'PATCH',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
@@ -67,7 +68,7 @@ export async function patchPostaOnboarding(payload: {
 }
 
 export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding?: PostaOnboardingState }> {
-  const res = await fetch(`/api/posta/onboarding/reopen${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding/reopen${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders(),
   });
@@ -75,8 +76,28 @@ export async function reopenPostaOnboarding(): Promise<{ ok: boolean; onboarding
   return { ok: Boolean(res.ok && data.ok), onboarding: data.onboarding };
 }
 
+export type PostaOnboardingMailVerify = {
+  ok: boolean;
+  smtpConfigured?: boolean;
+  smtpVerified?: boolean;
+  smtpError?: string | null;
+  imapConfigured?: boolean;
+  imapVerified?: boolean;
+  imapError?: string | null;
+  testedAt?: string;
+  error?: string;
+};
+
+export async function verifyOnboardingMailConnection(): Promise<PostaOnboardingMailVerify> {
+  const res = await posHubFetch(`/api/posta/onboarding/verify-connection${tenantQuery()}`, {
+    method: 'POST',
+    headers: posApiAuthHeaders(),
+  });
+  return (await res.json()) as PostaOnboardingMailVerify;
+}
+
 export async function seedPostaOnboardingAliasRules(): Promise<{ ok: boolean; added?: unknown[] }> {
-  const res = await fetch(`/api/posta/onboarding/seed-alias-rules${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding/seed-alias-rules${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders(),
   });
@@ -88,7 +109,7 @@ export async function completePostaOnboarding(options?: {
   primaryOnly?: boolean;
   skipIncompleteSteps?: boolean;
 }): Promise<{ ok: boolean; onboarding?: PostaOnboardingState; grantCount?: number }> {
-  const res = await fetch(`/api/posta/onboarding/complete${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/posta/onboarding/complete${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(options ?? {}),
@@ -117,16 +138,18 @@ export type MessagingPublicConfigHub = {
   rotatedAt: string | null;
   apiPrefix: string;
   authHeader: string;
+  allowedOrigins?: string[];
+  widgetScriptUrl?: string;
 };
 
 export async function fetchMessagingPublicConfig(): Promise<MessagingPublicConfigHub | null> {
-  const res = await fetch(`/api/messaging/public-config${tenantQuery()}`);
+  const res = await posHubFetch(`/api/messaging/public-config${tenantQuery()}`);
   if (!res.ok) return null;
   return (await res.json()) as MessagingPublicConfigHub;
 }
 
 export async function rotateMessagingPublicKey(): Promise<MessagingPublicConfigHub | null> {
-  const res = await fetch(`/api/messaging/public-config${tenantQuery()}`, {
+  const res = await posHubFetch(`/api/messaging/public-config${tenantQuery()}`, {
     method: 'POST',
     headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ rotate: true }),
@@ -138,14 +161,39 @@ export async function rotateMessagingPublicKey(): Promise<MessagingPublicConfigH
 export function buildMessagingEmbedSnippet(tenantId: string, apiKey: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ekolojikmarket.com.tr';
   const key = apiKey || 'API_ANAHTARI';
-  const tenantQs = tenantId && tenantId !== 'main' ? `?tenant=${encodeURIComponent(tenantId)}` : '';
-  return `<!-- Ekolojik müşteri mesajlaşma -->
+  const tenantLine =
+    tenantId && tenantId !== 'main' ? `\n    tenantId: '${tenantId}',` : `\n    tenantId: 'main',`;
+  return `<!-- Ekolojik müşteri mesajlaşma (Faz 40) -->
+<script src="${origin}/widget/messaging.js" defer></script>
 <script>
-  window.EkolojikMessaging = {
-    tenantId: '${tenantId}',
-    apiBase: '${origin}/api/public/messaging/v1',
-    apiKey: '${key}',
-    tenantQuery: '${tenantQs}'
-  };
+  document.addEventListener('DOMContentLoaded', function () {
+    EkolojikMessaging.init({${tenantLine}
+      apiKey: '${key}',
+      apiBase: '${origin}/api/public/messaging/v1'
+    });
+  });
 </script>`;
+}
+
+export async function saveMessagingAllowedOrigins(origins: string[]): Promise<MessagingPublicConfigHub | null> {
+  const res = await posHubFetch(`/api/messaging/public-config${tenantQuery()}`, {
+    method: 'POST',
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ allowedOrigins: origins }),
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as MessagingPublicConfigHub;
+}
+
+export async function testMessagingWidgetSmoke(): Promise<{
+  ok: boolean;
+  thread?: { id: string };
+  error?: string;
+}> {
+  const res = await posHubFetch(`/api/messaging/widget-test${tenantQuery()}`, {
+    method: 'POST',
+    headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: '{}',
+  });
+  return res.json();
 }

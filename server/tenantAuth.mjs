@@ -218,7 +218,14 @@ export async function registerTenant(dataDir, payload) {
   });
   await writeFile(registrationsPath, JSON.stringify(registrations, null, 2), 'utf8');
 
-  return { ok: true, tenantId, username, message: 'Hesap oluşturuldu.' };
+  return {
+    ok: true,
+    tenantId,
+    username,
+    message: 'Hesap oluşturuldu. İlk girişte Posta kurulum sihirbazı açılacaktır.',
+    postaOnboardingStatus: store.settings?.postaOnboarding?.status ?? 'pending',
+    registrationEmail: store.settings?.postaOnboarding?.registrationEmail ?? email,
+  };
 }
 
 export async function saveContactMessage(dataDir, payload) {

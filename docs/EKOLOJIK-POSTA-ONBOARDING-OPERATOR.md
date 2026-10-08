@@ -36,6 +36,16 @@ Onboarding güncelleme, tenant-mail kaydı, messaging anahtar rotate ve CRM mail
 
 E-posta outbox dosyaları `data/email-outbox/{pending|sent|failed}/{tenantId}/` altında tutulur (eski düz dosyalar ilk işlemde taşınır).
 
+**Başarısız outbox hijyeni (Faz 39):** Hub → Ayarlar → E-posta → **Başarısız gönderimler** (toplu yeniden kuyruk / arşiv). Sunucuda haftalık arşiv:
+
+```bash
+EKOLOJIK_DRY_RUN=1 bash scripts/sunucu-ekolojik-outbox-failed-arsivle.sh /var/www/market-pos
+EKOLOJIK_DRY_RUN=0 bash scripts/sunucu-ekolojik-outbox-failed-arsivle.sh /var/www/market-pos
+# İsteğe bağlı tek tenant: EKOLOJIK_OUTBOX_ARCHIVE_TENANT=main
+```
+
+Eşik uyarısı: `EKOLOJIK_OUTBOX_FAILED_ALERT_THRESHOLD` (varsayılan 50) — bildirim matrisinde **outbox_failed → ops e-posta** açık olmalı.
+
 ---
 
 ## 3 adım — operatör akışı
@@ -91,6 +101,9 @@ bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh
 |-----|-----|
 | `GET /api/messaging/public-config?tenant=…` | Anahtar durumu |
 | `POST /api/messaging/public-config` body `{ "rotate": true }` | Yeni tenant anahtarı |
+| `GET /widget/messaging.js` | Embed script (cache 24s sunucu) |
+| `POST /api/messaging/widget-test` | Admin smoke — test thread POS Sohbet’e düşer |
+| `allowedOrigins` (public-config JSON) | Harici site CORS allowlist |
 | `GET /api/public/messaging/v1/capabilities?tenant=…` | Widget “API açık mı?” |
 
 Embed örneği (sihirbazda kopyalanır):

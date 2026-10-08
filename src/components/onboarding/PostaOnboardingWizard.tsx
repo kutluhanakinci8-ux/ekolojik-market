@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { sendEmailTest } from '../../services/emailOutboxService';
 import { fetchPostaDeliverability } from '../../services/postaSettingsService';
 import { fetchTenantMailConfig, saveTenantMailConfig } from '../../services/postaTenantMailService';
@@ -10,7 +10,10 @@ import {
   fetchPostaOnboardingHub,
   patchPostaOnboarding,
   rotateMessagingPublicKey,
+  saveMessagingAllowedOrigins,
   seedPostaOnboardingAliasRules,
+  testMessagingWidgetSmoke,
+  verifyOnboardingMailConnection,
   type MessagingPublicConfigHub,
   type PostaOnboardingHub,
 } from '../../services/postaOnboardingService';
@@ -39,6 +42,17 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   const [tenantImapHost, setTenantImapHost] = useState('');
   const [tenantImapUser, setTenantImapUser] = useState('');
   const [tenantSmtpFrom, setTenantSmtpFrom] = useState('');
+  const [siteOrigin, setSiteOrigin] = useState(() =>
+    typeof window !== 'undefined' ? window.location.origin : 'https://example.com',
+  );
+  const [widgetTestOk, setWidgetTestOk] = useState(false);
+  const [mailConnectionOk, setMailConnectionOk] = useState(false);
+  const [requireMailConnectionTest, setRequireMailConnectionTest] = useState(false);
+  const widgetScriptLoaded = useRef(false);
+
+  useEffect(() => {
+    void patchPostaOnboarding({ status: 'in_progress' });
+  }, []);
 
   const reload = useCallback(async () => {
     const next = await fetchPostaOnboardingHub();
@@ -74,9 +88,42 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     if (stepIndex !== 1) return;
     void (async () => {
       const cfg = await fetchMessagingPublicConfig();
-      if (cfg) setMessagingConfig(cfg);
+      if (cfg) {
+        setMessagingConfig(cfg);
+        if (cfg.allowedOrigins?.length) setSiteOrigin(cfg.allowedOrigins[0]);
+      }
     })();
   }, [stepIndex]);
+
+  useEffect(() => {
+    if (stepIndex !== 1 || !messagingConfig?.publicKey || widgetScriptLoaded.current) return;
+    const mountId = 'ek-onboarding-widget-preview';
+    const el = document.getElementById(mountId);
+    if (!el) return;
+    const tenant = loadTenantId();
+    const script = document.createElement('script');
+    script.src = '/widget/messaging.js';
+    script.async = true;
+    script.onload = () => {
+      widgetScriptLoaded.current = true;
+      const api = (window as unknown as { EkolojikMessaging?: { init: (c: Record<string, string>) => void } })
+        .EkolojikMessaging;
+      api?.init({
+        mount: mountId,
+        tenantId: tenant || 'main',
+        apiKey: messagingConfig.publicKey,
+        apiBase: `${window.location.origin}/api/public/messaging/v1`,
+        title: 'Widget önizleme',
+        position: 'left',
+      });
+    };
+    document.body.appendChild(script);
+    return () => {
+      script.remove();
+      widgetScriptLoaded.current = false;
+      el.innerHTML = '';
+    };
+  }, [stepIndex, messagingConfig?.publicKey]);
 
   const step = STEPS[stepIndex];
   const onboarding = hub?.onboarding;
@@ -132,10 +179,33 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     setFlash(count ? `${count} kural eklendi (siparis@ / fatura@).` : 'Kurallar zaten tanımlı.');
   };
 
+  const handleVerifyMailConnection = async () => {
+    setBusy(true);
+    setFlash(null);
+    const result = await verifyOnboardingMailConnection();
+    setBusy(false);
+    await reload();
+    if (!result.ok) {
+      setMailConnectionOk(false);
+      setFlash(
+        result.smtpError || result.imapError
+          ? `Bağlantı: SMTP ${result.smtpVerified ? 'OK' : '—'}, IMAP ${result.imapVerified ? 'OK' : '—'}`
+          : 'SMTP veya IMAP doğrulaması başarısız — ayarları kontrol edin.',
+      );
+      return;
+    }
+    setMailConnectionOk(true);
+    setFlash('SMTP/IMAP bağlantı testi başarılı.');
+  };
+
   const handleTestMail = async () => {
     const to = testTo.trim();
     if (!to.includes('@')) {
       setFlash('Geçerli bir test e-posta adresi girin.');
+      return;
+    }
+    if (requireMailConnectionTest && !mailConnectionOk && !hub?.summary?.mailHealth.smtpVerified) {
+      setFlash('Önce “Bağlantıyı test et” ile SMTP/IMAP doğrulaması yapın veya zorunluluğu kapatın.');
       return;
     }
     setBusy(true);
@@ -164,6 +234,37 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     messagingConfig?.publicKey ||
     (messagingConfig?.effectiveSource === 'env' ? '(sunucu .env EKOLOJIK_MESSAGING_PUBLIC_KEY)' : '');
   const embedSnippet = buildMessagingEmbedSnippet(tenantId, messagingConfig?.publicKey ?? '');
+
+  const handleWidgetTest = async () => {
+    const origin = siteOrigin.trim();
+    if (!origin.startsWith('http')) {
+      setFlash('Site kökeni https://… formatında olmalı (CORS).');
+      return;
+    }
+    if (!messagingConfig?.configured && !messagingConfig?.publicKey) {
+      setFlash('Önce API anahtarı oluşturun.');
+      return;
+    }
+    setBusy(true);
+    setFlash(null);
+    await saveMessagingAllowedOrigins([origin]);
+    const result = await testMessagingWidgetSmoke();
+    setBusy(false);
+    if (!result.ok) {
+      setFlash(result.error ?? 'Widget testi başarısız.');
+      setWidgetTestOk(false);
+      return;
+    }
+    setWidgetTestOk(true);
+    setFlash('Widget testi OK — POS Posta → Müşteri mesajlarında test yazışmasını görebilirsiniz.');
+    await patchPostaOnboarding({
+      status: 'in_progress',
+      steps: { messagingEmbed: { done: true } },
+    });
+    await reload();
+    const cfg = await fetchMessagingPublicConfig();
+    if (cfg) setMessagingConfig(cfg);
+  };
 
   const handleRotateKey = async () => {
     setBusy(true);
@@ -257,6 +358,20 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
                   </button>
                 </div>
               )}
+              <label className="posta-onboarding-lead" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.9rem' }}>
+                <input
+                  type="checkbox"
+                  checked={requireMailConnectionTest}
+                  onChange={(e) => setRequireMailConnectionTest(e.target.checked)}
+                />
+                Devam etmeden önce SMTP/IMAP bağlantı testi zorunlu
+              </label>
+              <div className="posta-onboarding-actions">
+                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleVerifyMailConnection()}>
+                  Bağlantıyı test et
+                </button>
+                {mailConnectionOk && <span className="posta-onboarding-status ok">Bağlantı OK</span>}
+              </div>
               <label className="posta-onboarding-field">
                 Test e-postası gönder
                 <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="ornek@firma.com" />
@@ -305,9 +420,33 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
                 </p>
               )}
               <label className="posta-onboarding-field">
-                Site embed örneği
-                <textarea readOnly rows={7} value={embedSnippet} onFocus={(e) => e.target.select()} />
+                Web sitesi kökeni (CORS allowlist)
+                <input
+                  type="url"
+                  value={siteOrigin}
+                  onChange={(e) => setSiteOrigin(e.target.value)}
+                  placeholder="https://magaza-siteniz.com"
+                />
               </label>
+              <p className="posta-onboarding-lead" style={{ fontSize: '0.85rem' }}>
+                Harici sitelerde widget için bu adresi kaydedin; POS önizleme aynı kökende çalışır.
+              </p>
+              <label className="posta-onboarding-field">
+                Site embed örneği
+                <textarea readOnly rows={9} value={embedSnippet} onFocus={(e) => e.target.select()} />
+              </label>
+              <div id="ek-onboarding-widget-preview" className="posta-onboarding-widget-preview" aria-label="Widget önizleme alanı" />
+              <div className="posta-onboarding-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={busy || !messagingConfig?.configured}
+                  onClick={() => void handleWidgetTest()}
+                >
+                  Widget bağlantısını test et
+                </button>
+                {widgetTestOk && <span className="posta-onboarding-status ok">Test geçti</span>}
+              </div>
               {apiKeyForEmbed && !messagingConfig?.publicKey && (
                 <p className="posta-onboarding-lead" style={{ fontSize: '0.85rem' }}>Anahtar: {apiKeyForEmbed}</p>
               )}

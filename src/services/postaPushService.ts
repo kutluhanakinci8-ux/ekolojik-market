@@ -1,3 +1,5 @@
+import { posHubFetch } from './posHubFetch';
+
 export type PostaPushConfig = {
   ok: boolean;
   configured?: boolean;
@@ -22,12 +24,12 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export async function fetchPostaPushConfig(): Promise<PostaPushConfig> {
-  const res = await fetch('/api/posta/push/config');
+  const res = await posHubFetch('/api/posta/push/config');
   return res.json();
 }
 
 export async function fetchPostaPushStatus(): Promise<PostaPushStatus> {
-  const res = await fetch('/api/posta/push/status');
+  const res = await posHubFetch('/api/posta/push/status');
   return res.json();
 }
 
@@ -45,7 +47,7 @@ export async function subscribePostaWebPush(publicKey: string): Promise<{ ok: bo
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(publicKey),
   });
-  const res = await fetch('/api/posta/push/subscribe', {
+  const res = await posHubFetch('/api/posta/push/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ subscription: sub.toJSON() }),
@@ -58,7 +60,7 @@ export async function unsubscribePostaWebPush(): Promise<{ ok: boolean; error?: 
   const sub = await reg?.pushManager.getSubscription();
   if (!sub) return { ok: true };
   const endpoint = sub.endpoint;
-  await fetch('/api/posta/push/subscribe', {
+  await posHubFetch('/api/posta/push/subscribe', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ endpoint }),
@@ -68,6 +70,6 @@ export async function unsubscribePostaWebPush(): Promise<{ ok: boolean; error?: 
 }
 
 export async function sendPostaPushTest(): Promise<{ ok: boolean; sent?: number; error?: string }> {
-  const res = await fetch('/api/posta/push/test', { method: 'POST' });
+  const res = await posHubFetch('/api/posta/push/test', { method: 'POST' });
   return res.json();
 }

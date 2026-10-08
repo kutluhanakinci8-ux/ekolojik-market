@@ -1,6 +1,6 @@
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
-import { posApiAuthHeaders } from './posApiAuth';
+import { posApiAuthHeaders, posApiFetch } from './posApiAuth';
 
 function apiUrl(): string {
   const tenant = loadTenantId();
@@ -11,7 +11,7 @@ function apiUrl(): string {
 
 export async function fetchStoreSnapshot(): Promise<PersistedStoreSnapshot | null> {
   try {
-    const res = await fetch(apiUrl(), {
+    const res = await posApiFetch(apiUrl(), {
       headers: posApiAuthHeaders(),
       signal: AbortSignal.timeout(5000),
     });
@@ -26,7 +26,7 @@ export async function fetchStoreSnapshot(): Promise<PersistedStoreSnapshot | nul
 
 export async function saveStoreSnapshot(snapshot: PersistedStoreSnapshot): Promise<boolean> {
   try {
-    const res = await fetch(apiUrl(), {
+    const res = await posApiFetch(apiUrl(), {
       method: 'PUT',
       headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(snapshot),

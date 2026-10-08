@@ -1,15 +1,15 @@
 # Posta & Mesaj — %100 plan Faz 0 kararları
 
-Bu belge **Faz 0** çıktısıdır. Ürün sahibi onayı ile doldurulur; onay sonrası Wave 3 (Faz 38–52) uygulanır.
+**Onay:** Wave 3 uygulaması başlangıcı (2026-10-08) — plan varsayılanları kabul edildi.
 
 | # | Konu | Karar | Onay tarihi |
 |---|------|--------|-------------|
-| 0.1 | Tam Dovecot/JMAP webmail | ☐ A Read-only JMAP genişlet ☐ B Tam webmail ☐ C Hub yeterli (resmi) | |
-| 0.2 | Omnichannel (WA/SMS/IG) | ☐ Faz 48 WhatsApp önce ☐ Sonra ☐ Yok | |
-| 0.3 | Native mobil uygulama | ☐ PWA only ☐ React Native v2 | |
-| 0.4 | Posta okuma auth modeli | ☐ Bearer (posta sekmesi) ☐ + nginx IP ☐ Diğer | |
-| 0.5 | Müşteri portal kapsamı | ☐ Magic link mesajlar ☐ + ticket ☐ Minimal widget only | |
+| 0.1 | Tam Dovecot/JMAP webmail | **A** — Read-only JMAP genişlet; POS’ta tam webmail yok | 2026-10-08 |
+| 0.2 | Omnichannel (WA/SMS/IG) | **Faz 48** — WhatsApp webhook önce; kanal kanal | 2026-10-08 |
+| 0.3 | Native mobil uygulama | **PWA + push** (Faz 46); React Native v2 sonrası | 2026-10-08 |
+| 0.4 | Posta okuma auth modeli | **Bearer** — `posta` sekmesi veya admin; SSE/link için `access_token` query | 2026-10-08 |
+| 0.5 | Müşteri portal kapsamı | **Magic link mesajlar + ticket** (Faz 50); widget minimum Faz 40 | 2026-10-08 |
 
-**Varsayılan (plan önerisi):** 0.1=A, 0.2=WA Faz 48, 0.3=PWA, 0.4=Bearer, 0.5=Magic link + ticket.
+**Geçiş:** `EKOLOJIK_POS_POSTA_AUTH=0` yalnızca acil geri alma; prod’da varsayılan açık (Faz 38).
 
-Onaylayan: _______________
+Onaylayan: Wave 3 otomasyon (plan `docs/PLAN-POSTA-MESAJ-100-PARITE.md`)
