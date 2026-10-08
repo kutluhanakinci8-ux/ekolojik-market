@@ -15650,14 +15650,33 @@ input {
   color: var(--greenleaf-dark);
   border-color: rgba(81, 184, 72, 0.35);
 }
+.module-screen.posta-hub-screen--sohbet-focus {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 16px 6px;
+  min-height: 0;
+}
+.module-screen.posta-hub-screen--sohbet-focus > .posta-hub-hero,
+.module-screen.posta-hub-screen--sohbet-focus > .settings-flash,
+.module-screen.posta-hub-screen--sohbet-focus > .posta-hub-smtp-warn,
+.module-screen.posta-hub-screen--sohbet-focus > .posta-hub-offline-hint {
+  flex-shrink: 0;
+}
+.module-screen.posta-hub-screen--sohbet-focus > .posta-hub-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 20px 0;
+}
 .posta-hub-screen--sohbet-focus .posta-hub-hero {
-  margin-bottom: 10px;
-  padding: 16px 20px;
+  margin-bottom: 8px;
+  padding: 12px 20px;
 }
 .posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet {
-  height: calc(100dvh - 168px);
-  min-height: 480px;
-  max-height: calc(100dvh - 140px);
+  min-height: 0;
+  height: auto;
+  max-height: none;
 }
 .posta-hub-push-bar {
   display: flex;
@@ -15811,9 +15830,8 @@ input {
 .posta-hub-msg-search { margin-bottom: 4px; }
 @media (max-width: 900px) {
   .posta-hub-shell--sohbet { grid-template-columns: 1fr; }
-  .posta-hub-screen--sohbet-focus .posta-hub-shell--sohbet {
-    height: calc(100dvh - 180px);
-    min-height: 400px;
+  .module-screen.posta-hub-screen--sohbet-focus {
+    padding: 6px 10px 4px;
   }
   .posta-hub-shell--sohbet-open .posta-hub-list { display: none; }
   .posta-hub-shell--sohbet-open .posta-hub-folders { display: none; }
@@ -15968,8 +15986,9 @@ input {
 .posta-hub-sohbet-panel {
   flex: 1;
   min-height: 0;
-  padding: 16px 20px 12px;
-  gap: 12px;
+  padding: 10px 16px 8px;
+  gap: 8px;
+  overflow: hidden;
 }
 .posta-hub-sohbet-header,
 .posta-hub-sohbet-search-wrap,
@@ -15981,8 +16000,8 @@ input {
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px 16px;
-  padding-bottom: 14px;
+  gap: 8px 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--posta-border-soft);
 }
 .posta-hub-sohbet-header-main {
@@ -16187,13 +16206,13 @@ input {
 .posta-sohbet-compose-box textarea {
   width: 100%;
   border: none;
-  padding: 14px 16px;
+  padding: 10px 14px;
   font: inherit;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.45;
   resize: none;
-  min-height: 64px;
-  max-height: 120px;
+  min-height: 48px;
+  max-height: 96px;
   background: transparent;
 }
 .posta-sohbet-compose-box textarea:focus {

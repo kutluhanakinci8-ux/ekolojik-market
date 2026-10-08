@@ -1937,7 +1937,7 @@ export function EkolojikPostaHubScreen({
               <div className="posta-hub-thread-compose posta-hub-sohbet-compose">
                 <div className="posta-sohbet-compose-box">
                   <textarea
-                    rows={3}
+                    rows={2}
                     placeholder="Mesaj yazın…"
                     value={msgDraft}
                     onChange={(e) => {
