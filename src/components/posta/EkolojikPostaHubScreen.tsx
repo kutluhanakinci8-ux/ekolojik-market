@@ -1270,40 +1270,92 @@ export function EkolojikPostaHubScreen({
         {hubLayout !== 'sohbet' && (
         <aside className="posta-hub-folders" aria-label="Posta klasörleri">
           <div className="posta-klasor-scroll">
-            <button type="button" className="btn btn-primary posta-hub-compose" onClick={() => pickFolder('yaz')}>
-              Yaz
-            </button>
-            <p className="posta-hub-folder-group">Gelen</p>
-            {(['tumu', 'gelen', 'yildizli', 'ertelenen'] as PostaInboxFolder[]).map((f) => (
-              <button key={f} type="button" className={folder === f ? 'active' : ''} onClick={() => pickFolder(f)}>
-                {FOLDER_TITLES[f]}
-              </button>
-            ))}
-            <p className="posta-hub-folder-group">Mağaza</p>
-            <button type="button" className={folder === 'fatura' ? 'active' : ''} onClick={() => pickFolder('fatura')}>
-              Fatura
-            </button>
-            <button type="button" className={folder === 'mesajlar' ? 'active' : ''} onClick={() => pickFolder('mesajlar')}>
-              Müşteri mesajları
-            </button>
-            <button type="button" className={folder === 'gonderilen' ? 'active' : ''} onClick={() => pickFolder('gonderilen')}>
-              Gönderilen
-            </button>
-            <p className="posta-hub-folder-group">Diğer</p>
-            {(['spam', 'arsiv', 'cop'] as PostaInboxFolder[]).map((f) => (
-              <button key={f} type="button" className={folder === f ? 'active' : ''} onClick={() => pickFolder(f)}>
-                {FOLDER_TITLES[f]}
-              </button>
-            ))}
-            <button type="button" className={folder === 'taslaklar' ? 'active' : ''} onClick={() => pickFolder('taslaklar')}>
-              Taslaklar
-            </button>
-            <button type="button" className={folder === 'takvim' ? 'active' : ''} onClick={() => pickFolder('takvim')}>
-              Takvim
-            </button>
-            <button type="button" className={folder === 'kisiler' ? 'active' : ''} onClick={() => pickFolder('kisiler')}>
-              Kişiler
-            </button>
+            <ul className="posta-klasor-list">
+              <li className="posta-klasor-compose-li">
+                <button type="button" className="btn btn-primary posta-hub-compose posta-klasor-btn" onClick={() => pickFolder('yaz')}>
+                  Yaz
+                </button>
+              </li>
+              <li className="posta-hub-folder-group" aria-hidden="true">Gelen</li>
+              {(['tumu', 'gelen', 'yildizli', 'ertelenen'] as PostaInboxFolder[]).map((f) => (
+                <li key={f}>
+                  <button
+                    type="button"
+                    className={`posta-klasor-btn${folder === f ? ' active' : ''}`}
+                    onClick={() => pickFolder(f)}
+                  >
+                    {FOLDER_TITLES[f]}
+                  </button>
+                </li>
+              ))}
+              <li className="posta-hub-folder-group" aria-hidden="true">Mağaza</li>
+              <li>
+                <button
+                  type="button"
+                  className={`posta-klasor-btn${folder === 'fatura' ? ' active' : ''}`}
+                  onClick={() => pickFolder('fatura')}
+                >
+                  Fatura
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`posta-klasor-btn${folder === 'mesajlar' ? ' active' : ''}`}
+                  onClick={() => pickFolder('mesajlar')}
+                >
+                  Müşteri mesajları
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`posta-klasor-btn${folder === 'gonderilen' ? ' active' : ''}`}
+                  onClick={() => pickFolder('gonderilen')}
+                >
+                  Gönderilen
+                </button>
+              </li>
+              <li className="posta-hub-folder-group" aria-hidden="true">Diğer</li>
+              {(['spam', 'arsiv', 'cop'] as PostaInboxFolder[]).map((f) => (
+                <li key={f}>
+                  <button
+                    type="button"
+                    className={`posta-klasor-btn${folder === f ? ' active' : ''}`}
+                    onClick={() => pickFolder(f)}
+                  >
+                    {FOLDER_TITLES[f]}
+                  </button>
+                </li>
+              ))}
+              <li>
+                <button
+                  type="button"
+                  className={`posta-klasor-btn${folder === 'taslaklar' ? ' active' : ''}`}
+                  onClick={() => pickFolder('taslaklar')}
+                >
+                  Taslaklar
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`posta-klasor-btn${folder === 'takvim' ? ' active' : ''}`}
+                  onClick={() => pickFolder('takvim')}
+                >
+                  Takvim
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`posta-klasor-btn${folder === 'kisiler' ? ' active' : ''}`}
+                  onClick={() => pickFolder('kisiler')}
+                >
+                  Kişiler
+                </button>
+              </li>
+            </ul>
           </div>
           <div className="posta-hub-folder-meta">
             <small>SMTP</small>
