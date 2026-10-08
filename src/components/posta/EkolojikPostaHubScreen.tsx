@@ -1829,6 +1829,7 @@ export function EkolojikPostaHubScreen({
 
           {folder === 'mesajlar' && selectedThreadId && (
             <div className="posta-hub-sohbet-panel">
+              <div className="posta-hub-sohbet-inner">
               <header className="posta-hub-sohbet-header">
                 <div className="posta-hub-sohbet-header-main">
                   {hubLayout === 'sohbet' && (
@@ -2000,6 +2001,7 @@ export function EkolojikPostaHubScreen({
                     </button>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           )}

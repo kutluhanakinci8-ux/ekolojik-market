@@ -15655,6 +15655,10 @@ input {
   color: var(--greenleaf-dark);
   border-color: rgba(81, 184, 72, 0.35);
 }
+.app-shell > .module-screen.posta-hub-screen--sohbet-focus {
+  flex: 1 1 0%;
+  min-height: 0;
+}
 .module-screen.posta-hub-screen--sohbet-focus {
   overflow: hidden;
   display: flex;
@@ -16001,26 +16005,29 @@ input {
 }
 .posta-hub-sohbet-panel {
   --sohbet-inset: 18px;
-  --sohbet-msg-max: min(82%, 640px);
+  --sohbet-bubble-max: 72%;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   height: 100%;
-  gap: 10px;
   overflow: hidden;
-  padding: 12px var(--sohbet-inset) 10px;
+  padding: 0;
+}
+.posta-hub-sohbet-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+  width: 100%;
+  padding: 14px var(--sohbet-inset) 12px;
   box-sizing: border-box;
 }
-.posta-hub-sohbet-panel > .posta-hub-sohbet-header,
-.posta-hub-sohbet-panel > .posta-hub-sohbet-search-wrap,
-.posta-hub-sohbet-panel > .posta-hub-sohbet-typing,
-.posta-hub-sohbet-panel > .posta-hub-sohbet-messages,
-.posta-hub-sohbet-panel > .posta-hub-sohbet-compose {
+.posta-hub-sohbet-inner > * {
   width: 100%;
   max-width: 100%;
-  margin-left: 0;
-  margin-right: 0;
+  margin: 0;
   box-sizing: border-box;
 }
 .posta-hub-sohbet-header,
@@ -16059,7 +16066,7 @@ input {
 .posta-hub-sohbet-title-block {
   min-width: 0;
 }
-.posta-hub-sohbet-title-block h2 {
+.posta-hub-detail--sohbet .posta-hub-sohbet-title-block h2 {
   margin: 0 0 4px;
   font-size: 1.15rem;
   font-weight: 700;
@@ -16096,26 +16103,30 @@ input {
   flex-direction: column;
   -webkit-overflow-scrolling: touch;
 }
+.posta-hub-sohbet-panel .posta-sohbet-msg-avatar {
+  display: none;
+}
 .posta-hub-screen--premium .posta-sohbet-msg {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  max-width: var(--sohbet-msg-max, min(82%, 640px));
-  width: fit-content;
+  display: block;
+  width: 100%;
+  max-width: 100%;
   border: none;
   background: transparent;
   box-shadow: none;
   padding: 0;
   margin: 0;
 }
-.posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-  margin-left: auto;
-  margin-right: 0;
+.posta-hub-sohbet-panel .posta-sohbet-msg-body {
+  max-width: var(--sohbet-bubble-max);
 }
-.posta-hub-screen--premium .crm-msg--customer.posta-sohbet-msg {
-  align-self: flex-start;
+.posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg .posta-sohbet-msg-body {
+  margin-left: auto;
+  text-align: left;
+}
+.posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg .posta-sohbet-msg-meta {
+  justify-content: flex-end;
+}
+.posta-hub-screen--premium .crm-msg--customer.posta-sohbet-msg .posta-sohbet-msg-body {
   margin-right: auto;
   margin-left: 0;
 }
@@ -16125,11 +16136,6 @@ input {
   border-radius: 10px;
   font-size: 10px;
   margin-bottom: 2px;
-}
-.posta-hub-screen--premium .crm-msg--staff.posta-sohbet-msg .posta-sohbet-msg-avatar {
-  background: linear-gradient(145deg, #e8f4ff 0%, #f5faff 100%);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.2);
 }
 .posta-sohbet-msg-body {
   min-width: 0;
