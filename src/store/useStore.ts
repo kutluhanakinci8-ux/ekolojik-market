@@ -20,7 +20,7 @@ import { applyCatalogPricing } from '../utils/productPricing';
 import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
 import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
-import { clearPosApiToken, exchangePosApiToken } from '../services/posApiAuth';
+import { clearPosApiToken, exchangePosApiToken, loadPosApiToken } from '../services/posApiAuth';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
 import {
   loadAllImages,
@@ -594,9 +594,12 @@ function mergeUserLists(remoteUsers: PosUser[], localUsers: PosUser[]): PosUser[
 
     const localUpdated = new Date(localUser.updatedAt).getTime();
     const remoteUpdated = new Date(remoteUser.updatedAt).getTime();
-    if (localUpdated >= remoteUpdated) {
-      merged.set(localUser.username, localUser);
-    }
+    const pick = localUpdated >= remoteUpdated ? localUser : remoteUser;
+    const mergedUser = { ...pick };
+    if (!mergedUser.passwordHash && localUser.passwordHash) mergedUser.passwordHash = localUser.passwordHash;
+    if (!mergedUser.pinHash && localUser.pinHash) mergedUser.pinHash = localUser.pinHash;
+    if (!mergedUser.totpSecret && localUser.totpSecret) mergedUser.totpSecret = localUser.totpSecret;
+    merged.set(localUser.username, mergedUser);
   }
 
   return [...merged.values()];
@@ -949,8 +952,12 @@ export function useStore() {
         };
 
         applySnapshot(mergedSnapshot);
-        await saveStoreSnapshot(mergedSnapshot);
-        setSyncStatus('synced');
+        if (loadPosApiToken()) {
+          const saved = await saveStoreSnapshot(mergedSnapshot);
+          setSyncStatus(saved ? 'synced' : 'local-only');
+        } else {
+          setSyncStatus('local-only');
+        }
       } else if (hasPersistedStoreData(localSnapshot)) {
         const { products: migratedLocal } = applyIrsaliyeStockToProducts(localSnapshot.products ?? []);
         const localFixed = {
@@ -959,8 +966,12 @@ export function useStore() {
           updatedAt: new Date().toISOString(),
         };
         setProducts(mergeWithSeed(migratedLocal));
-        const saved = await saveStoreSnapshot(localFixed);
-        setSyncStatus(saved ? 'synced' : 'local-only');
+        if (loadPosApiToken()) {
+          const saved = await saveStoreSnapshot(localFixed);
+          setSyncStatus(saved ? 'synced' : 'local-only');
+        } else {
+          setSyncStatus('local-only');
+        }
       } else {
         setSyncStatus('synced');
       }
@@ -2945,7 +2956,13 @@ export function useStore() {
         };
       }
 
-      if (!user || !verifyPassword(password, user.passwordHash)) {
+      let passwordOk =
+        Boolean(user?.passwordHash) && verifyPassword(password, user!.passwordHash);
+      if (!passwordOk) {
+        const remoteAuth = await exchangePosApiToken({ username: normalized, password });
+        passwordOk = remoteAuth.ok && Boolean(user);
+      }
+      if (!user || !passwordOk) {
         recordFailedLogin(normalized);
         await appendLoginAudit({
           username: normalized,
@@ -3013,7 +3030,12 @@ export function useStore() {
         };
       }
 
-      if (!user || !user.pinHash || !verifyPin(pin, user.pinHash)) {
+      let pinOk = Boolean(user?.pinHash) && verifyPin(pin, user!.pinHash);
+      if (!pinOk) {
+        const remoteAuth = await exchangePosApiToken({ username: normalized, pin });
+        pinOk = remoteAuth.ok && Boolean(user);
+      }
+      if (!user || !pinOk) {
         recordFailedLogin(normalized);
         await appendLoginAudit({
           username: normalized,

@@ -105,15 +105,20 @@ export function extractBearerToken(req) {
   return '';
 }
 
-export async function assertPosAdminApiAuth(req, res, dataDir, tenantId) {
+export async function assertPosApiAuth(req, res, dataDir, tenantId, { requireAdmin = false } = {}) {
   const token = extractBearerToken(req);
-  const result = await verifyPosApiToken(dataDir, token, tenantId, { requireAdmin: true });
+  const result = await verifyPosApiToken(dataDir, token, tenantId, { requireAdmin });
   if (!result.ok) {
     res.writeHead(result.status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ ok: false, error: result.error }));
     return false;
   }
   return result.payload;
+}
+
+export async function assertPosAdminApiAuth(req, res, dataDir, tenantId) {
+  const payload = await assertPosApiAuth(req, res, dataDir, tenantId, { requireAdmin: true });
+  return payload || false;
 }
 
 export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { username, password, pin }) {

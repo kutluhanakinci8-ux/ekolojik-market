@@ -1,5 +1,6 @@
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posApiAuthHeaders } from './posApiAuth';
 
 function apiUrl(): string {
   const tenant = loadTenantId();
@@ -24,7 +25,7 @@ export async function saveStoreSnapshot(snapshot: PersistedStoreSnapshot): Promi
   try {
     const res = await fetch(apiUrl(), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(snapshot),
       signal: AbortSignal.timeout(8000),
     });

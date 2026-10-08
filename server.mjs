@@ -47,7 +47,12 @@ import {
   migrateLegacyPostaOnboarding,
   reopenPostaOnboardingState,
 } from './server/postaOnboarding.mjs';
-import { assertPosAdminApiAuth, issuePosApiTokenFromCredentials } from './server/posApiAuth.mjs';
+import {
+  assertPosAdminApiAuth,
+  assertPosApiAuth,
+  issuePosApiTokenFromCredentials,
+} from './server/posApiAuth.mjs';
+import { mergeStoreUserSecrets, sanitizeStoreSnapshotForClient } from './server/storeApiSanitize.mjs';
 import {
   buildOutboxCsv,
   buildContactCsv,
@@ -2431,12 +2436,13 @@ const server = createServer(async (req, res) => {
       const tenantId = resolveTenantId(url);
       const data = await readStoreData(tenantId);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(data ?? {}));
+      res.end(JSON.stringify(sanitizeStoreSnapshotForClient(data ?? {})));
       return;
     }
 
     if (pathname === '/api/data' && req.method === 'PUT') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readRequestBody(req);
       if (!data || typeof data !== 'object') {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -2459,8 +2465,9 @@ const server = createServer(async (req, res) => {
         }
       }
       data.updatedAt = data.updatedAt || new Date().toISOString();
-      const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(data);
-      const toSave = changed ? stockFixed : data;
+      const withSecrets = mergeStoreUserSecrets(existing, data);
+      const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);
+      const toSave = changed ? stockFixed : withSecrets;
       await writeStoreData(toSave, tenantId);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, updatedAt: toSave.updatedAt }));
