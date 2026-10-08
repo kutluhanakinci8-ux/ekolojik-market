@@ -1,6 +1,6 @@
 # Ekolojik Posta & Mesaj — NB parite tamamlandı
 
-**Durum:** Faz **1–24** (POS hub) + **Wave 2** NB PM uyarlaması devam ediyor (`docs/PLAN-EKOLOJIK-POSTA-NB-WAVE2.md`). Faz **25**: gönderen/DNS deliverability paneli (NB PM-3/PM-7).
+**Durum:** Faz **1–24** (POS hub) + **Wave 2** (Faz 25–37) kapandı. **Wave 3 — %100 tamamlama:** `docs/PLAN-POSTA-MESAJ-100-PARITE.md` (Faz 38–52).
 
 ## Tek komut doğrulama (VPS)
 

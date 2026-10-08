@@ -49,7 +49,8 @@ Notlar:
 
 - SMTP host / relay: ___________________
 - IMAP kutu: ___________________
-- Bilinçli eksik / Wave 2: `docs/PLAN-EKOLOJIK-POSTA-NB-WAVE2.md` (PM-8 matris UI, RTE, CalDAV, push, …)
+- Wave 2 (kapandı): `docs/PLAN-EKOLOJIK-POSTA-NB-WAVE2.md`
+- **Wave 3 (%100):** `docs/PLAN-POSTA-MESAJ-100-PARITE.md` — güvenlik, widget, kayıt, tenant DNS, omnichannel, CI, kapanış Faz 52
 
 ```bash
 bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-nb-ui-yuruyus.sh

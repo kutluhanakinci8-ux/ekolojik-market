@@ -132,7 +132,13 @@ flowchart TB
 
 ---
 
-## 5. Teslim öncesi operatör checklist
+## 5. %100 yol haritası
+
+Tüm eksiklerin faz faz kapatılması: **[PLAN-POSTA-MESAJ-100-PARITE.md](./PLAN-POSTA-MESAJ-100-PARITE.md)** (Wave 3, Faz 38–52).
+
+---
+
+## 6. Teslim öncesi operatör checklist
 
 1. [ ] VPS `.env`: `EKOLOJIK_POS_API_SECRET` (veya `data/pos-api-secret` yedeklendi)
 2. [ ] `pm2 status market-pos` → online
