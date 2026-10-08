@@ -147,6 +147,8 @@ import {
   getMessagingChannelsHub,
   saveMessagingChannelsHub,
 } from './server/messaging/channelConfig.mjs';
+import { getMessagingBotHub, saveMessagingBotHub } from './server/messaging/botConfig.mjs';
+import { getMessagingSlaMetrics } from './server/messaging/sla.mjs';
 import { handleChannelWebhook } from './server/integrations/channelWebhook.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
 import { readMessagingAttachment } from './server/messaging/attachments.mjs';
@@ -2415,6 +2417,49 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/messaging/bot-config' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getMessagingBotHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bot config hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/bot-config' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await saveMessagingBotHub(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bot kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/sla' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const days = Number(url.searchParams.get('days') || 14);
+      try {
+        const result = await getMessagingSlaMetrics(DATA_DIR, tenantId, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'SLA metrik hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/messaging/capabilities' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
       try {
@@ -2549,6 +2594,9 @@ const server = createServer(async (req, res) => {
             pinned: data?.pinned,
             archived: data?.archived,
             muted: data?.muted,
+            status: data?.status,
+            assignedUserId: data?.assignedUserId,
+            botHandoff: data?.botHandoff,
           });
           res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));

@@ -1,6 +1,6 @@
-export function isPostaAiEnabled() {
-  return String(process.env.EKOLOJIK_POSTA_AI ?? '').trim() === '1';
-}
+import { isPostaAiEnabled, getPostaAiRuntimeConfig } from './messaging/aiConfig.mjs';
+
+export { isPostaAiEnabled, getPostaAiRuntimeConfig };
 
 function localSuggest({ subject, body, tone }) {
   const subj = String(subject ?? '').trim();

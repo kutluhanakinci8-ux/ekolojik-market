@@ -19,7 +19,8 @@
     "test:imap-move": "node scripts/posta-imap-move-regression.mjs",
     "test:faz46": "node scripts/faz46-caldav-push-smoke.mjs",
     "test:faz47": "node scripts/faz47-engagement-smoke.mjs",
-    "test:faz48": "node scripts/faz48-omnichannel-smoke.mjs"
+    "test:faz48": "node scripts/faz48-omnichannel-smoke.mjs",
+    "test:faz49": "node scripts/faz49-bot-sla-smoke.mjs"
   },
   "dependencies": {
     "imapflow": "^1.7.8",
