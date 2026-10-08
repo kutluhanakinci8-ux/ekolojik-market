@@ -22,6 +22,10 @@ curl_ok() {
   curl -fsS "$1" | grep -q "$2"
 }
 
+curl_ok_auth() {
+  curl -fsS -H "$1" "$2" | grep -q "$3"
+}
+
 http_code() {
   curl -s -o /dev/null -w "%{http_code}" "$1"
 }
@@ -54,17 +58,17 @@ fi
 
 if [[ -n "${TOKEN}" ]]; then
   AUTH_H="Authorization: Bearer ${TOKEN}"
-  check 1 "Nav badge — unread API" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/unread-counts" '"ok":true'
-  check 2 "Hub API — inbox" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=3" '"ok":true'
-  check 3 "Gelen birleşik inbox" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=5" '"items"'
-  check 4 "Yaz — şablon" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/templates" '"templates"'
-  check 4b "compose hints" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/compose-hints?limit=5" '"emails"'
-  check 5 "Müşteri mesajları" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/messaging/threads?limit=5" '"ok":true'
-  check 6 "Gönderilen / outbox" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
-  check 8 "Posta ayarları" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/settings" '"ok":true'
-  check 9 "Export CSV (auth)" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" 'alici;konu'
-  check 49 "Messaging SLA" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/messaging/sla?days=7" '"ok":true'
-  check 49b "Bot config hub" curl_ok -H "${AUTH_H}" "${BASE_URL}/api/messaging/bot-config" '"bot"'
+  check 1 "Nav badge — unread API" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/unread-counts" '"ok":true'
+  check 2 "Hub API — inbox" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=3" '"ok":true'
+  check 3 "Gelen birleşik inbox" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/inbox?folder=gelen&limit=5" '"items"'
+  check 4 "Yaz — şablon" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/templates" '"templates"'
+  check 4b "compose hints" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/compose-hints?limit=5" '"emails"'
+  check 5 "Müşteri mesajları" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/threads?limit=5" '"ok":true'
+  check 6 "Gönderilen / outbox" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
+  check 8 "Posta ayarları" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/settings" '"ok":true'
+  check 9 "Export CSV (auth)" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" 'alici;konu'
+  check 49 "Messaging SLA" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/sla?days=7" '"ok":true'
+  check 49b "Bot config hub" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/bot-config" '"bot"'
 else
   echo "WARN #1-9 Oturum token yok — EKOLOJIK_POS_QA_TOKEN veya demo kullanıcı ile tam kapı çalıştırın"
   check 1s "Unread API korumalı (anon)" bash -c "[[ $(http_code '${BASE_URL}/api/posta/unread-counts') == '401' ]]"
