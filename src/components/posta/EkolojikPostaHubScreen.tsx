@@ -1982,9 +1982,9 @@ export function EkolojikPostaHubScreen({
                 </div>
                 <div className="posta-hub-sohbet-toolbar posta-hub-detail-buttons">
                   <label className="posta-hub-thread-workflow">
-                    <span className="sr-only">Durum</span>
                     <select
                       className="posta-hub-search"
+                      aria-label="Thread durumu"
                       value={selectedThread?.status ?? 'open'}
                       onChange={(e) =>
                         void patchSelectedThread({
@@ -1998,9 +1998,9 @@ export function EkolojikPostaHubScreen({
                     </select>
                   </label>
                   <label className="posta-hub-thread-workflow">
-                    <span className="sr-only">Atanan</span>
                     <select
                       className="posta-hub-search"
+                      aria-label="Atanan operatör"
                       value={selectedThread?.assignedUserId ?? ''}
                       onChange={(e) =>
                         void patchSelectedThread({
