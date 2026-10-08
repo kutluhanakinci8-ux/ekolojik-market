@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { sendEmailTest } from '../../services/emailOutboxService';
+import { fetchPostaDeliverability } from '../../services/postaSettingsService';
 import { loadTenantId } from '../../storage/tenantSession';
 import {
   buildMessagingEmbedSnippet,
@@ -8,6 +9,7 @@ import {
   fetchPostaOnboardingHub,
   patchPostaOnboarding,
   rotateMessagingPublicKey,
+  seedPostaOnboardingAliasRules,
   type MessagingPublicConfigHub,
   type PostaOnboardingHub,
 } from '../../services/postaOnboardingService';
@@ -31,6 +33,7 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   const [flash, setFlash] = useState<string | null>(null);
   const [testTo, setTestTo] = useState('');
   const [messagingConfig, setMessagingConfig] = useState<MessagingPublicConfigHub | null>(null);
+  const [mailAliases, setMailAliases] = useState<string[]>([]);
 
   const reload = useCallback(async () => {
     const next = await fetchPostaOnboardingHub();
@@ -45,6 +48,14 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (stepIndex !== 0) return;
+    void (async () => {
+      const d = await fetchPostaDeliverability();
+      if (d?.aliases?.length) setMailAliases(d.aliases);
+    })();
+  }, [stepIndex]);
 
   useEffect(() => {
     if (stepIndex !== 1) return;
@@ -93,6 +104,19 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
     await store.refreshTenantData();
     setBusy(false);
     onFinished();
+  };
+
+  const handleSeedAliasRules = async () => {
+    setBusy(true);
+    setFlash(null);
+    const result = await seedPostaOnboardingAliasRules();
+    setBusy(false);
+    if (!result.ok) {
+      setFlash('Kurallar eklenemedi.');
+      return;
+    }
+    const count = result.added?.length ?? 0;
+    setFlash(count ? `${count} kural eklendi (siparis@ / fatura@).` : 'Kurallar zaten tanımlı.');
   };
 
   const handleTestMail = async () => {
@@ -174,6 +198,15 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
                   IMAP: {summary.mailHealth.imapConfigured ? 'Yapılandırılmış' : 'Yapılandırılmamış'}
                 </li>
               </ul>
+              <p className="posta-onboarding-lead" style={{ fontSize: '0.9rem' }}>
+                Önerilen alias’lar (hosting veya <code>EKOLOJIK_MAIL_ALIASES</code>):{' '}
+                {mailAliases.length ? mailAliases.join(', ') : 'siparis@, fatura@ → aynı IMAP kutusu'}
+              </p>
+              <div className="posta-onboarding-actions">
+                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleSeedAliasRules()}>
+                  siparis@ / fatura@ kurallarını ekle
+                </button>
+              </div>
               <label className="posta-onboarding-field">
                 Test e-postası gönder
                 <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="ornek@firma.com" />

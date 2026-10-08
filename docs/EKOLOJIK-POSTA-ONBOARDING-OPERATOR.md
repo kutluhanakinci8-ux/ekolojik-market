@@ -43,6 +43,14 @@ Günlük Posta kullanımı: [EKOLOJIK-POSTA-KULLANIM.md](./EKOLOJIK-POSTA-KULLAN
 
 **Geçiş:** “Sunucu yöneticisi hallediyor” → adım atlanır (`mailHealth.skipped`).
 
+**Alias (Faz 5):** `siparis@`, `fatura@` genelde hosting’de aynı IMAP hesabına yönlenir. Sihirbazda **siparis@ / fatura@ kurallarını ekle** veya:
+
+```bash
+curl -sS -X POST 'https://ekolojikmarket.com.tr/api/posta/onboarding/seed-alias-rules'
+```
+
+Sunucu env: `EKOLOJIK_MAIL_ALIASES=siparis@ekolojikmarket.com.tr,fatura@ekolojikmarket.com.tr` → `GET /api/posta/deliverability` listesinde görünür.
+
 **VPS checklist (minimum):**
 
 | Değişken | Açıklama |

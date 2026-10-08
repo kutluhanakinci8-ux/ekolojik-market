@@ -6,6 +6,42 @@ import { patchPostaInboxFlags } from './postaInboxFlags.mjs';
 
 export const POSTA_RULES_ENGINE_VERSION = 2;
 
+/** Faz 5 — onboarding / alias önerisi (tek IMAP, alıcı veya konu eşleşmesi) */
+export const POSTA_ONBOARDING_ALIAS_RULE_TEMPLATES = [
+  {
+    id: 'rule-onboard-siparis-alias',
+    enabled: true,
+    name: 'Sipariş kutusu (siparis@ / konu)',
+    subjectContains: 'sipariş|siparis|order|sipariş no',
+    fromContains: '',
+    matchGroups: [
+      { subjectContains: 'sipariş|siparis|order|sipariş no', fromContains: '' },
+      { subjectContains: '', fromContains: 'siparis@|orders@|order@|siparis.' },
+    ],
+    minAttachmentBytes: 0,
+    maxAttachmentBytes: null,
+    routeToFatura: false,
+    label: 'siparis',
+    rulesVersion: POSTA_RULES_ENGINE_VERSION,
+  },
+  {
+    id: 'rule-onboard-fatura-alias',
+    enabled: true,
+    name: 'Fatura kutusu (fatura@ alıcı)',
+    subjectContains: '',
+    fromContains: 'fatura@|efatura@|e-fatura@',
+    matchGroups: [
+      { subjectContains: '', fromContains: 'fatura@|efatura@|e-fatura@|billing@' },
+      { subjectContains: 'fatura|e-fatura|e arşiv', fromContains: '' },
+    ],
+    minAttachmentBytes: 0,
+    maxAttachmentBytes: null,
+    routeToFatura: true,
+    label: 'fatura',
+    rulesVersion: POSTA_RULES_ENGINE_VERSION,
+  },
+];
+
 const DEFAULT_RULES = [
   {
     id: 'rule-fatura-konu',
@@ -145,6 +181,26 @@ export async function savePostaRules(dataDir, tenantId, rules) {
   const normalized = list.map((r) => normalizeRuleShape(r));
   await writeRulesFile(dataDir, tenantId, normalized.length ? normalized : DEFAULT_RULES.map(normalizeRuleShape));
   return { ok: true, rules: normalized.length ? normalized : DEFAULT_RULES.map(normalizeRuleShape) };
+}
+
+/** Mevcut kurallara onboarding alias şablonlarını ekler (aynı id varsa atlar). */
+export async function mergePostaOnboardingAliasRules(dataDir, tenantId = 'main') {
+  const existing = await readRulesFile(dataDir, tenantId);
+  const ids = new Set(existing.map((r) => String(r.id)));
+  const added = [];
+  const merged = [...existing];
+  for (const template of POSTA_ONBOARDING_ALIAS_RULE_TEMPLATES) {
+    if (ids.has(template.id)) continue;
+    const normalized = normalizeRuleShape(template);
+    merged.push(normalized);
+    added.push(normalized);
+    ids.add(normalized.id);
+  }
+  if (!added.length) {
+    return { ok: true, added: [], rules: existing.map(normalizeRuleShape) };
+  }
+  await writeRulesFile(dataDir, tenantId, merged.map(normalizeRuleShape));
+  return { ok: true, added, rules: merged.map(normalizeRuleShape) };
 }
 
 /**

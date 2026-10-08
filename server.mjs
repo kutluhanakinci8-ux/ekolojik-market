@@ -155,7 +155,12 @@ import {
 } from './server/postaCalendarSync.mjs';
 import { getPostaStorageSummary } from './server/postaStorage.mjs';
 import { batchPostaInboxAction, markAllPostaInboxReadInFolder } from './server/postaInboxBatch.mjs';
-import { getPostaRulesCapabilities, listPostaRules, savePostaRules } from './server/postaRules.mjs';
+import {
+  getPostaRulesCapabilities,
+  listPostaRules,
+  mergePostaOnboardingAliasRules,
+  savePostaRules,
+} from './server/postaRules.mjs';
 import { getPostaOutboxAnalytics } from './server/postaOutboxAnalytics.mjs';
 import { getPostaDeliverabilityHub } from './server/postaDeliverability.mjs';
 import { suggestPostaCompose, isPostaAiEnabled } from './server/postaAiCompose.mjs';
@@ -1678,6 +1683,19 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding güncelleme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/seed-alias-rules' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural eklenemedi' }));
       }
       return;
     }

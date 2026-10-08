@@ -258,7 +258,7 @@ Bu faz **ürün planı dışı**; onboarding şeması `mailHealth` adımına “
 - [x] **2b** — `GET/POST /api/messaging/public-config` + tenant key (`data/messaging/{tenant}/public-config.json`, env fallback)
 - [x] **3** — `allowedTabs` politikası (B) + `defaultUsers` + `migrateLegacyPostaOnboarding` + deploy script
 - [x] **4** — `EKOLOJIK-POSTA-ONBOARDING-OPERATOR.md` + kılavuz / entegrasyon linkleri
-- [ ] **5** — onboarding’de alias + varsayılan kural şablonları
+- [x] **5** — `POST /api/posta/onboarding/seed-alias-rules` + sihirbaz + `POSTA_ONBOARDING_ALIAS_RULE_TEMPLATES`
 
 ---
 
