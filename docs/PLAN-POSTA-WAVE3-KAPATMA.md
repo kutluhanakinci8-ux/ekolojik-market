@@ -64,7 +64,10 @@ bash scripts/sunucu-ekolojik-posta-tam-kabul.sh /var/www/market-pos
 - [x] Görsel smoke (Playwright): #1–11, #13, #15–16, #18–19, #20–21, #24–25 (`posta-nb-ui-visual-smoke.mjs`)
 - [x] IMAP doğrulama script Faz 38 Bearer (`sunucu-ekolojik-imap-dogrula.sh`)
 - [x] Operatör otomatik kapı: `sunucu-ekolojik-posta-wave3-operator-kapi.sh`
-- [ ] Manuel POS (#12 konuşma/ilet, #14 toplu işlem, #17 offline): `docs/EKOLOJIK-POSTA-NB-UI-YURUYUS.md`
+- [x] UI yürüyüş #12–14, #17 — Playwright (`posta-nb-ui-visual-smoke.mjs`, #41+)
+- [x] Resmi kapanış kapısı: `sunucu-ekolojik-posta-wave3-kapat.sh` (VPS: `EKOLOJIK_SKIP_NPM_TEST=1` opsiyonel)
+
+**Wave 3 kapanış tarihi:** 2026-10-08 (Faz 38–52, main deploy + operatör kapısı).
 
 Posta smoke token: `scripts/lib/ekolojik-posta-qa-token.sh` — demo kullanıcılar, `EKOLOJIK_POS_QA_USER`/`PASSWORD`, `EKOLOJIK_POS_QA_TOKEN`, veya VPS’te `store.json` mint (`mint-posta-qa-token.mjs`).
 

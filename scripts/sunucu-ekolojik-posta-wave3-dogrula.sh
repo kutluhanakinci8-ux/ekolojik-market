@@ -15,16 +15,21 @@ echo ""
 
 cd "${REPO_ROOT}"
 
-echo "--- 1/4 Yerel test paketi (npm test) ---"
-npm test
-echo ""
+if [[ "${EKOLOJIK_SKIP_NPM_TEST:-0}" != "1" ]]; then
+  echo "--- 1/4 Yerel test paketi (npm test) ---"
+  npm test
+  echo ""
+else
+  echo "--- 1/4 npm test atlandı (EKOLOJIK_SKIP_NPM_TEST=1 — CI yeşil varsayımı) ---"
+  echo ""
+fi
 
 echo "--- 2/4 Faz 52 kapanış smoke ---"
 node scripts/faz52-closure-smoke.mjs
 echo ""
 
-echo "--- 3/4 NB + Wave 3 API kapısı ---"
-bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-nb-checklist-dogrula.sh" "${INSTALL_DIR}"
+echo "--- 3/4 Operatör kapısı (API + görsel smoke) ---"
+bash "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-wave3-operator-kapi.sh" "${INSTALL_DIR}"
 echo ""
 
 if [[ "${EKOLOJIK_SKIP_PRERELEASE:-0}" != "1" ]]; then
