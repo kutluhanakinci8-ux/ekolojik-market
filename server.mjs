@@ -122,19 +122,26 @@ import {
   isTenantSmtpConfigured,
   saveTenantMailConfig,
 } from './server/tenantMailConfig.mjs';
-import { getPostaJmapLiteSession, queryPostaJmapLiteMailbox } from './server/postaJmapLite.mjs';
+import {
+  getPostaJmapLiteSession,
+  getPostaJmapLiteEmails,
+  listPostaJmapLiteMailboxes,
+  queryPostaJmapLiteMailbox,
+} from './server/postaJmapLite.mjs';
 import {
   deletePostaCalDavLiteEvent,
+  getPostaCalDavLiteEvent,
   getPostaCalDavLitePrincipal,
   listPostaCalDavLiteEvents,
   upsertPostaCalDavLiteEvent,
 } from './server/postaCalDavLite.mjs';
+import { getPostaCardDavLitePrincipal } from './server/postaCardDavLite.mjs';
 import {
   assertPostaPublicMailAuth,
   getPostaPublicMailCapabilities,
   sendPostaPublicMail,
 } from './server/postaPublicMail.mjs';
-import { attachPostaWebSocketGateway } from './server/postaWsGateway.mjs';
+import { attachPostaWebSocketGateway, getPostaWsGatewayMetrics } from './server/postaWsGateway.mjs';
 import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
 import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
 import { readMessagingAttachment } from './server/messaging/attachments.mjs';
@@ -1194,6 +1201,12 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/jmap-lite/Mailbox/query' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(listPostaJmapLiteMailboxes()));
+      return;
+    }
+
     if (pathname === '/api/posta/jmap-lite/Email/query' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
       const folder = url.searchParams.get('folder')?.trim() || 'gelen';
@@ -1209,9 +1222,51 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/jmap-lite/Email/get' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const idsParam = url.searchParams.get('ids')?.trim() || '';
+      const ids = idsParam.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+      try {
+        const result = await getPostaJmapLiteEmails(DATA_DIR, tenantId, ids);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'JMAP get hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/caldav-lite/principal' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(getPostaCalDavLitePrincipal()));
+      return;
+    }
+
+    if (pathname === '/api/posta/carddav-lite/principal' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaCardDavLitePrincipal()));
+      return;
+    }
+
+    if (pathname === '/api/posta/ws/metrics' && req.method === 'GET') {
+      try {
+        const ws = getPostaWsGatewayMetrics();
+        const days = Number(url.searchParams.get('days') || 7);
+        const live = await getPostaLiveMetrics(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            ws,
+            messagingLatency: live.deliveryLatency?.byChannel?.['ws-messaging'] ?? null,
+            windowDays: days,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'WS metrik hatası' }));
+      }
       return;
     }
 
@@ -1242,10 +1297,24 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const calDavDeleteMatch = pathname.match(/^\/api\/posta\/caldav-lite\/events\/([^/]+)$/);
-    if (calDavDeleteMatch && req.method === 'DELETE') {
+    const calDavEventMatch = pathname.match(/^\/api\/posta\/caldav-lite\/events\/([^/]+)$/);
+    if (calDavEventMatch && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
-      const eventId = decodeURIComponent(calDavDeleteMatch[1]);
+      const eventId = decodeURIComponent(calDavEventMatch[1]);
+      try {
+        const result = await getPostaCalDavLiteEvent(DATA_DIR, tenantId, eventId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV get hatası' }));
+      }
+      return;
+    }
+
+    if (calDavEventMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const eventId = decodeURIComponent(calDavEventMatch[1]);
       try {
         const result = await deletePostaCalDavLiteEvent(DATA_DIR, tenantId, eventId);
         res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1357,6 +1426,7 @@ const server = createServer(async (req, res) => {
             threadId: parsed.threadId,
             messageId: result.message?.id,
             direction: 'customer',
+            messageAt: result.message?.createdAt,
           });
           void notifyPostaLiveInbox(
             DATA_DIR,
@@ -2428,6 +2498,7 @@ const server = createServer(async (req, res) => {
               threadId,
               messageId: result.message.id,
               direction: result.message.direction,
+              messageAt: result.message.createdAt ?? new Date().toISOString(),
             });
             void notifyPostaLiveInbox(
               DATA_DIR,

@@ -49,6 +49,17 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 
 - Ağ kesilirse son **Gelen** listesi salt okunur gösterilir (service worker + yerel önbellek).
 
+### Takvim ve kişiler (CalDAV / CardDAV lite)
+
+- Hub **Takvim**: etkinlik ekleme/düzenleme; harici uygulama için **ICS abonelik** (`Ayarlar → E-posta` veya takvim paneli).
+- **CalDAV lite** (`GET /api/posta/caldav-lite/*`): REST ile etkinlik listesi / yazma / silme (tam CalDAV sunucu değil).
+- **CardDAV lite**: `export.vcf` dışa aktarma, `POST /api/posta/contacts/import` ile vCard/CSV içe aktarma.
+
+### PWA push
+
+- **Ayarlar → E-posta**: “Test bildirimi gönder” ve abonelik (VAPID gerekli).
+- **iOS**: Safari → Ana Ekrana Ekle → uygulamayı ana ekrandan açın → bildirim izni (iOS 16.4+).
+
 ## Ayarlar → E-posta
 
 - SMTP testi, kuyruk işleme, gönderen / Reply-To / ops / imza / bildirim matrisi.
