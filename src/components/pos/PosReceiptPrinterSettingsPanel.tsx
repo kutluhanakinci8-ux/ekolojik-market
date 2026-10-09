@@ -29,7 +29,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           <p>Termal fiş (Zywell 80mm) — Windows’ta yazıcı adı Chrome ile eşleşmeli</p>
         </div>
         <button type="button" className="btn btn-outline" onClick={applyZywellPreset}>
-          Zywell varsayılanı
+          POS-80C / Zywell varsayılanı
         </button>
       </div>
 
@@ -66,7 +66,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           <input
             value={printer.windowsPrinterName}
             onChange={(e) => set({ windowsPrinterName: e.target.value })}
-            placeholder="Örn. Zywell, ZYWEL ZY801"
+            placeholder="Örn. POS-80C, Zywell"
           />
         </label>
         <label className="settings-field">
@@ -101,10 +101,12 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         </label>
       </div>
       <p className="module-hint">
-        Ayarlar bu mağaza (tenant) için sunucuda saklanır. Zywell’de karışık karakter çıkarsa{' '}
-        <strong>Düz metin</strong> formatını kullanın ve Windows’ta “Generic / Text Only” değil{' '}
-        <strong>Zywell sürücüsü</strong> seçili olsun. Chrome yazdır hedefi:{' '}
-        <strong>{printer.windowsPrinterName || 'Zywell'}</strong>.
+        Bu paneldeki ayarlar fişe uygulanır (kağıt {printer.paperWidthMm} mm, kenar boşluğu{' '}
+        {printer.pageMarginMm} mm, format: {printer.printMode === 'plain' ? 'düz metin' : 'HTML'}).
+        Chrome yazdır penceresinde bir kez ayarlayın: <strong>Hedef = {printer.windowsPrinterName || 'POS-80C'}</strong>,
+        <strong> Üst ve alt bilgiler = Kapalı</strong>, <strong>Kenar boşlukları = Yok</strong>,{' '}
+        <strong>Ölçek = Sayfa genişliğine sığdır</strong>. Üstte URL/SIM satırı görünüyorsa “Üst ve alt bilgiler”
+        açıktır.
       </p>
     </section>
   );

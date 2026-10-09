@@ -1,6 +1,10 @@
 import type { CartItem, PriceType, Product, Sale } from '../types/product';
 import type { ProductSet } from '../types/productSet';
 import type { SaleReturn } from '../types/saleReturn';
+import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
+import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
+
+const BLANK_PRINT_TITLE = '\u200b';
 
 export interface ReceiptLineItem {
   name: string;
@@ -149,10 +153,18 @@ export function buildReturnReceipt(
   };
 }
 
-function receiptBaseStyles(paperWidthMm: 58 | 80 = 80): string {
+function receiptPageCss(paperWidthMm: 58 | 80, pageMarginMm = 0): string {
+  const m = Math.min(8, Math.max(0, pageMarginMm));
+  return `@page { size: ${paperWidthMm}mm auto; margin: ${m}mm; }`;
+}
+
+function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string {
   const bodyWidth = paperWidthMm === 58 ? 50 : 72;
   return `
-    @page { size: ${paperWidthMm}mm auto; margin: 4mm; }
+    ${receiptPageCss(paperWidthMm, pageMarginMm)}
+    @media print {
+      html, body { margin: 0 !important; padding: 0 !important; }
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -199,15 +211,22 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-function wrapPlainReceiptBody(body: string, paperWidthMm: 58 | 80): string {
+function wrapPlainReceiptBody(
+  body: string,
+  paperWidthMm: 58 | 80,
+  pageMarginMm = 0,
+): string {
   const width = paperWidthMm === 58 ? 50 : 72;
   return `<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <title>Fiş</title>
+  <title>${BLANK_PRINT_TITLE}</title>
   <style>
-    @page { size: ${paperWidthMm}mm auto; margin: 2mm; }
+    ${receiptPageCss(paperWidthMm, pageMarginMm)}
+    @media print {
+      html, body { margin: 0 !important; padding: 0 !important; }
+    }
     body {
       margin: 0;
       padding: 0;
@@ -341,7 +360,11 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58
 </html>`;
 }
 
-export function buildReceiptHtml(data: SaleReceiptData, paperWidthMm: 58 | 80 = 80): string {
+export function buildReceiptHtml(
+  data: SaleReceiptData,
+  paperWidthMm: 58 | 80 = 80,
+  pageMarginMm = 0,
+): string {
   const lines = data.items
     .map((item) => {
       const left = `${truncateName(item.name)} x${item.quantity}`;
@@ -364,9 +387,9 @@ export function buildReceiptHtml(data: SaleReceiptData, paperWidthMm: 58 | 80 = 
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <title>Fiş ${receiptRef}</title>
+  <title>${BLANK_PRINT_TITLE}</title>
   <style>
-    ${receiptBaseStyles(paperWidthMm)}
+    ${receiptBaseStyles(paperWidthMm, pageMarginMm)}
   </style>
 </head>
 <body>
@@ -413,6 +436,7 @@ export function printHtmlReceipt(html: string): Promise<void> {
     doc.open();
     doc.write(html);
     doc.close();
+    doc.title = BLANK_PRINT_TITLE;
 
     const cleanup = () => {
       if (iframe.parentNode) document.body.removeChild(iframe);
@@ -421,6 +445,7 @@ export function printHtmlReceipt(html: string): Promise<void> {
 
     const triggerPrint = () => {
       try {
+        doc.title = BLANK_PRINT_TITLE;
         win.focus();
         win.print();
       } catch {
@@ -428,6 +453,9 @@ export function printHtmlReceipt(html: string): Promise<void> {
       }
     };
 
+    win.addEventListener('beforeprint', () => {
+      doc.title = BLANK_PRINT_TITLE;
+    });
     win.addEventListener('afterprint', cleanup, { once: true });
     setTimeout(cleanup, 15000);
 
@@ -441,15 +469,20 @@ export function printHtmlReceipt(html: string): Promise<void> {
 
 export async function printThermalReceipt(
   data: SaleReceiptData,
-  options?: { paperWidthMm?: 58 | 80; copies?: number; printMode?: 'plain' | 'html' },
+  options?: ThermalReceiptPrintOptions,
 ): Promise<void> {
-  const paper = options?.paperWidthMm ?? 80;
-  const copies = Math.min(3, Math.max(1, options?.copies ?? 1));
-  const mode = options?.printMode ?? 'html';
+  const normalized = normalizeReceiptPrinterSettings(options ?? undefined);
+  const paper = normalized.paperWidthMm;
+  const copies = normalized.copies;
+  const margin = normalized.pageMarginMm;
+  const mode =
+    normalized.brand === 'zywell' || normalized.brand === 'generic'
+      ? 'plain'
+      : normalized.printMode;
   const html =
     mode === 'plain'
-      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(data), paper)
-      : buildReceiptHtml(data, paper);
+      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(data), paper, margin)
+      : buildReceiptHtml(data, paper, margin);
   for (let i = 0; i < copies; i += 1) {
     await printHtmlReceipt(html);
   }

@@ -11,8 +11,9 @@ import { join } from 'node:path';
 const ZYWELL_PRESET = {
   enabled: true,
   brand: 'zywell',
-  windowsPrinterName: 'Zywell',
-  paperWidthMm: 80,
+  windowsPrinterName: 'POS-80C',
+  paperWidthMm: 58,
+  pageMarginMm: 0,
   autoPrintOnSale: true,
   copies: 1,
   printMode: 'plain',

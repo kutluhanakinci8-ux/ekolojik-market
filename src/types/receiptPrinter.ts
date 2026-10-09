@@ -13,17 +13,20 @@ export interface ReceiptPrinterSettings {
   autoPrintOnSale: boolean;
   copies: number;
   printMode: ReceiptPrintMode;
+  /** @page kenar boşluğu (mm) — termalde 0 */
+  pageMarginMm: number;
 }
 
 /** Greenleaf kasada kullanılan Zywell 80mm termal varsayılanı */
 export const DEFAULT_ZYWELL_RECEIPT_PRINTER: ReceiptPrinterSettings = {
   enabled: true,
   brand: 'zywell',
-  windowsPrinterName: 'Zywell',
-  paperWidthMm: 80,
+  windowsPrinterName: 'POS-80C',
+  paperWidthMm: 58,
   autoPrintOnSale: true,
   copies: 1,
   printMode: 'plain',
+  pageMarginMm: 0,
 };
 
 export const DEFAULT_RECEIPT_PRINTER: ReceiptPrinterSettings = {
@@ -34,6 +37,7 @@ export const DEFAULT_RECEIPT_PRINTER: ReceiptPrinterSettings = {
   autoPrintOnSale: true,
   copies: 1,
   printMode: 'html',
+  pageMarginMm: 0,
 };
 
 export function normalizeReceiptPrinterSettings(
@@ -54,5 +58,11 @@ export function normalizeReceiptPrinterSettings(
     autoPrintOnSale: base.autoPrintOnSale !== false,
     copies,
     printMode: base.printMode === 'html' ? 'html' : 'plain',
+    pageMarginMm: Math.min(8, Math.max(0, Number(base.pageMarginMm) || 0)),
   };
 }
+
+export type ThermalReceiptPrintOptions = Pick<
+  ReceiptPrinterSettings,
+  'paperWidthMm' | 'copies' | 'printMode' | 'pageMarginMm' | 'brand'
+>;
