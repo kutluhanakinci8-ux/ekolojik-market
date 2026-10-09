@@ -195,6 +195,7 @@ import {
 
 import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
 
 function storageKeys() {
   return posLocalStorageKeys();
@@ -566,6 +567,34 @@ function mapUsersWithTabPolicy(users: PosUser[], settings?: AppSettings | null):
   }));
 }
 
+function snapshotMergedSettings(snapshot: PersistedStoreSnapshot): AppSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(snapshot.settings ?? {}),
+  } as AppSettings;
+}
+
+/** Ayrı tenant / POS Lite — Greenleaf kataloğu ve demo kullanıcıları karışmaz */
+function isIsolatedStoreContext(settings: AppSettings): boolean {
+  return isPosLiteProfile(settings) || loadTenantId() !== DEFAULT_TENANT_ID;
+}
+
+function resolveUsersFromSnapshot(
+  snapshot: PersistedStoreSnapshot,
+  mergedSettings: AppSettings,
+): PosUser[] {
+  if (!snapshot.users?.length) {
+    return isIsolatedStoreContext(mergedSettings) ? [] : DEFAULT_USERS.map((user) => ({ ...user }));
+  }
+  const remoteUsers = snapshot.users.map((user) =>
+    normalizeUser(user as unknown as Record<string, unknown>),
+  );
+  if (isIsolatedStoreContext(mergedSettings)) {
+    return mapUsersWithTabPolicy(remoteUsers, mergedSettings);
+  }
+  return mapUsersWithTabPolicy(mergeUserLists(remoteUsers, loadUsers()), mergedSettings);
+}
+
 function loadUsers(): PosUser[] {
   const stored = localStorage.getItem(storageKeys().users);
   if (stored) {
@@ -861,8 +890,11 @@ export function useStore() {
   ]);
 
   const applySnapshot = useCallback((snapshot: PersistedStoreSnapshot) => {
-    setProducts(mergeWithSeed(snapshot.products));
-    setProductSets(mergeProductSets(snapshot.productSets));
+    const mergedSettings = snapshotMergedSettings(snapshot);
+    const isolated = isIsolatedStoreContext(mergedSettings);
+
+    setProducts(isolated ? (snapshot.products ?? []) : mergeWithSeed(snapshot.products));
+    setProductSets(isolated ? (snapshot.productSets ?? []) : mergeProductSets(snapshot.productSets));
     setSales(repairSaleCustomerLinks(snapshot.sales ?? [], snapshot.customers ?? []));
     setSaleReturns(snapshot.saleReturns ?? []);
     setStockMovements(snapshot.stockMovements ?? []);
@@ -871,11 +903,13 @@ export function useStore() {
     const localHandovers = loadCashHandovers();
     const remoteHandovers = snapshot.cashHandovers;
     setCashHandovers(
-      remoteHandovers === undefined
-        ? localHandovers
-        : remoteHandovers.length === 0 && localHandovers.length > 0
+      isolated
+        ? (snapshot.cashHandovers ?? [])
+        : remoteHandovers === undefined
           ? localHandovers
-          : remoteHandovers,
+          : remoteHandovers.length === 0 && localHandovers.length > 0
+            ? localHandovers
+            : remoteHandovers,
     );
     setCashSessions(snapshot.cashSessions ?? []);
     setPurchaseInvoices(snapshot.purchaseInvoices ?? []);
@@ -895,8 +929,7 @@ export function useStore() {
     setCrmData(normalizeCrmData(snapshot.crm));
     saveCrmDataLocal(normalizeCrmData(snapshot.crm));
     setSettings({
-      ...DEFAULT_SETTINGS,
-      ...(snapshot.settings ?? {}),
+      ...mergedSettings,
       posNotes: normalizePosNotesConfig(snapshot.settings?.posNotes),
       currency: normalizeCurrencySettings(snapshot.settings?.currency),
       dashboardWidgets: normalizeDashboardWidgets(snapshot.settings?.dashboardWidgets),
@@ -917,17 +950,7 @@ export function useStore() {
       posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(snapshot.settings?.posCheckout ?? {}) },
     });
     if (snapshot.priceType) setPriceType(snapshot.priceType);
-    if (snapshot.users?.length) {
-      const remoteUsers = snapshot.users.map((user) => normalizeUser(user as unknown as Record<string, unknown>));
-      const localUsers = loadUsers();
-      const mergedSettings = {
-        ...DEFAULT_SETTINGS,
-        ...(snapshot.settings ?? {}),
-      } as AppSettings;
-      setUsers(mapUsersWithTabPolicy(mergeUserLists(remoteUsers, localUsers), mergedSettings));
-    } else {
-      setUsers((prev) => (prev.length > 0 ? prev : DEFAULT_USERS.map((user) => ({ ...user }))));
-    }
+    setUsers(resolveUsersFromSnapshot(snapshot, mergedSettings));
     if (snapshot.loginAuditLog?.length) {
       setLoginAuditLog(snapshot.loginAuditLog);
     }
@@ -947,7 +970,10 @@ export function useStore() {
 
       if (cancelled) return;
 
-      if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
+      if (tenant !== DEFAULT_TENANT_ID && remote) {
+        applySnapshot(remote);
+        setSyncStatus('synced');
+      } else if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
         const remoteUsers = (remote.users ?? []).map((user) => normalizeUser(user as unknown as Record<string, unknown>));
         const localUsers = loadUsers();
         const mergedUsers = mergeUserLists(remoteUsers, localUsers);
@@ -967,9 +993,6 @@ export function useStore() {
         } else {
           setSyncStatus('local-only');
         }
-      } else if (tenant !== DEFAULT_TENANT_ID && remote) {
-        applySnapshot(remote);
-        setSyncStatus('synced');
       } else if (hasPersistedStoreData(localSnapshot) && tenant === DEFAULT_TENANT_ID) {
         const { products: migratedLocal } = applyIrsaliyeStockToProducts(localSnapshot.products ?? []);
         const localFixed = {

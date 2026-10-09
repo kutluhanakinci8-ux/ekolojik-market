@@ -2978,9 +2978,16 @@ const server = createServer(async (req, res) => {
         }
       }
       data.updatedAt = data.updatedAt || new Date().toISOString();
-      const withSecrets = mergeStoreUserSecrets(existing, data);
-      const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);
-      const toSave = changed ? stockFixed : withSecrets;
+      const { guardIsolatedTenantStoreWrite, shouldSkipIrsaliyeStockMigration } = await import(
+        './server/tenantStoreGuard.mjs'
+      );
+      const guarded = guardIsolatedTenantStoreWrite(tenantId, existing, data);
+      const withSecrets = mergeStoreUserSecrets(existing, guarded);
+      let toSave = withSecrets;
+      if (!shouldSkipIrsaliyeStockMigration(tenantId, existing ?? withSecrets)) {
+        const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);
+        toSave = changed ? stockFixed : withSecrets;
+      }
       await writeStoreData(toSave, tenantId);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, updatedAt: toSave.updatedAt }));

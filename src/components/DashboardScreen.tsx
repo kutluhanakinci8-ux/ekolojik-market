@@ -10,6 +10,7 @@ import { PaymentCalendarPanel } from './PaymentCalendarPanel';
 import { DashboardCrmSummaryPanel } from './crm/DashboardCrmSummaryPanel';
 import { PaymentAlertTicker } from './PaymentAlertTicker';
 import { ProductImage } from './ProductImage';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
 
 interface DashboardScreenProps {
   store: Store;
@@ -69,6 +70,7 @@ export function DashboardScreen({ store }: DashboardScreenProps) {
     store.todayTotal,
   );
 
+  const posLite = isPosLiteProfile(store.settings);
   const isAdmin = store.authSession?.role === 'admin';
   const isPrimaryAdmin = Boolean(
     store.users.find((user) => user.id === store.authSession?.userId)?.isPrimaryAdmin,
@@ -83,9 +85,9 @@ export function DashboardScreen({ store }: DashboardScreenProps) {
     [isAdmin, store.settings.paymentReminders],
   );
   useEffect(() => {
-    if (!isAdmin || !store.crmSettings.automationEnabled) return;
+    if (posLite || !isAdmin || !store.crmSettings.automationEnabled) return;
     store.runCrmDailyAutomation();
-  }, [isAdmin, store]);
+  }, [posLite, isAdmin, store]);
 
   const visibleWidgetCount = [
     widgets.payment,
@@ -148,7 +150,7 @@ export function DashboardScreen({ store }: DashboardScreenProps) {
           {isAdmin && <DisplayCurrencyToolbarTail store={store} />}
         </div>
 
-        {isAdmin && (
+        {isAdmin && !posLite && (
           <PaymentAlertTicker alerts={paymentAlerts} />
         )}
       </header>
@@ -304,11 +306,11 @@ export function DashboardScreen({ store }: DashboardScreenProps) {
         </section>
         )}
 
-        {isAdmin && widgets.paymentCalendar && (
+        {isAdmin && widgets.paymentCalendar && !posLite && (
           <PaymentCalendarPanel store={store} />
         )}
 
-        {isAdmin && widgets.crmSummary && (
+        {isAdmin && widgets.crmSummary && !posLite && (
           <DashboardCrmSummaryPanel store={store} />
         )}
 
