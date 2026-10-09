@@ -10,6 +10,7 @@ import { isPosLiteProfile } from '../../utils/tenantProductProfile';
 import { printTestSaleReceipt } from '../../utils/receiptPrint';
 import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
 import { loadTenantId } from '../../storage/tenantSession';
+import { APP_BUILD_ID, APP_FEATURE_TAG } from '../../version';
 
 function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
   const [status, setStatus] = useState('');
@@ -60,10 +61,14 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
       <section className="settings-panel settings-panel--receipt-printer">
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
-          Lima Market (<strong>limaadmin</strong>) için fiş: satış sonrası otomatik, ek ayar yok.
-          Chrome → <strong>POS-80C</strong> (Greenleaf kasadakiyle aynı kod).
+          <strong>Lima Market</strong> — ayrı mağaza, <strong>limaadmin</strong> ile giriş. Satış sonrası
+          otomatik fiş; burada ek yazıcı ayarı yok. Chrome yazdır hedefi: <strong>POS-80C</strong>, 80&nbsp;mm.
         </p>
         <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
+        <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
+          Yüklü sürüm: {APP_FEATURE_TAG} · {APP_BUILD_ID}
+          {APP_FEATURE_TAG !== 'receipt-print-debug' ? ' — sayfayı Cmd+Shift+R ile yenileyin' : null}
+        </p>
       </section>
     );
   }
