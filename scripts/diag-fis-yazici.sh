@@ -70,7 +70,9 @@ section "6) Kasa Mac — yerelde calistirin"
 cat <<'MAC'
 
   lpstat -p -d
-  lpoptions -p POS-80C 2>/dev/null || lpoptions -d
+  lpoptions -p Printer_POS_80C 2>/dev/null || lpoptions -p POS-80C 2>/dev/null || lpoptions -d
+  # Erken kesim: Cutting=1 sayfa sonu (yanlis uzunlukta keser). Belge sonu icin:
+  # sudo lpoptions -p Printer_POS_80C -o Cutting=2Cutattheendofdocument
   sudo tail -f /var/log/cups/error_log
   lpstat -o
 

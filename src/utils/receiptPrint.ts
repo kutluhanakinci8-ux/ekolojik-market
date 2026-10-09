@@ -259,30 +259,48 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
     .total-row .line-price { font-size: 15px; font-weight: 900; }
     .footer { margin-top: 10px; font-size: 18px; font-weight: 900; }
     .meta-row { font-size: 18px; font-weight: 900; }
+    ${receiptTailSpacerCss()}
   `;
 }
 
-/** Chrome/Safari: @page auto → kısa sayfa, termal erken keser; içeriğe göre mm yükseklik */
-function buildReceiptPrintScript(): string {
+/** Termal: sabit @page yüksekliği veya kısa ölçüm → Mac POS-80C erken keser */
+function buildReceiptPrintScript(paperWidthMm: 58 | 80 = 80): string {
   const blankTitle = BLANK_PRINT_TITLE;
   return `
   <script>
     (function () {
       var t = ${JSON.stringify(blankTitle)};
-      function applyReceiptPageHeight() {
+      var paperW = ${paperWidthMm};
+      var CUT_MARGIN_MM = 36;
+      function measureReceiptHeightPx() {
         var b = document.body;
         var r = document.documentElement;
-        var px = Math.max(b ? b.scrollHeight : 0, r ? r.scrollHeight : 0, b ? b.offsetHeight : 0);
-        var mm = Math.ceil(px * 25.4 / 96) + 16;
-        if (mm < 120) mm = 120;
-        if (mm > 2000) mm = 2000;
+        var marker = document.getElementById('receipt-end-marker');
+        if (marker && b) {
+          var top = b.getBoundingClientRect().top;
+          var bottom = marker.getBoundingClientRect().bottom;
+          if (bottom > top) return Math.ceil(bottom - top);
+        }
+        return Math.max(
+          b ? b.scrollHeight : 0,
+          r ? r.scrollHeight : 0,
+          b ? b.offsetHeight : 0,
+          b ? b.getBoundingClientRect().height : 0
+        );
+      }
+      function applyReceiptPageHeight() {
+        var px = measureReceiptHeightPx();
+        var mm = Math.ceil(px * 25.4 / 96) + CUT_MARGIN_MM;
+        if (mm < 140) mm = 140;
+        if (mm > 2400) mm = 2400;
         var el = document.getElementById('receipt-page-dynamic');
         if (!el) {
           el = document.createElement('style');
           el.id = 'receipt-page-dynamic';
           document.head.appendChild(el);
         }
-        el.textContent = '@page { size: 80mm ' + mm + 'mm !important; margin: 0 !important; }';
+        el.textContent =
+          '@page { size: ' + paperW + 'mm ' + mm + 'mm !important; margin: 0 !important; }';
       }
       function before() {
         document.title = t;
@@ -292,6 +310,51 @@ function buildReceiptPrintScript(): string {
       window.onbeforeprint = before;
     })();
   </script>`;
+}
+
+const RECEIPT_TAIL_SPACER =
+  '<div id="receipt-end-marker" class="receipt-tail-spacer" aria-hidden="true"></div>';
+
+function receiptTailSpacerCss(): string {
+  return `.receipt-tail-spacer { height: 12mm; width: 100%; flex-shrink: 0; }`;
+}
+
+type ReceiptPrintWindow = Window & { applyReceiptPageHeight?: () => void };
+
+function applyReceiptPageHeightInWindow(win: ReceiptPrintWindow): void {
+  try {
+    win.applyReceiptPageHeight?.();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Layout + fontlar otursun, sonra ölçüm ve yazdır (beforeprint tek başına yetmeyebilir) */
+function scheduleThermalPrintInWindow(win: ReceiptPrintWindow, onError?: () => void): void {
+  const doc = win.document;
+  const trigger = () => {
+    applyReceiptPageHeightInWindow(win);
+    window.setTimeout(() => {
+      applyReceiptPageHeightInWindow(win);
+      try {
+        doc.title = BLANK_PRINT_TITLE;
+        win.focus();
+        win.print();
+      } catch {
+        onError?.();
+      }
+    }, 60);
+  };
+  const afterLayout = () => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(trigger);
+    });
+  };
+  if (doc.readyState === 'complete') {
+    window.setTimeout(afterLayout, 120);
+  } else {
+    win.addEventListener('load', () => window.setTimeout(afterLayout, 120), { once: true });
+  }
 }
 
 function escapeHtml(text: string): string {
@@ -446,6 +509,7 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58
     <div>İade işleminiz kaydedilmiştir.</div>
     <div>İyi günler dileriz.</div>
   </div>
+  ${RECEIPT_TAIL_SPACER}
 </body>
 </html>`;
 }
@@ -483,7 +547,7 @@ export function buildReceiptHtml(
     ${receiptBaseStyles(paperWidthMm, pageMarginMm)}
   </style>
 </head>
-<body class="receipt-thermal" data-receipt-layout="80mm-v7">
+<body class="receipt-thermal" data-receipt-layout="80mm-v8">
   <div class="center title total-row"><strong>${data.businessName}</strong></div>
   <div class="center muted"><strong>SATIŞ FİŞİ</strong></div>
   <hr class="divider" />
@@ -505,14 +569,15 @@ export function buildReceiptHtml(
     <div><strong>Bizi tercih ettiğiniz için teşekkürler.</strong></div>
     <div><strong>İyi günler dileriz.</strong></div>
   </div>
+  ${RECEIPT_TAIL_SPACER}
 </body>
 </html>`;
 }
 
-/** POS-80C Mac: 80 mm rulo — 58mm/inç + «sayfa genişliğine sığdır» silik raster yapıyordu */
+/** POS-80C Mac: 80 mm rulo — sabit 297mm sayfa uzunluğu erken kesime yol açıyordu */
 const CLASSIC_RECEIPT_80MM_FIX = `
   <style>
-    @page { size: 80mm 297mm; margin: 0 !important; }
+    @page { size: 80mm auto; margin: 0 !important; }
     @media print {
       html, body {
         width: 72mm !important;
@@ -542,7 +607,7 @@ export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
       '<meta charset="utf-8" />\n  <meta name="viewport" content="width=302" />',
     )
     .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
-    .replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
+    .replace('</body>', `${buildReceiptPrintScript(80)}\n</body>`);
 }
 
 /** 80 mm ≈ 302px — 0×0 iframe Safari’de scrollHeight≈0 → kısa sayfa, erken kesim */
@@ -571,7 +636,6 @@ function printHtmlReceiptClassicIframe(html: string): Promise<void> {
     doc.write(html);
     doc.close();
 
-    let sawBeforePrint = false;
     const cleanup = () => {
       logReceiptPrint('classic-done');
       if (iframe.parentNode) document.body.removeChild(iframe);
@@ -579,24 +643,17 @@ function printHtmlReceiptClassicIframe(html: string): Promise<void> {
     };
 
     win.addEventListener('beforeprint', () => {
-      sawBeforePrint = true;
+      applyReceiptPageHeightInWindow(win);
       logReceiptPrint('beforeprint');
     });
     win.addEventListener('afterprint', cleanup, { once: true });
 
-    setTimeout(() => {
-      if (!sawBeforePrint) {
-        logReceiptPrint('fallback-parent-print', { reason: 'onload-script-blocked-or-slow' });
-        try {
-          win.focus();
-          win.print();
-        } catch (err) {
-          logReceiptPrint('error-parent-print', { message: String(err) });
-        }
-      }
-    }, 450);
+    scheduleThermalPrintInWindow(win, () => {
+      logReceiptPrint('error-parent-print');
+      cleanup();
+    });
 
-    setTimeout(cleanup, 8000);
+    setTimeout(cleanup, 60_000);
   });
 }
 
@@ -615,29 +672,14 @@ function printHtmlReceiptInWindow(win: Window, html: string, onDone: () => void)
     onDone();
   };
 
-  const triggerPrint = () => {
-    try {
-      doc.title = BLANK_PRINT_TITLE;
-      const applyH = (win as Window & { applyReceiptPageHeight?: () => void }).applyReceiptPageHeight;
-      if (typeof applyH === 'function') applyH();
-      win.focus();
-      win.print();
-    } catch {
-      cleanup();
-    }
-  };
-
   win.addEventListener('beforeprint', () => {
     doc.title = BLANK_PRINT_TITLE;
+    applyReceiptPageHeightInWindow(win);
   });
   win.addEventListener('afterprint', cleanup, { once: true });
   setTimeout(cleanup, 60_000);
 
-  if (doc.readyState === 'complete') {
-    setTimeout(triggerPrint, 180);
-  } else {
-    win.addEventListener('load', () => setTimeout(triggerPrint, 180), { once: true });
-  }
+  scheduleThermalPrintInWindow(win, cleanup);
 }
 
 function printHtmlReceiptViaIframe(html: string): Promise<void> {
@@ -729,9 +771,8 @@ export function printReturnReceipt(
   data: ReturnReceiptData,
   paperWidthMm: 58 | 80 = 80,
 ): Promise<void> {
-  const html = buildReturnReceiptHtml(data, paperWidthMm).replace(
-    '</body>',
-    `${buildReceiptPrintScript()}\n</body>`,
-  );
+  const html = buildReturnReceiptHtml(data, paperWidthMm)
+    .replace('</body>', `${RECEIPT_TAIL_SPACER}\n</body>`)
+    .replace('</body>', `${buildReceiptPrintScript(paperWidthMm)}\n</body>`);
   return printHtmlReceiptClassic(html);
 }
