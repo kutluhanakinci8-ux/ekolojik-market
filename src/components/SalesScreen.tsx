@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CATEGORIES } from '../data/categories';
 import type { Store } from '../store/useStore';
 import { buildReceiptFromCart, printThermalReceipt } from '../utils/receiptPrint';
+import { logReceiptPrint } from '../utils/receiptPrintLog';
 import { DEFAULT_POS_CHECKOUT_SETTINGS, type CompleteSaleOptions } from '../types/pos';
 import { tryFiscalReceipt } from '../utils/posFiscalCheckout';
 import { PosPaymentModal } from './pos/PosPaymentModal';
@@ -241,10 +242,16 @@ export function SalesScreen({ store }: SalesScreenProps) {
         { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
         store.productSets,
       );
-      if (useClassicReceipt) {
-        await printThermalReceipt(receiptData);
-      } else if (receiptPrinter.autoPrintOnSale && receiptPrinter.brand !== 'none') {
-        await printThermalReceipt(receiptData, receiptPrinter);
+      try {
+        if (useClassicReceipt) {
+          await printThermalReceipt(receiptData);
+        } else if (receiptPrinter.autoPrintOnSale && receiptPrinter.brand !== 'none') {
+          await printThermalReceipt(receiptData, receiptPrinter);
+        } else {
+          logReceiptPrint('skipped', { reason: 'advanced-disabled' });
+        }
+      } catch (err) {
+        logReceiptPrint('error-sale-print', { message: String(err) });
       }
     }
 

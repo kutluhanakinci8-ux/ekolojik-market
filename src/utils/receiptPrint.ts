@@ -3,6 +3,7 @@ import type { ProductSet } from '../types/productSet';
 import type { SaleReturn } from '../types/saleReturn';
 import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
+import { logReceiptPrint } from './receiptPrintLog';
 
 const BLANK_PRINT_TITLE = '\u200b';
 
@@ -448,6 +449,7 @@ export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
 /** Gizli iframe — yazdırma yalnızca fiş HTML içindeki onload script ile (parent print yok) */
 function printHtmlReceiptClassic(html: string): Promise<void> {
   return new Promise((resolve) => {
+    logReceiptPrint('classic-start', { htmlBytes: html.length });
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.cssText =
@@ -457,6 +459,7 @@ function printHtmlReceiptClassic(html: string): Promise<void> {
     const win = iframe.contentWindow;
     const doc = win?.document;
     if (!doc || !win) {
+      logReceiptPrint('error-no-iframe-window');
       document.body.removeChild(iframe);
       resolve();
       return;
@@ -466,12 +469,31 @@ function printHtmlReceiptClassic(html: string): Promise<void> {
     doc.write(html);
     doc.close();
 
+    let sawBeforePrint = false;
     const cleanup = () => {
+      logReceiptPrint('classic-done');
       if (iframe.parentNode) document.body.removeChild(iframe);
       resolve();
     };
 
+    win.addEventListener('beforeprint', () => {
+      sawBeforePrint = true;
+      logReceiptPrint('beforeprint');
+    });
     win.addEventListener('afterprint', cleanup, { once: true });
+
+    setTimeout(() => {
+      if (!sawBeforePrint) {
+        logReceiptPrint('fallback-parent-print', { reason: 'onload-script-blocked-or-slow' });
+        try {
+          win.focus();
+          win.print();
+        } catch (err) {
+          logReceiptPrint('error-parent-print', { message: String(err) });
+        }
+      }
+    }, 450);
+
     setTimeout(cleanup, 8000);
   });
 }
@@ -533,10 +555,12 @@ function printHtmlReceiptViaIframe(html: string): Promise<void> {
 /** Termal fiş: görünür yazdırma penceresi (gizli iframe Mac/termalde PDF ham veri basıyordu) */
 export function printHtmlReceipt(html: string): Promise<void> {
   return new Promise((resolve) => {
+    logReceiptPrint('advanced-start', { htmlBytes: html.length });
     const features =
       'popup,width=360,height=720,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
     const printWin = window.open('', 'market-pos-receipt-print', features);
     if (!printWin) {
+      logReceiptPrint('popup-blocked', { fallback: 'iframe' });
       void printHtmlReceiptViaIframe(html).then(resolve);
       return;
     }
@@ -551,15 +575,34 @@ export function printHtmlReceipt(html: string): Promise<void> {
   });
 }
 
+export async function printTestSaleReceipt(businessName: string): Promise<void> {
+  const sample: SaleReceiptData = {
+    businessName,
+    createdAt: new Date(),
+    paymentMethod: 'cash',
+    total: 1,
+    items: [{ name: 'TEST FIS', quantity: 1, unitPrice: 1, lineTotal: 1 }],
+    saleId: 'TEST',
+  };
+  logReceiptPrint('test-print');
+  await printThermalReceipt(sample);
+}
+
 export async function printThermalReceipt(
   data: SaleReceiptData,
   options?: ThermalReceiptPrintOptions,
 ): Promise<void> {
   if (options === undefined) {
+    logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
     await printHtmlReceiptClassic(buildGreenleafSaleReceiptHtml(data));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);
+  logReceiptPrint('thermal-advanced-path', {
+    saleId: data.saleId,
+    printMode: normalized.printMode,
+    paperWidthMm: normalized.paperWidthMm,
+  });
   const paper = normalized.paperWidthMm;
   const copies = normalized.copies;
   const margin = normalized.pageMarginMm;

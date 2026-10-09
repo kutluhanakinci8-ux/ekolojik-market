@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Store } from '../../store/useStore';
 import {
   DEFAULT_ZYWELL_RECEIPT_PRINTER,
@@ -6,6 +7,48 @@ import {
   type ReceiptPrintMode,
 } from '../../types/receiptPrinter';
 import { isPosLiteProfile } from '../../utils/tenantProductProfile';
+import { printTestSaleReceipt } from '../../utils/receiptPrint';
+import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
+import { loadTenantId } from '../../storage/tenantSession';
+
+function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
+  const [status, setStatus] = useState('');
+  const tenant = loadTenantId();
+  const logPath =
+    tenant === 'main' || !tenant
+      ? '/var/www/market-pos/data/receipt-print.log'
+      : `/var/www/market-pos/data/tenants/${tenant}/receipt-print.log`;
+
+  const runTest = async () => {
+    setStatus('Test fiş gönderiliyor…');
+    try {
+      await printTestSaleReceipt(businessName);
+      const err = getLastReceiptPrintError();
+      const tail = getReceiptPrintLog().slice(-5).map((e) => e.phase).join(' → ');
+      setStatus(err ? `Hata: ${err}` : `Adımlar: ${tail}`);
+    } catch (e) {
+      setStatus(`Hata: ${String(e)}`);
+    }
+  };
+
+  return (
+    <div className="settings-subpanel" style={{ marginTop: 12 }}>
+      <h3>Fiş teşhis</h3>
+      <button type="button" className="btn btn-outline" onClick={() => void runTest()}>
+        Test fiş yazdır
+      </button>
+      {status ? <p className="module-hint">{status}</p> : null}
+      <p className="module-hint">
+        <strong>Tarayıcı:</strong> F12 → Konsol → <code>market-pos-fis</code> satırları.
+        <br />
+        <strong>Sunucu (SSH):</strong> <code>tail -f {logPath}</code>
+        <br />
+        <strong>Mac yazıcı:</strong> Terminal → <code>lpstat -p</code> ve{' '}
+        <code>tail -f /var/log/cups/error_log</code>
+      </p>
+    </div>
+  );
+}
 
 interface PosReceiptPrinterSettingsPanelProps {
   store: Store;
@@ -20,6 +63,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           Lima Market (<strong>limaadmin</strong>) için fiş: satış sonrası otomatik, ek ayar yok.
           Chrome → <strong>POS-80C</strong> (Greenleaf kasadakiyle aynı kod).
         </p>
+        <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
       </section>
     );
   }
@@ -117,6 +161,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         <strong>Kapalı</strong> bırakın: diğer kullanıcıdaki (yonetici) gibi HTML fiş + Chrome + POS-80C.
         Sadece özel ihtiyaçta açın. Chrome: hedef POS-80C, üst/alt bilgiler kapalı, kenar yok, sayfa genişliğine sığdır.
       </p>
+      <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
     </section>
   );
 }
