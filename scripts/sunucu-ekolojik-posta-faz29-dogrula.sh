@@ -20,7 +20,8 @@ if(!d.ok || !d.counts) process.exit(1);
 console.log('OK   engagement summary opens', d.counts.opens);
 "
 
-posta_curl "${BASE}/api/posta/engagement/export.csv?type=combined&days=30" | head -n 1 | grep -q '^type,at' || exit 1
+ENG_CSV_HEAD="$(posta_curl "${BASE}/api/posta/engagement/export.csv?type=combined&days=30" 2>/dev/null | head -n 1 || true)"
+echo "${ENG_CSV_HEAD}" | grep -q '^type,at' || exit 1
 echo "OK   engagement export.csv"
 
 echo "✓ Faz 29 doğrulama geçti"
