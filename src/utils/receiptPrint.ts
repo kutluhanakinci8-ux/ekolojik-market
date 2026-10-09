@@ -445,10 +445,28 @@ export function buildReceiptHtml(
 </html>`;
 }
 
-/** Klasik kasa fişi: 80mm, kenar 0, boş başlık (Chrome üstbilgi çakışmasın) */
+/** POS-80C / Mac Chrome: sürücü çoğu zaman ~2,125 inç (58mm) rulo raporlar */
+const CLASSIC_RECEIPT_INCH_FIX = `
+  <style>
+    @page { size: 2.125in auto; margin: 0 !important; }
+    @media print {
+      html, body {
+        width: 2in !important;
+        max-width: 2.125in !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>`;
+
+/** Klasik kasa fişi: 58mm + inç uyumu, kenar 0 */
 export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
-  const body = buildReceiptHtml(data, 80, 0);
-  return body.replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
+  const body = buildReceiptHtml(data, 58, 0);
+  return body
+    .replace('</head>', `${CLASSIC_RECEIPT_INCH_FIX}</head>`)
+    .replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
 }
 
 /** Gizli iframe — yazdırma yalnızca fiş HTML içindeki onload script ile (parent print yok) */
