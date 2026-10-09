@@ -19,6 +19,13 @@ echo "Runtime: ${INSTALL_DIR}"
 echo "API:     ${EKOLOJIK_VERIFY_BASE_URL}"
 echo ""
 
+LOCK_FILE="${EKOLOJIK_FAZ22_LOCK:-/tmp/ekolojik-faz22-gate.lock}"
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  echo "HATA: Faz 22 kapısı zaten çalışıyor (${LOCK_FILE})"
+  exit 2
+fi
+
 FAIL=0
 run() {
   if env EKOLOJIK_VERIFY_ROOT="${INSTALL_DIR}" EKOLOJIK_VERIFY_BASE_URL="${EKOLOJIK_VERIFY_BASE_URL}" bash "$@"; then
