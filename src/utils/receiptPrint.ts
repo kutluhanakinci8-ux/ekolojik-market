@@ -581,12 +581,8 @@ export function buildReceiptHtml(
 </html>`;
 }
 
-/** Mac CUPS pos80.ppd: PageSize=X80mmY3276mm — tarayıcı custom ~210mm erken kesime yol açar */
-const CLASSIC_RECEIPT_ROLL_HEIGHT_MM = 3276;
-
 const CLASSIC_RECEIPT_80MM_FIX = `
   <style>
-    @page { size: 80mm ${CLASSIC_RECEIPT_ROLL_HEIGHT_MM}mm; margin: 0 !important; }
     @media print {
       html, body {
         width: 72mm !important;
@@ -604,19 +600,45 @@ const CLASSIC_RECEIPT_80MM_FIX = `
         font-size: 18px !important;
         color: #000 !important;
       }
+      body.receipt-plain-thermal {
+        font-family: ${RECEIPT_THERMAL_FONT} !important;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        line-height: 1.4 !important;
+        color: #000 !important;
+      }
     }
   </style>`;
 
-/** Klasik kasa fişi (Lima / yönetici): 80 mm termal, gizli iframe */
+/** Lima klasik: düz metin — HTML tablo Firefox+CUPS’ta kısa kesik raster yapıyordu */
+export function buildGreenleafPlainReceiptHtml(data: SaleReceiptData): string {
+  const plain = buildPlainTextSaleReceipt(data);
+  return wrapPlainReceiptBody(plain, 80, 0)
+    .replace(
+      'font-size: 11px;',
+      `font-size: 15px;\n      font-weight: 700;\n      font-family: ${RECEIPT_THERMAL_FONT};`,
+    )
+    .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
+    .replace(
+      '</body>',
+      `${RECEIPT_TAIL_SPACER}\n${buildReceiptPrintScript(80)}\n</body>`,
+    )
+    .replace('<body>', '<body class="receipt-plain-thermal" data-receipt-layout="plain-v10">');
+}
+
+/** HTML tablo fiş (yedek / test) */
 export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
-  const body = buildReceiptHtml(data, 80, 0);
+  const body = buildReceiptHtml(data, 80, 0).replace(
+    /@page\s*\{\s*size:\s*80mm\s+auto[^}]*\}/,
+    '',
+  );
   return body
     .replace(
       '<meta charset="utf-8" />',
       '<meta charset="utf-8" />\n  <meta name="viewport" content="width=302" />',
     )
     .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
-    .replace('</body>', `${buildReceiptPrintScript(80, CLASSIC_RECEIPT_ROLL_HEIGHT_MM)}\n</body>`);
+    .replace('</body>', `${buildReceiptPrintScript(80)}\n</body>`);
 }
 
 /** 80 mm ≈ 302px — opacity:0 / 0×0 iframe Firefox’ta fişi birkaç mm’ye indiriyordu */
@@ -626,7 +648,7 @@ const THERMAL_PRINT_IFRAME_STYLE =
 /** Görünmez iframe (80 mm genişlik) — ayrı Firefox penceresi açmaz */
 function printHtmlReceiptClassicIframe(html: string): Promise<void> {
   return new Promise((resolve) => {
-    logReceiptPrint('classic-iframe-start', { htmlBytes: html.length });
+    logReceiptPrint('classic-plain-iframe-start', { htmlBytes: html.length });
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.cssText = THERMAL_PRINT_IFRAME_STYLE;
@@ -753,7 +775,7 @@ export async function printThermalReceipt(
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
     remindChromeReceiptPrintSettings();
-    await printHtmlReceiptClassicIframe(buildGreenleafSaleReceiptHtml(data));
+    await printHtmlReceiptClassicIframe(buildGreenleafPlainReceiptHtml(data));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);
