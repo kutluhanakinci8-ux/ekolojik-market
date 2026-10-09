@@ -168,7 +168,7 @@ function receiptPageCss(paperWidthMm: 58 | 80, pageMarginMm = 0): string {
   return `@page { size: ${paperWidthMm}mm auto; margin: ${m}mm; }`;
 }
 
-/** Termal rulo: gri tonlar ve ince font raster’da silik basılır */
+/** Termal rulo: Chrome raster + CUPS — kontrast ve kalın stroke (silik basımı azaltır) */
 const THERMAL_PRINT_DARK_CSS = `
     @media print {
       html, body {
@@ -178,18 +178,20 @@ const THERMAL_PRINT_DARK_CSS = `
         print-color-adjust: exact;
       }
       body {
-        font-size: 12px;
-        font-weight: 600;
+        font-size: 13px;
+        font-weight: 900;
         color: #000 !important;
+        filter: contrast(1.45) brightness(0.88);
       }
-      .muted, .line-sub td, .footer, .line-name, .line-price {
+      .muted, .line-sub td, .footer, .line-name, .line-price, td, div {
         color: #000 !important;
+        -webkit-text-stroke: 0.2px #000;
+        text-shadow: 0.35px 0 0 #000, -0.35px 0 0 #000;
       }
-      .line td { font-weight: 600; }
-      .line-name, .line-price { font-weight: 700; }
-      .line-sub td { font-size: 10px; font-weight: 600; }
-      .title { font-weight: 900; }
-      .total-row td, .total-row .line-price { font-weight: 900; }
+      .line td { font-weight: 900; }
+      .line-sub td { font-size: 11px; font-weight: 900; }
+      .title { font-weight: 900; font-size: 15px; }
+      .total-row td, .total-row .line-price { font-weight: 900; font-size: 15px; }
       .divider { border-top-width: 2px; border-top-style: solid; }
     }`;
 
