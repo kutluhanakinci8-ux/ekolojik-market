@@ -22,12 +22,14 @@ import type { PremiumProductSearchHandle } from './PremiumProductSearch';
 import { usePosBarcodeWedge } from '../hooks/usePosBarcodeWedge';
 import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
 
 interface SalesScreenProps {
   store: Store;
 }
 
 export function SalesScreen({ store }: SalesScreenProps) {
+  const posLiteCheckout = isPosLiteProfile(store.settings);
   const posCheckout = useMemo(
     () => ({ ...DEFAULT_POS_CHECKOUT_SETTINGS, ...store.settings.posCheckout }),
     [store.settings.posCheckout],
@@ -522,12 +524,13 @@ export function SalesScreen({ store }: SalesScreenProps) {
             onParkSale={() => store.parkCurrentSale()}
             checkoutBusy={checkoutBusy}
             cashDayClosed={store.isCashDayClosed && (posCheckout.blockSalesWhenDayClosed ?? true)}
-            crmCouponCode={store.saleCouponCode}
-            onCrmCouponChange={store.setSaleCouponCode}
-            crmPointsToRedeem={store.saleLoyaltyPointsToRedeem}
-            onCrmPointsChange={store.setSaleLoyaltyPointsToRedeem}
-            cartSubtotal={store.cartSubtotal}
-            crmDiscountLabel={crmDiscountLabel}
+            crmCouponCode={posLiteCheckout ? '' : store.saleCouponCode}
+            onCrmCouponChange={posLiteCheckout ? undefined : store.setSaleCouponCode}
+            crmPointsToRedeem={posLiteCheckout ? 0 : store.saleLoyaltyPointsToRedeem}
+            onCrmPointsChange={posLiteCheckout ? undefined : store.setSaleLoyaltyPointsToRedeem}
+            cartSubtotal={posLiteCheckout ? undefined : store.cartSubtotal}
+            crmDiscountLabel={posLiteCheckout ? '' : crmDiscountLabel}
+            compactCheckout={posLiteCheckout}
             businessName={formatBusinessBrand(store.settings.businessName)}
             posNotes={store.settings.posNotes.items}
             posNotesDurationSec={store.settings.posNotes.displayDurationSec}

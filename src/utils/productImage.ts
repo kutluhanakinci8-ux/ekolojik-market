@@ -64,9 +64,24 @@ export function getPlaceholderImage(product: Product): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+/** Lima demo kopyası (main 1,4,5,6 → 1001–1004) — settings haritası yüklenmeden önce yedek */
+const LIMA_DEMO_CATALOG_IMAGE_ID: Record<number, number> = {
+  1001: 1,
+  1002: 4,
+  1003: 5,
+  1004: 6,
+};
+
+function resolveCatalogImageId(product: Product): number {
+  return product.catalogImageId ?? LIMA_DEMO_CATALOG_IMAGE_ID[product.id] ?? product.id;
+}
+
 export function getProductImageUrl(product: Product): string {
-  const catalogPath = getCatalogImagePath(product.id);
-  return product.imageUrl || catalogPath || getPlaceholderImage(product);
+  if (product.imageUrl?.startsWith('/product-images/')) {
+    return product.imageUrl;
+  }
+  const catalogPath = getCatalogImagePath(resolveCatalogImageId(product));
+  return catalogPath || getPlaceholderImage(product);
 }
 
 export function isCustomImage(product: Product): boolean {

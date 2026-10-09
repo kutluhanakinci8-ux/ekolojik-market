@@ -1555,10 +1555,69 @@ input {
   padding: 0 4px 8px;
 }
 
+.cart-panel-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .cart-panel-header-row h2 {
   font-size: 18px;
   font-weight: 600;
   flex-shrink: 0;
+  margin: 0;
+}
+
+.cart-panel-header-clear {
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(254, 226, 226, 0.9);
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cart-panel-header-clear:hover:not(:disabled) {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+
+.cart-panel-header-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cart-payment-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.cart-footer-clear {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cart-footer-clear:hover:not(:disabled) {
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #b91c1c;
+  background: rgba(254, 226, 226, 0.5);
+}
+
+.cart-footer-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .cart-panel-header-actions {
@@ -2639,9 +2698,105 @@ input {
 }
 
 .cart-panel-footer {
+  flex-shrink: 0;
   padding: 20px;
   border-top: 1px solid var(--border);
   background: var(--bg);
+}
+
+/* POS Lite — daha fazla sepet satırı, kompakt ödeme */
+.cart-panel--compact-checkout .cart-panel-footer {
+  padding: 10px 12px 8px;
+}
+
+.cart-panel--compact-checkout.cart-panel--has-items .sale-customer-bar {
+  display: none;
+}
+
+.cart-panel--compact-checkout .cart-item {
+  padding: 8px 10px;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.cart-panel--compact-checkout .cart-item-info {
+  gap: 8px;
+}
+
+.cart-panel--compact-checkout .cart-item-info .product-image-sm {
+  width: 40px;
+  height: 40px;
+}
+
+.cart-panel--compact-checkout .cart-item-name {
+  font-size: 12px;
+  -webkit-line-clamp: 2;
+}
+
+.cart-panel--compact-checkout .cart-item-controls {
+  gap: 8px;
+}
+
+.cart-panel--compact-checkout .qty-control {
+  padding: 2px;
+}
+
+.cart-panel--compact-checkout .qty-control button {
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+}
+
+.cart-panel--compact-checkout .qty-control span {
+  min-width: 20px;
+  font-size: 13px;
+}
+
+.cart-panel--compact-checkout .cart-item-total {
+  font-size: 13px;
+}
+
+.cart-panel--compact-checkout .cart-total {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.cart-panel--compact-checkout .cart-total strong {
+  font-size: 20px;
+}
+
+.cart-panel--compact-checkout .payment-buttons--pos {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cart-panel--compact-checkout .btn-payment {
+  padding: 7px 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+
+.cart-panel--compact-checkout .cart-park-btn {
+  margin-top: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  min-height: 0;
+}
+
+.cart-panel--compact-checkout .cart-shortcut-hint {
+  margin: 3px 0 0;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.cart-panel--compact-checkout .cart-panel-top--compact {
+  padding-bottom: 6px;
+}
+
+.cart-panel--compact-checkout .cart-panel-top--compact + .cart-panel-items {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .cart-total {

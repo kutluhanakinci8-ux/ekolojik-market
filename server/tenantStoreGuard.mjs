@@ -1,7 +1,9 @@
+import { mergePosLiteProductMediaOnWrite } from './posLiteProductMedia.mjs';
+
 /** POS Lite / ayrı tenant — main (Greenleaf) seed verisinin yazılmasını engelle */
 const MAIN_DEMO_USERNAMES = new Set(['yonetici', 'kasiyer']);
 
-function isPosLiteStore(store) {
+export function isPosLiteStore(store) {
   return store?.settings?.productProfile === 'pos-lite';
 }
 
@@ -33,7 +35,7 @@ export function guardIsolatedTenantStoreWrite(tenantId, existing, incoming) {
     out.products = [];
   }
 
-  return out;
+  return mergePosLiteProductMediaOnWrite(existing, out);
 }
 
 export function shouldSkipIrsaliyeStockMigration(tenantId, store) {
