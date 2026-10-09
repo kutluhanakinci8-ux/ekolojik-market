@@ -51,6 +51,10 @@ const PAYMENT_LABELS: Record<SaleReceiptData['paymentMethod'], string> = {
   credit: 'Veresiye',
 };
 
+/** Mac rastertopos: c0 ilk satırlara basılır — markadan önce atıl satırlar */
+const RECEIPT_DRIVER_SACRIFICE_LINES = 4;
+const RECEIPT_SACRIFICE_FILL = '-';
+
 function formatReceiptMoney(amount: number): string {
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
@@ -739,10 +743,6 @@ function sanitizeReceiptVisibleText(text: string): string {
 function formatReceiptBrandName(name: string): string {
   return sanitizeReceiptVisibleText(name).toLocaleUpperCase('tr-TR');
 }
-
-/** Sürücü çöpünü markadan önce tüket (c0 gizlenemez; satır kaydırılır) */
-const RECEIPT_DRIVER_SACRIFICE_LINES = 4;
-const RECEIPT_SACRIFICE_FILL = '-';
 
 function buildDriverSacrificeLinesHtml(): string {
   const line = RECEIPT_SACRIFICE_FILL.repeat(30);
