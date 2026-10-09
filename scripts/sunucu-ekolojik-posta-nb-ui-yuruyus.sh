@@ -40,7 +40,9 @@ echo "--- UI DOM smoke (Playwright, #1–6 / #10 / #15–25 kısmi) ---"
 VIS_FAIL=0
 # shellcheck source=scripts/lib/ensure-playwright.sh
 source "${REPO_ROOT}/scripts/lib/ensure-playwright.sh"
-ensure_playwright "${REPO_ROOT}" || true
+if ! ensure_playwright "${REPO_ROOT}"; then
+  echo "WARN Playwright kurulumu başarısız — ${REPO_ROOT}/scripts/lib/ensure-playwright.sh"
+fi
 if node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
   MINT_JSON="$(node "${REPO_ROOT}/scripts/lib/mint-posta-qa-token.mjs" "${INSTALL_DIR}/data" 2>/dev/null || true)"
   if [[ -n "${MINT_JSON}" ]]; then
