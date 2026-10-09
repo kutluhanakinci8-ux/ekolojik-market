@@ -5,7 +5,14 @@ set -euo pipefail
 INSTALL_DIR="${1:-/var/www/market-pos}"
 REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
 PORT="${PORT:-5180}"
+export EKOLOJIK_VERIFY_ROOT="${INSTALL_DIR}"
 export EKOLOJIK_VERIFY_BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT}}"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-posta-smoke-auth.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-smoke-auth.sh"
+ekolojik_posta_smoke_auth_init "${INSTALL_DIR}"
+BASE="${EKOLOJIK_VERIFY_BASE_URL}"
 
 echo "=== Ekolojik Posta Faz 22 — tam parite kapısı ==="
 echo "Runtime: ${INSTALL_DIR}"
@@ -14,7 +21,7 @@ echo ""
 
 FAIL=0
 run() {
-  if bash "$@"; then
+  if env EKOLOJIK_VERIFY_ROOT="${INSTALL_DIR}" EKOLOJIK_VERIFY_BASE_URL="${EKOLOJIK_VERIFY_BASE_URL}" bash "$@"; then
     echo ""
   else
     FAIL=1
