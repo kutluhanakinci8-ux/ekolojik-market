@@ -43,7 +43,7 @@ source "${REPO_ROOT}/scripts/lib/ensure-playwright.sh"
 if ! ensure_playwright "${REPO_ROOT}"; then
   echo "WARN Playwright kurulumu başarısız — ${REPO_ROOT}/scripts/lib/ensure-playwright.sh"
 fi
-if node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
+if (cd "${REPO_ROOT}" && node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null); then
   MINT_JSON="$(node "${REPO_ROOT}/scripts/lib/mint-posta-qa-token.mjs" "${INSTALL_DIR}/data" 2>/dev/null || true)"
   if [[ -n "${MINT_JSON}" ]]; then
     if EKOLOJIK_POS_QA_MINT_JSON="${MINT_JSON}" node "${REPO_ROOT}/scripts/posta-nb-ui-visual-smoke.mjs" "${BASE}"; then

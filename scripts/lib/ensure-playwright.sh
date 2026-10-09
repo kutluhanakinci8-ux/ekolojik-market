@@ -11,13 +11,19 @@ ensure_playwright() {
   export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-${root}/.playwright-browsers}"
   mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 
-  if node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
+  _pw_import_ok() {
+    (cd "${root}" && node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null)
+  }
+
+  if _pw_import_ok; then
+    (cd "${root}" && export PLAYWRIGHT_BROWSERS_PATH && npx playwright install chromium 2>/dev/null) || true
     return 0
   fi
 
   echo "==> Playwright (dev) kuruluyor: ${root}"
   (
     cd "${root}"
+    export PLAYWRIGHT_BROWSERS_PATH
     NODE_ENV=development npm install --include=dev --no-audit --no-fund
     if ! npm ls playwright --depth=0 >/dev/null 2>&1; then
       NODE_ENV=development npm install -D playwright --no-audit --no-fund
@@ -28,7 +34,7 @@ ensure_playwright() {
     fi
   )
 
-  if node -e "import('playwright').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
+  if _pw_import_ok; then
     return 0
   fi
   echo "HATA: Playwright import başarısız — NODE_ENV=development npm install && npx playwright install chromium"
