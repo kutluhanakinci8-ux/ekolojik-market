@@ -207,7 +207,19 @@ export function CartPanel({
         </div>
 
         <div className="cart-panel-header-row">
-          <h2>Sepet</h2>
+          <div className="cart-panel-header-title">
+            <h2>Sepet</h2>
+            {hasCartItems && (
+              <button
+                type="button"
+                className="cart-panel-header-clear"
+                onClick={onClear}
+                disabled={checkoutBusy}
+              >
+                Temizle
+              </button>
+            )}
+          </div>
           <div className="cart-panel-header-actions">
             {partnerLocked && (
               <span className="cart-panel-partner-chip">Partner</span>
@@ -262,11 +274,6 @@ export function CartPanel({
             >
               {customerSearchOpen ? 'Müşteri aramasını kapat' : 'Kayıtlı müşteri ara'}
             </button>
-            {hasCartItems && (
-              <button type="button" className="cart-panel-toolbar__clear" onClick={onClear}>
-                Temizle
-              </button>
-            )}
           </div>
 
           {customerSearchOpen && (
@@ -483,6 +490,18 @@ export function CartPanel({
 
           {cashDayClosed && (
             <p className="cart-day-closed-warn" role="alert">Kasa günü kapalı — satış kapalı (Ayarlar’dan kuralı değiştirebilirsiniz).</p>
+          )}
+          {compactCheckout && (
+            <div className="cart-payment-toolbar">
+              <button
+                type="button"
+                className="cart-footer-clear"
+                onClick={onClear}
+                disabled={checkoutBusy}
+              >
+                Temizle
+              </button>
+            </div>
           )}
           <div className="payment-buttons payment-buttons--pos">
             <button type="button" className="btn btn-payment cash" onClick={() => onCheckout('cash')} disabled={checkoutBusy || cashDayClosed}>
