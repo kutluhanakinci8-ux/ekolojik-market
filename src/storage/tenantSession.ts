@@ -1,3 +1,5 @@
+import { syncPosLocalStorageKeys } from './posLocalStorageKeys';
+
 const TENANT_KEY = 'market-pos-tenant-id';
 
 /** Varsayılan tenant — mevcut Greenleaf kullanıcıları */
@@ -14,6 +16,7 @@ export function loadTenantId(): string {
 export function saveTenantId(tenantId: string): void {
   try {
     localStorage.setItem(TENANT_KEY, tenantId);
+    syncPosLocalStorageKeys(tenantId);
   } catch {
     /* ignore */
   }
