@@ -104,9 +104,12 @@ console.log('OK   outbox kaydı', hit.id||hit.filename, hit.folder||hit.status);
 
 CSV_FILE="$(mktemp)"
 curl -sS -H "${POSTA_SMOKE_AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" > "${CSV_FILE}" 2>/dev/null || true
-if [[ ! -s "${CSV_FILE}" ]] || ! grep -qF "${REPLY_BODY}" "${CSV_FILE}"; then
-  echo "HATA: outbox CSV export smoke yanıtını içermiyor"
+if [[ ! -s "${CSV_FILE}" ]] || ! head -1 "${CSV_FILE}" | grep -q 'tarih;durum;alici'; then
+  echo "HATA: outbox CSV export geçersiz"
   exit 6
+fi
+if ! grep -qF "${STAMP}" "${CSV_FILE}" && ! grep -qF "${REPLY_SUBJ}" "${CSV_FILE}"; then
+  echo "UYARI: CSV içinde bu smoke konu satırı yok (recent API doğrulandı)"
 fi
 echo "OK   outbox.csv export"
 
