@@ -18,6 +18,16 @@ fi
 cd "$WORKDIR"
 unzip -qo "$ZIP"
 SRC="$WORKDIR/Hoin-POS-58-80-master"
+
+echo "→ Baski yogunlugu (ESC/POS) yaması..."
+DARK_PATCH="${DARK_PATCH:-$(dirname "$0")/mac-rastertopos-darkness.patch}"
+if [[ -f "$DARK_PATCH" ]]; then
+  (cd "$SRC" && patch -p1 -N -r - < "$DARK_PATCH") || true
+elif ! grep -q 'POS-80C: koyu' "$SRC/rastertopos/rastertopos.c" 2>/dev/null; then
+  perl -i.bak -0pe 's/(putchar\(0x40\);\n)/$1\t\/* POS-80C: koyu baski *\/\n\tputchar(0x1b);\n\tputchar('"'"'7'"'"');\n\tputchar(128);\n\tputchar(150);\n\tputchar(2);\n/s' \
+    "$SRC/rastertopos/rastertopos.c" || true
+fi
+
 cd "$SRC/rastertopos"
 
 echo "→ rastertopos derleniyor (Mach-O olmalı)..."
