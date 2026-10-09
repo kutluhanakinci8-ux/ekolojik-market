@@ -168,11 +168,37 @@ function receiptPageCss(paperWidthMm: 58 | 80, pageMarginMm = 0): string {
   return `@page { size: ${paperWidthMm}mm auto; margin: ${m}mm; }`;
 }
 
+/** Termal rulo: gri tonlar ve ince font raster’da silik basılır */
+const THERMAL_PRINT_DARK_CSS = `
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        font-size: 12px;
+        font-weight: 600;
+        color: #000 !important;
+      }
+      .muted, .line-sub td, .footer, .line-name, .line-price {
+        color: #000 !important;
+      }
+      .line td { font-weight: 600; }
+      .line-name, .line-price { font-weight: 700; }
+      .line-sub td { font-size: 10px; font-weight: 600; }
+      .title { font-weight: 900; }
+      .total-row td, .total-row .line-price { font-weight: 900; }
+      .divider { border-top-width: 2px; border-top-style: solid; }
+    }`;
+
 function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string {
   const bodyWidth = paperWidthMm === 58 ? 50 : 72;
   return `
     ${receiptPageCss(paperWidthMm, pageMarginMm)}
-    @media print {
+    ${THERMAL_PRINT_DARK_CSS}
+    @media screen {
       html, body { margin: 0 !important; padding: 0 !important; }
     }
     * { box-sizing: border-box; }
@@ -189,10 +215,10 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
     .center { text-align: center; }
     .bold { font-weight: 700; }
     .title { font-size: 14px; font-weight: 800; margin-bottom: 2px; }
-    .muted { color: #333; font-size: 10px; }
+    .muted { color: #000; font-size: 10px; }
     .divider {
       border: none;
-      border-top: 1px dashed #000;
+      border-top: 1px solid #000;
       margin: 8px 0;
     }
     table { width: 100%; border-collapse: collapse; }
@@ -202,7 +228,7 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
     .line-sub td {
       padding: 0 0 4px;
       font-size: 9px;
-      color: #444;
+      color: #000;
     }
     .total-row td {
       padding-top: 6px;
