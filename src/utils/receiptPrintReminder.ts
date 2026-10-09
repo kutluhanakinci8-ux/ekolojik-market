@@ -13,6 +13,7 @@ export function remindChromeReceiptPrintSettings(): void {
       + '1. Hedef: «PDF olarak kaydet» DEĞİL → USB yazıcı (POS-80C / Zywell)\n'
       + '   (Liste boşsa: Mac Ayarlar → Yazıcılar, USB takılı mı; Chrome’u kapat-aç)\n'
       + '2. «Üst bilgi ve alt bilgileri yazdır» KAPALI — açıksa kenarda URL/c0 benzeri çöp + başlık bozulur\n'
+      + '   (Mac: hâlâ c0 varsa rastertopos koyuluk yaması — scripts/diag-fis-yazici.sh notu)\n'
       + '3. ÖLÇEK (zorunlu): tam %100 — 89 veya «sayfa genişliğine sığdır» OLMAZ\n'
       + '   (Silik basım + erken kesik fiş genelde buradan.)\n'
       + '4. Kenar boşluk: Yok\n'

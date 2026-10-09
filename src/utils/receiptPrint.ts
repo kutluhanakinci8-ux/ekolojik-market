@@ -340,15 +340,20 @@ function applyReceiptPageHeightInWindow(win: ReceiptPrintWindow): void {
 /** Layout + fontlar otursun, sonra ölçüm ve yazdır (beforeprint tek başına yetmeyebilir) */
 function scheduleThermalPrintInWindow(win: ReceiptPrintWindow, onError?: () => void): void {
   const doc = win.document;
+  let printInvoked = false;
   const trigger = () => {
+    if (printInvoked) return;
     applyReceiptPageHeightInWindow(win);
     window.setTimeout(() => {
+      if (printInvoked) return;
+      printInvoked = true;
       applyReceiptPageHeightInWindow(win);
       try {
         doc.title = BLANK_PRINT_TITLE;
         win.focus();
         win.print();
       } catch {
+        printInvoked = false;
         onError?.();
       }
     }, 60);
@@ -610,22 +615,31 @@ function receiptPremiumStyles(): string {
     * { box-sizing: border-box; }
     body.receipt-premium {
       margin: 0;
-      padding: 6px 4px 8px;
+      padding: 0 4px 8px;
       width: 72mm;
-      font-family: ${RECEIPT_THERMAL_FONT};
+      font-family: Arial, sans-serif;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 1.35;
       color: #000;
       background: #fff;
       -webkit-font-smoothing: none;
+      font-synthesis: none;
+    }
+    /* Mac rastertopos koyuluk ESC baytları bazen ilk satırda c0/çöp basar */
+    .rp-driver-skip {
+      display: block;
+      height: 22mm;
+      min-height: 22mm;
+      width: 100%;
     }
     .rp-brand {
       text-align: center;
-      font-size: 19px;
-      font-weight: 700;
+      font-size: 20px;
+      font-weight: 400;
       letter-spacing: normal;
-      margin: 0 0 4px;
+      margin: 0 0 6px;
+      line-height: 1.15;
       word-break: break-word;
     }
     .rp-kind {
@@ -696,8 +710,16 @@ function receiptPremiumStyles(): string {
   `;
 }
 
+function sanitizeReceiptVisibleText(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function formatReceiptBrandName(name: string): string {
-  return name.trim().toLocaleUpperCase('tr-TR');
+  return sanitizeReceiptVisibleText(name).toLocaleUpperCase('tr-TR');
 }
 
 /** Lima premium termal — hizalı tablo, tek ağırlık (ghost/çift basım yok) */
@@ -708,7 +730,7 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
       (item) => `
     <tr class="rp-item-name"><td colspan="2">${escapeHtml(item.name)}</td></tr>
     <tr class="rp-item-detail">
-      <td class="rp-sub">${item.quantity} × ${formatReceiptMoneyPlain(item.unitPrice)}</td>
+      <td class="rp-sub">${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}</td>
       <td class="rp-amt">${formatReceiptMoneyPlain(item.lineTotal)}</td>
     </tr>`,
     )
@@ -722,9 +744,10 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
   <title>${BLANK_PRINT_TITLE}</title>
   <style>${receiptPremiumStyles()}</style>
 </head>
-<body class="receipt-premium" data-receipt-layout="premium-v12">
-  <p class="rp-brand">${escapeHtml(formatReceiptBrandName(data.businessName))}</p>
-  <p class="rp-kind">SATIŞ FİŞİ</p>
+<body class="receipt-premium">
+  <div class="rp-driver-skip" aria-hidden="true"></div>
+  <div class="rp-brand">${escapeHtml(formatReceiptBrandName(data.businessName))}</div>
+  <div class="rp-kind">SATIŞ FİŞİ</div>
   <hr class="rp-rule" />
   <table class="rp-meta" role="presentation">
     <tr><td class="rp-label">Tarih</td><td class="rp-value">${formatReceiptDateTime(data.createdAt)}</td></tr>
@@ -782,11 +805,54 @@ export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
     .replace('</body>', `${buildReceiptPrintScript(80)}\n</body>`);
 }
 
-/** 80 mm ≈ 302px — opacity:0 / 0×0 iframe Firefox’ta fişi birkaç mm’ye indiriyordu */
-const THERMAL_PRINT_IFRAME_STYLE =
-  'position:fixed;left:0;top:0;width:302px;min-height:400px;height:auto;border:0;margin:0;padding:0;z-index:-1;pointer-events:none;overflow:visible;';
+const RECEIPT_PRINT_WINDOW_NAME = 'lima-market-receipt-print';
 
-/** Görünmez iframe (80 mm genişlik) — ayrı Firefox penceresi açmaz */
+/** 80 mm ≈ 302px — gizli iframe yedek (ana sayfa ile bindirme riski) */
+const THERMAL_PRINT_IFRAME_STYLE =
+  'position:fixed;left:0;top:0;width:302px;min-height:400px;height:auto;border:0;margin:0;padding:0;z-index:2147483646;background:#fff;pointer-events:none;overflow:visible;';
+
+/** Sadece fiş HTML — küçük popup (POS arka planı basılmaz) */
+function printHtmlReceiptIsolatedWindow(html: string): Promise<void> {
+  return new Promise((resolve) => {
+    logReceiptPrint('classic-premium-window-start', { htmlBytes: html.length });
+    const features =
+      'popup=yes,width=340,height=720,left=60,top=40,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
+    const win = window.open('', RECEIPT_PRINT_WINDOW_NAME, features) as ReceiptPrintWindow | null;
+    if (!win) {
+      logReceiptPrint('popup-blocked', { fallback: 'iframe' });
+      void printHtmlReceiptClassicIframe(html).then(resolve);
+      return;
+    }
+
+    let finished = false;
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      logReceiptPrint('classic-done');
+      try {
+        win.close();
+      } catch {
+        /* ignore */
+      }
+      resolve();
+    };
+
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.document.title = BLANK_PRINT_TITLE;
+
+    win.addEventListener('beforeprint', () => {
+      applyReceiptPageHeightInWindow(win);
+      logReceiptPrint('beforeprint');
+    });
+    win.addEventListener('afterprint', cleanup, { once: true });
+    setTimeout(cleanup, 60_000);
+    scheduleThermalPrintInWindow(win, cleanup);
+  });
+}
+
+/** Görünmez iframe yedek */
 function printHtmlReceiptClassicIframe(html: string): Promise<void> {
   return new Promise((resolve) => {
     logReceiptPrint('classic-premium-iframe-start', { htmlBytes: html.length });
@@ -916,7 +982,7 @@ export async function printThermalReceipt(
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
     remindChromeReceiptPrintSettings();
-    await printHtmlReceiptClassicIframe(buildGreenleafPremiumReceiptHtml(data));
+    await printHtmlReceiptIsolatedWindow(buildGreenleafPremiumReceiptHtml(data));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);
