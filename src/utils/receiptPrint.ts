@@ -593,13 +593,6 @@ const CLASSIC_RECEIPT_80MM_FIX = `
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      body.receipt-thermal,
-      body.receipt-thermal * {
-        font-family: ${RECEIPT_THERMAL_FONT} !important;
-        font-weight: 900 !important;
-        font-size: 18px !important;
-        color: #000 !important;
-      }
       body.receipt-plain-thermal {
         font-family: ${RECEIPT_THERMAL_FONT} !important;
         font-size: 15px !important;
@@ -610,7 +603,149 @@ const CLASSIC_RECEIPT_80MM_FIX = `
     }
   </style>`;
 
-/** Lima klasik: düz metin — HTML tablo Firefox+CUPS’ta kısa kesik raster yapıyordu */
+function receiptPremiumStyles(): string {
+  return `
+    @page { size: 80mm auto; margin: 0; }
+    * { box-sizing: border-box; }
+    body.receipt-premium {
+      margin: 0;
+      padding: 6px 4px 8px;
+      width: 72mm;
+      font-family: ${RECEIPT_THERMAL_FONT};
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.35;
+      color: #000;
+      background: #fff;
+      -webkit-font-smoothing: none;
+    }
+    .rp-brand {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin: 0 0 4px;
+    }
+    .rp-kind {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      margin: 0 0 10px;
+    }
+    .rp-rule {
+      border: none;
+      border-top: 1px solid #000;
+      margin: 10px 0;
+    }
+    .rp-rule--thick { border-top-width: 2px; }
+    .rp-meta {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .rp-meta td { padding: 3px 0; vertical-align: top; }
+    .rp-meta .rp-label { width: 38%; font-weight: 700; }
+    .rp-meta .rp-value { text-align: right; font-weight: 600; }
+    .rp-items { width: 100%; border-collapse: collapse; margin-top: 2px; }
+    .rp-item-name td {
+      padding: 8px 0 2px;
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+    .rp-item-detail td {
+      padding: 0 0 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .rp-item-detail .rp-sub { text-align: left; }
+    .rp-item-detail .rp-amt {
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .rp-total { width: 100%; border-collapse: collapse; margin-top: 2px; }
+    .rp-total td { padding: 8px 0 4px; font-size: 16px; font-weight: 800; }
+    .rp-total .rp-total-label { text-align: left; letter-spacing: 0.05em; }
+    .rp-total .rp-total-amt { text-align: right; white-space: nowrap; }
+    .rp-footer {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 12px;
+      line-height: 1.45;
+    }
+    .rp-footer strong {
+      display: block;
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+    ${receiptTailSpacerCss()}
+    @media print {
+      html, body { margin: 0 !important; padding: 0 !important; }
+      body.receipt-premium { width: 72mm !important; color: #000 !important; }
+    }
+  `;
+}
+
+/** Lima premium termal — hizalı tablo, tek ağırlık (ghost/çift basım yok) */
+export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string {
+  const receiptRef = data.receiptNo || data.saleId || '—';
+  const itemRows = data.items
+    .map(
+      (item) => `
+    <tr class="rp-item-name"><td colspan="2">${escapeHtml(item.name)}</td></tr>
+    <tr class="rp-item-detail">
+      <td class="rp-sub">${item.quantity} × ${formatReceiptMoneyPlain(item.unitPrice)}</td>
+      <td class="rp-amt">${formatReceiptMoneyPlain(item.lineTotal)}</td>
+    </tr>`,
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=302" />
+  <title>${BLANK_PRINT_TITLE}</title>
+  <style>${receiptPremiumStyles()}</style>
+</head>
+<body class="receipt-premium" data-receipt-layout="premium-v11">
+  <p class="rp-brand">${escapeHtml(data.businessName)}</p>
+  <p class="rp-kind">Satış Fişi</p>
+  <hr class="rp-rule" />
+  <table class="rp-meta" role="presentation">
+    <tr><td class="rp-label">Tarih</td><td class="rp-value">${formatReceiptDateTime(data.createdAt)}</td></tr>
+    <tr><td class="rp-label">Fiş No</td><td class="rp-value">${escapeHtml(receiptRef)}</td></tr>
+    <tr><td class="rp-label">Ödeme</td><td class="rp-value">${PAYMENT_LABELS[data.paymentMethod]}</td></tr>
+  </table>
+  <hr class="rp-rule" />
+  <table class="rp-items" role="presentation">${itemRows}</table>
+  <hr class="rp-rule rp-rule--thick" />
+  <table class="rp-total" role="presentation">
+    <tr>
+      <td class="rp-total-label">TOPLAM</td>
+      <td class="rp-total-amt">${formatReceiptMoneyPlain(data.total)}</td>
+    </tr>
+  </table>
+  <hr class="rp-rule" />
+  <div class="rp-footer">
+    <strong>Teşekkür ederiz</strong>
+    İyi günler dileriz.
+  </div>
+  ${RECEIPT_TAIL_SPACER}
+  ${buildReceiptPrintScript(80)}
+</body>
+</html>`;
+}
+
+/** Lima klasik: düz metin yedek */
 export function buildGreenleafPlainReceiptHtml(data: SaleReceiptData): string {
   const plain = buildPlainTextSaleReceipt(data);
   return wrapPlainReceiptBody(plain, 80, 0)
@@ -648,7 +783,7 @@ const THERMAL_PRINT_IFRAME_STYLE =
 /** Görünmez iframe (80 mm genişlik) — ayrı Firefox penceresi açmaz */
 function printHtmlReceiptClassicIframe(html: string): Promise<void> {
   return new Promise((resolve) => {
-    logReceiptPrint('classic-plain-iframe-start', { htmlBytes: html.length });
+    logReceiptPrint('classic-premium-iframe-start', { htmlBytes: html.length });
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.cssText = THERMAL_PRINT_IFRAME_STYLE;
@@ -775,7 +910,7 @@ export async function printThermalReceipt(
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
     remindChromeReceiptPrintSettings();
-    await printHtmlReceiptClassicIframe(buildGreenleafPlainReceiptHtml(data));
+    await printHtmlReceiptClassicIframe(buildGreenleafPremiumReceiptHtml(data));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);

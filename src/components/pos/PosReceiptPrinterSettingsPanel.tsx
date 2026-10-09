@@ -68,8 +68,8 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
           <strong>Lima Market</strong> — ayrı mağaza, <strong>limaadmin</strong> ile giriş. Satış sonrası
-          otomatik fiş; burada ek yazıcı ayarı yok. Yazdır hedefi: <strong>POS-80C</strong>, 80&nbsp;mm,
-          üst/alt bilgi <strong>kapalı</strong>, ölçek %100.
+          otomatik <strong>premium</strong> termal fiş; yazıcı ayarı burada yok. Hedef: <strong>POS-80C</strong>,
+          üst/alt bilgi kapalı, ölçek %100.
         </p>
         <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
