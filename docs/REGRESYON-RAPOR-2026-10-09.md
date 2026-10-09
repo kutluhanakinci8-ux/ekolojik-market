@@ -9,7 +9,8 @@
 | VPS `pre-release-qa` | ✓ **51 PASS, 0 FAIL** |
 | VPS Wave 3 operatör (Playwright) | ✓ |
 | VPS DNS `EKOLOJIK_DNS_STRICT=1` | ✓ |
-| VPS `faz22-dogrula` | ✗ **düzeltildi** — Wave2↔Faz22 döngüsü |
+| VPS `faz22-dogrula` | ✓ (Wave2 döngüsü + Faz20 auth + Faz28/29 SIGPIPE sonrası) |
+| VPS `e2e-tam` (Akış A/B) | ✓ (Faz 38 Bearer — akis smoke auth) |
 
 ## Bulunan hata (giderildi)
 
