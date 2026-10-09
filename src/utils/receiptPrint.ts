@@ -288,14 +288,8 @@ function buildReceiptPrintScript(): string {
         document.title = t;
         applyReceiptPageHeight();
       }
+      window.applyReceiptPageHeight = applyReceiptPageHeight;
       window.onbeforeprint = before;
-      window.onload = function () {
-        before();
-        setTimeout(function () {
-          applyReceiptPageHeight();
-          window.print();
-        }, 150);
-      };
     })();
   </script>`;
 }
@@ -483,12 +477,13 @@ export function buildReceiptHtml(
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=302" />
   <title>${BLANK_PRINT_TITLE}</title>
   <style>
     ${receiptBaseStyles(paperWidthMm, pageMarginMm)}
   </style>
 </head>
-<body class="receipt-thermal" data-receipt-layout="80mm-v6">
+<body class="receipt-thermal" data-receipt-layout="80mm-v7">
   <div class="center title total-row"><strong>${data.businessName}</strong></div>
   <div class="center muted"><strong>SATIŞ FİŞİ</strong></div>
   <hr class="divider" />
@@ -542,18 +537,54 @@ const CLASSIC_RECEIPT_80MM_FIX = `
 export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
   const body = buildReceiptHtml(data, 80, 0);
   return body
+    .replace(
+      '<meta charset="utf-8" />',
+      '<meta charset="utf-8" />\n  <meta name="viewport" content="width=302" />',
+    )
     .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
     .replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
 }
 
-/** Gizli iframe — yazdırma yalnızca fiş HTML içindeki onload script ile (parent print yok) */
-function printHtmlReceiptClassic(html: string): Promise<void> {
+/** 80 mm ≈ 302px — 0×0 iframe Safari’de scrollHeight≈0 → kısa sayfa, erken kesim */
+const THERMAL_PRINT_IFRAME_STYLE =
+  'position:fixed;left:-12000px;top:0;width:302px;min-height:1600px;height:auto;border:0;opacity:0;pointer-events:none;';
+
+/** Dar popup: layout doğru, yazdırma fiş HTML içindeki script ile (çift print yok) */
+function printHtmlReceiptClassicPopup(html: string): Promise<void> {
   return new Promise((resolve) => {
-    logReceiptPrint('classic-start', { htmlBytes: html.length });
+    logReceiptPrint('classic-popup-start', { htmlBytes: html.length });
+    const features =
+      'popup,width=340,height=1100,left=60,top=40,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
+    const printWin = window.open('', 'market-pos-receipt-classic', features);
+    if (!printWin) {
+      logReceiptPrint('classic-popup-blocked', { fallback: 'iframe' });
+      void printHtmlReceiptClassicIframe(html).then(resolve);
+      return;
+    }
+    printWin.document.open();
+    printWin.document.write(html);
+    printWin.document.close();
+    const done = () => {
+      logReceiptPrint('classic-done');
+      try {
+        printWin.close();
+      } catch {
+        /* ignore */
+      }
+      resolve();
+    };
+    printWin.addEventListener('afterprint', done, { once: true });
+    setTimeout(done, 90_000);
+  });
+}
+
+/** Yedek: boyutlu iframe (0×0 değil) */
+function printHtmlReceiptClassicIframe(html: string): Promise<void> {
+  return new Promise((resolve) => {
+    logReceiptPrint('classic-iframe-start', { htmlBytes: html.length });
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText =
-      'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
+    iframe.style.cssText = THERMAL_PRINT_IFRAME_STYLE;
     document.body.appendChild(iframe);
 
     const win = iframe.contentWindow;
@@ -598,6 +629,11 @@ function printHtmlReceiptClassic(html: string): Promise<void> {
   });
 }
 
+/** @deprecated use printHtmlReceiptClassicPopup */
+function printHtmlReceiptClassic(html: string): Promise<void> {
+  return printHtmlReceiptClassicPopup(html);
+}
+
 function printHtmlReceiptInWindow(win: Window, html: string, onDone: () => void): void {
   const doc = win.document;
   doc.open();
@@ -612,6 +648,8 @@ function printHtmlReceiptInWindow(win: Window, html: string, onDone: () => void)
   const triggerPrint = () => {
     try {
       doc.title = BLANK_PRINT_TITLE;
+      const applyH = (win as Window & { applyReceiptPageHeight?: () => void }).applyReceiptPageHeight;
+      if (typeof applyH === 'function') applyH();
       win.focus();
       win.print();
     } catch {
@@ -637,7 +675,7 @@ function printHtmlReceiptViaIframe(html: string): Promise<void> {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.cssText =
-      'position:fixed;left:0;top:0;width:1px;height:1px;border:0;opacity:0.01;pointer-events:none;';
+      'position:fixed;left:-10000px;top:0;width:302px;min-height:2400px;height:auto;border:0;opacity:0.01;pointer-events:none;';
     document.body.appendChild(iframe);
     const win = iframe.contentWindow;
     if (!win) {
@@ -695,7 +733,7 @@ export async function printThermalReceipt(
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
     remindChromeReceiptPrintSettings();
-    await printHtmlReceiptClassic(buildGreenleafSaleReceiptHtml(data));
+    await printHtmlReceiptClassicPopup(buildGreenleafSaleReceiptHtml(data));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);
