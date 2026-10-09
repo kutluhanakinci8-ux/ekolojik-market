@@ -24,7 +24,9 @@ Haftalık cron: `scripts/sunucu-ekolojik-outbox-failed-cron-kur.sh` (Pazar 04:30
 
 ```bash
 curl -sS http://127.0.0.1:5180/api/email/health | jq .counts
-find /var/www/market-pos/data/email-outbox/failed -name '*.json' | wc -l
+# Aktif failed (arşiv hariç):
+find /var/www/market-pos/data/email-outbox/failed \
+  -path '*/archive/*' -prune -o -name '*.json' -print | wc -l
 ```
 
 Yeni hatalar için: `scripts/sunucu-ekolojik-smtp-ops-recipient-dogrula.sh` (ops alıcı Postfix uyumu).
