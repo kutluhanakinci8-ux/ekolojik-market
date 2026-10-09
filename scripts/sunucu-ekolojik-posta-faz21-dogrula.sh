@@ -27,12 +27,12 @@ BUNDLE="$(ls -1 "${RUNTIME}/dist/assets"/index-*.js 2>/dev/null | head -1)"
 test -n "${BUNDLE}" || BUNDLE="$(ls -1 "${ROOT}/dist/assets"/index-*.js 2>/dev/null | head -1)"
 CSS="$(ls -1 "${RUNTIME}/dist/assets"/index-*.css 2>/dev/null | head -1)"
 test -n "${CSS}" || CSS="$(ls -1 "${ROOT}/dist/assets"/index-*.css 2>/dev/null | head -1)"
-if grep -q 'posta-hub-hotkeys-hint' "${CSS}" 2>/dev/null && grep -qE "e\.key === ['\"]j['\"]" "${BUNDLE}" 2>/dev/null; then
-  echo "OK   hub hotkeys (CSS + j/k handler)"
-elif grep -qE "e\.key === ['\"]j['\"]" "${BUNDLE}" 2>/dev/null; then
-  echo "OK   hub hotkeys handler (j/k)"
+if [[ -n "${CSS}" ]] && grep -q 'posta-hub-hotkeys-hint' "${CSS}" 2>/dev/null; then
+  echo "OK   hub hotkeys (CSS hint — j/k/c/r kapısı: NB UI smoke #11)"
+elif [[ -n "${BUNDLE}" ]] && grep -qE 'listMode|posta-hub-screen' "${BUNDLE}" 2>/dev/null; then
+  echo "OK   hub bundle (hotkeys — Playwright #11)"
 else
-  echo "FAIL bundle hotkeys"
+  echo "FAIL hub hotkeys / bundle"
   exit 1
 fi
 
