@@ -164,6 +164,8 @@ export type PostaDnsChecklistRow = {
   id: string;
   label: string;
   recordName: string;
+  panelHost?: string;
+  recordType?: string;
   status: string;
   current?: string | null;
   suggested?: string | null;
@@ -186,10 +188,16 @@ export type PostaDeliverabilityHub = {
     dkim: { status: string; value: string | null };
     selector?: string;
   };
-  suggestedRecords?: { spf: string; dmarc: string; dkimHint: string };
+  suggestedRecords?: { spf: string; dmarc: string; dkim?: string | null; dkimHint: string };
   dnsChecklist?: PostaDnsChecklistRow[];
   missingDns?: string[];
   deliverabilityReady?: boolean;
+  dnsPanelGuide?: {
+    provider: string;
+    ns: string[];
+    docPath: string;
+    strictCommand: string;
+  };
   error?: string;
 };
 

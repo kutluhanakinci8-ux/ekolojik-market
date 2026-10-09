@@ -12,7 +12,7 @@ echo ""
 
 echo "--- Registrar / DNS panel — kopyala-yapıştır ---"
 echo "@ TXT     v=spf1 ip4:${VPS_IP} a mx ~all"
-echo "_dmarc TXT  v=DMARC1; p=none; rua=mailto:info@${DOMAIN}"
+echo "_dmarc TXT  v=DMARC1; p=quarantine; rua=mailto:bildirim@${DOMAIN}; pct=100"
 echo ""
 
 if [[ -f "/etc/opendkim/keys/${DOMAIN}/${SELECTOR}.txt" ]]; then

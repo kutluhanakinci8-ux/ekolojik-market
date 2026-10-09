@@ -67,7 +67,7 @@ for sel in "${SELECTORS[@]}"; do
 done
 if [[ $DKIM_FOUND -eq 0 ]]; then
   if [[ "${STRICT}" == "1" ]]; then
-    bad "DKIM TXT bulunamadı (default/mail/selector1 denendi)"
+    bad "DKIM TXT bulunamadı (selector: ${SELECTORS[*]} — Turhost: ekolojik._domainkey)"
   else
     warn "DKIM selector denemeleri boş — panel/hosting DKIM adını kontrol edin"
   fi

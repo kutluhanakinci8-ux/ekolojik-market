@@ -60,7 +60,7 @@ bash scripts/sunucu-ekolojik-imap-vps-alias-fix.sh   # root — virtual_alias_ma
 node scripts/outbox-failed-archive-report.mjs /var/www/market-pos/data 800
 ```
 
-DNS TXT önerileri (panelde SPF/DMARC/DKIM): `bash scripts/sunucu-ekolojik-dns-txt-onerileri.sh /var/www/market-pos`  
+DNS TXT önerileri (Turhost panel, SPF/DMARC/DKIM tek tablo): `bash scripts/sunucu-ekolojik-dns-txt-onerileri.sh /var/www/market-pos` — rehber: `docs/EKOLOJIK-DNS-TURHOST-PANEL.md`  
 Kırılma testi giderim faz planı: `docs/PLAN-KIRILMA-GIDERIM.md`
 
 ---

@@ -6,8 +6,12 @@ set -euo pipefail
 
 DOMAIN="${EKOLOJIK_MAIL_DOMAIN:-ekolojikmarket.com.tr}"
 SELECTOR="${EKOLOJIK_DKIM_SELECTOR:-ekolojik}"
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
 APPLY=0
 [[ "${1:-}" == "--apply" ]] && APPLY=1
+
+# shellcheck source=scripts/lib/ekolojik-opendkim-dns-txt.sh
+source "${REPO_ROOT}/scripts/lib/ekolojik-opendkim-dns-txt.sh" 2>/dev/null || true
 
 KEY_DIR="/etc/opendkim/keys/${DOMAIN}"
 PRIVATE_KEY="${KEY_DIR}/${SELECTOR}.private"
@@ -28,18 +32,22 @@ fi
 show_txt() {
   if [[ -f "${TXT_FILE}" ]]; then
     echo "DNS TXT (panelde ${SELECTOR}._domainkey.${DOMAIN}):"
-    awk '
-      BEGIN { v="" }
-      /"/ {
-        for (i=1;i<=NF;i++) {
-          if ($i ~ /^"/ || v != "") {
-            gsub(/^"|"$/, "", $i)
-            v = v $i
+    if declare -f ekolojik_opendkim_txt_oneline >/dev/null 2>&1; then
+      ekolojik_opendkim_txt_oneline "${TXT_FILE}"
+    else
+      awk '
+        BEGIN { v="" }
+        /"/ {
+          for (i=1;i<=NF;i++) {
+            if ($i ~ /^"/ || v != "") {
+              gsub(/^"|"$/, "", $i)
+              v = v $i
+            }
           }
         }
-      }
-      END { print v }
-    ' "${TXT_FILE}" | tr -d ' \t' | sed 's/;;.*//'
+        END { print v }
+      ' "${TXT_FILE}" | tr -d ' \t' | sed -E 's/\);.*$//' | sed 's/;;.*//'
+    fi
     echo ""
   else
     echo "UYARI: ${TXT_FILE} yok — --apply ile anahtar üretin"
