@@ -168,22 +168,26 @@ function receiptPageCss(paperWidthMm: 58 | 80, pageMarginMm = 0): string {
   return `@page { size: ${paperWidthMm}mm auto; margin: ${m}mm; }`;
 }
 
-/** Termal: tek punto — küçük font raster’da silik, TOPLAM sadece büyük olduğu için koyu */
+/** Termal: sans-serif + tek punto (Courier küçük raster’da silik; TOPLAM büyük punto koyu kalıyordu) */
+const RECEIPT_THERMAL_FONT =
+  'Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif';
+
 const RECEIPT_THERMAL_BOLD_CSS = `
     body.receipt-thermal,
     body.receipt-thermal * {
-      font-size: 16px !important;
+      font-family: ${RECEIPT_THERMAL_FONT} !important;
+      font-size: 18px !important;
       font-weight: 900 !important;
       color: #000 !important;
       -webkit-font-smoothing: none;
       font-synthesis: weight;
     }
     body.receipt-thermal .title {
-      font-size: 17px !important;
+      font-size: 19px !important;
     }
     body.receipt-thermal .total-row td,
     body.receipt-thermal .total-row .line-price {
-      font-size: 16px !important;
+      font-size: 18px !important;
     }`;
 
 const THERMAL_PRINT_DARK_CSS = `
@@ -218,8 +222,8 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
       margin: 0;
       padding: 0;
       width: ${bodyWidth}mm;
-      font-family: "Courier New", Courier, monospace;
-      font-size: 14px;
+      font-family: ${RECEIPT_THERMAL_FONT};
+      font-size: 18px;
       font-weight: 900;
       line-height: 1.35;
       color: #000;
@@ -485,33 +489,35 @@ export function buildReceiptHtml(
 </html>`;
 }
 
-/** POS-80C / Mac Chrome: sürücü çoğu zaman ~2,125 inç (58mm) rulo raporlar */
-const CLASSIC_RECEIPT_INCH_FIX = `
+/** POS-80C Mac: 80 mm rulo — 58mm/inç + «sayfa genişliğine sığdır» silik raster yapıyordu */
+const CLASSIC_RECEIPT_80MM_FIX = `
   <style>
-    @page { size: 2.125in auto; margin: 0 !important; }
+    @page { size: 80mm auto; margin: 0 !important; }
     @media print {
       html, body {
-        width: 2in !important;
-        max-width: 2.125in !important;
-        margin: 0 auto !important;
+        width: 72mm !important;
+        max-width: 80mm !important;
+        margin: 0 !important;
         padding: 0 !important;
+        zoom: 1 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
       body.receipt-thermal,
       body.receipt-thermal * {
+        font-family: ${RECEIPT_THERMAL_FONT} !important;
         font-weight: 900 !important;
-        font-size: 16px !important;
+        font-size: 18px !important;
         color: #000 !important;
       }
     }
   </style>`;
 
-/** Klasik kasa fişi: 58mm + inç uyumu, kenar 0 */
+/** Klasik kasa fişi (Lima / yönetici): 80 mm termal, gizli iframe */
 export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
-  const body = buildReceiptHtml(data, 58, 0);
+  const body = buildReceiptHtml(data, 80, 0);
   return body
-    .replace('</head>', `${CLASSIC_RECEIPT_INCH_FIX}</head>`)
+    .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
     .replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
 }
 
