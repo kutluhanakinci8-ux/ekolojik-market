@@ -69,6 +69,12 @@ targetStore.settings = {
   posLiteCatalogImageByProductId: Object.fromEntries(
     cloned.map((p, i) => [String(p.id), sourceIds[i]]),
   ),
+  posLiteImageUrlByProductId: Object.fromEntries(
+    cloned.map((p, i) => {
+      const path = imageManifest[String(sourceIds[i])];
+      return path ? [String(p.id), path] : null;
+    }).filter(Boolean),
+  ),
 };
 targetStore.updatedAt = now;
 

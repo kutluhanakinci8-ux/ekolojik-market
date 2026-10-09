@@ -1,24 +1,15 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 function isPosLiteStore(store) {
   return store?.settings?.productProfile === 'pos-lite';
 }
 
-const manifest = JSON.parse(
-  readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), '../src/data/productImageManifest.json'),
-    'utf8',
-  ),
-);
-
-function catalogPathForSourceId(sourceId) {
-  if (sourceId == null) return undefined;
-  return manifest[String(sourceId)];
-}
-
 function imageMapFromSettings(settings) {
   const raw = settings?.posLiteCatalogImageByProductId;
+  if (!raw || typeof raw !== 'object') return null;
+  return raw;
+}
+
+function urlMapFromSettings(settings) {
+  const raw = settings?.posLiteImageUrlByProductId;
   if (!raw || typeof raw !== 'object') return null;
   return raw;
 }
@@ -28,17 +19,18 @@ function imageMapFromSettings(settings) {
  */
 export function enrichPosLiteProductMedia(store) {
   if (!isPosLiteStore(store)) return { store, changed: false };
-  const map = imageMapFromSettings(store.settings);
-  if (!map) return { store, changed: false };
+  const catalogMap = imageMapFromSettings(store.settings);
+  const urlMap = urlMapFromSettings(store.settings);
+  if (!catalogMap && !urlMap) return { store, changed: false };
 
   let changed = false;
   const products = (store.products ?? []).map((p) => {
-    const mapped = map[String(p.id)];
-    const catalogImageId = p.catalogImageId ?? mapped;
+    const mappedCatalog = catalogMap?.[String(p.id)];
+    const mappedUrl = urlMap?.[String(p.id)];
+    const catalogImageId = p.catalogImageId ?? mappedCatalog;
     const imageUrl =
-      p.imageUrl?.startsWith('/product-images/')
-        ? p.imageUrl
-        : catalogPathForSourceId(catalogImageId);
+      (p.imageUrl?.startsWith('/product-images/') ? p.imageUrl : undefined)
+      ?? (mappedUrl?.startsWith('/product-images/') ? mappedUrl : undefined);
     if (catalogImageId === p.catalogImageId && imageUrl === p.imageUrl) return p;
     changed = true;
     return {
@@ -61,15 +53,16 @@ export function mergePosLiteProductMediaOnWrite(existing, incoming) {
   if (!Array.isArray(incoming?.products)) return incoming;
 
   const prevById = new Map((existing?.products ?? []).map((p) => [p.id, p]));
-  const map = imageMapFromSettings(incoming.settings ?? existing?.settings);
+  const catalogMap = imageMapFromSettings(incoming.settings ?? existing?.settings);
+  const urlMap = urlMapFromSettings(incoming.settings ?? existing?.settings);
 
   const products = incoming.products.map((p) => {
     const prev = prevById.get(p.id);
-    const catalogImageId = p.catalogImageId ?? prev?.catalogImageId ?? map?.[String(p.id)];
+    const catalogImageId = p.catalogImageId ?? prev?.catalogImageId ?? catalogMap?.[String(p.id)];
     const imageUrl =
       (p.imageUrl?.startsWith('/product-images/') ? p.imageUrl : undefined)
       ?? (prev?.imageUrl?.startsWith('/product-images/') ? prev.imageUrl : undefined)
-      ?? catalogPathForSourceId(catalogImageId);
+      ?? (urlMap?.[String(p.id)]?.startsWith('/product-images/') ? urlMap[String(p.id)] : undefined);
     return {
       ...p,
       ...(catalogImageId != null ? { catalogImageId } : {}),

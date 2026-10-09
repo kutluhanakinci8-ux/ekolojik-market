@@ -252,6 +252,7 @@ export interface AppSettings {
   productProfile?: TenantProductProfile;
   /** POS Lite ürün id → Greenleaf katalog görsel id (örn. "1001": 1) */
   posLiteCatalogImageByProductId?: Record<string, number>;
+  posLiteImageUrlByProductId?: Record<string, string>;
   lowStockThreshold: number;
   defaultPriceType: PriceType;
   posNotes: PosNotesConfig;
