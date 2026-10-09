@@ -549,36 +549,7 @@ export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
 const THERMAL_PRINT_IFRAME_STYLE =
   'position:fixed;left:-12000px;top:0;width:302px;min-height:1600px;height:auto;border:0;opacity:0;pointer-events:none;';
 
-/** Dar popup: layout doğru, yazdırma fiş HTML içindeki script ile (çift print yok) */
-function printHtmlReceiptClassicPopup(html: string): Promise<void> {
-  return new Promise((resolve) => {
-    logReceiptPrint('classic-popup-start', { htmlBytes: html.length });
-    const features =
-      'popup,width=340,height=1100,left=60,top=40,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
-    const printWin = window.open('', 'market-pos-receipt-classic', features);
-    if (!printWin) {
-      logReceiptPrint('classic-popup-blocked', { fallback: 'iframe' });
-      void printHtmlReceiptClassicIframe(html).then(resolve);
-      return;
-    }
-    printWin.document.open();
-    printWin.document.write(html);
-    printWin.document.close();
-    const done = () => {
-      logReceiptPrint('classic-done');
-      try {
-        printWin.close();
-      } catch {
-        /* ignore */
-      }
-      resolve();
-    };
-    printWin.addEventListener('afterprint', done, { once: true });
-    setTimeout(done, 90_000);
-  });
-}
-
-/** Yedek: boyutlu iframe (0×0 değil) */
+/** Görünmez iframe (80 mm genişlik) — ayrı Firefox penceresi açmaz */
 function printHtmlReceiptClassicIframe(html: string): Promise<void> {
   return new Promise((resolve) => {
     logReceiptPrint('classic-iframe-start', { htmlBytes: html.length });
@@ -629,9 +600,8 @@ function printHtmlReceiptClassicIframe(html: string): Promise<void> {
   });
 }
 
-/** @deprecated use printHtmlReceiptClassicPopup */
 function printHtmlReceiptClassic(html: string): Promise<void> {
-  return printHtmlReceiptClassicPopup(html);
+  return printHtmlReceiptClassicIframe(html);
 }
 
 function printHtmlReceiptInWindow(win: Window, html: string, onDone: () => void): void {
@@ -733,7 +703,7 @@ export async function printThermalReceipt(
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
     remindChromeReceiptPrintSettings();
-    await printHtmlReceiptClassicPopup(buildGreenleafSaleReceiptHtml(data));
+    await printHtmlReceiptClassicIframe(buildGreenleafSaleReceiptHtml(data));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);
