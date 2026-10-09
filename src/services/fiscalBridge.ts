@@ -25,6 +25,18 @@ export interface FiscalReceiptResponse {
   simulated?: boolean;
 }
 
+/** Termal fiş atlanır yalnızca gerçek mali cihazda fiş kesildiğinde (belirsiz yanıtlarda termal devam). */
+export function isRealFiscalDevicePrint(
+  fiscal: Pick<FiscalReceiptResponse, 'success' | 'simulated' | 'receiptNo'>,
+): boolean {
+  if (!fiscal.success) return false;
+  if (fiscal.simulated === true) return false;
+  if (fiscal.simulated === false) return true;
+  const receiptNo = String(fiscal.receiptNo ?? '');
+  if (receiptNo.startsWith('SIM-')) return false;
+  return false;
+}
+
 export interface FiscalReturnReceiptItem extends FiscalReceiptItem {
   priceType?: PriceType;
 }

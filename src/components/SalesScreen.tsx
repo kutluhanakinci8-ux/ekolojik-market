@@ -212,21 +212,6 @@ export function SalesScreen({ store }: SalesScreenProps) {
       return;
     }
 
-    if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
-      const fiscal = await tryFiscalReceipt(
-        paidItems,
-        store.products,
-        store.productSets,
-        fiscalMethod,
-        sale.total,
-        posCheckout,
-      );
-      if (!fiscal.cancelled) {
-        receiptNo = fiscal.receiptNo ?? receiptNo;
-        fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
-      }
-    }
-
     const receiptPayment = method === 'split' ? 'card' : method;
     const receiptPrinterRaw = store.settings.receiptPrinter;
     const receiptPrinter = receiptPrinterRaw
@@ -235,22 +220,28 @@ export function SalesScreen({ store }: SalesScreenProps) {
     /** Greenleaf kasa yolu: ayar yok veya «kapalı» → HTML 80mm (POS-80C + Chrome, diğer kullanıcı) */
     const useGreenleafReceiptPath =
       receiptPrinter == null || receiptPrinter.enabled === false;
-    const shouldPrintThermal =
-      !samplesOnly
-      && method !== 'credit'
-      && !fiscalPrinted
-      && (useGreenleafReceiptPath
-        || (receiptPrinter!.enabled
-          && receiptPrinter!.autoPrintOnSale
-          && receiptPrinter!.brand !== 'none'));
-    if (shouldPrintThermal) {
+
+    const printSaleThermalIfNeeded = async (thermalReceiptNo?: string) => {
+      const shouldPrintThermal =
+        !samplesOnly
+        && method !== 'credit'
+        && !fiscalPrinted
+        && (useGreenleafReceiptPath
+          || (receiptPrinter!.enabled
+            && receiptPrinter!.autoPrintOnSale
+            && receiptPrinter!.brand !== 'none'));
+      if (!shouldPrintThermal) return;
       const receiptData = buildReceiptFromCart(
         paidItems,
         store.products,
         receiptPayment,
         sale.total,
         store.settings.businessName,
-        { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
+        {
+          receiptNo: thermalReceiptNo ?? receiptNo,
+          saleId: sale.id,
+          createdAt: new Date(sale.createdAt),
+        },
         store.productSets,
       );
       await printThermalReceipt(
@@ -265,6 +256,25 @@ export function SalesScreen({ store }: SalesScreenProps) {
             }
           : receiptPrinter!,
       );
+    };
+
+    /** Önce termal (Chrome yazdır), sonra yazar kasa — uzun await sonrası print() engellenmesin */
+    if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
+      await printSaleThermalIfNeeded();
+      const fiscal = await tryFiscalReceipt(
+        paidItems,
+        store.products,
+        store.productSets,
+        fiscalMethod,
+        sale.total,
+        posCheckout,
+      );
+      if (!fiscal.cancelled) {
+        receiptNo = fiscal.receiptNo ?? receiptNo;
+        fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
+      }
+    } else {
+      await printSaleThermalIfNeeded();
     }
 
     const methodLabel = samplesOnly
