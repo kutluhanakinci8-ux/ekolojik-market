@@ -168,42 +168,23 @@ function receiptPageCss(paperWidthMm: 58 | 80, pageMarginMm = 0): string {
   return `@page { size: ${paperWidthMm}mm auto; margin: ${m}mm; }`;
 }
 
-/** Tüm satırlar TOPLAM ile aynı kalınlık (termal raster) */
+/** Termal: tek punto — küçük font raster’da silik, TOPLAM sadece büyük olduğu için koyu */
 const RECEIPT_THERMAL_BOLD_CSS = `
     body.receipt-thermal,
-    body.receipt-thermal div,
-    body.receipt-thermal td {
-      font-size: 14px;
-      font-weight: 900;
-      color: #000;
+    body.receipt-thermal * {
+      font-size: 16px !important;
+      font-weight: 900 !important;
+      color: #000 !important;
       -webkit-font-smoothing: none;
+      font-synthesis: weight;
     }
     body.receipt-thermal .title {
-      font-size: 16px;
-      font-weight: 900;
-    }
-    body.receipt-thermal .muted,
-    body.receipt-thermal .footer,
-    body.receipt-thermal .footer div {
-      font-size: 14px;
-      font-weight: 900;
-    }
-    body.receipt-thermal .line td,
-    body.receipt-thermal .line-name,
-    body.receipt-thermal .line-price {
-      font-size: 14px;
-      font-weight: 900;
-    }
-    body.receipt-thermal .line-sub td {
-      font-size: 13px;
-      font-weight: 900;
+      font-size: 17px !important;
     }
     body.receipt-thermal .total-row td,
     body.receipt-thermal .total-row .line-price {
-      font-size: 15px;
-      font-weight: 900;
-    }
-    body.receipt-thermal .bold { font-weight: 900; }`;
+      font-size: 16px !important;
+    }`;
 
 const THERMAL_PRINT_DARK_CSS = `
     @media print {
@@ -214,13 +195,11 @@ const THERMAL_PRINT_DARK_CSS = `
         print-color-adjust: exact;
       }
       body.receipt-thermal {
-        filter: contrast(1.5) brightness(0.86);
+        filter: contrast(1.65) brightness(0.84);
       }
-      body.receipt-thermal div,
-      body.receipt-thermal td {
-        color: #000 !important;
-        -webkit-text-stroke: 0.25px #000;
-        text-shadow: 0.4px 0 0 #000, -0.4px 0 0 #000;
+      body.receipt-thermal * {
+        -webkit-text-stroke: 0.3px #000;
+        text-shadow: 0.5px 0 0 #000, -0.5px 0 0 #000;
       }
       .divider { border-top-width: 2px; border-top-style: solid; }
     }`;
@@ -459,11 +438,11 @@ export function buildReceiptHtml(
       const right = formatReceiptMoney(item.lineTotal);
       return `
         <tr class="line">
-          <td class="line-name">${left}</td>
-          <td class="line-price">${right}</td>
+          <td class="line-name"><strong>${left}</strong></td>
+          <td class="line-price"><strong>${right}</strong></td>
         </tr>
         <tr class="line-sub">
-          <td colspan="2">${item.quantity} x ${formatReceiptMoney(item.unitPrice)}</td>
+          <td colspan="2"><strong>${item.quantity} x ${formatReceiptMoney(item.unitPrice)}</strong></td>
         </tr>
       `;
     })
@@ -481,12 +460,12 @@ export function buildReceiptHtml(
   </style>
 </head>
 <body class="receipt-thermal">
-  <div class="center title">${data.businessName}</div>
-  <div class="center muted">SATIŞ FİŞİ</div>
+  <div class="center title"><strong>${data.businessName}</strong></div>
+  <div class="center muted"><strong>SATIŞ FİŞİ</strong></div>
   <hr class="divider" />
-  <div>Tarih: ${formatReceiptDateTime(data.createdAt)}</div>
-  <div>Fiş No: ${receiptRef}</div>
-  <div>Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}</div>
+  <div><strong>Tarih: ${formatReceiptDateTime(data.createdAt)}</strong></div>
+  <div><strong>Fiş No: ${receiptRef}</strong></div>
+  <div><strong>Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}</strong></div>
   <hr class="divider" />
   <table>
     <tbody>
@@ -499,8 +478,8 @@ export function buildReceiptHtml(
   </table>
   <hr class="divider" />
   <div class="center footer">
-    <div>Bizi tercih ettiğiniz için teşekkürler.</div>
-    <div>İyi günler dileriz.</div>
+    <div><strong>Bizi tercih ettiğiniz için teşekkürler.</strong></div>
+    <div><strong>İyi günler dileriz.</strong></div>
   </div>
 </body>
 </html>`;
@@ -519,10 +498,11 @@ const CLASSIC_RECEIPT_INCH_FIX = `
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      body.receipt-thermal div,
-      body.receipt-thermal td {
+      body.receipt-thermal,
+      body.receipt-thermal * {
         font-weight: 900 !important;
-        font-size: 14px !important;
+        font-size: 16px !important;
+        color: #000 !important;
       }
     }
   </style>`;
