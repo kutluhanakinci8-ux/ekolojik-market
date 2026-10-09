@@ -15,6 +15,7 @@ const ZYWELL_PRESET = {
   paperWidthMm: 80,
   autoPrintOnSale: true,
   copies: 1,
+  printMode: 'plain',
 };
 
 function arg(name) {

@@ -192,13 +192,60 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80): string {
   `;
 }
 
-function buildReceiptPrintScript(): string {
-  return `
-  <script>
-    window.onload = function () {
-      setTimeout(function () { window.print(); }, 120);
-    };
-  </script>`;
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function wrapPlainReceiptBody(body: string, paperWidthMm: 58 | 80): string {
+  const width = paperWidthMm === 58 ? 50 : 72;
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>Fiş</title>
+  <style>
+    @page { size: ${paperWidthMm}mm auto; margin: 2mm; }
+    body {
+      margin: 0;
+      padding: 0;
+      width: ${width}mm;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      color: #000;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>${escapeHtml(body)}</body>
+</html>`;
+}
+
+export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
+  const receiptRef = data.receiptNo || data.saleId || '—';
+  const lines: string[] = [
+    data.businessName.toUpperCase(),
+    'SATIŞ FİŞİ',
+    '--------------------------------',
+    `Tarih: ${formatReceiptDateTime(data.createdAt)}`,
+    `Fiş No: ${receiptRef}`,
+    `Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}`,
+    '--------------------------------',
+  ];
+  for (const item of data.items) {
+    lines.push(truncateName(item.name, 28));
+    lines.push(`  ${item.quantity} x ${formatReceiptMoney(item.unitPrice)}`);
+    lines.push(`  ${formatReceiptMoney(item.lineTotal)}`);
+  }
+  lines.push('--------------------------------');
+  lines.push(`TOPLAM  ${formatReceiptMoney(data.total)}`);
+  lines.push('');
+  lines.push('Teşekkürler.');
+  return lines.join('\n');
 }
 
 export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58 | 80 = 80): string {
@@ -290,7 +337,6 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58
     <div>İade işleminiz kaydedilmiştir.</div>
     <div>İyi günler dileriz.</div>
   </div>
-  ${buildReceiptPrintScript()}
 </body>
 </html>`;
 }
@@ -345,7 +391,6 @@ export function buildReceiptHtml(data: SaleReceiptData, paperWidthMm: 58 | 80 = 
     <div>Bizi tercih ettiğiniz için teşekkürler.</div>
     <div>İyi günler dileriz.</div>
   </div>
-  ${buildReceiptPrintScript()}
 </body>
 </html>`;
 }
@@ -374,18 +419,37 @@ export function printHtmlReceipt(html: string): Promise<void> {
       resolve();
     };
 
+    const triggerPrint = () => {
+      try {
+        win.focus();
+        win.print();
+      } catch {
+        cleanup();
+      }
+    };
+
     win.addEventListener('afterprint', cleanup, { once: true });
-    setTimeout(cleanup, 8000);
+    setTimeout(cleanup, 15000);
+
+    if (doc.readyState === 'complete') {
+      setTimeout(triggerPrint, 120);
+    } else {
+      win.addEventListener('load', () => setTimeout(triggerPrint, 120), { once: true });
+    }
   });
 }
 
 export async function printThermalReceipt(
   data: SaleReceiptData,
-  options?: { paperWidthMm?: 58 | 80; copies?: number },
+  options?: { paperWidthMm?: 58 | 80; copies?: number; printMode?: 'plain' | 'html' },
 ): Promise<void> {
   const paper = options?.paperWidthMm ?? 80;
   const copies = Math.min(3, Math.max(1, options?.copies ?? 1));
-  const html = buildReceiptHtml(data, paper);
+  const mode = options?.printMode ?? 'html';
+  const html =
+    mode === 'plain'
+      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(data), paper)
+      : buildReceiptHtml(data, paper);
   for (let i = 0; i < copies; i += 1) {
     await printHtmlReceipt(html);
   }

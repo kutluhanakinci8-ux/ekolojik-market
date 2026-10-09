@@ -252,6 +252,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
       await printThermalReceipt(receiptData, {
         paperWidthMm: receiptPrinter.paperWidthMm,
         copies: receiptPrinter.copies,
+        printMode: receiptPrinter.printMode,
       });
     }
 

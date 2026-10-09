@@ -3,6 +3,7 @@ import {
   DEFAULT_ZYWELL_RECEIPT_PRINTER,
   normalizeReceiptPrinterSettings,
   type ReceiptPrinterBrand,
+  type ReceiptPrintMode,
 } from '../../types/receiptPrinter';
 
 interface PosReceiptPrinterSettingsPanelProps {
@@ -69,6 +70,16 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           />
         </label>
         <label className="settings-field">
+          <span>Fiş formatı</span>
+          <select
+            value={printer.printMode}
+            onChange={(e) => set({ printMode: e.target.value as ReceiptPrintMode })}
+          >
+            <option value="plain">Düz metin (Zywell — önerilen)</option>
+            <option value="html">HTML tablo</option>
+          </select>
+        </label>
+        <label className="settings-field">
           <span>Kağıt genişliği</span>
           <select
             value={String(printer.paperWidthMm)}
@@ -90,9 +101,10 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         </label>
       </div>
       <p className="module-hint">
-        Ayarlar bu mağaza (tenant) için sunucuda saklanır. Windows’ta Chrome → Yazdır → hedef olarak{' '}
-        <strong>{printer.windowsPrinterName || 'Zywell'}</strong> seçili olmalı; ilk seferde “Varsayılan olarak
-        kaydet” ile kasiyer profiline sabitlenir.
+        Ayarlar bu mağaza (tenant) için sunucuda saklanır. Zywell’de karışık karakter çıkarsa{' '}
+        <strong>Düz metin</strong> formatını kullanın ve Windows’ta “Generic / Text Only” değil{' '}
+        <strong>Zywell sürücüsü</strong> seçili olsun. Chrome yazdır hedefi:{' '}
+        <strong>{printer.windowsPrinterName || 'Zywell'}</strong>.
       </p>
     </section>
   );
