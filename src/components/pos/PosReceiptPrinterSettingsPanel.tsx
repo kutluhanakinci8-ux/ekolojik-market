@@ -46,6 +46,9 @@ function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
         <br />
         <strong>Mac yazıcı:</strong> Terminal → <code>lpstat -p</code> ve{' '}
         <code>tail -f /var/log/cups/error_log</code>
+        <br />
+        <strong>Önizleme bozuksa:</strong> «Daha az ayar» → üst/alt bilgi <strong>kapalı</strong>, ölçek{' '}
+        <strong>%100</strong> (üstteki site adresi Chrome’dan gelir).
       </p>
     </div>
   );

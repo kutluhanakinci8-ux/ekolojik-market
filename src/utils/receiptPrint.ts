@@ -4,6 +4,7 @@ import type { SaleReturn } from '../types/saleReturn';
 import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
+import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
 
 const BLANK_PRINT_TITLE = '\u200b';
 
@@ -215,11 +216,18 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
 
 /** Greenleaf / yönetici kasa — fiş dokümanı kendi window.print() çağırır (main dalı) */
 function buildReceiptPrintScript(): string {
+  const blankTitle = BLANK_PRINT_TITLE;
   return `
   <script>
-    window.onload = function () {
-      setTimeout(function () { window.print(); }, 120);
-    };
+    (function () {
+      var t = ${JSON.stringify(blankTitle)};
+      document.title = t;
+      window.onbeforeprint = function () { document.title = t; };
+      window.onload = function () {
+        document.title = t;
+        setTimeout(function () { window.print(); }, 120);
+      };
+    })();
   </script>`;
 }
 
@@ -437,13 +445,10 @@ export function buildReceiptHtml(
 </html>`;
 }
 
-/** main (yonetici) ile birebir: 80mm, 4mm kenar, otomatik yazdır script */
+/** Klasik kasa fişi: 80mm, kenar 0, boş başlık (Chrome üstbilgi çakışmasın) */
 export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
-  const receiptRef = data.receiptNo || data.saleId || '—';
-  const body = buildReceiptHtml(data, 80, 4);
-  return body
-    .replace(`<title>${BLANK_PRINT_TITLE}</title>`, `<title>Fiş ${receiptRef}</title>`)
-    .replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
+  const body = buildReceiptHtml(data, 80, 0);
+  return body.replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
 }
 
 /** Gizli iframe — yazdırma yalnızca fiş HTML içindeki onload script ile (parent print yok) */
@@ -594,6 +599,7 @@ export async function printThermalReceipt(
 ): Promise<void> {
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
+    remindChromeReceiptPrintSettings();
     await printHtmlReceiptClassic(buildGreenleafSaleReceiptHtml(data));
     return;
   }
