@@ -262,18 +262,39 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
   `;
 }
 
-/** Greenleaf / yönetici kasa — fiş dokümanı kendi window.print() çağırır (main dalı) */
+/** Chrome/Safari: @page auto → kısa sayfa, termal erken keser; içeriğe göre mm yükseklik */
 function buildReceiptPrintScript(): string {
   const blankTitle = BLANK_PRINT_TITLE;
   return `
   <script>
     (function () {
       var t = ${JSON.stringify(blankTitle)};
-      document.title = t;
-      window.onbeforeprint = function () { document.title = t; };
-      window.onload = function () {
+      function applyReceiptPageHeight() {
+        var b = document.body;
+        var r = document.documentElement;
+        var px = Math.max(b ? b.scrollHeight : 0, r ? r.scrollHeight : 0, b ? b.offsetHeight : 0);
+        var mm = Math.ceil(px * 25.4 / 96) + 16;
+        if (mm < 120) mm = 120;
+        if (mm > 2000) mm = 2000;
+        var el = document.getElementById('receipt-page-dynamic');
+        if (!el) {
+          el = document.createElement('style');
+          el.id = 'receipt-page-dynamic';
+          document.head.appendChild(el);
+        }
+        el.textContent = '@page { size: 80mm ' + mm + 'mm !important; margin: 0 !important; }';
+      }
+      function before() {
         document.title = t;
-        setTimeout(function () { window.print(); }, 120);
+        applyReceiptPageHeight();
+      }
+      window.onbeforeprint = before;
+      window.onload = function () {
+        before();
+        setTimeout(function () {
+          applyReceiptPageHeight();
+          window.print();
+        }, 150);
       };
     })();
   </script>`;
@@ -496,7 +517,7 @@ export function buildReceiptHtml(
 /** POS-80C Mac: 80 mm rulo — 58mm/inç + «sayfa genişliğine sığdır» silik raster yapıyordu */
 const CLASSIC_RECEIPT_80MM_FIX = `
   <style>
-    @page { size: 80mm auto; margin: 0 !important; }
+    @page { size: 80mm 297mm; margin: 0 !important; }
     @media print {
       html, body {
         width: 72mm !important;
