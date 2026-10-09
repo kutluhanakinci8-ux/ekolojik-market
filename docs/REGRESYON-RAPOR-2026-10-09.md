@@ -27,8 +27,8 @@
 | Playwright `npm run test:nb-ui-visual` | `EKOLOJIK_POS_QA_MINT_JSON` gerekir — `sunucu-ekolojik-posta-nb-ui-yuruyus.sh` kullanın |
 | Playwright WARN #23 WA rozeti | Kanal yok — opsiyonel |
 | WARN #22 engagement | İzleme kapalı — opsiyonel |
-| `npm audit` | `react-router-dom@6` moderate (major upgrade ayrı iş); `source-map-js` audit fix uygulandı |
-| VPS outbox | `failed: 20` — arşiv/cron mevcut |
+| `npm audit` | `react-router-dom@7` (CVE kapısı); kalan: `undici` (yalnızca çeviri devDep) |
+| VPS outbox failed | Arşiv: `docs/EKOLOJIK-OUTBOX-FAILED-TEMIZLIK.md` + `outbox-failed-arsivle.sh` |
 
 ## Tek komut kapılar (VPS)
 
