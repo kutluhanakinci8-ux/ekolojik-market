@@ -48,6 +48,12 @@ fi
 cd "${APP_SRC}"
 echo "==> npm install..."
 npm install
+if [[ "${EKOLOJIK_SKIP_PLAYWRIGHT_INSTALL:-0}" != 1 ]]; then
+  # NB görsel smoke (Playwright) repo kökünden çalışır; production INSTALL_DIR'de devDeps yok
+  # shellcheck source=scripts/lib/ensure-playwright.sh
+  source "${REPO_ROOT}/scripts/lib/ensure-playwright.sh"
+  ensure_playwright "${REPO_ROOT}" || echo "    (Playwright kurulumu atlandı — görsel smoke WARN olabilir)"
+fi
 echo "==> Build..."
 npm run build
 

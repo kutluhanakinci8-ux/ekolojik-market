@@ -14,7 +14,7 @@ echo ""
 
 FAIL=0
 run() {
-  if bash "$@"; then echo ""; else FAIL=1; fi
+  if "$@"; then echo ""; else FAIL=1; fi
 }
 
 cd "${REPO_ROOT}"
