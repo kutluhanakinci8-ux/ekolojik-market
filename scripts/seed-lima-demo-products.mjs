@@ -6,7 +6,10 @@
  *   node scripts/seed-lima-demo-products.mjs --data-dir ./data --source-ids 1,4,5,6
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -25,8 +28,16 @@ const mainPath = join(dataDir, 'store.json');
 const targetPath =
   tenant === 'main' ? mainPath : join(dataDir, 'tenants', tenant, 'store.json');
 
+const manifestPath = join(repoRoot, 'src/data/productImageManifest.json');
+const imageManifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+
 const mainStore = JSON.parse(await readFile(mainPath, 'utf8'));
 const mainById = new Map((mainStore.products ?? []).map((p) => [p.id, p]));
+
+function catalogImageForSourceId(sourceId) {
+  const path = imageManifest[String(sourceId)];
+  return path ? { catalogImageId: sourceId } : {};
+}
 
 const missing = sourceIds.filter((id) => !mainById.has(id));
 if (missing.length) {
@@ -45,6 +56,7 @@ const cloned = sourceIds.map((sourceId, index) => {
     stock,
     isSample: src.isSample ?? false,
     sampleStock: src.sampleStock ?? 0,
+    ...catalogImageForSourceId(sourceId),
   };
 });
 
@@ -77,7 +89,8 @@ console.log(`OK   ${tenant}: ${cloned.length} ürün main mağazadan kopyalandı
 for (let i = 0; i < cloned.length; i++) {
   const p = cloned[i];
   const srcId = sourceIds[i];
+  const img = imageManifest[String(srcId)] ?? '(yok)';
   console.log(
-    `     main#${srcId} → #${p.id}  ${p.barcode ?? p.productCode ?? '-'}  ${p.name?.slice(0, 50)}  stok=${p.stock}`,
+    `     main#${srcId} → #${p.id}  ${p.barcode ?? p.productCode ?? '-'}  ${p.name?.slice(0, 50)}  stok=${p.stock}  resim=${img}`,
   );
 }

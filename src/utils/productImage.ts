@@ -65,7 +65,8 @@ export function getPlaceholderImage(product: Product): string {
 }
 
 export function getProductImageUrl(product: Product): string {
-  const catalogPath = getCatalogImagePath(product.id);
+  const catalogId = product.catalogImageId ?? product.id;
+  const catalogPath = getCatalogImagePath(catalogId);
   return product.imageUrl || catalogPath || getPlaceholderImage(product);
 }
 
