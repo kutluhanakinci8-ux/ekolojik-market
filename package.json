@@ -45,5 +45,9 @@
     "playwright": "^1.49.1",
     "typescript": "^5.6.3",
     "vite": "^6.4.3"
+  },
+  "overrides": {
+    "@fastify/busboy": "^3.2.2",
+    "undici": "^6.29.0"
   }
 }

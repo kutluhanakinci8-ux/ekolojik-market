@@ -5,6 +5,8 @@ import { createMailTrackToken, isMailTrackEnabled } from './postaMailTrack.mjs';
 
 const MAX_ATTEMPTS = 3;
 const RETRY_SECONDS = [60, 120, 300];
+/** Arşivlenmiş failed JSON — `failed/archive/` (aktif sayaç ve hub listelerinde hariç). */
+export const OUTBOX_FAILED_ARCHIVE_DIR = 'archive';
 
 function outboxRoot(dataDir) {
   return join(dataDir, 'email-outbox');
@@ -111,6 +113,7 @@ async function collectJsonFilesInState(root, state) {
       continue;
     }
     if (!ent.isDirectory()) continue;
+    if (state === 'failed' && ent.name === OUTBOX_FAILED_ARCHIVE_DIR) continue;
     const tenantDir = join(base, ent.name);
     let files;
     try {
@@ -244,6 +247,7 @@ async function listStateJsonAllTenants(root, state, limit) {
       continue;
     }
     if (!ent.isDirectory()) continue;
+    if (state === 'failed' && ent.name === OUTBOX_FAILED_ARCHIVE_DIR) continue;
     rows.push(...(await listDirJson(join(base, ent.name), perTenant)));
   }
   return rows.slice(0, limit);

@@ -12,12 +12,31 @@ if [[ ! -d "${FAILED_ROOT}" ]]; then
   exit 0
 fi
 
+TOTAL=0
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+# Eski düzen: failed/archive/*.json (tenant alt klasörü olmadan) → archive/main
+ARCHIVE_ROOT="${FAILED_ROOT}/archive"
+if [[ -d "${ARCHIVE_ROOT}" ]]; then
+  shopt -s nullglob
+  stray=( "${ARCHIVE_ROOT}"/*.json )
+  shopt -u nullglob
+  if [[ ${#stray[@]} -gt 0 ]]; then
+    mkdir -p "${ARCHIVE_ROOT}/main"
+    for f in "${stray[@]}"; do
+      if [[ "${DRY}" == "1" ]]; then
+        echo "DRY  taşı ${f} → ${ARCHIVE_ROOT}/main/"
+      else
+        mv "$f" "${ARCHIVE_ROOT}/main/"
+      fi
+      TOTAL=$((TOTAL + 1))
+    done
+  fi
+fi
+
 shopt -s nullglob
 LEGACY=("${FAILED_ROOT}"/*.json)
 shopt -u nullglob
-
-TOTAL=0
-STAMP="$(date +%Y%m%d-%H%M%S)"
 
 archive_file() {
   local src="$1"
