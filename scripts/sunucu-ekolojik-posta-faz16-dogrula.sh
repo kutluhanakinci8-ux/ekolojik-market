@@ -2,6 +2,12 @@
 # Faz 16 — compose tam parite smoke
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-posta-smoke-auth.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-smoke-auth.sh"
+ekolojik_posta_smoke_auth_init "${EKOLOJIK_VERIFY_ROOT:-/var/www/market-pos}"
+BASE="${EKOLOJIK_VERIFY_BASE_URL}"
+
 BASE="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:5180}"
 ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
 
@@ -18,7 +24,7 @@ if(d.ok===false && d.error && d.error.includes('Geçersiz')) process.exit(1);
 console.log('OK   compose API cc alanı kabul');
 "
 
-curl -fsS -X POST "${BASE}/api/posta/drafts" \
+posta_curl -X POST "${BASE}/api/posta/drafts" \
   -H 'Content-Type: application/json' \
   -d '{"to":"draft@example.com","cc":"a@b.com","subject":"t","body":"x"}' | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));

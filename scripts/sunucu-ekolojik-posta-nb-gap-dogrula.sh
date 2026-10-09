@@ -2,6 +2,12 @@
 # NB parite boşlukları — P1 public API, P2 köprüler, P3 public mail / tenant
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-posta-smoke-auth.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-smoke-auth.sh"
+ekolojik_posta_smoke_auth_init "${EKOLOJIK_VERIFY_ROOT:-/var/www/market-pos}"
+BASE="${EKOLOJIK_VERIFY_BASE_URL}"
+
 BASE="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:5180}"
 ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
 
@@ -19,19 +25,19 @@ if(!d.ok||!d.apiPrefix) process.exit(1);
 console.log('OK   public mail capabilities');
 "
 
-curl -fsS "${BASE}/api/posta/jmap-lite/session" | node -e "
+posta_curl "${BASE}/api/posta/jmap-lite/session" | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
 if(!d.ok||!d.capabilities) process.exit(1);
 console.log('OK   JMAP lite session');
 "
 
-curl -fsS "${BASE}/api/posta/caldav-lite/principal" | node -e "
+posta_curl "${BASE}/api/posta/caldav-lite/principal" | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
 if(!d.ok||!d.calendarHome) process.exit(1);
 console.log('OK   CalDAV lite principal');
 "
 
-curl -fsS "${BASE}/api/posta/tenants" | node -e "
+posta_curl "${BASE}/api/posta/tenants" | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
 if(!d.ok||!Array.isArray(d.tenants)) process.exit(1);
 console.log('OK   tenant list', d.tenants.join(','));
