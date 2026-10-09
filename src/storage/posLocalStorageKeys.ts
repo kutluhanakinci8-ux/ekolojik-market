@@ -1,4 +1,14 @@
-import { DEFAULT_TENANT_ID, loadTenantId } from './tenantSession';
+/** tenantSession ile döngüsel import olmaması için tenant id burada okunur */
+const TENANT_KEY = 'market-pos-tenant-id';
+const DEFAULT_TENANT_ID = 'main';
+
+function readTenantId(): string {
+  try {
+    return localStorage.getItem(TENANT_KEY) || DEFAULT_TENANT_ID;
+  } catch {
+    return DEFAULT_TENANT_ID;
+  }
+}
 
 const BASE_STORAGE_KEYS = {
   products: 'market-pos-products',
@@ -35,11 +45,11 @@ function buildKeys(tenantId: string): PosLocalStorageKeys {
   return out;
 }
 
-let activeKeys = buildKeys(loadTenantId());
+let activeKeys = buildKeys(readTenantId());
 
 /** Tarayıcı localStorage anahtarlarını aktif mağaza koduna göre ayır (main vs lima-market). */
 export function syncPosLocalStorageKeys(tenantId?: string): void {
-  activeKeys = buildKeys(tenantId ?? loadTenantId());
+  activeKeys = buildKeys(tenantId ?? readTenantId());
 }
 
 export function posLocalStorageKeys(): PosLocalStorageKeys {
