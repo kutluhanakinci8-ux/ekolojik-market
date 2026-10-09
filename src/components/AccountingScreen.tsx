@@ -35,6 +35,7 @@ import { SecurityReportsPanel } from './reports/SecurityReportsPanel';
 import { SystemActivityReportsPanel } from './reports/SystemActivityReportsPanel';
 import { VOUCHER_TYPE_LABELS } from '../types/journalVoucher';
 import { resolveUserTabPermissions } from '../utils/userAccess';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
 
 export type ReportsSubTab =
   | 'gelir'
@@ -112,14 +113,21 @@ function ReportsTypeMenu({
   onSelect,
   includeAdminReports,
   transactionsOnly = false,
+  posLiteProfile = false,
 }: {
   active: ReportsSubTab;
   onSelect: (id: ReportsSubTab) => void;
   includeAdminReports: boolean;
   transactionsOnly?: boolean;
+  posLiteProfile?: boolean;
 }) {
   const visibleItems = REPORTS_SUBTABS.filter((item) => {
     if (transactionsOnly) return item.id === 'islemler';
+    if (posLiteProfile) {
+      if (item.id === 'musteriler' || item.id === 'tedarikci' || item.id === 'ortaklar' || item.id === 'doviz') {
+        return false;
+      }
+    }
     if (item.id === 'islemler') return true;
     if (item.adminOnly && !includeAdminReports) return false;
     return true;
@@ -221,6 +229,7 @@ export function AccountingScreen({
   initialReportsSubTab,
   transactionsOnlyMenu = false,
 }: AccountingScreenProps) {
+  const posLite = isPosLiteProfile(store.settings);
   const tabPerms = resolveUserTabPermissions(
     store.users.find((u) => u.id === store.authSession?.userId),
     store.authSession,
@@ -516,6 +525,7 @@ export function AccountingScreen({
               onSelect={setReportsSubTab}
               includeAdminReports={isAdmin}
               transactionsOnly={transactionsOnlyMenu}
+              posLiteProfile={posLite}
             />
             <div className="accounting-reports-panel">
           {reportsSubTab === 'gelir' && (

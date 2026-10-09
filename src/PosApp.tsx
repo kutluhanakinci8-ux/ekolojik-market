@@ -24,6 +24,7 @@ import {
   POSTA_ONBOARDING_REQUEST_EVENT,
   shouldForcePostaOnboardingOpen,
 } from './storage/postaOnboardingSession';
+import { isPosLiteProfile } from './utils/tenantProductProfile';
 
 function renderPage(
   page: AppPage,
@@ -115,6 +116,7 @@ export function PosApp() {
   }, [store.settings.currency]);
 
   const evaluatePostaOnboardingGate = useCallback(async () => {
+    if (isPosLiteProfile(store.settings)) return;
     if (!store.authSession || store.authSession.role !== 'admin') return;
     if (shouldForcePostaOnboardingOpen()) {
       setPostaOnboardingOpen(true);
@@ -130,7 +132,7 @@ export function PosApp() {
     if (status !== 'completed' && status !== 'dismissed') {
       setPostaOnboardingOpen(true);
     }
-  }, [store.authSession]);
+  }, [store.authSession, store.settings]);
 
   useEffect(() => {
     void evaluatePostaOnboardingGate();

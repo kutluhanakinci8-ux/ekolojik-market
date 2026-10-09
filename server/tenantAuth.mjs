@@ -84,10 +84,65 @@ export async function listTenantIds(dataDir) {
   }
 }
 
-function createInitialStore({ businessName, adminName, username, passwordHash, email, phone, plan }) {
+const POS_LITE_ADMIN_TABS = [
+  'dashboard',
+  'sales',
+  'stock',
+  'reports',
+  'transactions',
+  'settings',
+];
+
+function createPostaOnboardingForProfile(productProfile, registrationEmail) {
+  if (productProfile !== 'pos-lite') {
+    return createDefaultPostaOnboarding(registrationEmail);
+  }
+  const now = new Date().toISOString();
+  const skipped = { done: false, skipped: true, at: now };
+  return {
+    version: 1,
+    status: 'dismissed',
+    startedAt: now,
+    completedAt: now,
+    steps: {
+      mailHealth: skipped,
+      messagingEmbed: skipped,
+      postaTab: skipped,
+    },
+    registrationEmail: String(registrationEmail ?? '').trim().toLowerCase(),
+    notes: 'POS Lite — Posta modülü kullanılmıyor',
+  };
+}
+
+function createInitialStore({
+  businessName,
+  adminName,
+  username,
+  passwordHash,
+  email,
+  phone,
+  plan,
+  productProfile = 'full',
+}) {
   const now = new Date().toISOString();
   const userId = `U${Date.now()}`;
   const mailDomain = email.includes('@') ? email.split('@')[1].trim().toLowerCase() : '';
+  const profile = productProfile === 'pos-lite' ? 'pos-lite' : 'full';
+  const adminTabs =
+    profile === 'pos-lite'
+      ? POS_LITE_ADMIN_TABS
+      : [
+          'dashboard',
+          'sales',
+          'stock',
+          'reports',
+          'accounting',
+          'transactions',
+          'customers',
+          'cashier',
+          'posta',
+          'settings',
+        ];
 
   return {
     updatedAt: now,
@@ -104,8 +159,9 @@ function createInitialStore({ businessName, adminName, username, passwordHash, e
     settings: {
       ...DEFAULT_SETTINGS,
       businessName,
+      productProfile: profile,
       tenantMeta: { email, phone, plan, trialEndsAt: new Date(Date.now() + 14 * 86400000).toISOString() },
-      postaOnboarding: createDefaultPostaOnboarding(email),
+      postaOnboarding: createPostaOnboardingForProfile(profile, email),
       postaAliases: defaultAliasesForDomain(mailDomain),
       postaMail: {
         opsEmail: email,
@@ -121,18 +177,7 @@ function createInitialStore({ businessName, adminName, username, passwordHash, e
         displayName: adminName,
         passwordHash,
         role: 'admin',
-        allowedTabs: [
-          'dashboard',
-          'sales',
-          'stock',
-          'reports',
-          'accounting',
-          'transactions',
-          'customers',
-          'cashier',
-          'posta',
-          'settings',
-        ],
+        allowedTabs: adminTabs,
         isActive: true,
         isPrimaryAdmin: true,
         mustChangePassword: false,
@@ -166,6 +211,8 @@ export async function registerTenant(dataDir, payload) {
   const username = String(payload.username ?? '').trim().toLowerCase();
   const password = String(payload.password ?? '');
   const plan = String(payload.plan ?? 'trial');
+  const productProfile =
+    payload.productProfile === 'pos-lite' || plan === 'pos-lite' ? 'pos-lite' : 'full';
 
   if (!businessName || !email || !adminName || !username || password.length < 6) {
     return { ok: false, message: 'Tüm zorunlu alanları doldurun. Şifre en az 6 karakter olmalı.' };
@@ -203,6 +250,7 @@ export async function registerTenant(dataDir, payload) {
     email,
     phone,
     plan,
+    productProfile,
   });
 
   await writeTenantStore(dataDir, tenantId, store);
@@ -230,7 +278,10 @@ export async function registerTenant(dataDir, payload) {
     ok: true,
     tenantId,
     username,
-    message: 'Hesap oluşturuldu. İlk girişte Posta kurulum sihirbazı açılacaktır.',
+    message:
+      productProfile === 'pos-lite'
+        ? 'POS Lite hesabı oluşturuldu. Mağaza kodu ile giriş yapın.'
+        : 'Hesap oluşturuldu. İlk girişte Posta kurulum sihirbazı açılacaktır.',
     postaOnboardingStatus: store.settings?.postaOnboarding?.status ?? 'pending',
     registrationEmail: store.settings?.postaOnboarding?.registrationEmail ?? email,
   };
