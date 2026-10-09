@@ -4,6 +4,10 @@ set -euo pipefail
 
 ROOT="${1:-/var/www/market-pos}"
 BASE_URL="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:${PORT:-5180}}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-posta-smoke-auth.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-smoke-auth.sh"
+ekolojik_posta_smoke_auth_init "${ROOT}"
 STAMP="$(date +%s)"
 MARKER="Ekolojik Akis A smoke ${STAMP}"
 TEST_EMAIL="akis-a-smoke+${STAMP}@ekolojikmarket.com.tr"
@@ -12,7 +16,7 @@ TEST_NAME="Akis A Smoke"
 echo "=== Ekolojik Posta Akış A smoke ==="
 echo "API: ${BASE_URL}"
 
-UNREAD_BEFORE="$(curl -fsS "${BASE_URL}/api/posta/unread-counts" 2>/dev/null || echo '{}')"
+UNREAD_BEFORE="$(posta_curl "${BASE_URL}/api/posta/unread-counts" 2>/dev/null || echo '{}')"
 echo "unread (önce): ${UNREAD_BEFORE}"
 
 CONTACT_JSON="$(curl -fsS -X POST "${BASE_URL}/api/contact" \
@@ -32,7 +36,7 @@ sleep 1
 
 INBOX_FILE="$(mktemp)"
 trap 'rm -f "${INBOX_FILE}"' EXIT
-curl -fsS "${BASE_URL}/api/posta/inbox?folder=gelen&limit=80" > "${INBOX_FILE}"
+posta_curl "${BASE_URL}/api/posta/inbox?folder=gelen&limit=80" > "${INBOX_FILE}"
 M="${MARKER}" node -e "
 const marker=process.env.M;
 const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));
@@ -50,7 +54,7 @@ if (!hit) {
 console.log('OK   Gelen iletişim', hit.id, hit.subject);
 " "${INBOX_FILE}" || exit 2
 
-UNREAD_AFTER="$(curl -fsS "${BASE_URL}/api/posta/unread-counts")"
+UNREAD_AFTER="$(posta_curl "${BASE_URL}/api/posta/unread-counts")"
 echo "unread (sonra): ${UNREAD_AFTER}"
 BEFORE="${UNREAD_BEFORE}" AFTER="${UNREAD_AFTER}" node -e "
 const before=JSON.parse(process.env.BEFORE);
@@ -68,7 +72,7 @@ console.log('OK   gelen unread arttı', before.gelen, '→', after.gelen);
 REPLY_TO="${EKOLOJIK_AKIS_A_REPLY_TO:-info@ekolojikmarket.com.tr}"
 REPLY_SUBJ="Re: Genel — ${STAMP}"
 REPLY_BODY="Akis A operator yaniti — ${STAMP}"
-SEND="$(curl -fsS -X POST "${BASE_URL}/api/email/test" \
+SEND="$(posta_curl -X POST "${BASE_URL}/api/email/test" \
   -H 'Content-Type: application/json' \
   -d "$(node -e "console.log(JSON.stringify({to:process.argv[1],subject:process.argv[2],body:process.argv[3]}))" \
     "${REPLY_TO}" "${REPLY_SUBJ}" "${REPLY_BODY}")")"
@@ -78,10 +82,10 @@ const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
 if (!j.ok) { console.error('HATA: yanıt gönderimi', j.error||j); process.exit(4); }
 "
 
-curl -fsS -X POST "${BASE_URL}/api/email/outbox/process" >/dev/null 2>&1 || true
+posta_curl -X POST "${BASE_URL}/api/email/outbox/process" >/dev/null 2>&1 || true
 sleep 1
 
-RECENT="$(curl -fsS "${BASE_URL}/api/email/outbox/recent?limit=30")"
+RECENT="$(posta_curl "${BASE_URL}/api/email/outbox/recent?limit=30")"
 T="${REPLY_TO}" B="${REPLY_BODY}" node -e "
 const to=process.env.T;
 const body=process.env.B;
@@ -97,7 +101,7 @@ if (!hit) {
 console.log('OK   outbox kaydı', hit.id||hit.filename, hit.folder||hit.status);
 " <<<"${RECENT}" || exit 5
 
-CSV="$(curl -fsS "${BASE_URL}/api/posta/export/outbox.csv" 2>/dev/null || true)"
+CSV="$(posta_curl "${BASE_URL}/api/posta/export/outbox.csv" 2>/dev/null || true)"
 if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -q "${REPLY_TO}"; then
   echo "HATA: outbox CSV export yanıt alıcısını içermiyor"
   exit 6
