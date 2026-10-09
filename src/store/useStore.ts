@@ -192,27 +192,12 @@ import {
   saveCrmAttachment,
 } from '../storage/crmAttachments';
 
-const STORAGE_KEYS = {
-  products: 'market-pos-products',
-  sales: 'market-pos-sales',
-  saleReturns: 'market-pos-sale-returns',
-  cart: 'market-pos-cart',
-  priceType: 'market-pos-price-type',
-  stockMovements: 'market-pos-stock-movements',
-  stockInitialized: 'market-pos-stock-initialized',
-  customers: 'market-pos-customers',
-  expenses: 'market-pos-expenses',
-  cashHandovers: 'market-pos-cash-handovers',
-  cashSessions: 'market-pos-cash-sessions',
-  purchaseInvoices: 'market-pos-purchase-invoices',
-  demoVatSeeded: 'market-pos-demo-vat-seeded',
-  demoSupplierSeeded: 'market-pos-demo-supplier-seeded',
-  settings: 'market-pos-settings',
-  users: 'market-pos-users',
-  loginAuditLog: 'market-pos-login-audit',
-  activityAuditLog: 'market-pos-activity-audit',
-  productSets: 'market-pos-product-sets',
-};
+import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
+import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+
+function storageKeys() {
+  return posLocalStorageKeys();
+}
 
 const CATALOG_PRODUCTS: Array<Omit<Product, 'stock'>> = [
   ...SEED_PRODUCTS.map((seed) => ({
@@ -261,7 +246,7 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
 }
 
 function loadProducts(): Product[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.products);
+  const stored = localStorage.getItem(storageKeys().products);
   if (stored) {
     try {
       return mergeWithSeed(JSON.parse(stored) as Product[]);
@@ -299,7 +284,7 @@ function mergeProductSets(stored: ProductSet[] | null | undefined): ProductSet[]
 }
 
 function loadProductSets(): ProductSet[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.productSets);
+  const stored = localStorage.getItem(storageKeys().productSets);
   if (stored) {
     try {
       return mergeProductSets(JSON.parse(stored) as ProductSet[]);
@@ -311,7 +296,7 @@ function loadProductSets(): ProductSet[] {
 }
 
 function loadCart(): CartItem[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.cart);
+  const stored = localStorage.getItem(storageKeys().cart);
   if (stored) {
     try {
       return JSON.parse(stored) as CartItem[];
@@ -323,12 +308,12 @@ function loadCart(): CartItem[] {
 }
 
 function loadPriceType(): PriceType {
-  const stored = localStorage.getItem(STORAGE_KEYS.priceType);
+  const stored = localStorage.getItem(storageKeys().priceType);
   return stored === 'partner' ? 'partner' : 'our';
 }
 
 function loadSales(): Sale[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.sales);
+  const stored = localStorage.getItem(storageKeys().sales);
   if (stored) {
     try {
       return JSON.parse(stored) as Sale[];
@@ -340,7 +325,7 @@ function loadSales(): Sale[] {
 }
 
 function loadSaleReturns(): SaleReturn[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.saleReturns);
+  const stored = localStorage.getItem(storageKeys().saleReturns);
   if (stored) {
     try {
       return JSON.parse(stored) as SaleReturn[];
@@ -352,7 +337,7 @@ function loadSaleReturns(): SaleReturn[] {
 }
 
 function loadStockMovements(): StockMovement[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.stockMovements);
+  const stored = localStorage.getItem(storageKeys().stockMovements);
   if (stored) {
     try {
       return JSON.parse(stored) as StockMovement[];
@@ -413,7 +398,7 @@ function normalizeCustomer(raw: Record<string, unknown>): Customer {
 }
 
 function loadCustomers(): Customer[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.customers);
+  const stored = localStorage.getItem(storageKeys().customers);
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as Record<string, unknown>[];
@@ -426,7 +411,7 @@ function loadCustomers(): Customer[] {
 }
 
 function loadExpenses(): Expense[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.expenses);
+  const stored = localStorage.getItem(storageKeys().expenses);
   if (stored) {
     try {
       return JSON.parse(stored) as Expense[];
@@ -438,7 +423,7 @@ function loadExpenses(): Expense[] {
 }
 
 function loadCashHandovers(): CashHandover[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.cashHandovers);
+  const stored = localStorage.getItem(storageKeys().cashHandovers);
   if (stored) {
     try {
       return JSON.parse(stored) as CashHandover[];
@@ -450,7 +435,7 @@ function loadCashHandovers(): CashHandover[] {
 }
 
 function loadCashSessions(): DailyCashSession[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.cashSessions);
+  const stored = localStorage.getItem(storageKeys().cashSessions);
   if (stored) {
     try {
       return JSON.parse(stored) as DailyCashSession[];
@@ -462,7 +447,7 @@ function loadCashSessions(): DailyCashSession[] {
 }
 
 function loadPurchaseInvoices(): PurchaseInvoice[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.purchaseInvoices);
+  const stored = localStorage.getItem(storageKeys().purchaseInvoices);
   if (stored) {
     try {
       return JSON.parse(stored) as PurchaseInvoice[];
@@ -502,7 +487,7 @@ function normalizeCurrencySettings(raw?: CurrencySettings): CurrencySettings {
 }
 
 function loadSettings(): AppSettings {
-  const stored = localStorage.getItem(STORAGE_KEYS.settings);
+  const stored = localStorage.getItem(storageKeys().settings);
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as AppSettings;
@@ -570,7 +555,7 @@ function normalizeUser(raw: Record<string, unknown>): PosUser {
 }
 
 function loadUsers(): PosUser[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.users);
+  const stored = localStorage.getItem(storageKeys().users);
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as Record<string, unknown>[];
@@ -612,7 +597,7 @@ function mergeUserLists(remoteUsers: PosUser[], localUsers: PosUser[]): PosUser[
 }
 
 function loadLoginAuditLog(): LoginAuditEntry[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.loginAuditLog);
+  const stored = localStorage.getItem(storageKeys().loginAuditLog);
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as LoginAuditEntry[];
@@ -625,7 +610,7 @@ function loadLoginAuditLog(): LoginAuditEntry[] {
 }
 
 function loadActivityAuditLog(): ActivityAuditEntry[] {
-  const stored = localStorage.getItem(STORAGE_KEYS.activityAuditLog);
+  const stored = localStorage.getItem(storageKeys().activityAuditLog);
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as ActivityAuditEntry[];
@@ -939,6 +924,8 @@ export function useStore() {
     let cancelled = false;
 
     (async () => {
+      syncPosLocalStorageKeys();
+      const tenant = loadTenantId();
       const localSnapshot = buildSnapshotFromStorage();
       const remote = await fetchStoreSnapshot();
 
@@ -964,7 +951,10 @@ export function useStore() {
         } else {
           setSyncStatus('local-only');
         }
-      } else if (hasPersistedStoreData(localSnapshot)) {
+      } else if (tenant !== DEFAULT_TENANT_ID && remote) {
+        applySnapshot(remote);
+        setSyncStatus('synced');
+      } else if (hasPersistedStoreData(localSnapshot) && tenant === DEFAULT_TENANT_ID) {
         const { products: migratedLocal } = applyIrsaliyeStockToProducts(localSnapshot.products ?? []);
         const localFixed = {
           ...localSnapshot,
@@ -978,6 +968,9 @@ export function useStore() {
         } else {
           setSyncStatus('local-only');
         }
+      } else if (remote) {
+        applySnapshot(remote);
+        setSyncStatus('synced');
       } else {
         setSyncStatus('synced');
       }
@@ -993,20 +986,20 @@ export function useStore() {
   useEffect(() => {
     if (!syncReady) return;
     const toSave = products.map(({ imageUrl: _, ...rest }) => rest);
-    localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(toSave));
+    localStorage.setItem(storageKeys().products, JSON.stringify(toSave));
   }, [products, syncReady]);
 
   useEffect(() => {
     if (!syncReady) return;
-    localStorage.setItem(STORAGE_KEYS.productSets, JSON.stringify(productSets));
+    localStorage.setItem(storageKeys().productSets, JSON.stringify(productSets));
   }, [productSets, syncReady]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.cart, JSON.stringify(cart));
+    localStorage.setItem(storageKeys().cart, JSON.stringify(cart));
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.priceType, priceType);
+    localStorage.setItem(storageKeys().priceType, priceType);
   }, [priceType]);
 
   useEffect(() => {
@@ -1023,19 +1016,19 @@ export function useStore() {
   }, [sales, customers, syncReady]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.sales, JSON.stringify(sales));
+    localStorage.setItem(storageKeys().sales, JSON.stringify(sales));
   }, [sales]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.saleReturns, JSON.stringify(saleReturns));
+    localStorage.setItem(storageKeys().saleReturns, JSON.stringify(saleReturns));
   }, [saleReturns]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.stockMovements, JSON.stringify(stockMovements));
+    localStorage.setItem(storageKeys().stockMovements, JSON.stringify(stockMovements));
   }, [stockMovements]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.customers, JSON.stringify(customers));
+    localStorage.setItem(storageKeys().customers, JSON.stringify(customers));
   }, [customers]);
 
   useEffect(() => {
@@ -1049,19 +1042,19 @@ export function useStore() {
   }, [heldPosSales, syncReady]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.expenses, JSON.stringify(expenses));
+    localStorage.setItem(storageKeys().expenses, JSON.stringify(expenses));
   }, [expenses]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.cashHandovers, JSON.stringify(cashHandovers));
+    localStorage.setItem(storageKeys().cashHandovers, JSON.stringify(cashHandovers));
   }, [cashHandovers]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.cashSessions, JSON.stringify(cashSessions));
+    localStorage.setItem(storageKeys().cashSessions, JSON.stringify(cashSessions));
   }, [cashSessions]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.purchaseInvoices, JSON.stringify(purchaseInvoices));
+    localStorage.setItem(storageKeys().purchaseInvoices, JSON.stringify(purchaseInvoices));
   }, [purchaseInvoices]);
 
   useEffect(() => {
@@ -1073,19 +1066,19 @@ export function useStore() {
   }, [syncReady, sales, saleReturns, expenses, cashHandovers, journalVouchers]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
+    localStorage.setItem(storageKeys().settings, JSON.stringify(settings));
   }, [settings]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
+    localStorage.setItem(storageKeys().users, JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.loginAuditLog, JSON.stringify(loginAuditLog));
+    localStorage.setItem(storageKeys().loginAuditLog, JSON.stringify(loginAuditLog));
   }, [loginAuditLog]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.activityAuditLog, JSON.stringify(activityAuditLog));
+    localStorage.setItem(storageKeys().activityAuditLog, JSON.stringify(activityAuditLog));
   }, [activityAuditLog]);
 
   useEffect(() => {
@@ -1279,7 +1272,7 @@ export function useStore() {
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, stock: newStock } : p)),
       );
-      localStorage.setItem(STORAGE_KEYS.stockInitialized, '1');
+      localStorage.setItem(storageKeys().stockInitialized, '1');
       if (authSession) {
         logActivity(authSession, 'stock_adjust', `Stok güncellendi: ${product.name}`, {
           urun: product.name,
@@ -1526,7 +1519,7 @@ export function useStore() {
       setProducts(updated);
       if (movements.length > 0) {
         setStockMovements((prev) => [...movements, ...prev]);
-        localStorage.setItem(STORAGE_KEYS.stockInitialized, '1');
+        localStorage.setItem(storageKeys().stockInitialized, '1');
         if (authSession) {
           logActivity(authSession, 'stock_bulk', `Toplu stok güncellendi: ${safeStock} adet`, {
             miktar: safeStock,
@@ -1993,7 +1986,7 @@ export function useStore() {
       return [...demoSales, ...kept];
     });
 
-    localStorage.setItem(STORAGE_KEYS.demoVatSeeded, '1');
+    localStorage.setItem(storageKeys().demoVatSeeded, '1');
   }, [products]);
 
   const seedDemoSupplierData = useCallback((): { ok: true } | { ok: false; reason: 'missing_products' | 'already_seeded' } => {
@@ -2021,7 +2014,7 @@ export function useStore() {
       setStockMovements((prev) => [...stockUpdate.movements, ...prev]);
     }
 
-    localStorage.setItem(STORAGE_KEYS.demoSupplierSeeded, '1');
+    localStorage.setItem(storageKeys().demoSupplierSeeded, '1');
 
     if (authSession) {
       logActivity(authSession, 'purchase_invoice_add', 'Örnek tedarikçi ve 2 alış faturası yüklendi', {
@@ -2035,14 +2028,14 @@ export function useStore() {
 
   useEffect(() => {
     if (!syncReady) return;
-    if (localStorage.getItem(STORAGE_KEYS.demoVatSeeded)) return;
+    if (localStorage.getItem(storageKeys().demoVatSeeded)) return;
     if (purchaseInvoices.length > 0) return;
     seedDemoVatData();
   }, [syncReady, purchaseInvoices.length, seedDemoVatData]);
 
   useEffect(() => {
     if (!syncReady) return;
-    if (localStorage.getItem(STORAGE_KEYS.demoSupplierSeeded)) return;
+    if (localStorage.getItem(storageKeys().demoSupplierSeeded)) return;
     if (suppliers.some((supplier) => isDemoSupplier(supplier))) return;
     if (purchaseInvoices.some((invoice) => isDemoSupplierPurchaseInvoice(invoice))) return;
     seedDemoSupplierData();
@@ -2064,7 +2057,7 @@ export function useStore() {
 
     setProducts(nextProducts);
     setStockMovements((prev) => [...movements, ...prev]);
-    localStorage.setItem(STORAGE_KEYS.stockInitialized, '1');
+    localStorage.setItem(storageKeys().stockInitialized, '1');
     if (authSession) {
       logActivity(
         authSession,
@@ -2819,7 +2812,7 @@ export function useStore() {
     }
 
     setCashSessions(nextSessions);
-    localStorage.setItem(STORAGE_KEYS.cashSessions, JSON.stringify(nextSessions));
+    localStorage.setItem(storageKeys().cashSessions, JSON.stringify(nextSessions));
 
     if (authSession) {
       logActivity(authSession, 'cash_day_close', `Gün kapatıldı — ertesi gün açılış: ${formatCurrencyTry(closingBalance)}`, {
@@ -2924,6 +2917,7 @@ export function useStore() {
   );
 
   const refreshTenantData = useCallback(async (): Promise<void> => {
+    syncPosLocalStorageKeys();
     const remote = await fetchStoreSnapshot();
     if (remote) {
       applySnapshot(remote);
@@ -3197,7 +3191,7 @@ export function useStore() {
 
     const nextUsers = [user, ...users];
     setUsers(nextUsers);
-    localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(nextUsers));
+    localStorage.setItem(storageKeys().users, JSON.stringify(nextUsers));
 
     if (authSession) {
       logActivity(authSession, 'user_create', `Kullanıcı oluşturuldu: ${user.displayName}`, {
@@ -3279,7 +3273,7 @@ export function useStore() {
 
     const nextUsers = users.map((user) => (user.id === id ? updated : user));
     setUsers(nextUsers);
-    localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(nextUsers));
+    localStorage.setItem(storageKeys().users, JSON.stringify(nextUsers));
 
     if (authSession?.userId === id) {
       if (!updated.isActive) {
@@ -3322,7 +3316,7 @@ export function useStore() {
     }
     const nextUsers = users.filter((item) => item.id !== id);
     setUsers(nextUsers);
-    localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(nextUsers));
+    localStorage.setItem(storageKeys().users, JSON.stringify(nextUsers));
 
     if (authSession) {
       logActivity(authSession, 'user_delete', `Kullanıcı silindi: ${user.displayName}`, {
