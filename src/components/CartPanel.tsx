@@ -60,6 +60,8 @@ interface CartPanelProps {
   scanSearchRef?: RefObject<PremiumProductSearchHandle>;
   onBarcodeScan?: (normalized: string) => BarcodeScanApplyResult;
   onBarcodeScanFeedback?: (result: BarcodeScanApplyResult) => void;
+  /** POS Lite: kupon/puan kapalı, ödeme alanı kompakt */
+  compactCheckout?: boolean;
 }
 
 type CustomerStatus = 'registered' | 'new-registration' | 'gl-linked' | 'partner-only' | 'name-only' | 'none';
@@ -106,6 +108,7 @@ export function CartPanel({
   scanSearchRef,
   onBarcodeScan,
   onBarcodeScanFeedback,
+  compactCheckout = false,
 }: CartPanelProps) {
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerQuery, setCustomerQuery] = useState('');
@@ -180,8 +183,14 @@ export function CartPanel({
   const hasCartItems = cart.length > 0;
   const samplesOnly = hasCartItems && total === 0 && sampleCount > 0;
 
+  const showCrmCheckout =
+    !compactCheckout && onCrmCouponChange && !samplesOnly;
+  const crmHint = compactCheckout ? '' : crmDiscountLabel;
+
   return (
-    <aside className="cart-panel">
+    <aside
+      className={`cart-panel${compactCheckout ? ' cart-panel--compact-checkout' : ''}${hasCartItems ? ' cart-panel--has-items' : ''}`}
+    >
       <div className={`cart-panel-top ${hasCartItems ? 'cart-panel-top--compact' : ''}`}>
         <div className="cart-panel-search">
           <PremiumProductSearch
@@ -437,13 +446,13 @@ export function CartPanel({
 
       {cart.length > 0 && (
         <div className={`cart-panel-footer ${sampleCount > 0 ? 'cart-panel-footer--has-sample' : ''}`}>
-          {onCrmCouponChange && !samplesOnly && (
+          {showCrmCheckout && (
             <div className="cart-crm-row">
               <input
                 className="cart-crm-input"
                 placeholder="Kupon kodu"
                 value={crmCouponCode}
-                onChange={(e) => onCrmCouponChange(e.target.value.toUpperCase())}
+                onChange={(e) => onCrmCouponChange!(e.target.value.toUpperCase())}
               />
               {onCrmPointsChange && (
                 <input
@@ -457,7 +466,7 @@ export function CartPanel({
               )}
             </div>
           )}
-          {crmDiscountLabel && <p className="cart-crm-hint">{crmDiscountLabel}</p>}
+          {crmHint && <p className="cart-crm-hint">{crmHint}</p>}
           <div className="cart-total">
             <span>Toplam</span>
             <strong>{samplesOnly ? 'Ücretsiz' : formatCurrency(total)}</strong>

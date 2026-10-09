@@ -2639,9 +2639,105 @@ input {
 }
 
 .cart-panel-footer {
+  flex-shrink: 0;
   padding: 20px;
   border-top: 1px solid var(--border);
   background: var(--bg);
+}
+
+/* POS Lite — daha fazla sepet satırı, kompakt ödeme */
+.cart-panel--compact-checkout .cart-panel-footer {
+  padding: 10px 12px 8px;
+}
+
+.cart-panel--compact-checkout.cart-panel--has-items .sale-customer-bar {
+  display: none;
+}
+
+.cart-panel--compact-checkout .cart-item {
+  padding: 8px 10px;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.cart-panel--compact-checkout .cart-item-info {
+  gap: 8px;
+}
+
+.cart-panel--compact-checkout .cart-item-info .product-image-sm {
+  width: 40px;
+  height: 40px;
+}
+
+.cart-panel--compact-checkout .cart-item-name {
+  font-size: 12px;
+  -webkit-line-clamp: 2;
+}
+
+.cart-panel--compact-checkout .cart-item-controls {
+  gap: 8px;
+}
+
+.cart-panel--compact-checkout .qty-control {
+  padding: 2px;
+}
+
+.cart-panel--compact-checkout .qty-control button {
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+}
+
+.cart-panel--compact-checkout .qty-control span {
+  min-width: 20px;
+  font-size: 13px;
+}
+
+.cart-panel--compact-checkout .cart-item-total {
+  font-size: 13px;
+}
+
+.cart-panel--compact-checkout .cart-total {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.cart-panel--compact-checkout .cart-total strong {
+  font-size: 20px;
+}
+
+.cart-panel--compact-checkout .payment-buttons--pos {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cart-panel--compact-checkout .btn-payment {
+  padding: 7px 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+
+.cart-panel--compact-checkout .cart-park-btn {
+  margin-top: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  min-height: 0;
+}
+
+.cart-panel--compact-checkout .cart-shortcut-hint {
+  margin: 3px 0 0;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.cart-panel--compact-checkout .cart-panel-top--compact {
+  padding-bottom: 6px;
+}
+
+.cart-panel--compact-checkout .cart-panel-top--compact + .cart-panel-items {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .cart-total {
