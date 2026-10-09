@@ -28,6 +28,7 @@ export function PinLoginPad({ store, defaultUsername, onSwitchToPassword, onSucc
     setBusy(true);
     setError(null);
     try {
+      await store.refreshTenantData();
       const result = await store.loginWithPin(username, pin);
       if (result.status === 'error' || result.status === 'locked') {
         setError(result.message);
