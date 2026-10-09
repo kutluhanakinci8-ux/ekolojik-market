@@ -14,7 +14,9 @@ echo "=============================================="
 echo ""
 echo "NOT: Termal yazici (POS-80C) kasa Mac/PC USB baglidir."
 echo "     Sunucu fisi BASMAZ; tarayici loglari ve store ayari burada."
-echo "     Mac yazici: lpstat / cups (kasa Mac'te, SSH sunucuda degil)."
+echo ""
+echo "!!! SUNUCUDA (root@srv...) lpstat / cups YOKTUR — 'command not found' NORMAL."
+echo "    Yazici logu icin Mac'te YENI Terminal: prompt 'macbook@macbook-air ~' (ssh YOK)."
 echo ""
 
 section() { echo ""; echo "── $1 ──"; }
