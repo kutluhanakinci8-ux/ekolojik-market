@@ -1,6 +1,13 @@
 import type { AppPage } from '../components/AppShell';
 import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS } from '../data/navigation';
+import type { AppSettings } from '../types/business';
 import type { AuthSession, PosUser } from '../types/user';
+import {
+  filterTabsForProductProfile,
+  isPosLiteProfile,
+  POS_LITE_ADMIN_TABS,
+  POS_LITE_CASHIER_TABS,
+} from './tenantProductProfile';
 
 export interface UserTabPermissions {
   hasFullAccounting: boolean;
@@ -14,6 +21,7 @@ export interface UserTabPermissions {
 export function resolveUserTabPermissions(
   user: PosUser | undefined,
   session: AuthSession | null | undefined,
+  settings?: AppSettings | null,
 ): UserTabPermissions {
   if (!user || !session) {
     return {
@@ -22,6 +30,19 @@ export function resolveUserTabPermissions(
       hasCashier: false,
       hasCustomers: false,
       hasReports: false,
+    };
+  }
+  if (isPosLiteProfile(settings)) {
+    const raw =
+      user.role === 'admin'
+        ? POS_LITE_ADMIN_TABS
+        : user.allowedTabs.filter((tab) => ALL_APP_PAGES.includes(tab));
+    return {
+      hasFullAccounting: false,
+      hasTransactions: raw.includes('transactions'),
+      hasCashier: false,
+      hasCustomers: false,
+      hasReports: raw.includes('reports'),
     };
   }
   if (user.role === 'admin') {
@@ -43,7 +64,15 @@ export function resolveUserTabPermissions(
   };
 }
 
-export function resolveUserAllowedTabs(user: PosUser): AppPage[] {
+export function resolveUserAllowedTabs(user: PosUser, settings?: AppSettings | null): AppPage[] {
+  if (isPosLiteProfile(settings)) {
+    if (user.role === 'admin') {
+      return [...POS_LITE_ADMIN_TABS];
+    }
+    const allowed = user.allowedTabs.filter((tab) => ALL_APP_PAGES.includes(tab));
+    const tabs = allowed.length > 0 ? allowed : [...POS_LITE_CASHIER_TABS];
+    return filterTabsForProductProfile(tabs, settings);
+  }
   if (user.role === 'admin') {
     return ALL_APP_PAGES;
   }
@@ -56,14 +85,18 @@ export function resolveUserAllowedTabs(user: PosUser): AppPage[] {
   return tabs;
 }
 
-export function buildAuthSession(user: PosUser, sessionId?: string): AuthSession {
+export function buildAuthSession(
+  user: PosUser,
+  sessionId?: string,
+  settings?: AppSettings | null,
+): AuthSession {
   return {
     userId: user.id,
     sessionId: sessionId ?? `S${Date.now()}`,
     username: user.username,
     displayName: user.displayName,
     role: user.role,
-    allowedTabs: resolveUserAllowedTabs(user),
+    allowedTabs: resolveUserAllowedTabs(user, settings),
     loggedInAt: new Date().toISOString(),
     mustChangePassword: user.mustChangePassword === true,
   };

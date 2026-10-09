@@ -24,7 +24,7 @@ import {
   POSTA_ONBOARDING_REQUEST_EVENT,
   shouldForcePostaOnboardingOpen,
 } from './storage/postaOnboardingSession';
-import { isPosLiteProfile } from './utils/tenantProductProfile';
+import { filterTabsForProductProfile, isPosLiteProfile } from './utils/tenantProductProfile';
 
 function renderPage(
   page: AppPage,
@@ -73,6 +73,9 @@ function renderPage(
 
 export function PosApp() {
   const store = useStore();
+  const allowedTabs = store.authSession
+    ? filterTabsForProductProfile(store.authSession.allowedTabs, store.settings)
+    : [];
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState<AppPage>('sales');
   const [postaUnread, setPostaUnread] = useState(0);
@@ -90,10 +93,10 @@ export function PosApp() {
 
   useEffect(() => {
     if (!store.authSession || !viewPosta) return;
-    if (store.authSession.allowedTabs.includes('posta')) {
+    if (allowedTabs.includes('posta')) {
       setPage('posta');
     }
-  }, [store.authSession, viewPosta]);
+  }, [store.authSession, viewPosta, allowedTabs]);
 
   useIdleLogout(() => {
     store.logout('idle');
@@ -106,10 +109,11 @@ export function PosApp() {
 
   useEffect(() => {
     if (!store.authSession) return;
-    if (!canAccessPage(store.authSession, page)) {
-      setPage(getDefaultLandingPage(store.authSession));
+    const session = { ...store.authSession, allowedTabs };
+    if (!canAccessPage(session, page)) {
+      setPage(getDefaultLandingPage(session));
     }
-  }, [store.authSession, page]);
+  }, [store.authSession, page, allowedTabs]);
 
   useEffect(() => {
     setCurrencyDisplaySettings(store.settings.currency);
@@ -147,7 +151,7 @@ export function PosApp() {
   }, [evaluatePostaOnboardingGate]);
 
   useEffect(() => {
-    if (!store.authSession?.allowedTabs.includes('posta')) return;
+    if (!allowedTabs.includes('posta')) return;
     let cancelled = false;
     const applyCounts = (total?: number) => {
       if (!cancelled && total != null) setPostaUnread(total);
@@ -185,7 +189,7 @@ export function PosApp() {
       window.clearInterval(id);
       es?.close();
     };
-  }, [store.authSession]);
+  }, [store.authSession, allowedTabs]);
 
   if (!store.authSession) {
     return <Navigate to="/giris" replace />;
@@ -207,7 +211,6 @@ export function PosApp() {
     );
   }
 
-  const allowedTabs = store.authSession.allowedTabs;
   const showCostProfitToggle = canRevealCostProfit(store.authSession);
   const shellPage = resolveTopNavHighlight(page, allowedTabs);
 

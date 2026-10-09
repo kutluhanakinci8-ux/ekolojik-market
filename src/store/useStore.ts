@@ -538,7 +538,14 @@ function normalizeUser(raw: Record<string, unknown>): PosUser {
     displayName: String(raw.displayName ?? raw.username ?? ''),
     passwordHash: String(raw.passwordHash ?? ''),
     role,
-    allowedTabs: role === 'admin' ? ALL_APP_PAGES : allowedTabs,
+    allowedTabs:
+      role === 'admin'
+        ? (Array.isArray(raw.allowedTabs) && raw.allowedTabs.length
+            ? raw.allowedTabs.filter(
+                (tab): tab is AppPage => typeof tab === 'string' && ALL_APP_PAGES.includes(tab as AppPage),
+              )
+            : [...ALL_APP_PAGES])
+        : allowedTabs,
     isActive: raw.isActive !== false,
     isPrimaryAdmin: raw.isPrimaryAdmin === true || String(raw.id) === 'U-admin',
     createdAt,
@@ -549,10 +556,14 @@ function normalizeUser(raw: Record<string, unknown>): PosUser {
     totpEnabled: raw.totpEnabled === true,
   };
 
-  return {
+  return user;
+}
+
+function mapUsersWithTabPolicy(users: PosUser[], settings?: AppSettings | null): PosUser[] {
+  return users.map((user) => ({
     ...user,
-    allowedTabs: resolveUserAllowedTabs(user),
-  };
+    allowedTabs: resolveUserAllowedTabs(user, settings),
+  }));
 }
 
 function loadUsers(): PosUser[] {
@@ -909,7 +920,11 @@ export function useStore() {
     if (snapshot.users?.length) {
       const remoteUsers = snapshot.users.map((user) => normalizeUser(user as unknown as Record<string, unknown>));
       const localUsers = loadUsers();
-      setUsers(mergeUserLists(remoteUsers, localUsers));
+      const mergedSettings = {
+        ...DEFAULT_SETTINGS,
+        ...(snapshot.settings ?? {}),
+      } as AppSettings;
+      setUsers(mapUsersWithTabPolicy(mergeUserLists(remoteUsers, localUsers), mergedSettings));
     } else {
       setUsers((prev) => (prev.length > 0 ? prev : DEFAULT_USERS.map((user) => ({ ...user }))));
     }
@@ -1141,7 +1156,7 @@ export function useStore() {
       setAuthSession(null);
       return;
     }
-    const freshSession = buildAuthSession(user, authSession.sessionId);
+    const freshSession = buildAuthSession(user, authSession.sessionId, settings);
     const tabsChanged =
       freshSession.allowedTabs.join('|') !== authSession.allowedTabs.join('|')
       || freshSession.displayName !== authSession.displayName
@@ -1150,7 +1165,7 @@ export function useStore() {
       saveAuthSession(freshSession);
       setAuthSession(freshSession);
     }
-  }, [users, authSession]);
+  }, [users, authSession, settings]);
 
   useEffect(() => {
     setPriceType(settings.defaultPriceType);
@@ -2890,7 +2905,7 @@ export function useStore() {
     ) => {
       clearLoginLockout(user.username);
       const sessionId = `S${Date.now()}`;
-      const session = buildAuthSession(user, sessionId);
+      const session = buildAuthSession(user, sessionId, settings);
       lastTrackedPageRef.current = null;
       saveAuthSession(session);
       setAuthSession(session);
@@ -2920,7 +2935,7 @@ export function useStore() {
         setSyncStatus('synced');
       }
     },
-    [appendLoginAudit, logActivity, applySnapshot],
+    [appendLoginAudit, logActivity, applySnapshot, settings],
   );
 
   const refreshTenantData = useCallback(async (): Promise<void> => {
@@ -3135,7 +3150,7 @@ export function useStore() {
     };
 
     setUsers((prev) => prev.map((item) => (item.id === user.id ? updated : item)));
-    const session = buildAuthSession(updated, authSession.sessionId);
+    const session = buildAuthSession(updated, authSession.sessionId, settings);
     saveAuthSession(session);
     setAuthSession(session);
     logActivity(session, 'password_change', 'Şifre değiştirildi');
@@ -3330,7 +3345,7 @@ export function useStore() {
       if (!updated.isActive) {
         logout();
       } else {
-        const session = buildAuthSession(updated, authSession.sessionId);
+        const session = buildAuthSession(updated, authSession.sessionId, settings);
         saveAuthSession(session);
         setAuthSession(session);
       }
