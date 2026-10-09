@@ -35,7 +35,8 @@ if (!j.ok) { console.error('HATA: iletişim kaydı', j.message||j); process.exit
 sleep 1
 
 INBOX_FILE="$(mktemp)"
-trap 'rm -f "${INBOX_FILE}"' EXIT
+CSV_FILE=""
+trap 'rm -f "${INBOX_FILE}" "${CSV_FILE:-}"' EXIT
 posta_curl "${BASE_URL}/api/posta/inbox?folder=gelen&limit=80" > "${INBOX_FILE}"
 M="${MARKER}" node -e "
 const marker=process.env.M;
@@ -101,9 +102,10 @@ if (!hit) {
 console.log('OK   outbox kaydı', hit.id||hit.filename, hit.folder||hit.status);
 " <<<"${RECENT}" || exit 5
 
-CSV="$(curl -sS -H "${POSTA_SMOKE_AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" 2>/dev/null || true)"
-if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -qE "${REPLY_TO}|${STAMP}"; then
-  echo "HATA: outbox CSV export yanıt alıcısını içermiyor"
+CSV_FILE="$(mktemp)"
+curl -sS -H "${POSTA_SMOKE_AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" > "${CSV_FILE}" 2>/dev/null || true
+if [[ ! -s "${CSV_FILE}" ]] || ! grep -qF "${REPLY_BODY}" "${CSV_FILE}"; then
+  echo "HATA: outbox CSV export smoke yanıtını içermiyor"
   exit 6
 fi
 echo "OK   outbox.csv export"
