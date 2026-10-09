@@ -1,7 +1,9 @@
+import { mergePosLiteProductMediaOnWrite } from './posLiteProductMedia.mjs';
+
 /** POS Lite / ayrı tenant — main (Greenleaf) seed verisinin yazılmasını engelle */
 const MAIN_DEMO_USERNAMES = new Set(['yonetici', 'kasiyer']);
 
-function isPosLiteStore(store) {
+export function isPosLiteStore(store) {
   return store?.settings?.productProfile === 'pos-lite';
 }
 
@@ -33,7 +35,18 @@ export function guardIsolatedTenantStoreWrite(tenantId, existing, incoming) {
     out.products = [];
   }
 
-  return out;
+  const merged = mergePosLiteProductMediaOnWrite(existing, out);
+  return mergeReceiptPrinterSettingsOnWrite(existing, merged);
+}
+
+function mergeReceiptPrinterSettingsOnWrite(existing, incoming) {
+  if (!incoming?.settings) return incoming;
+  if (isPosLiteStore(existing) || isPosLiteStore(incoming)) {
+    const settings = { ...incoming.settings };
+    delete settings.receiptPrinter;
+    return { ...incoming, settings };
+  }
+  return incoming;
 }
 
 export function shouldSkipIrsaliyeStockMigration(tenantId, store) {

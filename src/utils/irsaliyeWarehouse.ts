@@ -41,8 +41,8 @@ export function getIrsaliyeWarehouseProducts(products: Product[]): Product[] {
   return products.filter(isIrsaliyeWarehouseProduct);
 }
 
-export function getIrsaliyeWarehouseStockMetrics(
-  products: Product[],
+function stockMetricsForProductList(
+  warehouseProducts: Product[],
   lowStockThreshold: number,
 ): {
   products: Product[];
@@ -52,7 +52,6 @@ export function getIrsaliyeWarehouseStockMetrics(
   inStockCount: number;
   healthPercent: number;
 } {
-  const warehouseProducts = getIrsaliyeWarehouseProducts(products);
   const totalStockUnits = warehouseProducts.reduce((sum, p) => sum + p.stock, 0);
   const lowStockCount = warehouseProducts.filter(
     (p) => p.stock > 0 && p.stock <= lowStockThreshold,
@@ -72,6 +71,24 @@ export function getIrsaliyeWarehouseStockMetrics(
     inStockCount,
     healthPercent,
   };
+}
+
+/** Greenleaf: yalnızca irsaliye depo kartları; POS Lite: tüm katalog */
+export function getStockScreenMetrics(
+  products: Product[],
+  lowStockThreshold: number,
+  mode: 'irsaliye-warehouse' | 'tenant-catalog',
+) {
+  const list =
+    mode === 'tenant-catalog' ? products : getIrsaliyeWarehouseProducts(products);
+  return stockMetricsForProductList(list, lowStockThreshold);
+}
+
+export function getIrsaliyeWarehouseStockMetrics(
+  products: Product[],
+  lowStockThreshold: number,
+) {
+  return getStockScreenMetrics(products, lowStockThreshold, 'irsaliye-warehouse');
 }
 
 export { IRSALIYE_LUY2026000000002_ID };

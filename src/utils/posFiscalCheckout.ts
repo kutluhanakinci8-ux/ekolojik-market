@@ -1,7 +1,7 @@
 import type { CartItem, Product } from '../types/product';
 import type { ProductSet } from '../types/productSet';
 import type { PosCheckoutSettings } from '../types/pos';
-import { printFiscalReceipt } from '../services/fiscalBridge';
+import { isRealFiscalDevicePrint, printFiscalReceipt } from '../services/fiscalBridge';
 
 export async function tryFiscalReceipt(
   paidItems: CartItem[],
@@ -35,7 +35,11 @@ export async function tryFiscalReceipt(
   try {
     const fiscal = await printFiscalReceipt({ items: fiscalItems, paymentMethod: fiscalMethod, total });
     if (fiscal.success) {
-      return { receiptNo: fiscal.receiptNo, fiscalPrinted: !fiscal.simulated, cancelled: false };
+      return {
+        receiptNo: fiscal.receiptNo,
+        fiscalPrinted: isRealFiscalDevicePrint(fiscal),
+        cancelled: false,
+      };
     }
     if (settings.fiscalFailMode === 'continue') {
       return { fiscalPrinted: false, cancelled: false };

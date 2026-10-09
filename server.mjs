@@ -16,6 +16,7 @@ import {
 } from './server/tenantAuth.mjs';
 import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
+import { shouldSkipIrsaliyeStockMigration } from './server/tenantStoreGuard.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
 import {
   getEkolojikMailConfig,
@@ -321,11 +322,16 @@ async function readStoreData(tenantId = 'main') {
 
   let persist = false;
 
-  if (data?.products?.length) {
+  if (data?.products?.length && !shouldSkipIrsaliyeStockMigration(tenantId, data)) {
     const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
     data = snapshot;
     if (stockChanged) persist = true;
   }
+
+  const { enrichPosLiteProductMedia } = await import('./server/posLiteProductMedia.mjs');
+  const { store: mediaEnriched, changed: mediaChanged } = enrichPosLiteProductMedia(data);
+  data = mediaEnriched;
+  if (mediaChanged) persist = true;
 
   if (persist) {
     await writeStoreData(data, tenantId);
@@ -2941,6 +2947,21 @@ const server = createServer(async (req, res) => {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, message: 'Mesaj kaydedilemedi' }));
       }
+      return;
+    }
+
+    if (pathname === '/api/pos/receipt-print-log' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const body = await readRequestBody(req);
+      const { appendReceiptPrintLog } = await import('./server/receiptPrintLog.mjs');
+      await appendReceiptPrintLog(DATA_DIR, tenantId, {
+        phase: body?.phase ?? 'unknown',
+        detail: body?.detail ?? null,
+        userAgent: body?.userAgent ?? null,
+      });
+      res.writeHead(204);
+      res.end();
       return;
     }
 

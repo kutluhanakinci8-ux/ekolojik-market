@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CATEGORIES } from '../data/categories';
 import type { Store } from '../store/useStore';
 import { buildReceiptFromCart, printThermalReceipt } from '../utils/receiptPrint';
+import { logReceiptPrint } from '../utils/receiptPrintLog';
 import { DEFAULT_POS_CHECKOUT_SETTINGS, type CompleteSaleOptions } from '../types/pos';
 import { tryFiscalReceipt } from '../utils/posFiscalCheckout';
 import { PosPaymentModal } from './pos/PosPaymentModal';
@@ -22,12 +23,16 @@ import type { PremiumProductSearchHandle } from './PremiumProductSearch';
 import { usePosBarcodeWedge } from '../hooks/usePosBarcodeWedge';
 import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
+import { shouldUseGreenleafReceiptPath } from '../utils/greenleafReceipt';
 
 interface SalesScreenProps {
   store: Store;
 }
 
 export function SalesScreen({ store }: SalesScreenProps) {
+  const posLiteCheckout = isPosLiteProfile(store.settings);
   const posCheckout = useMemo(
     () => ({ ...DEFAULT_POS_CHECKOUT_SETTINGS, ...store.settings.posCheckout }),
     [store.settings.posCheckout],
@@ -168,94 +173,109 @@ export function SalesScreen({ store }: SalesScreenProps) {
     setCheckoutBusy(true);
     setPaymentModal(null);
 
-    const cartSnapshot = [...store.cart];
-    const paidItems = cartSnapshot.filter((item) => item.priceType !== 'sample');
-    const sampleCount = store.cartSampleCount;
-    const total = store.cartTotal;
-    const samplesOnly = paidItems.length === 0 && sampleCount > 0;
+    try {
+      const cartSnapshot = [...store.cart];
+      const paidItems = cartSnapshot.filter((item) => item.priceType !== 'sample');
+      const sampleCount = store.cartSampleCount;
+      const total = store.cartTotal;
+      const samplesOnly = paidItems.length === 0 && sampleCount > 0;
 
-    let receiptNo: string | undefined;
-    let fiscalPrinted = false;
-    const fiscalMethod = method === 'split' ? 'split' : method;
+      let receiptNo: string | undefined;
+      let fiscalPrinted = false;
+      const fiscalMethod = method === 'split' ? 'split' : method;
 
-    const runFiscal = !samplesOnly && method !== 'credit';
-    if (runFiscal && posCheckout.fiscalTiming === 'before_sale') {
-      const fiscal = await tryFiscalReceipt(
-        paidItems,
-        store.products,
-        store.productSets,
-        fiscalMethod,
-        total,
-        posCheckout,
-      );
-      if (fiscal.cancelled) {
-        setCheckoutBusy(false);
+      const runFiscal = !samplesOnly && method !== 'credit';
+      if (runFiscal && posCheckout.fiscalTiming === 'before_sale') {
+        const fiscal = await tryFiscalReceipt(
+          paidItems,
+          store.products,
+          store.productSets,
+          fiscalMethod,
+          total,
+          posCheckout,
+        );
+        if (fiscal.cancelled) {
+          return;
+        }
+        receiptNo = fiscal.receiptNo;
+        fiscalPrinted = fiscal.fiscalPrinted;
+      }
+
+      const sale = store.completeSale(method, options);
+      if (!sale) {
+        setLastSale(
+          store.checkoutError
+            ?? (method === 'credit'
+              ? 'Veresiye kaydedilemedi — müşteri seçin veya Greenleaf no girin'
+              : 'Satış kaydedilemedi — müşteri bilgisini kontrol edin'),
+        );
+        setTimeout(() => setLastSale(null), 5000);
         return;
       }
-      receiptNo = fiscal.receiptNo;
-      fiscalPrinted = fiscal.fiscalPrinted;
-    }
 
-    const sale = store.completeSale(method, options);
-    if (!sale) {
-      setLastSale(
-        store.checkoutError
-          ?? (method === 'credit'
-            ? 'Veresiye kaydedilemedi — müşteri seçin veya Greenleaf no girin'
-            : 'Satış kaydedilemedi — müşteri bilgisini kontrol edin'),
-      );
-      setTimeout(() => setLastSale(null), 5000);
-      setCheckoutBusy(false);
-      return;
-    }
-
-    if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
-      const fiscal = await tryFiscalReceipt(
-        paidItems,
-        store.products,
-        store.productSets,
-        fiscalMethod,
-        sale.total,
-        posCheckout,
-      );
-      if (!fiscal.cancelled) {
-        receiptNo = fiscal.receiptNo ?? receiptNo;
-        fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
+      if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
+        const fiscal = await tryFiscalReceipt(
+          paidItems,
+          store.products,
+          store.productSets,
+          fiscalMethod,
+          sale.total,
+          posCheckout,
+        );
+        if (!fiscal.cancelled) {
+          receiptNo = fiscal.receiptNo ?? receiptNo;
+          fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
+        }
       }
+
+      const receiptPayment = method === 'split' ? 'card' : method;
+      const useClassicReceipt = shouldUseGreenleafReceiptPath(store.settings);
+      const receiptPrinter = normalizeReceiptPrinterSettings(store.settings.receiptPrinter);
+      if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
+        const receiptData = buildReceiptFromCart(
+          paidItems,
+          store.products,
+          receiptPayment,
+          sale.total,
+          store.settings.businessName,
+          { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
+          store.productSets,
+        );
+        const runPrint = () => {
+          if (useClassicReceipt) {
+            return printThermalReceipt(receiptData);
+          }
+          if (receiptPrinter.autoPrintOnSale && receiptPrinter.brand !== 'none') {
+            return printThermalReceipt(receiptData, receiptPrinter);
+          }
+          logReceiptPrint('skipped', { reason: 'advanced-disabled' });
+          return Promise.resolve();
+        };
+        // Yazdır penceresi açık kalınca kasa kilitlemesin (⏳ butonlar)
+        void runPrint().catch((err) => {
+          logReceiptPrint('error-sale-print', { message: String(err) });
+        });
+      }
+
+      const methodLabel = samplesOnly
+        ? 'Numune'
+        : method === 'cash' ? 'Nakit'
+          : method === 'card' ? 'Kart'
+            : method === 'credit' ? 'Veresiye'
+              : method === 'split' ? 'Bölünmüş'
+                : 'Havale';
+      const changeMsg = sale.changeGiven != null && sale.changeGiven > 0
+        ? ` · Para üstü ${formatCurrency(sale.changeGiven)}`
+        : '';
+      const fiscalMsg = receiptNo ? ` · Fiş: ${receiptNo}` : fiscalPrinted ? '' : samplesOnly ? '' : ' · Fiş yazdırıldı';
+      const sampleMsg = sampleCount > 0 ? ` · ${sampleCount} numune` : '';
+      const amountMsg = samplesOnly ? `${sampleCount} adet numune verildi` : `${formatCurrency(sale.total)} satış`;
+      setLastSale(`${methodLabel} ile ${amountMsg}${sampleMsg}${changeMsg}${fiscalMsg}`);
+      setTimeout(() => setLastSale(null), 5000);
+    } finally {
+      setCheckoutBusy(false);
+      focusBarcodeInput();
     }
-
-    const receiptPayment = method === 'split' ? 'card' : method;
-    if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
-      const receiptData = buildReceiptFromCart(
-        paidItems,
-        store.products,
-        receiptPayment,
-        sale.total,
-        store.settings.businessName,
-        { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
-        store.productSets,
-      );
-      await printThermalReceipt(receiptData);
-    }
-
-    const methodLabel = samplesOnly
-      ? 'Numune'
-      : method === 'cash' ? 'Nakit'
-        : method === 'card' ? 'Kart'
-          : method === 'credit' ? 'Veresiye'
-            : method === 'split' ? 'Bölünmüş'
-              : 'Havale';
-    const changeMsg = sale.changeGiven != null && sale.changeGiven > 0
-      ? ` · Para üstü ${formatCurrency(sale.changeGiven)}`
-      : '';
-    const fiscalMsg = receiptNo ? ` · Fiş: ${receiptNo}` : fiscalPrinted ? '' : samplesOnly ? '' : ' · Fiş yazdırıldı';
-    const sampleMsg = sampleCount > 0 ? ` · ${sampleCount} numune` : '';
-    const amountMsg = samplesOnly ? `${sampleCount} adet numune verildi` : `${formatCurrency(sale.total)} satış`;
-    setLastSale(`${methodLabel} ile ${amountMsg}${sampleMsg}${changeMsg}${fiscalMsg}`);
-    setTimeout(() => setLastSale(null), 5000);
-
-    setCheckoutBusy(false);
-    focusBarcodeInput();
   }, [checkoutBusy, focusBarcodeInput, posCheckout, store]);
 
   const handleCheckout = useCallback((method: 'cash' | 'card' | 'transfer' | 'credit' | 'split') => {
@@ -522,12 +542,13 @@ export function SalesScreen({ store }: SalesScreenProps) {
             onParkSale={() => store.parkCurrentSale()}
             checkoutBusy={checkoutBusy}
             cashDayClosed={store.isCashDayClosed && (posCheckout.blockSalesWhenDayClosed ?? true)}
-            crmCouponCode={store.saleCouponCode}
-            onCrmCouponChange={store.setSaleCouponCode}
-            crmPointsToRedeem={store.saleLoyaltyPointsToRedeem}
-            onCrmPointsChange={store.setSaleLoyaltyPointsToRedeem}
-            cartSubtotal={store.cartSubtotal}
-            crmDiscountLabel={crmDiscountLabel}
+            crmCouponCode={posLiteCheckout ? '' : store.saleCouponCode}
+            onCrmCouponChange={posLiteCheckout ? undefined : store.setSaleCouponCode}
+            crmPointsToRedeem={posLiteCheckout ? 0 : store.saleLoyaltyPointsToRedeem}
+            onCrmPointsChange={posLiteCheckout ? undefined : store.setSaleLoyaltyPointsToRedeem}
+            cartSubtotal={posLiteCheckout ? undefined : store.cartSubtotal}
+            crmDiscountLabel={posLiteCheckout ? '' : crmDiscountLabel}
+            compactCheckout={posLiteCheckout}
             businessName={formatBusinessBrand(store.settings.businessName)}
             posNotes={store.settings.posNotes.items}
             posNotesDurationSec={store.settings.posNotes.displayDurationSec}
