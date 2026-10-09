@@ -56,6 +56,14 @@ function formatReceiptMoney(amount: number): string {
   }).format(amount);
 }
 
+/** Termal düz metin — ₺ yerine TL (bazı ESC/POS sürücülerde sembol bozulmasın) */
+function formatReceiptMoneyPlain(amount: number): string {
+  return `${new Intl.NumberFormat('tr-TR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)} TL`;
+}
+
 function formatReceiptDateTime(date: Date): string {
   return new Intl.DateTimeFormat('tr-TR', {
     day: '2-digit',
@@ -257,11 +265,11 @@ export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
   ];
   for (const item of data.items) {
     lines.push(truncateName(item.name, 28));
-    lines.push(`  ${item.quantity} x ${formatReceiptMoney(item.unitPrice)}`);
-    lines.push(`  ${formatReceiptMoney(item.lineTotal)}`);
+    lines.push(`  ${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}`);
+    lines.push(`  ${formatReceiptMoneyPlain(item.lineTotal)}`);
   }
   lines.push('--------------------------------');
-  lines.push(`TOPLAM  ${formatReceiptMoney(data.total)}`);
+  lines.push(`TOPLAM  ${formatReceiptMoneyPlain(data.total)}`);
   lines.push('');
   lines.push('Teşekkürler.');
   return lines.join('\n');
@@ -418,52 +426,78 @@ export function buildReceiptHtml(
 </html>`;
 }
 
-export function printHtmlReceipt(html: string): Promise<void> {
+function printHtmlReceiptInWindow(win: Window, html: string, onDone: () => void): void {
+  const doc = win.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  doc.title = BLANK_PRINT_TITLE;
+
+  const cleanup = () => {
+    onDone();
+  };
+
+  const triggerPrint = () => {
+    try {
+      doc.title = BLANK_PRINT_TITLE;
+      win.focus();
+      win.print();
+    } catch {
+      cleanup();
+    }
+  };
+
+  win.addEventListener('beforeprint', () => {
+    doc.title = BLANK_PRINT_TITLE;
+  });
+  win.addEventListener('afterprint', cleanup, { once: true });
+  setTimeout(cleanup, 60_000);
+
+  if (doc.readyState === 'complete') {
+    setTimeout(triggerPrint, 180);
+  } else {
+    win.addEventListener('load', () => setTimeout(triggerPrint, 180), { once: true });
+  }
+}
+
+function printHtmlReceiptViaIframe(html: string): Promise<void> {
   return new Promise((resolve) => {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
+    iframe.style.cssText =
+      'position:fixed;left:0;top:0;width:1px;height:1px;border:0;opacity:0.01;pointer-events:none;';
     document.body.appendChild(iframe);
-
     const win = iframe.contentWindow;
-    const doc = win?.document;
-    if (!doc || !win) {
+    if (!win) {
       document.body.removeChild(iframe);
       resolve();
       return;
     }
-
-    doc.open();
-    doc.write(html);
-    doc.close();
-    doc.title = BLANK_PRINT_TITLE;
-
-    const cleanup = () => {
+    printHtmlReceiptInWindow(win, html, () => {
       if (iframe.parentNode) document.body.removeChild(iframe);
       resolve();
-    };
-
-    const triggerPrint = () => {
-      try {
-        doc.title = BLANK_PRINT_TITLE;
-        win.focus();
-        win.print();
-      } catch {
-        cleanup();
-      }
-    };
-
-    win.addEventListener('beforeprint', () => {
-      doc.title = BLANK_PRINT_TITLE;
     });
-    win.addEventListener('afterprint', cleanup, { once: true });
-    setTimeout(cleanup, 15000);
+  });
+}
 
-    if (doc.readyState === 'complete') {
-      setTimeout(triggerPrint, 120);
-    } else {
-      win.addEventListener('load', () => setTimeout(triggerPrint, 120), { once: true });
+/** Termal fiş: görünür yazdırma penceresi (gizli iframe Mac/termalde PDF ham veri basıyordu) */
+export function printHtmlReceipt(html: string): Promise<void> {
+  return new Promise((resolve) => {
+    const features =
+      'popup,width=360,height=720,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
+    const printWin = window.open('', 'market-pos-receipt-print', features);
+    if (!printWin) {
+      void printHtmlReceiptViaIframe(html).then(resolve);
+      return;
     }
+    printHtmlReceiptInWindow(printWin, html, () => {
+      try {
+        printWin.close();
+      } catch {
+        /* ignore */
+      }
+      resolve();
+    });
   });
 }
 

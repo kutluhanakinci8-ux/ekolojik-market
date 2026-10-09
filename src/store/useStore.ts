@@ -4021,6 +4021,7 @@ export function useStore() {
 
   const updateReceiptPrinterSettings = useCallback(
     (patch: Partial<AppSettings['receiptPrinter']>) => {
+      if (isPosLiteProfile(settings)) return;
       updateSettings({
         receiptPrinter: normalizeReceiptPrinterSettings({
           ...settings.receiptPrinter,
@@ -4028,7 +4029,7 @@ export function useStore() {
         }),
       });
     },
-    [settings.receiptPrinter, updateSettings],
+    [settings, updateSettings],
   );
 
   const processSaleReturn = useCallback((

@@ -41,26 +41,10 @@ export function guardIsolatedTenantStoreWrite(tenantId, existing, incoming) {
 
 function mergeReceiptPrinterSettingsOnWrite(existing, incoming) {
   if (!incoming?.settings) return incoming;
-  const prev = existing?.settings?.receiptPrinter;
-  const next = incoming.settings.receiptPrinter;
-  if (prev && !next) {
-    return {
-      ...incoming,
-      settings: { ...incoming.settings, receiptPrinter: prev },
-    };
-  }
-  if (prev && next) {
-    return {
-      ...incoming,
-      settings: {
-        ...incoming.settings,
-        receiptPrinter: {
-          ...prev,
-          ...next,
-          windowsPrinterName: next.windowsPrinterName || prev.windowsPrinterName,
-        },
-      },
-    };
+  if (isPosLiteStore(existing) || isPosLiteStore(incoming)) {
+    const settings = { ...incoming.settings };
+    delete settings.receiptPrinter;
+    return { ...incoming, settings };
   }
   return incoming;
 }

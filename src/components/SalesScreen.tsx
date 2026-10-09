@@ -24,6 +24,7 @@ import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
+import { GREENLEAF_THERMAL_PRINT, shouldUseGreenleafReceiptPath } from '../utils/greenleafReceipt';
 
 interface SalesScreenProps {
   store: Store;
@@ -217,9 +218,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
     const receiptPrinter = receiptPrinterRaw
       ? normalizeReceiptPrinterSettings(receiptPrinterRaw)
       : null;
-    /** Greenleaf kasa yolu: ayar yok veya «kapalı» → HTML 80mm (POS-80C + Chrome, diğer kullanıcı) */
-    const useGreenleafReceiptPath =
-      receiptPrinter == null || receiptPrinter.enabled === false;
+    const useGreenleafReceiptPath = shouldUseGreenleafReceiptPath(store.settings);
 
     const printSaleThermalIfNeeded = async (thermalReceiptNo?: string) => {
       const shouldPrintThermal =
@@ -246,15 +245,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
       );
       await printThermalReceipt(
         receiptData,
-        useGreenleafReceiptPath
-          ? {
-              brand: 'none',
-              paperWidthMm: 80,
-              printMode: 'html',
-              pageMarginMm: 0,
-              copies: 1,
-            }
-          : receiptPrinter!,
+        useGreenleafReceiptPath ? GREENLEAF_THERMAL_PRINT : receiptPrinter!,
       );
     };
 

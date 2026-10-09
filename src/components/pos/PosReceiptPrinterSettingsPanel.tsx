@@ -5,12 +5,26 @@ import {
   type ReceiptPrinterBrand,
   type ReceiptPrintMode,
 } from '../../types/receiptPrinter';
+import { isPosLiteProfile } from '../../utils/tenantProductProfile';
 
 interface PosReceiptPrinterSettingsPanelProps {
   store: Store;
 }
 
 export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSettingsPanelProps) {
+  if (isPosLiteProfile(store.settings)) {
+    return (
+      <section className="settings-panel settings-panel--receipt-printer">
+        <h2>Fiş yazıcısı</h2>
+        <p className="module-hint">
+          Lima Market, Greenleaf kasadaki (yonetici) ile aynı yolu kullanır: satış sonrası Chrome yazdır
+          → <strong>POS-80C</strong>, 80&nbsp;mm düz metin fiş. Burada ek ayar yok; ayar açıp sunucuya
+          kaydetmek termal çöp çıktısına yol açabiliyordu.
+        </p>
+      </section>
+    );
+  }
+
   const printer = normalizeReceiptPrinterSettings(store.settings.receiptPrinter);
 
   const set = (patch: Partial<typeof printer>) => {
