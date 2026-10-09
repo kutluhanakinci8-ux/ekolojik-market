@@ -69,6 +69,8 @@ bash scripts/sunucu-ekolojik-posta-tam-kabul.sh /var/www/market-pos
 
 **Wave 3 kapanış tarihi:** 2026-10-08 (Faz 38–52, main deploy + operatör kapısı).
 
+**Post-Wave 3 (main):** PR #44 — Playwright ensure, NB #6 SIGPIPE, `wave3-kapat` run fix (merge `c5ca276`, 2026-10-09).
+
 Posta smoke token: `scripts/lib/ekolojik-posta-qa-token.sh` — demo kullanıcılar, `EKOLOJIK_POS_QA_USER`/`PASSWORD`, `EKOLOJIK_POS_QA_TOKEN`, veya VPS’te `store.json` mint (`mint-posta-qa-token.mjs`).
 
 *Wave 3 plan: `docs/PLAN-POSTA-MESAJ-100-PARITE.md` — tamamlandı.*

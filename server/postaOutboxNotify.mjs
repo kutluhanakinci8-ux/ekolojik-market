@@ -4,8 +4,20 @@ import { getEffectiveMailPresentation, shouldSendPostaNotification } from './pos
 import { recordPostaHubAlert } from './postaHubAlerts.mjs';
 import { getOutboxCounts, listFailedOutboxMessages, classifyOutboxLastError } from './emailOutbox.mjs';
 
+const OPS_NOTIFY_SOURCES = new Set(['outbox-failed-ops', 'outbox-failed-threshold']);
+
+function opsNotifySubject(message) {
+  const raw = String(message?.subject ?? message?.id ?? 'outbox');
+  const stripped = raw.replace(/^(?:\[Outbox hata\]\s*)+/i, '').trim();
+  const base = (stripped || raw).slice(0, 160);
+  return `[Outbox hata] ${base}`;
+}
+
 export async function maybeNotifyOutboxFailure(dataDir, message) {
   if (!message?.id) return { skipped: true };
+  if (OPS_NOTIFY_SOURCES.has(message.source)) {
+    return { skipped: true, reason: 'ops_meta_message' };
+  }
 
   const summary = { ops: null, hub: null, skipped: false };
 
@@ -30,7 +42,7 @@ export async function maybeNotifyOutboxFailure(dataDir, message) {
     const { sendEkolojikMail } = await import('./emailOutboxProcessor.mjs');
     summary.ops = await sendEkolojikMail(dataDir, {
       to: opsEmail,
-      subject: `[Outbox hata] ${message.subject ?? message.id}`,
+      subject: opsNotifySubject(message),
       tenantId,
       body: [
         'E-posta gönderimi kalıcı olarak başarısız (Ekolojik outbox)',
