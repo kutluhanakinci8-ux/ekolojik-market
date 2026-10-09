@@ -30,3 +30,5 @@ find /var/www/market-pos/data/email-outbox/failed \
 ```
 
 Yeni hatalar için: `scripts/sunucu-ekolojik-smtp-ops-recipient-dogrula.sh` (ops alıcı Postfix uyumu).
+
+**Not:** `failed/archive/` arşiv klasörüdür; `/api/email/health` `counts.failed` yalnızca aktif `failed/{tenant}/*.json` sayar (kod: `OUTBOX_FAILED_ARCHIVE_DIR`).

@@ -10,7 +10,10 @@ import {
   idempotencyKeyForTenant,
   enqueueEkolojikMail,
   findOutboxByIdempotency,
+  getOutboxCounts,
+  OUTBOX_FAILED_ARCHIVE_DIR,
 } from '../../server/emailOutbox.mjs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import {
   requiresPostaPosAuth,
   isPostaAuthExempt,
@@ -85,6 +88,19 @@ test('sanitizeStoreSnapshotForClient strips passwordHash', () => {
 
 const dir = await mkdtemp(join(tmpdir(), 'ek-unit-outbox-'));
 try {
+  await testAsync('getOutboxCounts excludes failed/archive', async () => {
+    const failed = join(dir, 'email-outbox', 'failed');
+    await mkdir(join(failed, OUTBOX_FAILED_ARCHIVE_DIR), { recursive: true });
+    await mkdir(join(failed, 'main'), { recursive: true });
+    await writeFile(
+      join(failed, OUTBOX_FAILED_ARCHIVE_DIR, 'ghost.json'),
+      JSON.stringify({ status: 'failed' }),
+    );
+    await writeFile(join(failed, 'main', 'active.json'), JSON.stringify({ status: 'failed' }));
+    const counts = await getOutboxCounts(dir);
+    assert.equal(counts.failed, 1);
+  });
+
   await testAsync('enqueue idempotency dedupe', async () => {
     const key = `unit:${Date.now()}`;
     const payload = {
