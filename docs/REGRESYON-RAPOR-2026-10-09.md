@@ -10,7 +10,8 @@
 | VPS Wave 3 operatör (Playwright) | ✓ |
 | VPS DNS `EKOLOJIK_DNS_STRICT=1` | ✓ |
 | VPS `faz22-dogrula` | ✓ (Wave2 döngüsü + Faz20 auth + Faz28/29 SIGPIPE sonrası) |
-| VPS `e2e-tam` (Akış A/B) | ✓ (Faz 38 Bearer — akis smoke auth) |
+| VPS `e2e-tam` (Akış C) | ✓ (`sunucu-ekolojik-posta-e2e-tam.sh`, main `dd2242a`) |
+| VPS `faz22-dogrula` | ✓ |
 
 ## Bulunan hata (giderildi)
 
