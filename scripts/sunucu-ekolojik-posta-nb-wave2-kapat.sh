@@ -24,7 +24,7 @@ for n in 25 26 27 28 29 30 31 32 33; do
 done
 
 run "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-nb-gap-dogrula.sh"
-run "${REPO_ROOT}/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh" "${INSTALL_DIR}"
+# Not: faz22-dogrula zaten Faz 34 üzerinden bu scripti çağırır — burada tekrar çağırma (sonsuz iç içe geçme).
 
 echo ""
 if [[ $FAIL -eq 0 ]]; then
