@@ -193,6 +193,7 @@ const RECEIPT_THERMAL_BOLD_CSS = `
       font-weight: 900 !important;
     }`;
 
+/** filter/text-shadow CUPS rastertopos’ta bbox’ı bozup 1–2 cm’lik boş kesik fiş yapabiliyor */
 const THERMAL_PRINT_DARK_CSS = `
     @media print {
       html, body {
@@ -201,12 +202,10 @@ const THERMAL_PRINT_DARK_CSS = `
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      body.receipt-thermal {
-        filter: contrast(1.65) brightness(0.84);
-      }
+      body.receipt-thermal,
       body.receipt-thermal * {
-        -webkit-text-stroke: 0.3px #000;
-        text-shadow: 0.5px 0 0 #000, -0.5px 0 0 #000;
+        font-weight: 900 !important;
+        color: #000 !important;
       }
       .divider { border-top-width: 2px; border-top-style: solid; }
     }`;
@@ -264,13 +263,18 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
 }
 
 /** Termal: sabit @page yüksekliği veya kısa ölçüm → Mac POS-80C erken keser */
-function buildReceiptPrintScript(paperWidthMm: 58 | 80 = 80): string {
+function buildReceiptPrintScript(
+  paperWidthMm: 58 | 80 = 80,
+  fixedRollHeightMm?: number,
+): string {
   const blankTitle = BLANK_PRINT_TITLE;
+  const rollMm = fixedRollHeightMm ?? 0;
   return `
   <script>
     (function () {
       var t = ${JSON.stringify(blankTitle)};
       var paperW = ${paperWidthMm};
+      var fixedRoll = ${rollMm};
       var CUT_MARGIN_MM = 36;
       function measureReceiptHeightPx() {
         var b = document.body;
@@ -289,10 +293,13 @@ function buildReceiptPrintScript(paperWidthMm: 58 | 80 = 80): string {
         );
       }
       function applyReceiptPageHeight() {
-        var px = measureReceiptHeightPx();
-        var mm = Math.ceil(px * 25.4 / 96) + CUT_MARGIN_MM;
-        if (mm < 140) mm = 140;
-        if (mm > 2400) mm = 2400;
+        var mm = fixedRoll > 0 ? fixedRoll : 0;
+        if (!mm) {
+          var px = measureReceiptHeightPx();
+          mm = Math.ceil(px * 25.4 / 96) + CUT_MARGIN_MM;
+          if (mm < 140) mm = 140;
+          if (mm > 2400) mm = 2400;
+        }
         var el = document.getElementById('receipt-page-dynamic');
         if (!el) {
           el = document.createElement('style');
@@ -547,7 +554,7 @@ export function buildReceiptHtml(
     ${receiptBaseStyles(paperWidthMm, pageMarginMm)}
   </style>
 </head>
-<body class="receipt-thermal" data-receipt-layout="80mm-v8">
+<body class="receipt-thermal" data-receipt-layout="80mm-v9">
   <div class="center title total-row"><strong>${data.businessName}</strong></div>
   <div class="center muted"><strong>SATIŞ FİŞİ</strong></div>
   <hr class="divider" />
@@ -574,10 +581,12 @@ export function buildReceiptHtml(
 </html>`;
 }
 
-/** POS-80C Mac: 80 mm rulo — sabit 297mm sayfa uzunluğu erken kesime yol açıyordu */
+/** Mac CUPS pos80.ppd: PageSize=X80mmY3276mm — tarayıcı custom ~210mm erken kesime yol açar */
+const CLASSIC_RECEIPT_ROLL_HEIGHT_MM = 3276;
+
 const CLASSIC_RECEIPT_80MM_FIX = `
   <style>
-    @page { size: 80mm auto; margin: 0 !important; }
+    @page { size: 80mm ${CLASSIC_RECEIPT_ROLL_HEIGHT_MM}mm; margin: 0 !important; }
     @media print {
       html, body {
         width: 72mm !important;
@@ -607,12 +616,12 @@ export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
       '<meta charset="utf-8" />\n  <meta name="viewport" content="width=302" />',
     )
     .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
-    .replace('</body>', `${buildReceiptPrintScript(80)}\n</body>`);
+    .replace('</body>', `${buildReceiptPrintScript(80, CLASSIC_RECEIPT_ROLL_HEIGHT_MM)}\n</body>`);
 }
 
-/** 80 mm ≈ 302px — 0×0 iframe Safari’de scrollHeight≈0 → kısa sayfa, erken kesim */
+/** 80 mm ≈ 302px — opacity:0 / 0×0 iframe Firefox’ta fişi birkaç mm’ye indiriyordu */
 const THERMAL_PRINT_IFRAME_STYLE =
-  'position:fixed;left:-12000px;top:0;width:302px;min-height:1600px;height:auto;border:0;opacity:0;pointer-events:none;';
+  'position:fixed;left:0;top:0;width:302px;min-height:400px;height:auto;border:0;margin:0;padding:0;z-index:-1;pointer-events:none;overflow:visible;';
 
 /** Görünmez iframe (80 mm genişlik) — ayrı Firefox penceresi açmaz */
 function printHtmlReceiptClassicIframe(html: string): Promise<void> {
@@ -686,8 +695,7 @@ function printHtmlReceiptViaIframe(html: string): Promise<void> {
   return new Promise((resolve) => {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText =
-      'position:fixed;left:-10000px;top:0;width:302px;min-height:2400px;height:auto;border:0;opacity:0.01;pointer-events:none;';
+    iframe.style.cssText = THERMAL_PRINT_IFRAME_STYLE;
     document.body.appendChild(iframe);
     const win = iframe.contentWindow;
     if (!win) {
