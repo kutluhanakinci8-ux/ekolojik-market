@@ -186,8 +186,11 @@ const RECEIPT_THERMAL_BOLD_CSS = `
       font-size: 19px !important;
     }
     body.receipt-thermal .total-row td,
-    body.receipt-thermal .total-row .line-price {
+    body.receipt-thermal .total-row .line-price,
+    body.receipt-thermal .meta-row,
+    body.receipt-thermal .meta-row strong {
       font-size: 18px !important;
+      font-weight: 900 !important;
     }`;
 
 const THERMAL_PRINT_DARK_CSS = `
@@ -254,7 +257,8 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
       font-weight: 900;
     }
     .total-row .line-price { font-size: 15px; font-weight: 900; }
-    .footer { margin-top: 10px; font-size: 14px; font-weight: 900; }
+    .footer { margin-top: 10px; font-size: 18px; font-weight: 900; }
+    .meta-row { font-size: 18px; font-weight: 900; }
   `;
 }
 
@@ -441,12 +445,12 @@ export function buildReceiptHtml(
       const left = `${truncateName(item.name)} x${item.quantity}`;
       const right = formatReceiptMoney(item.lineTotal);
       return `
-        <tr class="line">
-          <td class="line-name"><strong>${left}</strong></td>
-          <td class="line-price"><strong>${right}</strong></td>
+        <tr class="line total-row">
+          <td class="line-name bold">${left}</td>
+          <td class="line-price">${right}</td>
         </tr>
-        <tr class="line-sub">
-          <td colspan="2"><strong>${item.quantity} x ${formatReceiptMoney(item.unitPrice)}</strong></td>
+        <tr class="line-sub total-row">
+          <td colspan="2">${item.quantity} x ${formatReceiptMoney(item.unitPrice)}</td>
         </tr>
       `;
     })
@@ -463,13 +467,13 @@ export function buildReceiptHtml(
     ${receiptBaseStyles(paperWidthMm, pageMarginMm)}
   </style>
 </head>
-<body class="receipt-thermal">
-  <div class="center title"><strong>${data.businessName}</strong></div>
+<body class="receipt-thermal" data-receipt-layout="80mm-v6">
+  <div class="center title total-row"><strong>${data.businessName}</strong></div>
   <div class="center muted"><strong>SATIŞ FİŞİ</strong></div>
   <hr class="divider" />
-  <div><strong>Tarih: ${formatReceiptDateTime(data.createdAt)}</strong></div>
-  <div><strong>Fiş No: ${receiptRef}</strong></div>
-  <div><strong>Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}</strong></div>
+  <div class="meta-row"><strong>Tarih: ${formatReceiptDateTime(data.createdAt)}</strong></div>
+  <div class="meta-row"><strong>Fiş No: ${receiptRef}</strong></div>
+  <div class="meta-row"><strong>Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}</strong></div>
   <hr class="divider" />
   <table>
     <tbody>
