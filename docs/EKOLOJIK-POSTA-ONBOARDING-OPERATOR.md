@@ -46,6 +46,20 @@ EKOLOJIK_DRY_RUN=0 bash scripts/sunucu-ekolojik-outbox-failed-arsivle.sh /var/ww
 
 Eşik uyarısı: `EKOLOJIK_OUTBOX_FAILED_ALERT_THRESHOLD` (varsayılan 50) — bildirim matrisinde **outbox_failed → ops e-posta** açık olmalı.
 
+Haftalık cron (root, bir kez):
+
+```bash
+bash scripts/sunucu-ekolojik-outbox-failed-cron-kur.sh
+```
+
+**Yerel Postfix (`127.0.0.1:25`) + ops bildirimleri:** `EKOLOJIK_OPS_EMAIL` (genelde `info@…`) Postfix’te **virtual alias** ile teslim alınmalıdır. Aksi halde `550 Recipient address rejected` ve binlerce `outbox-failed-ops` kaydı oluşur (kod artık meta-mail döngüsünü keser; kök neden yine Postfix).
+
+```bash
+bash scripts/sunucu-ekolojik-smtp-ops-recipient-dogrula.sh /var/www/market-pos
+bash scripts/sunucu-ekolojik-imap-vps-alias-fix.sh   # root — virtual_alias_maps düzeltir
+node scripts/outbox-failed-archive-report.mjs /var/www/market-pos/data 800
+```
+
 ---
 
 ## 3 adım — operatör akışı
