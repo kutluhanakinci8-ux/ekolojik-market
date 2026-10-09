@@ -250,6 +250,9 @@ export interface AppSettings {
   businessName: string;
   /** `pos-lite`: stok + satış + sınırlı raporlar; Posta/müşteri modülleri kapalı profil */
   productProfile?: TenantProductProfile;
+  /** POS Lite ürün id → Greenleaf katalog görsel id (örn. "1001": 1) */
+  posLiteCatalogImageByProductId?: Record<string, number>;
+  posLiteImageUrlByProductId?: Record<string, string>;
   lowStockThreshold: number;
   defaultPriceType: PriceType;
   posNotes: PosNotesConfig;

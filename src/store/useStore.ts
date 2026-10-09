@@ -741,9 +741,16 @@ function buildLocalSnapshot(
   capitalContributions: CapitalContribution[],
   crm: CrmPersistedData,
 ): PersistedStoreSnapshot {
+  const posLite = isPosLiteProfile(settings);
   return {
     updatedAt: new Date().toISOString(),
-    products: products.map(({ imageUrl: _, ...rest }) => rest),
+    products: products.map((p) => {
+      const { imageUrl, catalogImageId, ...rest } = p;
+      const next: Product = { ...rest };
+      if (catalogImageId != null) next.catalogImageId = catalogImageId;
+      if (posLite && imageUrl?.startsWith('/product-images/')) next.imageUrl = imageUrl;
+      return next;
+    }),
     productSets,
     sales,
     saleReturns,
@@ -850,9 +857,11 @@ export function useStore() {
     users?: PosUser[];
     cashSessions?: DailyCashSession[];
   }): PersistedStoreSnapshot => {
-    const { products: irsaliyeProducts } = applyIrsaliyeStockToProducts(products);
+    const snapshotProducts = isIsolatedStoreContext(settings)
+      ? products
+      : applyIrsaliyeStockToProducts(products).products;
     return buildLocalSnapshot(
-      irsaliyeProducts,
+      snapshotProducts,
       productSets,
       sales,
       saleReturns,
@@ -2088,6 +2097,10 @@ export function useStore() {
 
   useEffect(() => {
     if (!syncReady || irsaliyeStockMigrationRef.current) return;
+    if (isIsolatedStoreContext(settings)) {
+      irsaliyeStockMigrationRef.current = true;
+      return;
+    }
     if (localStorage.getItem(IRSALIYE_STOCK_MIGRATION_KEY)) {
       irsaliyeStockMigrationRef.current = true;
       return;
@@ -2111,7 +2124,7 @@ export function useStore() {
         { irsaliye: 'LUY2026000000002' },
       );
     }
-  }, [syncReady, products, authSession, logActivity]);
+  }, [syncReady, products, authSession, logActivity, settings]);
 
   const refreshExchangeRatesFromTcmb = useCallback(async () => {
     const tcmb = await fetchTcmbRates();
