@@ -52,6 +52,7 @@ import {
 import {
   DEFAULT_POS_NOTES,
   DEFAULT_SETTINGS,
+  normalizeReceiptPrinterSettings,
   normalizeUtilityBillSubscriptions,
   type PosNote,
 } from '../types/business';
@@ -512,6 +513,7 @@ function loadSettings(): AppSettings {
         customExpenseCategories: normalizeCustomExpenseCategories(parsed.customExpenseCategories),
         crm: { ...DEFAULT_CRM_SETTINGS, ...(parsed.crm ?? {}), automationEnabled: parsed.crm?.automationEnabled ?? DEFAULT_CRM_SETTINGS.automationEnabled },
         posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(parsed.posCheckout ?? {}) },
+        receiptPrinter: normalizeReceiptPrinterSettings(parsed.receiptPrinter),
       };
     } catch {
       return DEFAULT_SETTINGS;
@@ -957,6 +959,7 @@ export function useStore() {
       ),
       crm: { ...DEFAULT_CRM_SETTINGS, ...(snapshot.settings?.crm ?? {}) },
       posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(snapshot.settings?.posCheckout ?? {}) },
+      receiptPrinter: normalizeReceiptPrinterSettings(snapshot.settings?.receiptPrinter),
     });
     if (snapshot.priceType) setPriceType(snapshot.priceType);
     setUsers(resolveUsersFromSnapshot(snapshot, mergedSettings));
@@ -4016,6 +4019,18 @@ export function useStore() {
     });
   }, [settings.posCheckout, updateSettings]);
 
+  const updateReceiptPrinterSettings = useCallback(
+    (patch: Partial<AppSettings['receiptPrinter']>) => {
+      updateSettings({
+        receiptPrinter: normalizeReceiptPrinterSettings({
+          ...settings.receiptPrinter,
+          ...patch,
+        }),
+      });
+    },
+    [settings.receiptPrinter, updateSettings],
+  );
+
   const processSaleReturn = useCallback((
     saleId: string,
     requestedLines: Array<{ lineKey: string; quantity: number }>,
@@ -4646,6 +4661,7 @@ export function useStore() {
     heldPosSales,
     recordCashDrawerCount,
     updatePosCheckoutSettings,
+    updateReceiptPrinterSettings,
     processSaleReturn,
     setProductStock,
     updateProductBarcode,

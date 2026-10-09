@@ -2,6 +2,10 @@ import type { PaymentStatus, PurchaseInvoiceLine } from './accounting';
 import type { CurrencySettings } from './currency';
 import type { CashDrawerCount, PosCheckoutSettings } from './pos';
 import { DEFAULT_POS_CHECKOUT_SETTINGS } from './pos';
+import type { ReceiptPrinterSettings } from './receiptPrinter';
+import { DEFAULT_RECEIPT_PRINTER, normalizeReceiptPrinterSettings } from './receiptPrinter';
+
+export { normalizeReceiptPrinterSettings };
 import { DEFAULT_CRM_SETTINGS, type CrmSettings } from './crm';
 import { DEFAULT_CURRENCY_SETTINGS } from './currency';
 import type { DashboardWidgetsConfig } from './dashboard';
@@ -266,6 +270,7 @@ export interface AppSettings {
   customExpenseCategories?: CustomExpenseCategory[];
   crm?: CrmSettings;
   posCheckout?: PosCheckoutSettings;
+  receiptPrinter?: ReceiptPrinterSettings;
 }
 
 export const DEFAULT_POS_NOTES: PosNotesConfig = {
@@ -291,6 +296,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   customExpenseCategories: [],
   crm: { ...DEFAULT_CRM_SETTINGS },
   posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS },
+  receiptPrinter: { ...DEFAULT_RECEIPT_PRINTER },
 };
 
 export { normalizeUtilityBillSubscriptions };

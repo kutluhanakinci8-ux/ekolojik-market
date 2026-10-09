@@ -23,6 +23,7 @@ import { usePosBarcodeWedge } from '../hooks/usePosBarcodeWedge';
 import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 
 interface SalesScreenProps {
   store: Store;
@@ -227,7 +228,18 @@ export function SalesScreen({ store }: SalesScreenProps) {
     }
 
     const receiptPayment = method === 'split' ? 'card' : method;
-    if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
+    const receiptPrinterRaw = store.settings.receiptPrinter;
+    const receiptPrinter = normalizeReceiptPrinterSettings(receiptPrinterRaw);
+    const legacyAutoPrint = receiptPrinterRaw == null;
+    const shouldPrintThermal =
+      !samplesOnly
+      && method !== 'credit'
+      && !fiscalPrinted
+      && (legacyAutoPrint
+        || (receiptPrinter.enabled
+          && receiptPrinter.autoPrintOnSale
+          && receiptPrinter.brand !== 'none'));
+    if (shouldPrintThermal) {
       const receiptData = buildReceiptFromCart(
         paidItems,
         store.products,
@@ -237,7 +249,10 @@ export function SalesScreen({ store }: SalesScreenProps) {
         { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
         store.productSets,
       );
-      await printThermalReceipt(receiptData);
+      await printThermalReceipt(receiptData, {
+        paperWidthMm: receiptPrinter.paperWidthMm,
+        copies: receiptPrinter.copies,
+      });
     }
 
     const methodLabel = samplesOnly

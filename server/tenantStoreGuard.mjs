@@ -35,7 +35,34 @@ export function guardIsolatedTenantStoreWrite(tenantId, existing, incoming) {
     out.products = [];
   }
 
-  return mergePosLiteProductMediaOnWrite(existing, out);
+  const merged = mergePosLiteProductMediaOnWrite(existing, out);
+  return mergeReceiptPrinterSettingsOnWrite(existing, merged);
+}
+
+function mergeReceiptPrinterSettingsOnWrite(existing, incoming) {
+  if (!incoming?.settings) return incoming;
+  const prev = existing?.settings?.receiptPrinter;
+  const next = incoming.settings.receiptPrinter;
+  if (prev && !next) {
+    return {
+      ...incoming,
+      settings: { ...incoming.settings, receiptPrinter: prev },
+    };
+  }
+  if (prev && next) {
+    return {
+      ...incoming,
+      settings: {
+        ...incoming.settings,
+        receiptPrinter: {
+          ...prev,
+          ...next,
+          windowsPrinterName: next.windowsPrinterName || prev.windowsPrinterName,
+        },
+      },
+    };
+  }
+  return incoming;
 }
 
 export function shouldSkipIrsaliyeStockMigration(tenantId, store) {

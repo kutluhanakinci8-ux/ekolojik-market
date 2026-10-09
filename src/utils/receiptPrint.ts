@@ -149,14 +149,15 @@ export function buildReturnReceipt(
   };
 }
 
-function receiptBaseStyles(): string {
+function receiptBaseStyles(paperWidthMm: 58 | 80 = 80): string {
+  const bodyWidth = paperWidthMm === 58 ? 50 : 72;
   return `
-    @page { size: 80mm auto; margin: 4mm; }
+    @page { size: ${paperWidthMm}mm auto; margin: 4mm; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 0;
-      width: 72mm;
+      width: ${bodyWidth}mm;
       font-family: "Courier New", Courier, monospace;
       font-size: 11px;
       line-height: 1.35;
@@ -200,7 +201,7 @@ function buildReceiptPrintScript(): string {
   </script>`;
 }
 
-export function buildReturnReceiptHtml(data: ReturnReceiptData): string {
+export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58 | 80 = 80): string {
   const lines = data.items
     .map((item) => {
       const sample = item.priceType === 'sample';
@@ -228,7 +229,7 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData): string {
   <meta charset="utf-8" />
   <title>İade Fişi ${data.returnId}</title>
   <style>
-    ${receiptBaseStyles()}
+    ${receiptBaseStyles(paperWidthMm)}
     .return-banner {
       margin: 8px 0;
       padding: 8px 4px;
@@ -294,7 +295,7 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData): string {
 </html>`;
 }
 
-export function buildReceiptHtml(data: SaleReceiptData): string {
+export function buildReceiptHtml(data: SaleReceiptData, paperWidthMm: 58 | 80 = 80): string {
   const lines = data.items
     .map((item) => {
       const left = `${truncateName(item.name)} x${item.quantity}`;
@@ -319,7 +320,7 @@ export function buildReceiptHtml(data: SaleReceiptData): string {
   <meta charset="utf-8" />
   <title>Fiş ${receiptRef}</title>
   <style>
-    ${receiptBaseStyles()}
+    ${receiptBaseStyles(paperWidthMm)}
   </style>
 </head>
 <body>
@@ -378,10 +379,21 @@ export function printHtmlReceipt(html: string): Promise<void> {
   });
 }
 
-export function printThermalReceipt(data: SaleReceiptData): Promise<void> {
-  return printHtmlReceipt(buildReceiptHtml(data));
+export async function printThermalReceipt(
+  data: SaleReceiptData,
+  options?: { paperWidthMm?: 58 | 80; copies?: number },
+): Promise<void> {
+  const paper = options?.paperWidthMm ?? 80;
+  const copies = Math.min(3, Math.max(1, options?.copies ?? 1));
+  const html = buildReceiptHtml(data, paper);
+  for (let i = 0; i < copies; i += 1) {
+    await printHtmlReceipt(html);
+  }
 }
 
-export function printReturnReceipt(data: ReturnReceiptData): Promise<void> {
-  return printHtmlReceipt(buildReturnReceiptHtml(data));
+export function printReturnReceipt(
+  data: ReturnReceiptData,
+  paperWidthMm: 58 | 80 = 80,
+): Promise<void> {
+  return printHtmlReceipt(buildReturnReceiptHtml(data, paperWidthMm));
 }
