@@ -81,6 +81,17 @@ Tüm raporlar tenant store’dan hesaplanır; başka mağazanın verisi gelmez.
 
 Yönetici `allowedTabs` listesinden `posta`, `customers`, `accounting`, `cashier` kaldırın; Posta onboarding `status: "dismissed"` yapın. Deploy sonrası yeniden giriş.
 
-## 6) InPOS (yazar kasa)
+## 6) Veri izolasyonu (kontrol)
+
+- Her tenant ayrı `store.json`; API `?tenant=` ile okunur/yazılır.
+- POS Lite: Greenleaf kataloğu (`mergeWithSeed`) ve `yonetici`/`kasiyer` demo kullanıcıları **istemcide birleştirilmez**.
+- Sunucu: `tenantStoreGuard.mjs` toplu katalog / demo kullanıcı yazımını reddeder.
+
+```bash
+node scripts/verify-tenant-isolation.mjs --data-dir /var/www/market-pos/data
+node scripts/reset-pos-lite-tenant.mjs --data-dir /var/www/market-pos/data --tenant lima-market --username limaadmin --password '...'
+```
+
+## 7) InPOS (yazar kasa)
 
 Kasa Windows PC’de `inpos-bridge` — tenant’tan bağımsız, yerel `127.0.0.1:9191`. Bkz. `inpos-bridge/KURULUM.md`.
