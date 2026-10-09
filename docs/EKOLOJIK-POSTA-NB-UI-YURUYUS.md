@@ -51,7 +51,7 @@ EKOLOJIK_SKIP_NPM_TEST=1 bash scripts/sunucu-ekolojik-posta-wave3-kapat.sh /var/
 ```
 
 ```bash
-npm i -D playwright && npx playwright install chromium
+bash scripts/lib/ensure-playwright.sh /var/www/ekolojik-market-pos
 MINT_JSON="$(node scripts/lib/mint-posta-qa-token.mjs /var/www/market-pos/data)"
 EKOLOJIK_POS_QA_MINT_JSON="$MINT_JSON" node scripts/posta-nb-ui-visual-smoke.mjs http://127.0.0.1:5180
 ```

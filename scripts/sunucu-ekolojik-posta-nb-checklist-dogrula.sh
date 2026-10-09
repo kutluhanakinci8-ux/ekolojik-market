@@ -30,6 +30,18 @@ curl_ok_auth() {
   curl -fsS -H "$1" "$2" 2>/dev/null | head -c 16384 | grep -q "$3"
 }
 
+curl_ok_auth_retry() {
+  local h="$1" url="$2" pat="$3"
+  local attempt
+  for attempt in 1 2 3; do
+    if curl_ok_auth "${h}" "${url}" "${pat}"; then
+      return 0
+    fi
+    [[ "${attempt}" -lt 3 ]] && sleep 1
+  done
+  return 1
+}
+
 http_code() {
   curl -s -o /dev/null -w "%{http_code}" "$1" 2>/dev/null || echo 000
 }
@@ -78,7 +90,7 @@ if [[ -n "${TOKEN}" ]]; then
   check 4 "Yaz — şablon" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/templates" '"templates"'
   check 4b "compose hints" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/compose-hints?limit=5" '"emails"'
   check 5 "Müşteri mesajları" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/threads?limit=5" '"ok":true'
-  check 6 "Gönderilen / outbox" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
+  check 6 "Gönderilen / outbox" curl_ok_auth_retry "${AUTH_H}" "${BASE_URL}/api/email/outbox/recent?limit=5" '"items"'
   check 8 "Posta ayarları" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/posta/settings" '"ok":true'
   check 9 "Export CSV (auth)" bash -c 'curl -fsS -H "$1" "$2" -o /tmp/ek-nb-outbox.csv && head -1 /tmp/ek-nb-outbox.csv | grep -q "alici"' _ "${AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv"
   check 49 "Messaging SLA" curl_ok_auth "${AUTH_H}" "${BASE_URL}/api/messaging/sla?days=7" '"ok":true'
