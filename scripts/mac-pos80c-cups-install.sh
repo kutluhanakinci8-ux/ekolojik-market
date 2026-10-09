@@ -31,6 +31,13 @@ else
   echo "→ Koyuluk yamasi atlandi (temiz rastertopos). Koyu icin: APPLY_POS80_DARKNESS=1"
 fi
 
+# Yamadan kalan ESC 7 satirlarini temizle (c0/Ç0 uretir)
+if grep -q "putchar('7')" "$SRC/rastertopos/rastertopos.c" 2>/dev/null; then
+  echo "→ rastertopos.c icindeki koyuluk ESC blogu kaldiriliyor..."
+  perl -i.bak -0pe 's/\n\t\/\* POS-80C: koyu baski.*?\n\tputchar\(2\);\n//s' \
+    "$SRC/rastertopos/rastertopos.c" || true
+fi
+
 cd "$SRC/rastertopos"
 
 echo "→ rastertopos derleniyor (Mach-O olmalı)..."

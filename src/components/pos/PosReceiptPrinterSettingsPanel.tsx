@@ -68,8 +68,9 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
           <strong>Lima Market</strong> — ayrı mağaza, <strong>limaadmin</strong> ile giriş. Satış sonrası
-          otomatik premium fiş. Mac sürücüsü başta <strong>c0</strong> basıyorsa fişin üstünde birkaç
-          atıl çizgi çıkar (marka alta kayar). Kalıcı çözüm: <code>mac-pos80c-rebuild-clean.sh</code> (Mac).
+          otomatik premium fiş. Mac’te <strong>c0/Ç0</strong> için: Terminal’de sürekli çalışan ham yazdır
+          köprüsü (CUPS rastertopos atlanır):{' '}
+          <code>node scripts/lima-mac-raw-print.mjs</code> — sonra test satışı.
         </p>
         <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>

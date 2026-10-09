@@ -5,6 +5,7 @@ import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
+import { tryLimaMacRawReceiptPrint } from './limaMacRawPrint';
 
 /** Termal sürücüde \u200b başlık kenarda «c0» / bozuk karakter basabiliyor */
 const BLANK_PRINT_TITLE = '';
@@ -414,14 +415,20 @@ function wrapPlainReceiptBody(
 </html>`;
 }
 
-export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
+export function buildPlainTextSaleReceipt(
+  data: SaleReceiptData,
+  opts?: { sacrificeLines?: boolean },
+): string {
   const receiptRef = data.receiptNo || data.saleId || '—';
-  const sacrifice = Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
-    RECEIPT_SACRIFICE_FILL.repeat(30),
-  );
+  const useSacrifice = opts?.sacrificeLines !== false;
+  const sacrifice = useSacrifice
+    ? Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
+        RECEIPT_SACRIFICE_FILL.repeat(30),
+      )
+    : [];
   const lines: string[] = [
     ...sacrifice,
-    '',
+    ...(useSacrifice ? [''] : []),
     formatReceiptBrandName(data.businessName),
     'SATIŞ FİŞİ',
     '--------------------------------',
@@ -1011,6 +1018,13 @@ export async function printThermalReceipt(
 ): Promise<void> {
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
+    const plainNoSacrifice = buildPlainTextSaleReceipt(data, { sacrificeLines: false });
+    const rawOk = await tryLimaMacRawReceiptPrint(plainNoSacrifice);
+    if (rawOk) {
+      logReceiptPrint('thermal-raw-escpos-ok', { saleId: data.saleId });
+      return;
+    }
+    logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed' });
     remindChromeReceiptPrintSettings();
     await printHtmlReceiptIsolatedWindow(buildGreenleafPremiumReceiptHtml(data));
     return;
