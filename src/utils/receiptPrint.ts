@@ -412,8 +412,13 @@ function wrapPlainReceiptBody(
 
 export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
   const receiptRef = data.receiptNo || data.saleId || '—';
+  const sacrifice = Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
+    RECEIPT_SACRIFICE_FILL.repeat(30),
+  );
   const lines: string[] = [
-    data.businessName.toUpperCase(),
+    ...sacrifice,
+    '',
+    formatReceiptBrandName(data.businessName),
     'SATIŞ FİŞİ',
     '--------------------------------',
     `Tarih: ${formatReceiptDateTime(data.createdAt)}`,
@@ -626,12 +631,25 @@ function receiptPremiumStyles(): string {
       -webkit-font-smoothing: none;
       font-synthesis: none;
     }
-    /* Mac rastertopos koyuluk ESC baytları bazen ilk satırda c0/çöp basar */
+    /* Mac rastertopos: ilk 1–3 metin satırı bozulur (c0) — marka aşağıda başlar */
     .rp-driver-skip {
       display: block;
-      height: 22mm;
-      min-height: 22mm;
+      height: 10mm;
+      min-height: 10mm;
       width: 100%;
+    }
+    .rp-sacrifice {
+      display: block;
+      margin: 0;
+      padding: 2px 0;
+      font-size: 9px;
+      line-height: 1.05;
+      font-weight: 400;
+      text-align: center;
+      letter-spacing: 0;
+      color: #000;
+      white-space: nowrap;
+      overflow: hidden;
     }
     .rp-brand {
       text-align: center;
@@ -722,6 +740,17 @@ function formatReceiptBrandName(name: string): string {
   return sanitizeReceiptVisibleText(name).toLocaleUpperCase('tr-TR');
 }
 
+/** Sürücü çöpünü markadan önce tüket (c0 gizlenemez; satır kaydırılır) */
+const RECEIPT_DRIVER_SACRIFICE_LINES = 4;
+const RECEIPT_SACRIFICE_FILL = '-';
+
+function buildDriverSacrificeLinesHtml(): string {
+  const line = RECEIPT_SACRIFICE_FILL.repeat(30);
+  return Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
+    `<div class="rp-sacrifice">${line}</div>`,
+  ).join('\n');
+}
+
 /** Lima premium termal — hizalı tablo, tek ağırlık (ghost/çift basım yok) */
 export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string {
   const receiptRef = data.receiptNo || data.saleId || '—';
@@ -746,6 +775,7 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
 </head>
 <body class="receipt-premium">
   <div class="rp-driver-skip" aria-hidden="true"></div>
+  ${buildDriverSacrificeLinesHtml()}
   <div class="rp-brand">${escapeHtml(formatReceiptBrandName(data.businessName))}</div>
   <div class="rp-kind">SATIŞ FİŞİ</div>
   <hr class="rp-rule" />

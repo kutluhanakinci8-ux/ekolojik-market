@@ -68,8 +68,8 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
           <strong>Lima Market</strong> — ayrı mağaza, <strong>limaadmin</strong> ile giriş. Satış sonrası
-          otomatik <strong>premium</strong> termal fiş; yazıcı ayarı burada yok. Hedef: <strong>POS-80C</strong>,
-          üst/alt bilgi kapalı, ölçek %100.
+          otomatik premium fiş. Mac sürücüsü başta <strong>c0</strong> basıyorsa fişin üstünde birkaç
+          atıl çizgi çıkar (marka alta kayar). Kalıcı çözüm: <code>mac-pos80c-rebuild-clean.sh</code> (Mac).
         </p>
         <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
