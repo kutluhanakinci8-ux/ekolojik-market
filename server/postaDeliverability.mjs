@@ -9,14 +9,36 @@ import { readOpenDkimTxtOneLine } from './ekolojikOpenDkimDns.mjs';
 
 const execFileAsync = promisify(execFile);
 
+function dnsResolvers() {
+  const one = process.env.EKOLOJIK_DNS_RESOLVER?.trim();
+  if (one) return [one];
+  const many = process.env.EKOLOJIK_DNS_RESOLVERS?.trim();
+  if (many) return many.split(/[,;\s]+/).filter(Boolean);
+  return ['dns1.turhost.com', 'dns2.turhost.com', '1.1.1.1', '8.8.8.8'];
+}
+
 async function digTxt(name) {
-  try {
-    const { stdout } = await execFileAsync('dig', ['+short', 'TXT', name], { timeout: 8000 });
-    return String(stdout ?? '')
+  const normalize = (stdout) =>
+    String(stdout ?? '')
       .split('\n')
       .map((line) => line.replace(/^"|"$/g, '').trim())
       .filter(Boolean)
       .join(' ');
+
+  for (const resolver of dnsResolvers()) {
+    try {
+      const { stdout } = await execFileAsync('dig', ['+short', 'TXT', name, `@${resolver}`], {
+        timeout: 8000,
+      });
+      const merged = normalize(stdout);
+      if (merged.trim()) return merged;
+    } catch {
+      /* try next resolver */
+    }
+  }
+  try {
+    const { stdout } = await execFileAsync('dig', ['+short', 'TXT', name], { timeout: 8000 });
+    return normalize(stdout);
   } catch {
     return '';
   }
