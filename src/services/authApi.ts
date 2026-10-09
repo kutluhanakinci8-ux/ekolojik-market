@@ -5,7 +5,8 @@ export interface RegisterPayload {
   adminName: string;
   username: string;
   password: string;
-  plan?: 'trial' | 'starter' | 'business';
+  plan?: 'trial' | 'starter' | 'business' | 'pos-lite';
+  productProfile?: 'full' | 'pos-lite';
 }
 
 export interface RegisterResult {

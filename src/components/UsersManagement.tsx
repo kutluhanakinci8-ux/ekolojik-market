@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS, USER_PERMISSION_TABS } from '../data/navigation';
+import { isPosLiteProfile, POS_LITE_ADMIN_TABS, POS_LITE_CASHIER_TABS } from '../utils/tenantProductProfile';
 import type { Store } from '../store/useStore';
 import type { AppPage } from './AppShell';
 import type { PosUser, UserRole } from '../types/user';
@@ -40,6 +41,14 @@ function userInitials(name: string): string {
 }
 
 export function UsersManagement({ store }: UsersManagementProps) {
+  const posLite = isPosLiteProfile(store.settings);
+  const defaultCashierTabs = posLite ? [...POS_LITE_CASHIER_TABS] : [...DEFAULT_CASHIER_TABS];
+  const permissionTabs = useMemo(() => {
+    if (!posLite) return USER_PERMISSION_TABS;
+    const allowed = new Set(POS_LITE_CASHIER_TABS.concat(['dashboard', 'sales', 'stock', 'reports', 'transactions', 'settings']));
+    return USER_PERMISSION_TABS.filter((item) => allowed.has(item.id));
+  }, [posLite]);
+  const adminTabsForProfile = posLite ? [...POS_LITE_ADMIN_TABS] : [...ALL_APP_PAGES];
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +63,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
 
   const resetForm = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, allowedTabs: defaultCashierTabs });
     setError(null);
   };
 
@@ -67,7 +76,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
       pin: '',
       clearPin: false,
       role: user.role,
-      allowedTabs: user.role === 'admin' ? ALL_APP_PAGES : [...user.allowedTabs],
+      allowedTabs: user.role === 'admin' ? adminTabsForProfile : [...user.allowedTabs],
       isActive: user.isActive,
     });
     setError(null);
@@ -88,7 +97,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
     setForm((prev) => ({
       ...prev,
       role,
-      allowedTabs: role === 'admin' ? ALL_APP_PAGES : (prev.allowedTabs.length ? prev.allowedTabs : [...DEFAULT_CASHIER_TABS]),
+      allowedTabs: role === 'admin' ? adminTabsForProfile : (prev.allowedTabs.length ? prev.allowedTabs : defaultCashierTabs),
     }));
   };
 
@@ -106,7 +115,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
           pin: form.pin || undefined,
           clearPin: form.clearPin,
           role: form.role,
-          allowedTabs: form.role === 'admin' ? ALL_APP_PAGES : form.allowedTabs,
+          allowedTabs: form.role === 'admin' ? adminTabsForProfile : form.allowedTabs,
           isActive: form.isActive,
         });
         if (result) {
@@ -121,7 +130,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
           password: form.password,
           pin: form.pin || undefined,
           role: form.role,
-          allowedTabs: form.role === 'admin' ? ALL_APP_PAGES : form.allowedTabs,
+          allowedTabs: form.role === 'admin' ? adminTabsForProfile : form.allowedTabs,
           isActive: form.isActive,
         });
         if (result) {
@@ -233,7 +242,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
             <div className="users-tabs-picker users-tabs-picker--premium">
               <span className="users-tabs-label">Görünecek Sekmeler</span>
               <div className="users-tabs-pills">
-                {USER_PERMISSION_TABS.map((item) => {
+                {permissionTabs.map((item) => {
                   const active = form.allowedTabs.includes(item.id);
                   return (
                     <button

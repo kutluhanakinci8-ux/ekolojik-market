@@ -19,7 +19,14 @@ export function LandingLogin() {
   const [totpCode, setTotpCode] = useState('');
   const [pendingTotpUserId, setPendingTotpUserId] = useState<string | null>(null);
   const [pendingUsername, setPendingUsername] = useState('');
-  const [tenantId, setTenantId] = useState(loadTenantId());
+  const [tenantId, setTenantId] = useState(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
+    if (fromUrl) {
+      saveTenantId(fromUrl);
+      return fromUrl;
+    }
+    return loadTenantId();
+  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(registerState?.message ?? null);
   const [busy, setBusy] = useState(false);

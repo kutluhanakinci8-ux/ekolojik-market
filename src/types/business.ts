@@ -244,8 +244,12 @@ export interface PosNotesConfig {
   items: PosNote[];
 }
 
+export type TenantProductProfile = 'full' | 'pos-lite';
+
 export interface AppSettings {
   businessName: string;
+  /** `pos-lite`: stok + satış + sınırlı raporlar; Posta/müşteri modülleri kapalı profil */
+  productProfile?: TenantProductProfile;
   lowStockThreshold: number;
   defaultPriceType: PriceType;
   posNotes: PosNotesConfig;
