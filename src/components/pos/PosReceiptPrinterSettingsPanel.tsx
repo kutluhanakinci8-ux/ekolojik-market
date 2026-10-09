@@ -47,8 +47,11 @@ function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
         <strong>Mac yazıcı:</strong> Terminal → <code>lpstat -p</code> ve{' '}
         <code>tail -f /var/log/cups/error_log</code>
         <br />
-        <strong>Önizleme bozuksa:</strong> «Daha az ayar» → üst/alt bilgi <strong>kapalı</strong>, ölçek{' '}
-        <strong>%100</strong> (üstteki site adresi Chrome’dan gelir).
+        <strong>Önizleme bozuksa:</strong> üst/alt bilgi <strong>kapalı</strong>, ölçek <strong>%100</strong>.
+        <br />
+        <strong>Chrome’da yazıcı yok / sadece PDF:</strong> Hedef açılır menüden <strong>POS-80C</strong>{' '}
+        seçin. Görünmüyorsa Mac → Sistem Ayarları → Yazıcılar (USB), sonra Chrome yeniden başlat.
+        Terminal: <code>lpstat -p</code>
       </p>
     </div>
   );

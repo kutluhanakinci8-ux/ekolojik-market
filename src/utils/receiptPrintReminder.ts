@@ -9,11 +9,11 @@ export function remindChromeReceiptPrintSettings(): void {
     return;
   }
   window.alert(
-    'Termal fiş (POS-80C) için Chrome yazdır penceresi:\n\n'
-      + '1. «Daha az ayar» → Üstbilgi ve altbilgi KAPALI\n'
-      + '2. Ölçek: %100 (sayfa genişliğine sığdır değil)\n'
-      + '3. Hedef: Printer POS-80C\n'
-      + '4. Kenar boşlukları: Yok / 0\n\n'
-      + 'Üstte görünen site adresi Chrome’dan gelir; kapalı olmazsa fiş bozuk basılır.',
+    'Termal fiş — Chrome yazdır penceresi:\n\n'
+      + '1. Hedef: «PDF olarak kaydet» DEĞİL → USB yazıcı (POS-80C / Zywell)\n'
+      + '   (Liste boşsa: Mac Ayarlar → Yazıcılar, USB takılı mı; Chrome’u kapat-aç)\n'
+      + '2. «Daha fazla ayar» → Üstbilgi ve altbilgi KAPALI\n'
+      + '3. Ölçek %100, kenar 0\n\n'
+      + 'Firefox’ta görünen yazıcı Chrome’da da sistem listesinden gelir; hedefi elle seçmek gerekir.',
   );
 }
