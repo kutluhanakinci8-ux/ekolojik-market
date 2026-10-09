@@ -212,6 +212,16 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
   `;
 }
 
+/** Greenleaf / yönetici kasa — fiş dokümanı kendi window.print() çağırır (main dalı) */
+function buildReceiptPrintScript(): string {
+  return `
+  <script>
+    window.onload = function () {
+      setTimeout(function () { window.print(); }, 120);
+    };
+  </script>`;
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -426,6 +436,46 @@ export function buildReceiptHtml(
 </html>`;
 }
 
+/** main (yonetici) ile birebir: 80mm, 4mm kenar, otomatik yazdır script */
+export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
+  const receiptRef = data.receiptNo || data.saleId || '—';
+  const body = buildReceiptHtml(data, 80, 4);
+  return body
+    .replace(`<title>${BLANK_PRINT_TITLE}</title>`, `<title>Fiş ${receiptRef}</title>`)
+    .replace('</body>', `${buildReceiptPrintScript()}\n</body>`);
+}
+
+/** Gizli iframe — yazdırma yalnızca fiş HTML içindeki onload script ile (parent print yok) */
+function printHtmlReceiptClassic(html: string): Promise<void> {
+  return new Promise((resolve) => {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText =
+      'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(iframe);
+
+    const win = iframe.contentWindow;
+    const doc = win?.document;
+    if (!doc || !win) {
+      document.body.removeChild(iframe);
+      resolve();
+      return;
+    }
+
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const cleanup = () => {
+      if (iframe.parentNode) document.body.removeChild(iframe);
+      resolve();
+    };
+
+    win.addEventListener('afterprint', cleanup, { once: true });
+    setTimeout(cleanup, 8000);
+  });
+}
+
 function printHtmlReceiptInWindow(win: Window, html: string, onDone: () => void): void {
   const doc = win.document;
   doc.open();
@@ -505,7 +555,11 @@ export async function printThermalReceipt(
   data: SaleReceiptData,
   options?: ThermalReceiptPrintOptions,
 ): Promise<void> {
-  const normalized = normalizeReceiptPrinterSettings(options ?? undefined);
+  if (options === undefined) {
+    await printHtmlReceiptClassic(buildGreenleafSaleReceiptHtml(data));
+    return;
+  }
+  const normalized = normalizeReceiptPrinterSettings(options);
   const paper = normalized.paperWidthMm;
   const copies = normalized.copies;
   const margin = normalized.pageMarginMm;
@@ -523,5 +577,9 @@ export function printReturnReceipt(
   data: ReturnReceiptData,
   paperWidthMm: 58 | 80 = 80,
 ): Promise<void> {
-  return printHtmlReceipt(buildReturnReceiptHtml(data, paperWidthMm));
+  const html = buildReturnReceiptHtml(data, paperWidthMm).replace(
+    '</body>',
+    `${buildReceiptPrintScript()}\n</body>`,
+  );
+  return printHtmlReceiptClassic(html);
 }

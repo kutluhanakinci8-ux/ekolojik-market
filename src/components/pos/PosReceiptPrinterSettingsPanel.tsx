@@ -17,9 +17,8 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
       <section className="settings-panel settings-panel--receipt-printer">
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
-          Lima Market, Greenleaf kasadaki (yonetici) ile aynı yolu kullanır: satış sonrası Chrome yazdır
-          → <strong>POS-80C</strong>, 80&nbsp;mm düz metin fiş. Burada ek ayar yok; ayar açıp sunucuya
-          kaydetmek termal çöp çıktısına yol açabiliyordu.
+          Lima Market, <strong>yonetici / Kutluhan Akıncı</strong> (main) kasası ile aynı fiş kodunu kullanır:
+          HTML 80&nbsp;mm, gizli iframe, Chrome → <strong>POS-80C</strong>. Burada ek ayar yok.
         </p>
       </section>
     );

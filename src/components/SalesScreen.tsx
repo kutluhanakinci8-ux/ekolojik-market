@@ -24,7 +24,7 @@ import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
-import { GREENLEAF_THERMAL_PRINT, shouldUseGreenleafReceiptPath } from '../utils/greenleafReceipt';
+import { shouldUseGreenleafReceiptPath } from '../utils/greenleafReceipt';
 
 interface SalesScreenProps {
   store: Store;
@@ -213,45 +213,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
       return;
     }
 
-    const receiptPayment = method === 'split' ? 'card' : method;
-    const receiptPrinterRaw = store.settings.receiptPrinter;
-    const receiptPrinter = receiptPrinterRaw
-      ? normalizeReceiptPrinterSettings(receiptPrinterRaw)
-      : null;
-    const useGreenleafReceiptPath = shouldUseGreenleafReceiptPath(store.settings);
-
-    const printSaleThermalIfNeeded = async (thermalReceiptNo?: string) => {
-      const shouldPrintThermal =
-        !samplesOnly
-        && method !== 'credit'
-        && !fiscalPrinted
-        && (useGreenleafReceiptPath
-          || (receiptPrinter!.enabled
-            && receiptPrinter!.autoPrintOnSale
-            && receiptPrinter!.brand !== 'none'));
-      if (!shouldPrintThermal) return;
-      const receiptData = buildReceiptFromCart(
-        paidItems,
-        store.products,
-        receiptPayment,
-        sale.total,
-        store.settings.businessName,
-        {
-          receiptNo: thermalReceiptNo ?? receiptNo,
-          saleId: sale.id,
-          createdAt: new Date(sale.createdAt),
-        },
-        store.productSets,
-      );
-      await printThermalReceipt(
-        receiptData,
-        useGreenleafReceiptPath ? GREENLEAF_THERMAL_PRINT : receiptPrinter!,
-      );
-    };
-
-    /** Önce termal (Chrome yazdır), sonra yazar kasa — uzun await sonrası print() engellenmesin */
     if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
-      await printSaleThermalIfNeeded();
       const fiscal = await tryFiscalReceipt(
         paidItems,
         store.products,
@@ -264,8 +226,32 @@ export function SalesScreen({ store }: SalesScreenProps) {
         receiptNo = fiscal.receiptNo ?? receiptNo;
         fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
       }
-    } else {
-      await printSaleThermalIfNeeded();
+    }
+
+    const receiptPayment = method === 'split' ? 'card' : method;
+    const useGreenleafReceiptPath = shouldUseGreenleafReceiptPath(store.settings);
+    const receiptPrinter = normalizeReceiptPrinterSettings(store.settings.receiptPrinter);
+    const useAdvancedReceiptPrinter =
+      !useGreenleafReceiptPath
+      && receiptPrinter.enabled
+      && receiptPrinter.autoPrintOnSale
+      && receiptPrinter.brand !== 'none';
+
+    if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
+      const receiptData = buildReceiptFromCart(
+        paidItems,
+        store.products,
+        receiptPayment,
+        sale.total,
+        store.settings.businessName,
+        { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
+        store.productSets,
+      );
+      if (useGreenleafReceiptPath) {
+        await printThermalReceipt(receiptData);
+      } else if (useAdvancedReceiptPrinter) {
+        await printThermalReceipt(receiptData, receiptPrinter);
+      }
     }
 
     const methodLabel = samplesOnly
