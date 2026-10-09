@@ -168,7 +168,43 @@ function receiptPageCss(paperWidthMm: 58 | 80, pageMarginMm = 0): string {
   return `@page { size: ${paperWidthMm}mm auto; margin: ${m}mm; }`;
 }
 
-/** Termal rulo: Chrome raster + CUPS — kontrast ve kalın stroke (silik basımı azaltır) */
+/** Tüm satırlar TOPLAM ile aynı kalınlık (termal raster) */
+const RECEIPT_THERMAL_BOLD_CSS = `
+    body.receipt-thermal,
+    body.receipt-thermal div,
+    body.receipt-thermal td {
+      font-size: 14px;
+      font-weight: 900;
+      color: #000;
+      -webkit-font-smoothing: none;
+    }
+    body.receipt-thermal .title {
+      font-size: 16px;
+      font-weight: 900;
+    }
+    body.receipt-thermal .muted,
+    body.receipt-thermal .footer,
+    body.receipt-thermal .footer div {
+      font-size: 14px;
+      font-weight: 900;
+    }
+    body.receipt-thermal .line td,
+    body.receipt-thermal .line-name,
+    body.receipt-thermal .line-price {
+      font-size: 14px;
+      font-weight: 900;
+    }
+    body.receipt-thermal .line-sub td {
+      font-size: 13px;
+      font-weight: 900;
+    }
+    body.receipt-thermal .total-row td,
+    body.receipt-thermal .total-row .line-price {
+      font-size: 15px;
+      font-weight: 900;
+    }
+    body.receipt-thermal .bold { font-weight: 900; }`;
+
 const THERMAL_PRINT_DARK_CSS = `
     @media print {
       html, body {
@@ -177,21 +213,15 @@ const THERMAL_PRINT_DARK_CSS = `
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      body {
-        font-size: 13px;
-        font-weight: 900;
-        color: #000 !important;
-        filter: contrast(1.45) brightness(0.88);
+      body.receipt-thermal {
+        filter: contrast(1.5) brightness(0.86);
       }
-      .muted, .line-sub td, .footer, .line-name, .line-price, td, div {
+      body.receipt-thermal div,
+      body.receipt-thermal td {
         color: #000 !important;
-        -webkit-text-stroke: 0.2px #000;
-        text-shadow: 0.35px 0 0 #000, -0.35px 0 0 #000;
+        -webkit-text-stroke: 0.25px #000;
+        text-shadow: 0.4px 0 0 #000, -0.4px 0 0 #000;
       }
-      .line td { font-weight: 900; }
-      .line-sub td { font-size: 11px; font-weight: 900; }
-      .title { font-weight: 900; font-size: 15px; }
-      .total-row td, .total-row .line-price { font-weight: 900; font-size: 15px; }
       .divider { border-top-width: 2px; border-top-style: solid; }
     }`;
 
@@ -199,6 +229,7 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
   const bodyWidth = paperWidthMm === 58 ? 50 : 72;
   return `
     ${receiptPageCss(paperWidthMm, pageMarginMm)}
+    ${RECEIPT_THERMAL_BOLD_CSS}
     ${THERMAL_PRINT_DARK_CSS}
     @media screen {
       html, body { margin: 0 !important; padding: 0 !important; }
@@ -209,36 +240,38 @@ function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string
       padding: 0;
       width: ${bodyWidth}mm;
       font-family: "Courier New", Courier, monospace;
-      font-size: 11px;
+      font-size: 14px;
+      font-weight: 900;
       line-height: 1.35;
       color: #000;
       background: #fff;
     }
     .center { text-align: center; }
-    .bold { font-weight: 700; }
-    .title { font-size: 14px; font-weight: 800; margin-bottom: 2px; }
-    .muted { color: #000; font-size: 10px; }
+    .bold { font-weight: 900; }
+    .title { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
+    .muted { color: #000; font-size: 14px; font-weight: 900; }
     .divider {
       border: none;
-      border-top: 1px solid #000;
+      border-top: 2px solid #000;
       margin: 8px 0;
     }
     table { width: 100%; border-collapse: collapse; }
-    .line td { padding: 2px 0; vertical-align: top; }
+    .line td { padding: 2px 0; vertical-align: top; font-weight: 900; }
     .line-name { width: 68%; word-break: break-word; }
     .line-price { width: 32%; text-align: right; white-space: nowrap; }
     .line-sub td {
       padding: 0 0 4px;
-      font-size: 9px;
+      font-size: 13px;
+      font-weight: 900;
       color: #000;
     }
     .total-row td {
       padding-top: 6px;
-      font-size: 13px;
-      font-weight: 800;
+      font-size: 15px;
+      font-weight: 900;
     }
-    .total-row .line-price { font-size: 14px; }
-    .footer { margin-top: 10px; font-size: 10px; }
+    .total-row .line-price { font-size: 15px; font-weight: 900; }
+    .footer { margin-top: 10px; font-size: 14px; font-weight: 900; }
   `;
 }
 
@@ -380,7 +413,7 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58
     }
   </style>
 </head>
-<body>
+<body class="receipt-thermal">
   <div class="center title">${data.businessName}</div>
   <div class="return-banner">
     İADE FİŞİ
@@ -447,7 +480,7 @@ export function buildReceiptHtml(
     ${receiptBaseStyles(paperWidthMm, pageMarginMm)}
   </style>
 </head>
-<body>
+<body class="receipt-thermal">
   <div class="center title">${data.businessName}</div>
   <div class="center muted">SATIŞ FİŞİ</div>
   <hr class="divider" />
@@ -485,6 +518,11 @@ const CLASSIC_RECEIPT_INCH_FIX = `
         padding: 0 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+      }
+      body.receipt-thermal div,
+      body.receipt-thermal td {
+        font-weight: 900 !important;
+        font-size: 14px !important;
       }
     }
   </style>`;
