@@ -27,8 +27,27 @@ echo "=== Ekolojik DNS mail (TXT) ==="
 echo "Alan: ${DOMAIN} (tenant=${TENANT}, strict=${STRICT})"
 echo ""
 
+DNS_RESOLVERS=()
+if [[ -n "${EKOLOJIK_DNS_RESOLVER:-}" ]]; then
+  DNS_RESOLVERS+=("${EKOLOJIK_DNS_RESOLVER}")
+elif [[ -n "${EKOLOJIK_DNS_RESOLVERS:-}" ]]; then
+  IFS=',' read -r -a DNS_RESOLVERS <<< "${EKOLOJIK_DNS_RESOLVERS}"
+else
+  DNS_RESOLVERS=(dns1.turhost.com dns2.turhost.com 1.1.1.1 8.8.8.8)
+fi
+
 txt_records() {
-  dig +short TXT "$1" 2>/dev/null | tr -d '"' | tr '\n' ' '
+  local name="$1" out="" r
+  for r in "${DNS_RESOLVERS[@]}"; do
+    r="${r// /}"
+    [[ -z "${r}" ]] && continue
+    out="$(dig +short TXT "${name}" @"${r}" 2>/dev/null | tr -d '"' | tr '\n' ' ')"
+    if [[ -n "${out// /}" ]]; then
+      echo "${out}"
+      return 0
+    fi
+  done
+  dig +short TXT "${name}" 2>/dev/null | tr -d '"' | tr '\n' ' '
 }
 
 SPF="$(txt_records "${DOMAIN}")"
@@ -67,7 +86,7 @@ for sel in "${SELECTORS[@]}"; do
 done
 if [[ $DKIM_FOUND -eq 0 ]]; then
   if [[ "${STRICT}" == "1" ]]; then
-    bad "DKIM TXT bulunamadı (default/mail/selector1 denendi)"
+    bad "DKIM TXT bulunamadı (selector: ${SELECTORS[*]} — Turhost: ekolojik._domainkey)"
   else
     warn "DKIM selector denemeleri boş — panel/hosting DKIM adını kontrol edin"
   fi

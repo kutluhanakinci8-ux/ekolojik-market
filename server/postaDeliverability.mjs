@@ -5,17 +5,40 @@ import { verifyEkolojikSmtp } from './ekolojikSmtp.mjs';
 import { getEffectiveMailPresentation } from './postaSettings.mjs';
 import { getTenantSmtpMailConfig, isTenantSmtpConfigured } from './tenantMailConfig.mjs';
 import { readTenantStore, writeTenantStore } from './tenantAuth.mjs';
+import { readOpenDkimTxtOneLine } from './ekolojikOpenDkimDns.mjs';
 
 const execFileAsync = promisify(execFile);
 
+function dnsResolvers() {
+  const one = process.env.EKOLOJIK_DNS_RESOLVER?.trim();
+  if (one) return [one];
+  const many = process.env.EKOLOJIK_DNS_RESOLVERS?.trim();
+  if (many) return many.split(/[,;\s]+/).filter(Boolean);
+  return ['dns1.turhost.com', 'dns2.turhost.com', '1.1.1.1', '8.8.8.8'];
+}
+
 async function digTxt(name) {
-  try {
-    const { stdout } = await execFileAsync('dig', ['+short', 'TXT', name], { timeout: 8000 });
-    return String(stdout ?? '')
+  const normalize = (stdout) =>
+    String(stdout ?? '')
       .split('\n')
       .map((line) => line.replace(/^"|"$/g, '').trim())
       .filter(Boolean)
       .join(' ');
+
+  for (const resolver of dnsResolvers()) {
+    try {
+      const { stdout } = await execFileAsync('dig', ['+short', 'TXT', name, `@${resolver}`], {
+        timeout: 8000,
+      });
+      const merged = normalize(stdout);
+      if (merged.trim()) return merged;
+    } catch {
+      /* try next resolver */
+    }
+  }
+  try {
+    const { stdout } = await execFileAsync('dig', ['+short', 'TXT', name], { timeout: 8000 });
+    return normalize(stdout);
   } catch {
     return '';
   }
@@ -89,15 +112,26 @@ export async function seedTenantPostaAliases(dataDir, tenantId = 'main') {
   return { ok: true, seeded: true, aliases };
 }
 
-function buildDnsChecklist(domain, pres, vpsIp, selector, dns) {
-  const suggestedSpf = `v=spf1 ip4:${vpsIp} a mx ~all`;
-  const suggestedDmarc = `v=DMARC1; p=none; rua=mailto:${pres.opsEmail || pres.from || `postmaster@${domain}`}`;
+function dmarcRua(pres, domain) {
+  const addr = pres.opsEmail || pres.from || `postmaster@${domain}`;
+  const mail = String(addr).includes('@') ? addr : `postmaster@${domain}`;
+  return `mailto:${mail}`;
+}
+
+function buildDnsChecklist(domain, pres, vpsIp, selector, dns, dkimSuggested) {
+  const suggestedSpf = `v=spf1 a mx ip4:${vpsIp} ~all`;
+  const suggestedDmarc = `v=DMARC1; p=quarantine; rua=${dmarcRua(pres, domain)}; pct=100`;
   const dkimName = `${selector}._domainkey.${domain}`;
+  const dkimValue =
+    dkimSuggested ||
+    `OpenDKIM: bash scripts/sunucu-ekolojik-opendkim-kur.sh (host: ${selector}._domainkey)`;
   return [
     {
       id: 'spf',
       label: 'SPF',
       recordName: domain,
+      panelHost: '@',
+      recordType: 'TXT',
       status: dns.spf.status,
       current: dns.spf.value,
       suggested: suggestedSpf,
@@ -106,6 +140,8 @@ function buildDnsChecklist(domain, pres, vpsIp, selector, dns) {
       id: 'dmarc',
       label: 'DMARC',
       recordName: `_dmarc.${domain}`,
+      panelHost: '_dmarc',
+      recordType: 'TXT',
       status: dns.dmarc.status,
       current: dns.dmarc.value,
       suggested: suggestedDmarc,
@@ -114,9 +150,11 @@ function buildDnsChecklist(domain, pres, vpsIp, selector, dns) {
       id: 'dkim',
       label: 'DKIM',
       recordName: dkimName,
+      panelHost: `${selector}._domainkey`,
+      recordType: 'TXT',
       status: dns.dkim.status,
       current: dns.dkim.value,
-      suggested: `Hosting panelinde TXT: ${dkimName} (OpenDKIM veya sağlayıcı DKIM)`,
+      suggested: dkimValue,
     },
   ];
 }
@@ -145,6 +183,7 @@ export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
     ? await verifyEkolojikSmtp({ dataDir, tenantId })
     : { ok: false, error: 'SMTP yapılandırılmadı' };
   const mailCfg = await getTenantSmtpMailConfig(dataDir, tenantId);
+  const localDkimTxt = await readOpenDkimTxtOneLine(domain, selector);
 
   const { aliases, source: aliasesSource } = await resolveTenantAliases(dataDir, tenantId, domain);
 
@@ -159,12 +198,22 @@ export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
   };
 
   const suggestedRecords = {
-    spf: `v=spf1 ip4:${vpsIp} a mx ~all`,
-    dmarc: `v=DMARC1; p=none; rua=mailto:${pres.opsEmail || pres.from}`,
-    dkimHint: `Panel/hosting: ${dkimSelectorUsed}._domainkey.${domain} (OpenDKIM veya sağlayıcı DKIM)`,
+    spf: `v=spf1 a mx ip4:${vpsIp} ~all`,
+    dmarc: `v=DMARC1; p=quarantine; rua=${dmarcRua(pres, domain)}; pct=100`,
+    dkim: localDkimTxt,
+    dkimHint: localDkimTxt
+      ? `${dkimSelectorUsed}._domainkey.${domain}`
+      : `Panel/hosting: ${dkimSelectorUsed}._domainkey.${domain} (OpenDKIM)`,
   };
 
-  const dnsChecklist = buildDnsChecklist(domain, pres, vpsIp, dkimSelectorUsed, dns);
+  const dnsChecklist = buildDnsChecklist(
+    domain,
+    pres,
+    vpsIp,
+    dkimSelectorUsed,
+    dns,
+    localDkimTxt,
+  );
   const missingDns = dnsChecklist.filter((r) => r.status !== 'ok').map((r) => r.id);
   const deliverabilityReady = missingDns.length === 0 && Boolean(smtpVerify.ok);
 
@@ -189,6 +238,13 @@ export async function getPostaDeliverabilityHub(dataDir, tenantId = 'main') {
     dnsChecklist,
     missingDns,
     deliverabilityReady,
+    dnsPanelGuide: {
+      provider: 'Turhost',
+      ns: ['dns1.turhost.com', 'dns2.turhost.com'],
+      docPath: 'docs/EKOLOJIK-DNS-TURHOST-PANEL.md',
+      strictCommand:
+        'EKOLOJIK_DNS_STRICT=1 bash scripts/sunucu-ekolojik-dns-mail-dogrula.sh',
+    },
     nbParity: 'PM-3/PM-7 deliverability hub (tenant From domain, Faz 43)',
   };
 }
