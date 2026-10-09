@@ -24,7 +24,7 @@ else
   echo "UYARI: DNS doğrulama — panel SPF/DMARC/DKIM (strict: EKOLOJIK_DNS_STRICT=1)" | tee -a "${LOG}"
 fi
 
-for c in /etc/cron.d/ekolojik-posta-parite /etc/cron.d/ekolojik-market-data-backup; do
+for c in /etc/cron.d/ekolojik-posta-parite /etc/cron.d/ekolojik-market-data-backup /etc/cron.d/ekolojik-outbox-failed-archive; do
   if [[ -f "${c}" ]]; then
     echo "OK   cron $(basename "${c}")" | tee -a "${LOG}"
   else

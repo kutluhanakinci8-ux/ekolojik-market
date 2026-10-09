@@ -91,3 +91,4 @@ systemctl reload postfix
 echo "OK   ${LOCAL_USER} → ${TOKEN} → ekolojik-lda"
 postmap -q "${LOCAL_USER}" "hash:${VIRTUAL_FILE}"
 postmap -q "${TOKEN_LOCAL}" "hash:${TRANSPORT_FILE}"
+echo "     virtual_alias_maps=$(postconf -h virtual_alias_maps)"

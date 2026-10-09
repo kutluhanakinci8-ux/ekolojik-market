@@ -178,4 +178,9 @@ if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
       exit 1
     fi
   fi
+  if [[ "$(id -u)" == "0" ]]; then
+    bash "${REPO_ROOT}/scripts/sunucu-ekolojik-outbox-failed-cron-kur.sh" || true
+  fi
+  bash "${REPO_ROOT}/scripts/sunucu-ekolojik-smtp-ops-recipient-dogrula.sh" "${INSTALL_DIR}" || \
+    echo "UYARI: ops SMTP alıcı — bash ${REPO_ROOT}/scripts/sunucu-ekolojik-imap-vps-alias-fix.sh"
 fi
