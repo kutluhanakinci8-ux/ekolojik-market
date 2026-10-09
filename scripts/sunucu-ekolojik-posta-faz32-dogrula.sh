@@ -2,25 +2,31 @@
 # Faz 32 — NB PM-6 SSE canlılık + mesaj gecikme metrik
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/ekolojik-posta-smoke-auth.sh
+source "${SCRIPT_DIR}/lib/ekolojik-posta-smoke-auth.sh"
+ekolojik_posta_smoke_auth_init "${EKOLOJIK_VERIFY_ROOT:-/var/www/market-pos}"
+BASE="${EKOLOJIK_VERIFY_BASE_URL}"
+
 BASE="${EKOLOJIK_VERIFY_BASE_URL:-http://127.0.0.1:5180}"
 ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
 
 echo "=== Ekolojik Posta Faz 32 doğrulama ==="
 test -f "${ROOT}/server/postaLive.mjs" || exit 1
 
-curl -fsS "${BASE}/api/posta/live/capabilities" | node -e "
+posta_curl "${BASE}/api/posta/live/capabilities" | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
 if(!d.ok || !d.events?.includes('ping') || !d.events?.includes('inbox')) process.exit(1);
 console.log('OK   live capabilities v', d.version);
 "
 
-curl -fsS "${BASE}/api/posta/live/metrics?days=7" | node -e "
+posta_curl "${BASE}/api/posta/live/metrics?days=7" | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
 if(!d.ok || !d.sse || d.deliveryLatency == null) process.exit(1);
 console.log('OK   live metrics samples', d.deliveryLatency.sampleCount);
 "
 
-SSE_SAMPLE="$(timeout 6 curl -fsS -N "${BASE}/api/posta/events" 2>/dev/null | head -n 12 || true)"
+SSE_SAMPLE="$(timeout 6 curl -fsS -N "$(posta_sse_url)" 2>/dev/null | head -n 12 || true)"
 echo "$SSE_SAMPLE" | grep -q '^retry:' || { echo "SSE retry satırı yok"; exit 1; }
 echo "$SSE_SAMPLE" | grep -qE '^event: (unread|ping)' || { echo "SSE unread/ping yok"; exit 1; }
 echo "OK   SSE stream retry + events"
