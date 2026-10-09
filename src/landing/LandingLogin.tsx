@@ -40,12 +40,12 @@ export function LandingLogin() {
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
-    if (fromUrl) {
-      saveTenantId(fromUrl);
-      setTenantId(fromUrl);
-      void store.refreshTenantData();
-    }
-  }, [store]);
+    if (!fromUrl) return;
+    saveTenantId(fromUrl);
+    setTenantId(fromUrl);
+    void store.refreshTenantData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnızca URL tenant ile ilk yükleme
+  }, []);
 
   const goToApp = () => {
     navigate('/app', { replace: true });
