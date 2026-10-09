@@ -741,9 +741,16 @@ function buildLocalSnapshot(
   capitalContributions: CapitalContribution[],
   crm: CrmPersistedData,
 ): PersistedStoreSnapshot {
+  const posLite = isPosLiteProfile(settings);
   return {
     updatedAt: new Date().toISOString(),
-    products: products.map(({ imageUrl: _, ...rest }) => rest),
+    products: products.map((p) => {
+      const { imageUrl, catalogImageId, ...rest } = p;
+      const next: Product = { ...rest };
+      if (catalogImageId != null) next.catalogImageId = catalogImageId;
+      if (posLite && imageUrl?.startsWith('/product-images/')) next.imageUrl = imageUrl;
+      return next;
+    }),
     productSets,
     sales,
     saleReturns,

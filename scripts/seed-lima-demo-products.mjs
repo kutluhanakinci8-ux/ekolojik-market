@@ -36,7 +36,8 @@ const mainById = new Map((mainStore.products ?? []).map((p) => [p.id, p]));
 
 function catalogImageForSourceId(sourceId) {
   const path = imageManifest[String(sourceId)];
-  return path ? { catalogImageId: sourceId } : {};
+  if (!path) return {};
+  return { catalogImageId: sourceId, imageUrl: path };
 }
 
 const missing = sourceIds.filter((id) => !mainById.has(id));
@@ -62,6 +63,13 @@ const cloned = sourceIds.map((sourceId, index) => {
 
 const targetStore = JSON.parse(await readFile(targetPath, 'utf8'));
 targetStore.products = cloned;
+targetStore.settings = {
+  ...(targetStore.settings ?? {}),
+  productProfile: targetStore.settings?.productProfile ?? 'pos-lite',
+  posLiteCatalogImageByProductId: Object.fromEntries(
+    cloned.map((p, i) => [String(p.id), sourceIds[i]]),
+  ),
+};
 targetStore.updatedAt = now;
 
 const movements = cloned

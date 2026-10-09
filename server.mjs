@@ -328,6 +328,11 @@ async function readStoreData(tenantId = 'main') {
     if (stockChanged) persist = true;
   }
 
+  const { enrichPosLiteProductMedia } = await import('./server/posLiteProductMedia.mjs');
+  const { store: mediaEnriched, changed: mediaChanged } = enrichPosLiteProductMedia(data);
+  data = mediaEnriched;
+  if (mediaChanged) persist = true;
+
   if (persist) {
     await writeStoreData(data, tenantId);
   }
