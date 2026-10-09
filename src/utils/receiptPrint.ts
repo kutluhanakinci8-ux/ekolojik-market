@@ -6,7 +6,8 @@ import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
 
-const BLANK_PRINT_TITLE = '\u200b';
+/** Termal sürücüde \u200b başlık kenarda «c0» / bozuk karakter basabiliyor */
+const BLANK_PRINT_TITLE = '';
 
 export interface ReceiptLineItem {
   name: string;
@@ -621,18 +622,17 @@ function receiptPremiumStyles(): string {
     }
     .rp-brand {
       text-align: center;
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: normal;
       margin: 0 0 4px;
+      word-break: break-word;
     }
     .rp-kind {
       text-align: center;
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.26em;
-      text-transform: uppercase;
+      letter-spacing: 0.12em;
       margin: 0 0 10px;
     }
     .rp-rule {
@@ -690,8 +690,14 @@ function receiptPremiumStyles(): string {
     @media print {
       html, body { margin: 0 !important; padding: 0 !important; }
       body.receipt-premium { width: 72mm !important; color: #000 !important; }
+      body.receipt-premium::before,
+      body.receipt-premium::after { content: none !important; display: none !important; }
     }
   `;
+}
+
+function formatReceiptBrandName(name: string): string {
+  return name.trim().toLocaleUpperCase('tr-TR');
 }
 
 /** Lima premium termal — hizalı tablo, tek ağırlık (ghost/çift basım yok) */
@@ -716,9 +722,9 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
   <title>${BLANK_PRINT_TITLE}</title>
   <style>${receiptPremiumStyles()}</style>
 </head>
-<body class="receipt-premium" data-receipt-layout="premium-v11">
-  <p class="rp-brand">${escapeHtml(data.businessName)}</p>
-  <p class="rp-kind">Satış Fişi</p>
+<body class="receipt-premium" data-receipt-layout="premium-v12">
+  <p class="rp-brand">${escapeHtml(formatReceiptBrandName(data.businessName))}</p>
+  <p class="rp-kind">SATIŞ FİŞİ</p>
   <hr class="rp-rule" />
   <table class="rp-meta" role="presentation">
     <tr><td class="rp-label">Tarih</td><td class="rp-value">${formatReceiptDateTime(data.createdAt)}</td></tr>
