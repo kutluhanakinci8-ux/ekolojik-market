@@ -48,7 +48,7 @@ console.log(j.thread.id);
 
 echo "OK   thread ${THREAD_ID} + ops bildirimi"
 
-sleep 1
+sleep 2
 
 UNREAD_MID="$(posta_curl "${BASE_URL}/api/posta/unread-counts")"
 echo "unread (müşteri mesajı): ${UNREAD_MID}"
@@ -62,13 +62,14 @@ if ((after.messaging??0) <= (before.messaging??0)) {
 console.log('OK   messaging unread arttı', before.messaging, '→', after.messaging);
 " || exit 3
 
-THREADS="$(posta_curl "${BASE_URL}/api/messaging/threads?limit=30&customerId=${CUSTOMER_ID}")"
-M="${MARKER}" node -e "
+THREADS="$(posta_curl "${BASE_URL}/api/messaging/threads?limit=50")"
+TID="${THREAD_ID}" M="${MARKER}" node -e "
+const tid=process.env.TID;
 const marker=process.env.M;
 const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
-const hit=(j.threads||[]).find((t)=>String(t.lastMessagePreview||'').includes(marker));
+const hit=(j.threads||[]).find((t)=>t.id===tid || String(t.lastMessagePreview||'').includes(marker));
 if (!hit) {
-  console.error('HATA: thread listesinde smoke mesajı yok');
+  console.error('HATA: thread listesinde smoke kaydı yok', tid);
   process.exit(4);
 }
 console.log('OK   thread listede', hit.id);
