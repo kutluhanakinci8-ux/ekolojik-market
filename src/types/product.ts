@@ -27,6 +27,8 @@ export interface Product {
   /** Numune stok adedi (satılabilir stoktan bağımsız) */
   sampleStock?: number;
   imageUrl?: string;
+  /** Greenleaf katalog görseli (farklı tenant ürün id’si için kaynak id, örn. Lima #1001 → main #1) */
+  catalogImageId?: number;
   sourceUrl?: string;
   /** Adet kademeli toptan birim fiyatları (KDV dahil) */
   wholesalePrices?: WholesalePrices;

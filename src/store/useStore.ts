@@ -52,6 +52,7 @@ import {
 import {
   DEFAULT_POS_NOTES,
   DEFAULT_SETTINGS,
+  normalizeReceiptPrinterSettings,
   normalizeUtilityBillSubscriptions,
   type PosNote,
 } from '../types/business';
@@ -196,6 +197,7 @@ import {
 import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import { sanitizeReceiptPrinterSettings } from '../utils/greenleafReceipt';
 
 function storageKeys() {
   return posLocalStorageKeys();
@@ -512,6 +514,10 @@ function loadSettings(): AppSettings {
         customExpenseCategories: normalizeCustomExpenseCategories(parsed.customExpenseCategories),
         crm: { ...DEFAULT_CRM_SETTINGS, ...(parsed.crm ?? {}), automationEnabled: parsed.crm?.automationEnabled ?? DEFAULT_CRM_SETTINGS.automationEnabled },
         posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(parsed.posCheckout ?? {}) },
+        receiptPrinter: sanitizeReceiptPrinterSettings({
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+        } as AppSettings),
       };
     } catch {
       return DEFAULT_SETTINGS;
@@ -741,9 +747,16 @@ function buildLocalSnapshot(
   capitalContributions: CapitalContribution[],
   crm: CrmPersistedData,
 ): PersistedStoreSnapshot {
+  const posLite = isPosLiteProfile(settings);
   return {
     updatedAt: new Date().toISOString(),
-    products: products.map(({ imageUrl: _, ...rest }) => rest),
+    products: products.map((p) => {
+      const { imageUrl, catalogImageId, ...rest } = p;
+      const next: Product = { ...rest };
+      if (catalogImageId != null) next.catalogImageId = catalogImageId;
+      if (posLite && imageUrl?.startsWith('/product-images/')) next.imageUrl = imageUrl;
+      return next;
+    }),
     productSets,
     sales,
     saleReturns,
@@ -850,9 +863,11 @@ export function useStore() {
     users?: PosUser[];
     cashSessions?: DailyCashSession[];
   }): PersistedStoreSnapshot => {
-    const { products: irsaliyeProducts } = applyIrsaliyeStockToProducts(products);
+    const snapshotProducts = isIsolatedStoreContext(settings)
+      ? products
+      : applyIrsaliyeStockToProducts(products).products;
     return buildLocalSnapshot(
-      irsaliyeProducts,
+      snapshotProducts,
       productSets,
       sales,
       saleReturns,
@@ -948,6 +963,7 @@ export function useStore() {
       ),
       crm: { ...DEFAULT_CRM_SETTINGS, ...(snapshot.settings?.crm ?? {}) },
       posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(snapshot.settings?.posCheckout ?? {}) },
+      receiptPrinter: sanitizeReceiptPrinterSettings(mergedSettings),
     });
     if (snapshot.priceType) setPriceType(snapshot.priceType);
     setUsers(resolveUsersFromSnapshot(snapshot, mergedSettings));
@@ -2088,6 +2104,10 @@ export function useStore() {
 
   useEffect(() => {
     if (!syncReady || irsaliyeStockMigrationRef.current) return;
+    if (isIsolatedStoreContext(settings)) {
+      irsaliyeStockMigrationRef.current = true;
+      return;
+    }
     if (localStorage.getItem(IRSALIYE_STOCK_MIGRATION_KEY)) {
       irsaliyeStockMigrationRef.current = true;
       return;
@@ -2111,7 +2131,7 @@ export function useStore() {
         { irsaliye: 'LUY2026000000002' },
       );
     }
-  }, [syncReady, products, authSession, logActivity]);
+  }, [syncReady, products, authSession, logActivity, settings]);
 
   const refreshExchangeRatesFromTcmb = useCallback(async () => {
     const tcmb = await fetchTcmbRates();
@@ -4003,6 +4023,19 @@ export function useStore() {
     });
   }, [settings.posCheckout, updateSettings]);
 
+  const updateReceiptPrinterSettings = useCallback(
+    (patch: Partial<AppSettings['receiptPrinter']>) => {
+      if (isPosLiteProfile(settings)) return;
+      updateSettings({
+        receiptPrinter: normalizeReceiptPrinterSettings({
+          ...settings.receiptPrinter,
+          ...patch,
+        }),
+      });
+    },
+    [settings, updateSettings],
+  );
+
   const processSaleReturn = useCallback((
     saleId: string,
     requestedLines: Array<{ lineKey: string; quantity: number }>,
@@ -4633,6 +4666,7 @@ export function useStore() {
     heldPosSales,
     recordCashDrawerCount,
     updatePosCheckoutSettings,
+    updateReceiptPrinterSettings,
     processSaleReturn,
     setProductStock,
     updateProductBarcode,

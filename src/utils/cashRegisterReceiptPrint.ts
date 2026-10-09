@@ -1,4 +1,4 @@
-import { printFiscalCashReport } from '../services/fiscalBridge';
+import { isRealFiscalDevicePrint, printFiscalCashReport } from '../services/fiscalBridge';
 import {
   CASH_ACTIVITY_KIND_LABELS,
   type CashActivityRow,
@@ -254,7 +254,7 @@ export async function printCashRegisterReceipt(
   try {
     const fiscal = await printFiscalCashReport(buildFiscalPayload(data));
     if (fiscal.success) {
-      fiscalPrinted = !fiscal.simulated;
+      fiscalPrinted = isRealFiscalDevicePrint(fiscal);
       if (fiscalPrinted) {
         return {
           printed: true,

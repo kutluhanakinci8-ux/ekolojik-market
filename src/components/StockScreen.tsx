@@ -7,13 +7,14 @@ import type { Product, WholesalePrices } from '../types/product';
 import { formatCurrency, formatDateTime } from '../utils/format';
 import { exportStockCsv, getStockInventoryValue } from '../utils/stockExport';
 import {
-  getIrsaliyeWarehouseStockMetrics,
+  getStockScreenMetrics,
   IRSALIYE_CODES_WITHOUT_PRODUCT,
   IRSALIYE_LUY2026000000002_ID,
   IRSALIYE_PDF_LINE_COUNT,
   IRSALIYE_WAREHOUSE_CODE_COUNT,
   IRSALIYE_WAREHOUSE_UNIT_TOTAL,
 } from '../utils/irsaliyeWarehouse';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import {
   WHOLESALE_BASE_LABELS,
   WHOLESALE_QUANTITIES,
@@ -108,9 +109,12 @@ export function StockScreen({ store }: StockScreenProps) {
   const [bulkWholesaleDiscounts, setBulkWholesaleDiscounts] = useState(DEFAULT_WHOLESALE_DISCOUNTS);
   const [wholesaleDisplayTier, setWholesaleDisplayTier] = useState<WholesaleDisplayTier>(10);
 
+  const posLiteCatalog = isPosLiteProfile(store.settings);
+  const stockListMode = posLiteCatalog ? 'tenant-catalog' : 'irsaliye-warehouse';
+
   const warehouse = useMemo(
-    () => getIrsaliyeWarehouseStockMetrics(store.products, store.lowStockThreshold),
-    [store.products, store.lowStockThreshold],
+    () => getStockScreenMetrics(store.products, store.lowStockThreshold, stockListMode),
+    [store.products, store.lowStockThreshold, stockListMode],
   );
 
   const warehouseProducts = warehouse.products;
@@ -336,16 +340,22 @@ export function StockScreen({ store }: StockScreenProps) {
         </div>
       </div>
 
-      <div className="stock-summary-strip" role="region" aria-label="İrsaliye depo özeti">
+      <div
+        className="stock-summary-strip"
+        role="region"
+        aria-label={posLiteCatalog ? 'Stok özeti' : 'İrsaliye depo özeti'}
+      >
         <div className="stock-summary-strip-main">
           <button type="button" className="stock-summary-chip active" onClick={() => applyFilter('all')}>
             <span className="stock-summary-chip-label">Ürün</span>
             <strong>{warehouseProducts.length}</strong>
           </button>
-          <span className="stock-summary-chip stock-summary-chip--static">
-            <span className="stock-summary-chip-label">Stok kodu</span>
-            <strong>{IRSALIYE_WAREHOUSE_CODE_COUNT}</strong>
-          </span>
+          {!posLiteCatalog && (
+            <span className="stock-summary-chip stock-summary-chip--static">
+              <span className="stock-summary-chip-label">Stok kodu</span>
+              <strong>{IRSALIYE_WAREHOUSE_CODE_COUNT}</strong>
+            </span>
+          )}
           <button type="button" className="stock-summary-chip stock-summary-chip--green" onClick={() => applyFilter('all')}>
             <span className="stock-summary-chip-label">Toplam stok</span>
             <strong>{totalStockUnits.toLocaleString('tr-TR')}</strong>
@@ -387,7 +397,7 @@ export function StockScreen({ store }: StockScreenProps) {
             {summaryOpen ? 'Özet gizle ▴' : 'Detaylı özet ▾'}
           </button>
         </div>
-        {summaryOpen && (
+        {summaryOpen && !posLiteCatalog && (
           <div className="stock-summary-strip-detail">
             <span className="stock-summary-meta">
               e-İrsaliye <strong>{IRSALIYE_LUY2026000000002_ID}</strong> · {IRSALIYE_PDF_LINE_COUNT} satır ·{' '}
@@ -405,14 +415,22 @@ export function StockScreen({ store }: StockScreenProps) {
             <span className="stock-version">Depo {APP_CATALOG_VERSION}</span>
           </div>
         )}
+        {summaryOpen && posLiteCatalog && (
+          <div className="stock-summary-strip-detail">
+            <span className="stock-summary-meta">
+              Mağaza kataloğu · {warehouseProducts.length} ürün · toplam stok{' '}
+              {totalStockUnits.toLocaleString('tr-TR')} · envanter {formatCurrency(inventoryValue)}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="stock-body">
         <div className="stock-table-panel">
           <div className="stock-table-bar">
             <span>
-              <strong>{filtered.length}</strong> / {warehouseProducts.length} irsaliye ürünü · PDF{' '}
-              {IRSALIYE_PDF_LINE_COUNT} satır
+              <strong>{filtered.length}</strong> / {warehouseProducts.length}{' '}
+              {posLiteCatalog ? 'ürün' : `irsaliye ürünü · PDF ${IRSALIYE_PDF_LINE_COUNT} satır`}
             </span>
             {totalPages > 1 && (
               <div className="pagination">
