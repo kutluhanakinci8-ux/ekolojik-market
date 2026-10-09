@@ -73,4 +73,13 @@
 3. **Faz 4** (npm) — güvenlik  
 4. **Faz 3** (DNS TXT) — operatör + öneri scripti; panel işi sizde  
 
+## Uygulama durumu (2026-10-09)
+
+| Faz | main merge | VPS deploy | Kabul |
+|-----|------------|------------|--------|
+| 1 Playwright | `ba0b773` + `0957f7f` (1b cwd) | ✓ | Görsel smoke geçti |
+| 2 Script auth | `82369fc` + `b0474bd` (2b faz21) | ✓ | nb-gap, faz15/21, imap-klasor OK |
+| 3 DNS öneri | `53dc4f2` | ✓ | `dns-txt-onerileri.sh`; strict DNS **panel** bekliyor |
+| 4 npm | `2f6c8e7` | ✓ | `nodemailer@10.0.16` (prod) |
+
 *Son güncelleme: kırılma değerlendirme 2026-10-09.*
