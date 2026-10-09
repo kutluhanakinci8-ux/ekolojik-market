@@ -49,9 +49,9 @@ function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
         <br />
         <strong>Önizleme bozuksa:</strong> üst/alt bilgi <strong>kapalı</strong>, ölçek <strong>%100</strong>.
         <br />
-        <strong>Chrome’da yazıcı yok / sadece PDF:</strong> Hedef açılır menüden <strong>POS-80C</strong>{' '}
-        seçin. Görünmüyorsa Mac → Sistem Ayarları → Yazıcılar (USB), sonra Chrome yeniden başlat.
-        Terminal: <code>lpstat -p</code>
+        <strong>Chrome:</strong> Hedef <strong>POS-80C</strong>. Kağıt boyutu küçük kare (2,125 inç) ise
+        Mac’te yazıcıya <strong>80mm termal rulo</strong> tanımlayın; Chrome’da en geniş rulo seçin.
+        <code>lpstat -p -d</code>
       </p>
     </div>
   );
