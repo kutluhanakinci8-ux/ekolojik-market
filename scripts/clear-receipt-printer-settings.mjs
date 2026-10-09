@@ -19,8 +19,9 @@ function storePath(id) {
   return id === 'main' ? join(dataDir, 'store.json') : join(dataDir, 'tenants', id, 'store.json');
 }
 
+/** main silinmez — Greenleaf kasa ayarı restore script ile yönetilir */
 const tenants =
-  tenant === 'all' ? ['main', 'lima-market'] : [tenant];
+  tenant === 'all' ? ['lima-market'] : [tenant];
 
 for (const id of tenants) {
   const path = storePath(id);

@@ -8,16 +8,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const ZYWELL_PRESET = {
-  enabled: true,
-  brand: 'zywell',
-  windowsPrinterName: 'POS-80C',
-  paperWidthMm: 58,
-  pageMarginMm: 0,
-  autoPrintOnSale: true,
-  copies: 1,
-  printMode: 'plain',
-};
+import { GREENLEAF_KASA_RECEIPT_PRESET } from './restore-greenleaf-receipt-settings.mjs';
+
+const ZYWELL_PRESET = { ...GREENLEAF_KASA_RECEIPT_PRESET };
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -45,14 +38,13 @@ const sourcePrinter =
   ?? (sourceTenant === 'main' ? ZYWELL_PRESET : null)
   ?? ZYWELL_PRESET;
 
-if (!sourceStore.settings?.receiptPrinter && sourceTenant === 'main') {
-  sourceStore.settings = { ...(sourceStore.settings ?? {}), receiptPrinter: sourcePrinter };
-  sourceStore.updatedAt = new Date().toISOString();
-  await writeFile(sourcePath, JSON.stringify(sourceStore, null, 2));
-  console.log(`OK   ${sourceTenant}: Zywell fiş yazıcı ayarı yazıldı`);
-}
-
-const mergedPrinter = { ...ZYWELL_PRESET, ...sourcePrinter, printMode: sourcePrinter.printMode ?? ZYWELL_PRESET.printMode };
+/** main store'a otomatik yazma — Lima düzeltmeleri Greenleaf'i bozmasın */
+const mergedPrinter = {
+  ...ZYWELL_PRESET,
+  ...sourcePrinter,
+  enabled: false,
+  printMode: sourcePrinter.printMode === 'plain' ? 'plain' : 'html',
+};
 targetStore.settings = {
   ...(targetStore.settings ?? {}),
   receiptPrinter: mergedPrinter,
@@ -60,5 +52,5 @@ targetStore.settings = {
 targetStore.updatedAt = new Date().toISOString();
 await writeFile(targetPath, JSON.stringify(targetStore, null, 2));
 
-console.log(`OK   ${targetTenant}: fiş yazıcı ayarı kopyalandı`);
+console.log(`OK   ${targetTenant}: fiş yazıcı ayarı kopyalandı (gelişmiş profil kapalı)`);
 console.log(JSON.stringify(targetStore.settings.receiptPrinter, null, 2));

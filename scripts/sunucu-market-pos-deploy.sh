@@ -111,6 +111,9 @@ echo "==> Sunucu verisi: irsaliye stokları..."
 node "${APP_SRC}/scripts/apply-irsaliye-stock.mjs" "${INSTALL_DIR}/data" || echo "    (veri migrasyonu atlandı — data/ henüz yok olabilir)"
 echo "==> Sunucu verisi: Posta onboarding (Faz 3)..."
 node "${APP_SRC}/scripts/migrate-posta-onboarding.mjs" "${INSTALL_DIR}/data" || echo "    (posta onboarding migrasyonu atlandı)"
+echo "==> Greenleaf (main): kasa fiş ayarı geri yükleme..."
+node "${APP_SRC}/scripts/restore-greenleaf-receipt-settings.mjs" --data-dir "${INSTALL_DIR}/data" --tenant main" \
+  || echo "    (main fiş ayarı atlandı)"
 echo "==> Lima Market: receiptPrinter sunucu kaydı temizliği..."
 node "${APP_SRC}/scripts/clear-receipt-printer-settings.mjs" --data-dir "${INSTALL_DIR}/data" --tenant lima-market" \
   || echo "    (lima receiptPrinter temizliği atlandı)"
