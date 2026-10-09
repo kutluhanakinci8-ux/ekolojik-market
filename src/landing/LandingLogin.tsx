@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
+import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
 import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId } from '../storage/tenantSession';
 
 type LoginMode = 'password' | 'pin';
@@ -41,6 +42,11 @@ export function LandingLogin() {
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
     if (!fromUrl) return;
+    const claims = decodePosApiTokenClaims(loadPosApiToken());
+    const tokenTenant = claims?.tenantId ?? DEFAULT_TENANT_ID;
+    if (loadPosApiToken() && tokenTenant !== fromUrl) {
+      clearPosApiToken();
+    }
     saveTenantId(fromUrl);
     setTenantId(fromUrl);
     void store.refreshTenantData();

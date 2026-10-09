@@ -22,6 +22,7 @@ import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
 import {
   clearPosApiToken,
+  decodePosApiTokenClaims,
   exchangePosApiToken,
   loadPosApiToken,
   startPosApiTokenRefreshScheduler,
@@ -1103,7 +1104,13 @@ export function useStore() {
   ]);
 
   useEffect(() => {
-    if (!syncReady) return;
+    if (!syncReady || !authSession) return;
+
+    const token = loadPosApiToken();
+    const claims = decodePosApiTokenClaims(token);
+    const tenant = loadTenantId();
+    const tokenTenant = claims?.tenantId ?? DEFAULT_TENANT_ID;
+    if (token && tokenTenant !== tenant) return;
 
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(async () => {
@@ -1115,7 +1122,7 @@ export function useStore() {
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [buildCurrentSnapshot, syncReady]);
+  }, [buildCurrentSnapshot, syncReady, authSession]);
 
   useEffect(() => {
     if (authSession && loadPosApiToken()) {
@@ -2945,6 +2952,7 @@ export function useStore() {
 
   const login = useCallback(async (username: string, password: string, totpCode?: string): Promise<LoginResult> => {
     try {
+      syncPosLocalStorageKeys();
       const normalized = username.trim().toLowerCase();
       const lockCheck = checkLoginAllowed(normalized);
       if (!lockCheck.allowed) {
@@ -2955,7 +2963,34 @@ export function useStore() {
         };
       }
 
-      const user = users.find((item) => item.username === normalized);
+      let user: PosUser | undefined;
+      const remoteAuth = await exchangePosApiToken({ username: normalized, password });
+      if (remoteAuth.ok) {
+        const remote = await fetchStoreSnapshot();
+        if (remote?.users?.length) {
+          const remoteUsers = remote.users.map((u) =>
+            normalizeUser(u as unknown as Record<string, unknown>),
+          );
+          setUsers(remoteUsers);
+          user = remoteUsers.find((item) => item.username === normalized);
+          applySnapshot(remote);
+        }
+      } else {
+        user = users.find((item) => item.username === normalized);
+        const passwordOk =
+          Boolean(user?.passwordHash) && verifyPassword(password, user!.passwordHash);
+        if (!passwordOk) {
+          recordFailedLogin(normalized);
+          await appendLoginAudit({
+            username: normalized,
+            success: false,
+            method: 'password',
+            failureReason: 'Kullanıcı adı veya şifre hatalı',
+          });
+          return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
+        }
+      }
+
       if (user && !user.isActive) {
         await appendLoginAudit({
           userId: user.id,
@@ -2971,13 +3006,7 @@ export function useStore() {
         };
       }
 
-      let passwordOk =
-        Boolean(user?.passwordHash) && verifyPassword(password, user!.passwordHash);
-      if (!passwordOk) {
-        const remoteAuth = await exchangePosApiToken({ username: normalized, password });
-        passwordOk = remoteAuth.ok && Boolean(user);
-      }
-      if (!user || !passwordOk) {
+      if (!user) {
         recordFailedLogin(normalized);
         await appendLoginAudit({
           username: normalized,
@@ -3011,10 +3040,11 @@ export function useStore() {
     } catch {
       return { status: 'error', message: 'Giriş sırasında bir hata oluştu. Sayfayı yenileyip tekrar deneyin.' };
     }
-  }, [users, appendLoginAudit, finalizeLogin]);
+  }, [users, appendLoginAudit, finalizeLogin, applySnapshot]);
 
   const loginWithPin = useCallback(async (username: string, pin: string): Promise<LoginResult> => {
     try {
+      syncPosLocalStorageKeys();
       const normalized = username.trim().toLowerCase();
       if (!isValidPin(pin)) {
         return { status: 'error', message: 'PIN 6 haneli olmalıdır.' };
@@ -3029,7 +3059,33 @@ export function useStore() {
         };
       }
 
-      const user = users.find((item) => item.username === normalized);
+      let user: PosUser | undefined;
+      const remoteAuth = await exchangePosApiToken({ username: normalized, pin });
+      if (remoteAuth.ok) {
+        const remote = await fetchStoreSnapshot();
+        if (remote?.users?.length) {
+          const remoteUsers = remote.users.map((u) =>
+            normalizeUser(u as unknown as Record<string, unknown>),
+          );
+          setUsers(remoteUsers);
+          user = remoteUsers.find((item) => item.username === normalized);
+          applySnapshot(remote);
+        }
+      } else {
+        user = users.find((item) => item.username === normalized);
+        const pinOk = Boolean(user?.pinHash) && verifyPin(pin, user!.pinHash);
+        if (!pinOk) {
+          recordFailedLogin(normalized);
+          await appendLoginAudit({
+            username: normalized,
+            success: false,
+            method: 'pin',
+            failureReason: 'PIN hatalı',
+          });
+          return { status: 'error', message: 'Kullanıcı adı veya PIN hatalı.' };
+        }
+      }
+
       if (user && !user.isActive) {
         await appendLoginAudit({
           userId: user.id,
@@ -3045,12 +3101,7 @@ export function useStore() {
         };
       }
 
-      let pinOk = Boolean(user?.pinHash) && verifyPin(pin, user!.pinHash);
-      if (!pinOk) {
-        const remoteAuth = await exchangePosApiToken({ username: normalized, pin });
-        pinOk = remoteAuth.ok && Boolean(user);
-      }
-      if (!user || !pinOk) {
+      if (!user) {
         recordFailedLogin(normalized);
         await appendLoginAudit({
           username: normalized,
@@ -3066,7 +3117,7 @@ export function useStore() {
     } catch {
       return { status: 'error', message: 'PIN girişi sırasında bir hata oluştu.' };
     }
-  }, [users, appendLoginAudit, finalizeLogin]);
+  }, [users, appendLoginAudit, finalizeLogin, applySnapshot]);
 
   const changePassword = useCallback(async (newPassword: string): Promise<string | null> => {
     if (!authSession) return 'Oturum bulunamadı.';
