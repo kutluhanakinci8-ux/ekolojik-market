@@ -11,10 +11,9 @@ if [[ -f "$BAK" ]]; then
   sudo cp "$BAK" "$FILTER"
   sudo chmod 755 "$FILTER"
 else
-  echo "Yedek yok: $BAK"
-  echo "Kaynaktan yamalı dosyayı yeniden derleyip koyuluk putchar blokunu kaldırın"
-  echo "veya: bash scripts/mac-pos80c-cups-install.sh (önce yamayı patch -R ile geri alın)"
-  exit 1
+  echo "Yedek yok — temiz rastertopos yeniden derleniyor..."
+  DIR="$(cd "$(dirname "$0")" && pwd)"
+  exec bash "$DIR/mac-pos80c-rebuild-clean.sh"
 fi
 
 sudo launchctl kickstart -k system/org.cups.cupsd 2>/dev/null || true

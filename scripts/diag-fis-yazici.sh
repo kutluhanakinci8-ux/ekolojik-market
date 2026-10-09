@@ -73,9 +73,9 @@ cat <<'MAC'
   lpoptions -p Printer_POS_80C 2>/dev/null || lpoptions -p POS-80C 2>/dev/null || lpoptions -d
   # Erken kesim: Cutting=1 sayfa sonu (yanlis uzunlukta keser). Belge sonu icin:
   # sudo lpoptions -p Printer_POS_80C -o Cutting=2Cutattheendofdocument
-  # Baslikta c0/çöp: rastertopos koyuluk yamasi ESC kaciyorsa — yedek surucu:
-  # sudo cp /usr/libexec/cups/filter/rastertopos.bak /usr/libexec/cups/filter/rastertopos 2>/dev/null || true
-  # (mac-pos80c-cups-install.sh yedegi yoksa yamayi geri alip rastertopos yeniden derleyin)
+  # c0/Ç0 + LIMA bozuk: Mac'te temiz surucu (VPS'te pm2 yok):
+  #   bash scripts/mac-pos80c-rebuild-clean.sh
+  #   bash scripts/mac-pos80c-smoke-test.sh
   sudo tail -f /var/log/cups/error_log
   lpstat -o
 

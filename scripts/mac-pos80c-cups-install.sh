@@ -19,13 +19,16 @@ cd "$WORKDIR"
 unzip -qo "$ZIP"
 SRC="$WORKDIR/Hoin-POS-58-80-master"
 
-echo "→ Baski yogunlugu (ESC/POS) yaması..."
-DARK_PATCH="${DARK_PATCH:-$(dirname "$0")/mac-rastertopos-darkness.patch}"
-if [[ -f "$DARK_PATCH" ]]; then
-  (cd "$SRC" && patch -p1 -N -r - < "$DARK_PATCH") || true
-elif ! grep -q 'POS-80C: koyu' "$SRC/rastertopos/rastertopos.c" 2>/dev/null; then
-  perl -i.bak -0pe 's/(putchar\(0x40\);\n)/$1\t\/* POS-80C: koyu baski *\/\n\tputchar(0x1b);\n\tputchar('"'"'7'"'"');\n\tputchar(128);\n\tputchar(150);\n\tputchar(2);\n/s' \
-    "$SRC/rastertopos/rastertopos.c" || true
+# Varsayılan KAPALI: ESC 7 yamasi baslikta Ç0/c0 ve LIMA bozulmasi yapar (printf | lp testi).
+APPLY_POS80_DARKNESS="${APPLY_POS80_DARKNESS:-0}"
+if [[ "$APPLY_POS80_DARKNESS" == "1" ]]; then
+  echo "→ Baski yogunlugu (ESC/POS) yamasi — APPLY_POS80_DARKNESS=1"
+  DARK_PATCH="${DARK_PATCH:-$(dirname "$0")/mac-rastertopos-darkness.patch}"
+  if [[ -f "$DARK_PATCH" ]]; then
+    (cd "$SRC" && patch -p1 -N -r - < "$DARK_PATCH") || true
+  fi
+else
+  echo "→ Koyuluk yamasi atlandi (temiz rastertopos). Koyu icin: APPLY_POS80_DARKNESS=1"
 fi
 
 cd "$SRC/rastertopos"
@@ -40,8 +43,12 @@ file ./rastertopos | grep -q 'Mach-O' || {
   exit 1
 }
 
-sudo cp ./rastertopos /usr/libexec/cups/filter/rastertopos
-sudo chmod 755 /usr/libexec/cups/filter/rastertopos
+FILTER=/usr/libexec/cups/filter/rastertopos
+if [[ -f "$FILTER" ]]; then
+  sudo cp "$FILTER" "${FILTER}.bak" 2>/dev/null || true
+fi
+sudo cp ./rastertopos "$FILTER"
+sudo chmod 755 "$FILTER"
 
 sudo mkdir -p /Library/Printers/PPDs/Contents/Resources
 sudo cp "$SRC/ppd/pos80.ppd" /Library/Printers/PPDs/Contents/Resources/pos80.ppd
