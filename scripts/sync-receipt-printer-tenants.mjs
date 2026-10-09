@@ -51,9 +51,10 @@ if (!sourceStore.settings?.receiptPrinter && sourceTenant === 'main') {
   console.log(`OK   ${sourceTenant}: Zywell fiş yazıcı ayarı yazıldı`);
 }
 
+const mergedPrinter = { ...ZYWELL_PRESET, ...sourcePrinter, printMode: sourcePrinter.printMode ?? ZYWELL_PRESET.printMode };
 targetStore.settings = {
   ...(targetStore.settings ?? {}),
-  receiptPrinter: { ...sourcePrinter },
+  receiptPrinter: mergedPrinter,
 };
 targetStore.updatedAt = new Date().toISOString();
 await writeFile(targetPath, JSON.stringify(targetStore, null, 2));
