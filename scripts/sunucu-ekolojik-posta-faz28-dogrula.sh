@@ -26,7 +26,8 @@ echo "${ICS_HEAD}" | grep -q 'BEGIN:VCALENDAR' || exit 1
 echo "OK   export.ics"
 
 token="$(node -e "const d=JSON.parse(process.argv[1]);const u=new URL(d.ics.subscribeUrl);console.log(u.searchParams.get('token'));" "$hub")"
-posta_curl "${BASE}/api/posta/calendar/feed.ics?token=${token}" | head -c 40 | grep -q 'BEGIN:VCALENDAR' || exit 1
+FEED_HEAD="$(posta_curl "${BASE}/api/posta/calendar/feed.ics?token=${token}" 2>/dev/null | head -c 40 || true)"
+echo "${FEED_HEAD}" | grep -q 'BEGIN:VCALENDAR' || exit 1
 echo "OK   feed.ics token"
 
 echo "✓ Faz 28 doğrulama geçti"
