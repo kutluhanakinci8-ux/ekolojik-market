@@ -38,6 +38,15 @@ export function LandingLogin() {
     }
   }, [registerState?.message, navigate]);
 
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
+    if (fromUrl) {
+      saveTenantId(fromUrl);
+      setTenantId(fromUrl);
+      void store.refreshTenantData();
+    }
+  }, [store]);
+
   const goToApp = () => {
     navigate('/app', { replace: true });
   };
@@ -49,6 +58,7 @@ export function LandingLogin() {
 
     const resolvedTenant = tenantId.trim() || DEFAULT_TENANT_ID;
     saveTenantId(resolvedTenant);
+    await store.refreshTenantData();
 
     try {
       const result = await store.login(
