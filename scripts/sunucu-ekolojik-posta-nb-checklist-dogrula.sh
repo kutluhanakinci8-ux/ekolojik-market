@@ -26,8 +26,10 @@ curl_ok() {
 }
 
 curl_ok_auth() {
-  # Büyük CSV/ZIP yanıtlarında grep erken çıkınca curl SIGPIPE (23) vermesin
-  curl -fsS -H "$1" "$2" 2>/dev/null | head -c 16384 | grep -q "$3"
+  # Büyük gövdelerde head pipe'ı curl'e SIGPIPE (23) verir — pipefail ile FAIL olmaması için önce kes
+  local body
+  body="$(curl -sS --max-time 45 -H "$1" "$2" 2>/dev/null | head -c 16384)" || true
+  grep -q "$3" <<< "${body}"
 }
 
 curl_ok_auth_retry() {
