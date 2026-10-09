@@ -34,7 +34,7 @@ function parseRange(fromStr, toStr) {
 export async function buildOutboxCsv(dataDir, { from, to } = {}) {
   const { fromDate, toDate, error } = parseRange(from, to);
   if (error) return { ok: false, error };
-  const { pending, sent, failed } = await listRecentOutbox(dataDir, 500);
+  const { pending, sent, failed } = await listRecentOutbox(dataDir, 2000);
   const rows = [...pending, ...sent, ...failed].filter((m) =>
     inRange(m.sentAt || m.createdAt, fromDate, toDate),
   );
