@@ -28,9 +28,10 @@ if(!d.ok || !d.counts) process.exit(1);
 console.log('OK   analytics sent', d.window?.sent ?? 0);
 "
 
-posta_curl -X POST "${BASE}/api/posta/compose/ai-suggest" \
+AI_JSON="$(curl -sS -H "${POSTA_SMOKE_AUTH_H}" -X POST "${BASE}/api/posta/compose/ai-suggest" \
   -H 'Content-Type: application/json' \
-  -d '{"subject":"test"}' | node -e "
+  -d '{"subject":"test","body":"smoke"}')"
+echo "${AI_JSON}" | node -e "
 const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
 if(d.ok) { console.log('OK   ai enabled'); process.exit(0); }
 if(d.error && String(d.error).includes('EKOLOJIK_POSTA_AI')) { console.log('OK   ai disabled default'); process.exit(0); }

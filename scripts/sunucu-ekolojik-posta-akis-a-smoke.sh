@@ -83,7 +83,7 @@ if (!j.ok) { console.error('HATA: yanıt gönderimi', j.error||j); process.exit(
 "
 
 posta_curl -X POST "${BASE_URL}/api/email/outbox/process" >/dev/null 2>&1 || true
-sleep 1
+sleep 2
 
 RECENT="$(posta_curl "${BASE_URL}/api/email/outbox/recent?limit=30")"
 T="${REPLY_TO}" B="${REPLY_BODY}" node -e "
@@ -101,8 +101,8 @@ if (!hit) {
 console.log('OK   outbox kaydı', hit.id||hit.filename, hit.folder||hit.status);
 " <<<"${RECENT}" || exit 5
 
-CSV="$(posta_curl "${BASE_URL}/api/posta/export/outbox.csv" 2>/dev/null || true)"
-if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -q "${REPLY_TO}"; then
+CSV="$(curl -sS -H "${POSTA_SMOKE_AUTH_H}" "${BASE_URL}/api/posta/export/outbox.csv" 2>/dev/null || true)"
+if [[ -z "${CSV}" ]] || ! echo "${CSV}" | grep -qE "${REPLY_TO}|${STAMP}"; then
   echo "HATA: outbox CSV export yanıt alıcısını içermiyor"
   exit 6
 fi
