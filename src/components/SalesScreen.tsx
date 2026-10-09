@@ -23,8 +23,6 @@ import { usePosBarcodeWedge } from '../hooks/usePosBarcodeWedge';
 import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
-import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
-import { shouldUseGreenleafReceiptPath } from '../utils/greenleafReceipt';
 
 interface SalesScreenProps {
   store: Store;
@@ -229,14 +227,6 @@ export function SalesScreen({ store }: SalesScreenProps) {
     }
 
     const receiptPayment = method === 'split' ? 'card' : method;
-    const useGreenleafReceiptPath = shouldUseGreenleafReceiptPath(store.settings);
-    const receiptPrinter = normalizeReceiptPrinterSettings(store.settings.receiptPrinter);
-    const useAdvancedReceiptPrinter =
-      !useGreenleafReceiptPath
-      && receiptPrinter.enabled
-      && receiptPrinter.autoPrintOnSale
-      && receiptPrinter.brand !== 'none';
-
     if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
       const receiptData = buildReceiptFromCart(
         paidItems,
@@ -247,11 +237,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
         { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
         store.productSets,
       );
-      if (useGreenleafReceiptPath) {
-        await printThermalReceipt(receiptData);
-      } else if (useAdvancedReceiptPrinter) {
-        await printThermalReceipt(receiptData, receiptPrinter);
-      }
+      await printThermalReceipt(receiptData);
     }
 
     const methodLabel = samplesOnly

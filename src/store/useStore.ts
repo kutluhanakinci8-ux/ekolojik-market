@@ -197,6 +197,7 @@ import {
 import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import { sanitizeReceiptPrinterSettings } from '../utils/greenleafReceipt';
 
 function storageKeys() {
   return posLocalStorageKeys();
@@ -513,7 +514,10 @@ function loadSettings(): AppSettings {
         customExpenseCategories: normalizeCustomExpenseCategories(parsed.customExpenseCategories),
         crm: { ...DEFAULT_CRM_SETTINGS, ...(parsed.crm ?? {}), automationEnabled: parsed.crm?.automationEnabled ?? DEFAULT_CRM_SETTINGS.automationEnabled },
         posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(parsed.posCheckout ?? {}) },
-        receiptPrinter: normalizeReceiptPrinterSettings(parsed.receiptPrinter),
+        receiptPrinter: sanitizeReceiptPrinterSettings({
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+        } as AppSettings),
       };
     } catch {
       return DEFAULT_SETTINGS;
@@ -959,7 +963,7 @@ export function useStore() {
       ),
       crm: { ...DEFAULT_CRM_SETTINGS, ...(snapshot.settings?.crm ?? {}) },
       posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(snapshot.settings?.posCheckout ?? {}) },
-      receiptPrinter: normalizeReceiptPrinterSettings(snapshot.settings?.receiptPrinter),
+      receiptPrinter: sanitizeReceiptPrinterSettings(mergedSettings),
     });
     if (snapshot.priceType) setPriceType(snapshot.priceType);
     setUsers(resolveUsersFromSnapshot(snapshot, mergedSettings));

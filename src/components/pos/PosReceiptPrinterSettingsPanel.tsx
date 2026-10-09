@@ -17,8 +17,8 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
       <section className="settings-panel settings-panel--receipt-printer">
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
-          Lima Market, <strong>yonetici / Kutluhan Akıncı</strong> (main) kasası ile aynı fiş kodunu kullanır:
-          HTML 80&nbsp;mm, gizli iframe, Chrome → <strong>POS-80C</strong>. Burada ek ayar yok.
+          Lima Market (<strong>limaadmin</strong>) için fiş: satış sonrası otomatik, ek ayar yok.
+          Chrome → <strong>POS-80C</strong> (Greenleaf kasadakiyle aynı kod).
         </p>
       </section>
     );
