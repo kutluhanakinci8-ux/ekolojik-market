@@ -40,7 +40,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
             checked={printer.enabled}
             onChange={(e) => set({ enabled: e.target.checked })}
           />
-          <span>Termal fiş yazdırma açık</span>
+          <span>Gelişmiş fiş profili (kapalı = Greenleaf kasa yolu, önerilen)</span>
         </label>
         <label className="settings-check">
           <input
@@ -101,12 +101,8 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         </label>
       </div>
       <p className="module-hint">
-        Bu paneldeki ayarlar fişe uygulanır (kağıt {printer.paperWidthMm} mm, kenar boşluğu{' '}
-        {printer.pageMarginMm} mm, format: {printer.printMode === 'plain' ? 'düz metin' : 'HTML'}).
-        Chrome yazdır penceresinde bir kez ayarlayın: <strong>Hedef = {printer.windowsPrinterName || 'POS-80C'}</strong>,
-        <strong> Üst ve alt bilgiler = Kapalı</strong>, <strong>Kenar boşlukları = Yok</strong>,{' '}
-        <strong>Ölçek = Sayfa genişliğine sığdır</strong>. Üstte URL/SIM satırı görünüyorsa “Üst ve alt bilgiler”
-        açıktır.
+        <strong>Kapalı</strong> bırakın: diğer kullanıcıdaki (yonetici) gibi HTML fiş + Chrome + POS-80C.
+        Sadece özel ihtiyaçta açın. Chrome: hedef POS-80C, üst/alt bilgiler kapalı, kenar yok, sayfa genişliğine sığdır.
       </p>
     </section>
   );

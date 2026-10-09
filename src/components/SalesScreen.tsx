@@ -229,16 +229,20 @@ export function SalesScreen({ store }: SalesScreenProps) {
 
     const receiptPayment = method === 'split' ? 'card' : method;
     const receiptPrinterRaw = store.settings.receiptPrinter;
-    const receiptPrinter = normalizeReceiptPrinterSettings(receiptPrinterRaw);
-    const legacyAutoPrint = receiptPrinterRaw == null;
+    const receiptPrinter = receiptPrinterRaw
+      ? normalizeReceiptPrinterSettings(receiptPrinterRaw)
+      : null;
+    /** Greenleaf kasa yolu: ayar yok veya «kapalı» → HTML 80mm (POS-80C + Chrome, diğer kullanıcı) */
+    const useGreenleafReceiptPath =
+      receiptPrinter == null || receiptPrinter.enabled === false;
     const shouldPrintThermal =
       !samplesOnly
       && method !== 'credit'
       && !fiscalPrinted
-      && (legacyAutoPrint
-        || (receiptPrinter.enabled
-          && receiptPrinter.autoPrintOnSale
-          && receiptPrinter.brand !== 'none'));
+      && (useGreenleafReceiptPath
+        || (receiptPrinter!.enabled
+          && receiptPrinter!.autoPrintOnSale
+          && receiptPrinter!.brand !== 'none'));
     if (shouldPrintThermal) {
       const receiptData = buildReceiptFromCart(
         paidItems,
@@ -249,9 +253,18 @@ export function SalesScreen({ store }: SalesScreenProps) {
         { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
         store.productSets,
       );
-      await printThermalReceipt(receiptData, {
-        ...receiptPrinter,
-      });
+      await printThermalReceipt(
+        receiptData,
+        useGreenleafReceiptPath
+          ? {
+              brand: 'none',
+              paperWidthMm: 80,
+              printMode: 'html',
+              pageMarginMm: 0,
+              copies: 1,
+            }
+          : receiptPrinter!,
+      );
     }
 
     const methodLabel = samplesOnly

@@ -19,13 +19,13 @@ export interface ReceiptPrinterSettings {
 
 /** Greenleaf kasada kullanılan Zywell 80mm termal varsayılanı */
 export const DEFAULT_ZYWELL_RECEIPT_PRINTER: ReceiptPrinterSettings = {
-  enabled: true,
+  enabled: false,
   brand: 'zywell',
   windowsPrinterName: 'POS-80C',
   paperWidthMm: 58,
   autoPrintOnSale: true,
   copies: 1,
-  printMode: 'plain',
+  printMode: 'html',
   pageMarginMm: 0,
 };
 

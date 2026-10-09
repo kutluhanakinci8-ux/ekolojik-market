@@ -293,7 +293,7 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <title>İade Fişi ${data.returnId}</title>
+  <title>${BLANK_PRINT_TITLE}</title>
   <style>
     ${receiptBaseStyles(paperWidthMm)}
     .return-banner {
@@ -475,10 +475,7 @@ export async function printThermalReceipt(
   const paper = normalized.paperWidthMm;
   const copies = normalized.copies;
   const margin = normalized.pageMarginMm;
-  const mode =
-    normalized.brand === 'zywell' || normalized.brand === 'generic'
-      ? 'plain'
-      : normalized.printMode;
+  const mode = normalized.printMode === 'plain' ? 'plain' : 'html';
   const html =
     mode === 'plain'
       ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(data), paper, margin)
