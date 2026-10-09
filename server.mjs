@@ -16,6 +16,7 @@ import {
 } from './server/tenantAuth.mjs';
 import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
+import { shouldSkipIrsaliyeStockMigration } from './server/tenantStoreGuard.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
 import {
   getEkolojikMailConfig,
@@ -321,7 +322,7 @@ async function readStoreData(tenantId = 'main') {
 
   let persist = false;
 
-  if (data?.products?.length) {
+  if (data?.products?.length && !shouldSkipIrsaliyeStockMigration(tenantId, data)) {
     const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
     data = snapshot;
     if (stockChanged) persist = true;
