@@ -159,7 +159,7 @@ const movements = LIMA_PRODUCTS.map((p) => ({
 }));
 store.products = LIMA_PRODUCTS;
 store.stockMovements = [...movements, ...(store.stockMovements ?? [])].slice(0, 500);
-store.productSets = store.productSets ?? [];
+store.productSets = [];
 store.settings = {
   ...store.settings,
   businessName: store.settings?.businessName?.trim() || 'Lima Market',

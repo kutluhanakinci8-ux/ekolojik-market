@@ -28,11 +28,30 @@ function looksLikeGreenleafBulk(products) {
  * @param {string} tenantId
  * @param {object|null} store
  */
+/** Set kalemleri tenant kataloğunda yoksa (Greenleaf setleri) gösterilmez */
+export function filterProductSetsForCatalog(products, productSets) {
+  if (!Array.isArray(productSets) || productSets.length === 0) return [];
+  const ids = new Set((products ?? []).map((p) => Number(p?.id)));
+  if (ids.size === 0) return [];
+  return productSets.filter((set) => {
+    const items = set?.items ?? [];
+    if (!items.length) return false;
+    return items.every((line) => ids.has(Number(line?.productId)));
+  });
+}
+
 export function sanitizeIsolatedTenantStoreRead(tenantId, store) {
   if (!isIsolatedTenant(tenantId) || !store || typeof store !== 'object') return store;
+  let next = store;
   const products = store.products;
-  if (!looksLikeGreenleafBulk(products)) return store;
-  return { ...store, products: [] };
+  if (looksLikeGreenleafBulk(products)) {
+    next = { ...next, products: [] };
+  }
+  const sets = filterProductSetsForCatalog(next.products, next.productSets);
+  if (sets.length !== (next.productSets?.length ?? 0)) {
+    next = { ...next, productSets: sets };
+  }
+  return next;
 }
 
 /**

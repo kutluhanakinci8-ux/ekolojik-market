@@ -24,6 +24,7 @@ import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFe
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import {
   categoriesForTenantSales,
+  filterTenantProductSets,
   isTenantCatalogIsolated,
   resolveEffectiveTenantId,
 } from '../utils/tenantCatalogIsolation';
@@ -98,9 +99,16 @@ export function SalesScreen({ store }: SalesScreenProps) {
 
   const parsedSearch = useMemo(() => parseProductSearch(search), [search]);
 
+  const tenantSets = useMemo(
+    () =>
+      posLiteCheckout
+        ? filterTenantProductSets(store.products, store.productSets)
+        : store.productSets,
+    [store.productSets, store.products, posLiteCheckout],
+  );
   const activeSets = useMemo(
-    () => store.productSets.filter((set) => set.isActive),
-    [store.productSets],
+    () => tenantSets.filter((set) => set.isActive),
+    [tenantSets],
   );
 
   const effectiveCategory = category === 'all' && parsedSearch.categoryId

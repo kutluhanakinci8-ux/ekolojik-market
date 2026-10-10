@@ -3,6 +3,7 @@ import { CATEGORIES, getCategoryLabel, type Category } from '../data/categories'
 import { SEED_PRODUCTS } from '../data/seedProducts';
 import type { AppSettings } from '../types/business';
 import type { Product } from '../types/product';
+import type { ProductSet } from '../types/productSet';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 import { decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
 import { isPosLiteProfile } from './tenantProductProfile';
@@ -64,6 +65,17 @@ export function coerceTenantCatalogProducts(
   return filtered.length > 0 ? filtered : list.filter((p) => Number(p.id) > 200);
 }
 
+/** Greenleaf setleri — tenant kataloğunda olmayan ürün ID’leri */
+export function filterTenantProductSets(products: Product[], productSets: ProductSet[]): ProductSet[] {
+  if (!productSets.length || !products.length) return [];
+  const ids = new Set(products.map((p) => p.id));
+  return productSets.filter((set) => {
+    const items = set.items ?? [];
+    if (!items.length) return false;
+    return items.every((line) => ids.has(line.productId));
+  });
+}
+
 export function categoriesForTenantSales(
   products: Product[],
   setCount: number,
@@ -75,7 +87,7 @@ export function categoriesForTenantSales(
   const base = CATEGORIES.filter((cat) => {
     if (cat.id === 'all') return true;
     if (cat.id === 'setler') return setCount > 0;
-    return (used.has(cat.id));
+    return used.has(cat.id);
   });
 
   for (const catId of used) {
@@ -83,5 +95,14 @@ export function categoriesForTenantSales(
       base.push({ id: catId, label: getCategoryLabel(catId), icon: '🏷️' });
     }
   }
-  return base;
+
+  // Tek kategori varsa "Limo" vb. gereksiz sekme gösterme — yalnızca Tümü
+  const productCats = base.filter((c) => c.id !== 'all' && c.id !== 'setler');
+  if (productCats.length === 1 && setCount === 0) {
+    return base.filter((c) => c.id === 'all');
+  }
+
+  return base.map((c) =>
+    c.id === 'limo' ? { ...c, label: 'Ürünler', icon: '🧴' } : c,
+  );
 }
