@@ -724,6 +724,14 @@ export function StockScreen({ store }: StockScreenProps) {
           store.updateProductBarcode(productId, barcode);
           showToast('Barkod kaydedildi');
         }}
+        onUploadImage={(productId, imageUrl) => {
+          store.updateProductImage(productId, imageUrl);
+          showToast('Ürün fotoğrafı kaydedildi');
+        }}
+        onRemoveImage={(productId) => {
+          store.removeProductImage(productId);
+          showToast('Ürün fotoğrafı kaldırıldı');
+        }}
       />
 
       {bulkWholesaleOpen && (

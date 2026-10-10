@@ -4,6 +4,7 @@ import { getCategoryLabel } from '../data/categories';
 import type { Product, WholesalePrices } from '../types/product';
 import type { ProductSet, ProductSetItem } from '../types/productSet';
 import { ProductImage } from './ProductImage';
+import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
 import './StockOperationsModal.css';
 
@@ -34,6 +35,8 @@ interface StockOperationsModalProps {
   onAdjustSetStock: (setId: string, delta: number, note?: string) => void;
   onRemoveSet: (setId: string) => void;
   onUpdateBarcode?: (productId: number, barcode: string) => void;
+  onUploadImage?: (productId: number, imageUrl: string) => void;
+  onRemoveImage?: (productId: number) => void;
 }
 
 const OPERATIONS: Array<{
@@ -94,6 +97,8 @@ export function StockOperationsModal({
   onAdjustSetStock,
   onRemoveSet,
   onUpdateBarcode,
+  onUploadImage,
+  onRemoveImage,
 }: StockOperationsModalProps) {
   const [operation, setOperation] = useState<StockOperationType>(initialOperation);
   const [productId, setProductId] = useState('');
@@ -295,7 +300,40 @@ export function StockOperationsModal({
 
             {selectedProduct ? (
               <div className="stock-ops-dialog__selected">
-                <ProductImage product={selectedProduct} size="md" />
+                <div className="stock-ops-dialog__photo-col">
+                  <ProductImage
+                    product={selectedProduct}
+                    size="lg"
+                    editable={Boolean(onUploadImage)}
+                    onUpload={onUploadImage}
+                    onRemove={onRemoveImage}
+                  />
+                  {onUploadImage && (
+                    <div className="stock-ops-dialog__photo-actions">
+                      <button
+                        type="button"
+                        className="stock-ops-dialog__photo-btn"
+                        onClick={() => {
+                          const input = document.querySelector(
+                            '.stock-ops-dialog__selected .image-upload-input',
+                          ) as HTMLInputElement | null;
+                          input?.click();
+                        }}
+                      >
+                        📷 {isCustomImage(selectedProduct) ? 'Fotoğrafı değiştir' : 'Fotoğraf ekle'}
+                      </button>
+                      {isCustomImage(selectedProduct) && onRemoveImage && (
+                        <button
+                          type="button"
+                          className="stock-ops-dialog__photo-btn stock-ops-dialog__photo-btn--muted"
+                          onClick={() => onRemoveImage(selectedProduct.id)}
+                        >
+                          Kaldır
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="stock-ops-dialog__selected-info">
                   <div className="stock-ops-dialog__selected-top">
                     <span className="stock-cat-pill">{getCategoryLabel(selectedProduct.category)}</span>

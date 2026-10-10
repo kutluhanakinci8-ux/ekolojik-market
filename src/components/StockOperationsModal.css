@@ -272,14 +272,57 @@
 
 .stock-ops-dialog__selected {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
   gap: 14px;
-  align-items: center;
+  align-items: start;
   margin-bottom: 16px;
   padding: 14px 16px;
   border: 1px solid rgba(34, 84, 61, 0.14);
   border-radius: 16px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fcf7 100%);
+}
+
+.stock-ops-dialog__photo-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 112px;
+}
+
+.stock-ops-dialog__photo-col .product-image-lg {
+  width: 96px;
+  height: 96px;
+}
+
+.stock-ops-dialog__photo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.stock-ops-dialog__photo-btn {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #c8e6c4;
+  border-radius: 10px;
+  background: #fff;
+  color: #2d6b28;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.stock-ops-dialog__photo-btn:hover {
+  border-color: #3dad35;
+  background: #f0f9ee;
+}
+
+.stock-ops-dialog__photo-btn--muted {
+  color: #64748b;
+  font-weight: 600;
 }
 
 .stock-ops-dialog__selected-info h3 {
