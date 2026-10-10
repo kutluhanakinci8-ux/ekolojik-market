@@ -15,12 +15,20 @@ const MAIN_DEMO_PRODUCT_IDS = new Set<number>([
 
 export const MAIN_GREENLEAF_CATALOG_MIN = 30;
 
+function isLimaBrandedSettings(settings?: AppSettings | null): boolean {
+  const name = (settings?.businessName ?? '').trim().toLowerCase();
+  return name.includes('lima');
+}
+
+/** main tenant anahtarında yanlışlıkla Lima ayarı + Greenleaf kataloğu birleşmesini engelle */
 export function isTenantCatalogIsolated(
   tenantId: string = loadTenantId(),
   settings?: AppSettings | null,
 ): boolean {
   if (tenantId && tenantId !== DEFAULT_TENANT_ID) return true;
-  return isPosLiteProfile(settings);
+  if (isPosLiteProfile(settings)) return true;
+  if (isLimaBrandedSettings(settings)) return true;
+  return false;
 }
 
 export function resolveEffectiveTenantId(): string {
