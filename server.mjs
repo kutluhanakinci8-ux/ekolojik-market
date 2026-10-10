@@ -2960,6 +2960,33 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/pos/lima-thermal-print/health' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const port = Number(process.env.LIMA_RAW_PRINT_PORT || 18765);
+      try {
+        const probe = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) });
+        const data = await probe.json().catch(() => ({}));
+        res.writeHead(probe.ok ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: probe.ok, bridge: data }));
+      } catch (error) {
+        res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: String(error) }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/pos/lima-thermal-print' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const body = await readRequestBody(req);
+      const { forwardLimaThermalPrint } = await import('./server/limaThermalPrint.mjs');
+      const result = await forwardLimaThermalPrint(body);
+      res.writeHead(result.ok ? 200 : result.status || 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
     if (pathname === '/api/data' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
       if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;

@@ -173,9 +173,21 @@ else
   exit 1
 fi
 
+echo "==> Lima ham fiş köprüsü (sessiz termal)..."
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 delete lima-receipt-bridge 2>/dev/null || true
+  POS80_QUEUE_NAME="${POS80_QUEUE_NAME:-Printer_POS_80C}" \
+    pm2 start "${REPO_ROOT}/scripts/lima-raw-print-bridge.mjs" \
+    --name lima-receipt-bridge \
+    --cwd "${REPO_ROOT}" \
+    --interpreter node || echo "    UYARI: lima-receipt-bridge başlatılamadı"
+  pm2 save 2>/dev/null || true
+else
+  echo "    pm2 yok — köprü: node ${REPO_ROOT}/scripts/lima-raw-print-bridge.mjs"
+fi
+
 echo "Not: Mali yazıcı köprüsü (inpos-bridge) VPS'te çalışmaz."
-echo "     Kasa bilgisayarında (Windows): ${APP_SRC}/inpos-bridge"
-echo "     cd inpos-bridge && npm install && npm start"
+echo "     Kasa USB yazıcı (Windows): ${REPO_ROOT}/scripts/start-lima-receipt-bridge.bat"
 
 if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
   echo ""

@@ -27,11 +27,12 @@ function escposPayload(text) {
   return Buffer.concat([init, body, cut]);
 }
 
-function lpRaw(buffer) {
+function lpRaw(buffer, queueName) {
+  const q = queueName || QUEUE;
   return new Promise((resolve, reject) => {
     const file = join(tmpdir(), `lima-raw-${Date.now()}.bin`);
     writeFileSync(file, buffer);
-    const child = spawn('lp', ['-d', QUEUE, '-o', 'raw', file], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('lp', ['-d', q, '-o', 'raw', file], { stdio: ['ignore', 'pipe', 'pipe'] });
     let err = '';
     child.stderr.on('data', (c) => {
       err += c;
@@ -48,14 +49,15 @@ function lpRaw(buffer) {
   });
 }
 
-function winRaw(buffer) {
+function winRaw(buffer, queueName) {
+  const q = queueName || QUEUE;
   return new Promise((resolve, reject) => {
     const file = join(tmpdir(), `lima-raw-${Date.now()}.bin`);
     writeFileSync(file, buffer);
     const ps1 = join(REPO_ROOT, 'scripts', 'win-raw-escpos.ps1');
     const child = spawn(
       'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-PrinterName', QUEUE, '-FilePath', file],
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-PrinterName', q, '-FilePath', file],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let err = '';
@@ -74,10 +76,10 @@ function winRaw(buffer) {
   });
 }
 
-async function sendRaw(buffer) {
-  if (platform() === 'win32') return winRaw(buffer);
-  if (platform() === 'darwin') return lpRaw(buffer);
-  return lpRaw(buffer);
+async function sendRaw(buffer, queueName) {
+  if (platform() === 'win32') return winRaw(buffer, queueName);
+  if (platform() === 'darwin') return lpRaw(buffer, queueName);
+  return lpRaw(buffer, queueName);
 }
 
 const server = createServer(async (req, res) => {
@@ -115,9 +117,10 @@ const server = createServer(async (req, res) => {
   }
 
   try {
-    await sendRaw(escposPayload(body.text ?? ''));
+    const printer = body.printer ? String(body.printer).trim() : '';
+    await sendRaw(escposPayload(body.text ?? ''), printer || QUEUE);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true }));
+    res.end(JSON.stringify({ ok: true, queue: printer || QUEUE }));
   } catch (e) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: String(e) }));

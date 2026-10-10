@@ -6,7 +6,7 @@ import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
 import { remindSilentReceiptBridgeMissing } from './receiptPrintBridgeReminder';
-import { tryLimaMacRawReceiptPrint } from './limaMacRawPrint';
+import { tryLimaRawReceiptPrint } from './limaRawReceiptPrint';
 import { applyRetailVat } from './productPricing';
 import { DEFAULT_VAT_RATE, roundMoney } from './vatAnalytics';
 
@@ -938,55 +938,12 @@ export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
     .replace('</body>', `${buildReceiptPrintScript(80)}\n</body>`);
 }
 
-const RECEIPT_PRINT_WINDOW_NAME = 'lima-market-receipt-print';
-
 /** 80 mm ≈ 302px — gizli iframe yedek (ana sayfa ile bindirme riski) */
 const THERMAL_PRINT_IFRAME_STYLE =
   'position:fixed;left:0;top:0;width:302px;min-height:400px;height:auto;border:0;margin:0;padding:0;z-index:2147483646;background:#fff;pointer-events:none;overflow:visible;';
 
-/** Sadece fiş HTML — küçük popup (POS arka planı basılmaz) */
-function printHtmlReceiptIsolatedWindow(html: string): Promise<void> {
-  return new Promise((resolve) => {
-    logReceiptPrint('classic-premium-window-start', { htmlBytes: html.length });
-    const features =
-      'popup=yes,width=340,height=720,left=60,top=40,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
-    const win = window.open('', RECEIPT_PRINT_WINDOW_NAME, features) as ReceiptPrintWindow | null;
-    if (!win) {
-      logReceiptPrint('popup-blocked', { fallback: 'iframe' });
-      void printHtmlReceiptClassicIframe(html).then(resolve);
-      return;
-    }
-
-    let finished = false;
-    const cleanup = () => {
-      if (finished) return;
-      finished = true;
-      logReceiptPrint('classic-done');
-      try {
-        win.close();
-      } catch {
-        /* ignore */
-      }
-      resolve();
-    };
-
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-    win.document.title = BLANK_PRINT_TITLE;
-
-    win.addEventListener('beforeprint', () => {
-      applyReceiptPageHeightInWindow(win);
-      logReceiptPrint('beforeprint');
-    });
-    win.addEventListener('afterprint', cleanup, { once: true });
-    setTimeout(cleanup, 60_000);
-    scheduleThermalPrintInWindow(win, cleanup);
-  });
-}
-
-/** Görünmez iframe yedek */
-function printHtmlReceiptClassicIframe(html: string): Promise<void> {
+/** Görünmez iframe — ayrı popup penceresi açmaz (yine de bazı tarayıcılarda diyalog çıkabilir) */
+export function printHtmlReceiptClassicIframe(html: string): Promise<void> {
   return new Promise((resolve) => {
     logReceiptPrint('classic-premium-iframe-start', { htmlBytes: html.length });
     const iframe = document.createElement('iframe');
@@ -1111,13 +1068,14 @@ export async function printTestSaleReceipt(businessName: string): Promise<void> 
 export async function printThermalReceipt(
   data: SaleReceiptData,
   options?: ThermalReceiptPrintOptions,
+  printerName = 'Printer POS-80C',
 ): Promise<void> {
   const receipt = withSaleReceiptVatBreakdown(data);
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: receipt.saleId, items: receipt.items.length });
     const plainNoSacrifice = buildPlainTextSaleReceipt(receipt);
     const limaSilent = isLimaBrandedReceipt(receipt.businessName);
-    const rawOk = await tryLimaMacRawReceiptPrint(plainNoSacrifice);
+    const rawOk = await tryLimaRawReceiptPrint(plainNoSacrifice, printerName);
     if (rawOk) {
       logReceiptPrint('thermal-raw-escpos-ok', { saleId: receipt.saleId });
       return;
@@ -1128,7 +1086,7 @@ export async function printThermalReceipt(
       return;
     }
     remindChromeReceiptPrintSettings();
-    await printHtmlReceiptIsolatedWindow(buildGreenleafPremiumReceiptHtml(receipt));
+    await printHtmlReceiptClassicIframe(buildGreenleafPremiumReceiptHtml(receipt));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);

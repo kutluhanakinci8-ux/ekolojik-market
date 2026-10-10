@@ -9,10 +9,11 @@ export function remindSilentReceiptBridgeMissing(): void {
     return;
   }
   window.alert(
-    'Sessiz fiş yazdırılamadı — yerel köprü çalışmıyor.\n\n'
-      + 'Kasa bilgisayarında (POS-80C takılı) bir kez başlatın:\n'
-      + '• Windows: scripts\\start-lima-receipt-bridge.bat\n'
-      + '• Mac: node scripts/lima-raw-print-bridge.mjs\n\n'
-      + 'Pencere açık kalsın. Sonra test satışı yapın — Firefox/Chrome yazdır diyaloğu açılmaz.',
+    'Fiş doğrudan yazıcıya gönderilemedi (köprü kapalı).\n\n'
+      + 'Kasa PC’de bir kez kurun:\n'
+      + '• Windows: scripts\\start-lima-receipt-bridge.bat (açık kalsın)\n'
+      + '   veya scripts\\install-lima-bridge-windows-task.ps1 (otomatik başlatma)\n'
+      + '• Sunucu deploy köprüsü: pm2 lima-receipt-bridge\n\n'
+      + 'Tarayıcı «Yazdır» penceresi Lima’da açılmaz — yalnızca ham ESC/POS.',
   );
 }

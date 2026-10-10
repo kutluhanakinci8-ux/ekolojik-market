@@ -255,7 +255,9 @@ export function SalesScreen({ store }: SalesScreenProps) {
         { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
         store.productSets,
       );
-      await printThermalReceipt(receiptData);
+      const printerName =
+        store.settings.receiptPrinter?.windowsPrinterName?.trim() || 'Printer POS-80C';
+      await printThermalReceipt(receiptData, undefined, printerName);
     }
 
     const methodLabel = samplesOnly
