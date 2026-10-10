@@ -15,23 +15,13 @@ jobs:
     timeout-minutes: 30
     if: github.repository == 'kutluhanakinci8-ux/ekolojik-market'
     steps:
-      - name: VPS secrets kontrolü
+      - name: VPS auth secret kontrolü
         run: |
-          missing=0
-          for key in VPS_SSH_HOST VPS_SSH_USER; do
-            if [ -z "${!key:-}" ]; then
-              echo "::error::GitHub secret eksik: $key"
-              missing=1
-            fi
-          done
           if [ -z "${VPS_SSH_KEY:-}" ] && [ -z "${VPS_SSH_KEY_B64:-}" ] && [ -z "${VPS_SSH_PASS:-}" ]; then
-            echo "::error::GitHub secret eksik: VPS_SSH_KEY, VPS_SSH_KEY_B64 veya VPS_SSH_PASS"
-            missing=1
+            echo "::error::Bu repoda Actions secret yok. kutluhanakinci8-ux/ekolojik-market → Settings → Secrets → VPS_SSH_KEY veya VPS_SSH_PASS (org secret ise bu repoya erişim verin)."
+            exit 1
           fi
-          [ "$missing" -eq 0 ] || exit 1
         env:
-          VPS_SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
-          VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
           VPS_SSH_PASS: ${{ secrets.VPS_SSH_PASS }}
@@ -76,8 +66,8 @@ jobs:
         if: steps.auth.outputs.mode == 'key'
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_SSH_HOST }}
-          username: ${{ secrets.VPS_SSH_USER }}
+          host: ${{ secrets.VPS_SSH_HOST || '168.231.109.27' }}
+          username: ${{ secrets.VPS_SSH_USER || 'root' }}
           key_path: ${{ steps.ssh_key.outputs.key_file }}
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
           command_timeout: 25m
@@ -100,8 +90,8 @@ jobs:
         if: steps.auth.outputs.mode == 'pass'
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_SSH_HOST }}
-          username: ${{ secrets.VPS_SSH_USER }}
+          host: ${{ secrets.VPS_SSH_HOST || '168.231.109.27' }}
+          username: ${{ secrets.VPS_SSH_USER || 'root' }}
           password: ${{ secrets.VPS_SSH_PASS }}
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
           command_timeout: 25m
