@@ -6,6 +6,7 @@ export interface Category {
 
 export const CATEGORIES: Category[] = [
   { id: 'all', label: 'Tümü', icon: '🏪' },
+  { id: 'limo', label: 'Limo', icon: '🍋' },
   { id: 'kisisel-bakim', label: 'Kişisel Bakım', icon: '🧴' },
   { id: 'cilt-bakim', label: 'Cilt Bakımı', icon: '✨' },
   { id: 'temizlik', label: 'Temizlik', icon: '🫧' },

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cffafe"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="#f8fafc"/>
+  <rect x="130" y="50" width="140" height="300" rx="20" fill="url(#bg)" stroke="#0891b2" stroke-width="3"/>
+  <rect x="165" y="28" width="70" height="40" rx="10" fill="#0891b2"/>
+  <text x="200" y="195" text-anchor="middle" font-size="64">>ô</text>
+  <text x="200" y="275" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#164e63">LIMA</text>
+  <text x="200" y="300" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="#155e75">Argan Saç ^ampuan1</text>
+  <text x="200" y="378" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#64748b">400 ml</text>
+</svg>

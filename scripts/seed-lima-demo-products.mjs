@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Lima Market (POS Lite) — 4 deneme ürünü
+ * Lima Market — 4 özgün stok (Greenleaf’ten bağımsız, fotoğraflı)
+ *
  *   node scripts/seed-lima-demo-products.mjs --data-dir /var/www/market-pos/data
  */
-import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -16,114 +17,147 @@ const tenant = arg('tenant') || 'lima-market';
 const path =
   tenant === 'main' ? join(dataDir, 'store.json') : join(dataDir, 'tenants', tenant, 'store.json');
 
-/** Lima deneme seti — barkodları satış ekranında manuel girilebilir */
-const DEMO_PRODUCTS = [
+/** Lima Market kendi kataloğu — id 1001+ main seed ile çakışmaz */
+const LIMA_PRODUCTS = [
   {
     id: 1001,
-    productCode: 'LIMA-001',
-    barcode: '8690631000001',
-    name: 'Organik Zeytinyağı 500 ml',
-    category: 'temizlik',
-    pv: 1,
-    purchasePrice: 85,
-    partnerPrice: 120,
-    fullSalePrice: 149.9,
+    productCode: 'LIMA-LM01',
+    barcode: '8695551001001',
+    name: 'Lima Limon Aromalı Duş Jeli',
+    category: 'limo',
+    pv: 0.5,
+    purchasePrice: 42,
+    partnerPrice: 58,
+    fullSalePrice: 89.9,
     ourPercent: 0,
-    ourPriceWithVat: 149.9,
-    partnerPriceWithVat: 120,
-    boxDimensions: '-',
-    weightKg: 0.5,
+    ourPriceWithVat: 89.9,
+    partnerPriceWithVat: 58,
+    boxDimensions: '40×25×15 cm',
+    weightKg: 0.52,
     desi: 1,
     cargoPerUnit: 0,
     suratTotal: 0,
     arasTotal: 0,
     yurticiTotal: 0,
-    stock: 40,
+    stock: 36,
     isSample: false,
     sampleStock: 0,
+    imageUrl: '/product-images/lima-1001.svg',
   },
   {
     id: 1002,
-    productCode: 'LIMA-002',
-    barcode: '8690631000002',
-    name: 'Tam Buğday Ekmeği',
-    category: 'temizlik',
+    productCode: 'LIMA-LM02',
+    barcode: '8695551001002',
+    name: 'Lima Lavanta Duş Jeli',
+    category: 'limo',
     pv: 0.5,
-    purchasePrice: 12,
-    partnerPrice: 18,
-    fullSalePrice: 24.9,
+    purchasePrice: 44,
+    partnerPrice: 60,
+    fullSalePrice: 92.9,
     ourPercent: 0,
-    ourPriceWithVat: 24.9,
-    partnerPriceWithVat: 18,
-    boxDimensions: '-',
-    weightKg: 0.4,
+    ourPriceWithVat: 92.9,
+    partnerPriceWithVat: 60,
+    boxDimensions: '40×25×15 cm',
+    weightKg: 0.52,
     desi: 1,
     cargoPerUnit: 0,
     suratTotal: 0,
     arasTotal: 0,
     yurticiTotal: 0,
-    stock: 60,
+    stock: 42,
     isSample: false,
     sampleStock: 0,
+    imageUrl: '/product-images/lima-1002.svg',
   },
   {
     id: 1003,
-    productCode: 'LIMA-003',
-    barcode: '8690631000003',
-    name: 'Süt 1 L (tam yağlı)',
-    category: 'temizlik',
-    pv: 0.5,
-    purchasePrice: 28,
-    partnerPrice: 35,
-    fullSalePrice: 42.5,
+    productCode: 'LIMA-LM03',
+    barcode: '8695551001003',
+    name: 'Lima Argan Özlü Saç Şampuanı',
+    category: 'limo',
+    pv: 0.7,
+    purchasePrice: 55,
+    partnerPrice: 72,
+    fullSalePrice: 109.9,
     ourPercent: 0,
-    ourPriceWithVat: 42.5,
-    partnerPriceWithVat: 35,
-    boxDimensions: '-',
-    weightKg: 1,
+    ourPriceWithVat: 109.9,
+    partnerPriceWithVat: 72,
+    boxDimensions: '35×20×12 cm',
+    weightKg: 0.41,
     desi: 1,
     cargoPerUnit: 0,
     suratTotal: 0,
     arasTotal: 0,
     yurticiTotal: 0,
-    stock: 48,
+    stock: 28,
     isSample: false,
     sampleStock: 0,
+    imageUrl: '/product-images/lima-1003.svg',
   },
   {
     id: 1004,
-    productCode: 'LIMA-004',
-    barcode: '8690631000004',
-    name: 'Çiçek Balı 250 g',
-    category: 'temizlik',
-    pv: 1.2,
-    purchasePrice: 95,
-    partnerPrice: 130,
-    fullSalePrice: 165,
+    productCode: 'LIMA-LM04',
+    barcode: '8695551001004',
+    name: 'Lima Aloe Vücut Losyonu',
+    category: 'limo',
+    pv: 0.6,
+    purchasePrice: 48,
+    partnerPrice: 65,
+    fullSalePrice: 99.9,
     ourPercent: 0,
-    ourPriceWithVat: 165,
-    partnerPriceWithVat: 130,
-    boxDimensions: '-',
-    weightKg: 0.25,
+    ourPriceWithVat: 99.9,
+    partnerPriceWithVat: 65,
+    boxDimensions: '30×18×8 cm',
+    weightKg: 0.28,
     desi: 1,
     cargoPerUnit: 0,
     suratTotal: 0,
     arasTotal: 0,
     yurticiTotal: 0,
-    stock: 25,
+    stock: 31,
     isSample: false,
     sampleStock: 0,
+    imageUrl: '/product-images/lima-1004.svg',
   },
 ];
 
-const raw = await readFile(path, 'utf8');
-const store = JSON.parse(raw);
+let store;
+try {
+  const raw = await readFile(path, 'utf8');
+  store = JSON.parse(raw);
+} catch (err) {
+  if (err?.code === 'ENOENT') {
+    await mkdir(dirname(path), { recursive: true });
+    store = {
+      updatedAt: new Date().toISOString(),
+      products: [],
+      productSets: [],
+      sales: [],
+      users: [],
+      settings: { businessName: 'Lima Market', productProfile: 'pos-lite', lowStockThreshold: 10 },
+    };
+  } else {
+    throw err;
+  }
+}
+
 const now = new Date().toISOString();
-store.products = DEMO_PRODUCTS;
+store.products = LIMA_PRODUCTS;
+store.productSets = store.productSets ?? [];
+store.settings = {
+  ...store.settings,
+  businessName: store.settings?.businessName?.trim() || 'Lima Market',
+  productProfile: 'pos-lite',
+  lowStockThreshold: store.settings?.lowStockThreshold ?? 10,
+};
 store.updatedAt = now;
+
+await mkdir(dirname(path), { recursive: true });
 await writeFile(path, JSON.stringify(store, null, 2));
 
-console.log(`OK   ${tenant}: ${DEMO_PRODUCTS.length} deneme ürünü yazıldı`);
-for (const p of DEMO_PRODUCTS) {
-  console.log(`     ${p.barcode}  ${p.name}  stok=${p.stock}  satış=${p.fullSalePrice} ₺`);
+console.log(`OK   ${tenant}: ${LIMA_PRODUCTS.length} Lima ürünü (fotoğraflı) yazıldı → ${path}`);
+for (const p of LIMA_PRODUCTS) {
+  console.log(`     ${p.barcode}  ${p.name}  stok=${p.stock}  ${p.fullSalePrice} ₺  ${p.imageUrl}`);
 }
+console.log('');
+console.log('Tarayıcıda: çıkış → giriş (mağaza: lima-market) → Ctrl+Shift+R');
