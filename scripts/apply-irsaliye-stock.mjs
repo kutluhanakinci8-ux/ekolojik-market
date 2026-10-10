@@ -13,6 +13,10 @@ const dataDir = process.argv[2] || join(process.cwd(), 'data');
 
 async function migrateTenant(tenantId) {
   const snapshot = await readTenantStore(dataDir, tenantId);
+  if (shouldSkipIrsaliyeStockMigration(tenantId, snapshot)) {
+    console.log(`  ${tenantId}: irsaliye migrasyonu atlandı (ayrı tenant)`);
+    return;
+  }
   if (!snapshot?.products?.length) {
     console.log(`  ${tenantId}: ürün yok, atlandı`);
     return;
