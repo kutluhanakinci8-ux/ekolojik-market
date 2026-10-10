@@ -70,10 +70,12 @@ export function getProductImageUrl(product: Product): string {
   const limaPath = resolveLimaProductImagePath(product);
   const isolated = isTenantCatalogIsolated();
   const catalogPath = isolated ? undefined : getCatalogImagePath(product.id);
+  // Lima ürünleri: sunucudaki lima-*.svg her zaman öncelikli (bozuk data: URL store’da kalabilir)
+  if (limaPath) return limaPath;
   if (product.imageUrl && (!isolated || !product.imageUrl.includes('/product-images/p-'))) {
     return product.imageUrl;
   }
-  return limaPath || catalogPath || getPlaceholderImage(product);
+  return catalogPath || getPlaceholderImage(product);
 }
 
 export function isCustomImage(product: Product): boolean {

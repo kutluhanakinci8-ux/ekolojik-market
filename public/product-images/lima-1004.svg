@@ -1,15 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#dcfce7"/>
-      <stop offset="100%" stop-color="#4ade80"/>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#bbf7d0"/>
+      <stop offset="100%" stop-color="#22c55e"/>
     </linearGradient>
+    <radialGradient id="shine" cx="35%" cy="25%" r="55%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect width="400" height="400" fill="#f8fafc"/>
-  <rect x="135" y="80" width="130" height="260" rx="28" fill="url(#bg)" stroke="#16a34a" stroke-width="3"/>
-  <ellipse cx="200" cy="75" rx="45" ry="18" fill="#16a34a"/>
-  <text x="200" y="210" text-anchor="middle" font-size="64"><?</text>
-  <text x="200" y="285" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#14532d">LIMA</text>
-  <text x="200" y="310" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="#166534">Aloe Vücut Losyonu</text>
-  <text x="200" y="378" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#64748b">250 ml</text>
+  <rect width="400" height="400" fill="#f1f5f9"/>
+  <ellipse cx="200" cy="355" rx="90" ry="17" fill="#cbd5e1" opacity="0.5"/>
+  <rect x="142" y="88" width="116" height="228" rx="26" fill="url(#g)" stroke="#15803d" stroke-width="2.5"/>
+  <rect x="142" y="88" width="116" height="228" rx="26" fill="url(#shine)"/>
+  <ellipse cx="200" cy="82" rx="38" ry="14" fill="#15803d"/>
+  <rect x="188" y="52" width="24" height="42" rx="6" fill="#166534"/>
+  <path d="M168 200 Q200 165 232 200 Q200 235 168 200" fill="#86efac" stroke="#166534" stroke-width="2"/>
+  <text x="200" y="268" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#14532d">LIMA</text>
+  <text x="200" y="292" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="#166534">Aloe Vucut Losyonu</text>
+  <text x="200" y="318" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#64748b">250 ml</text>
 </svg>

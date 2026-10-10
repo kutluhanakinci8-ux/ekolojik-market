@@ -51,10 +51,8 @@ function limaProduct(base) {
   };
 }
 
-async function limaImageDataUrl(productId) {
-  const file = join(REPO_ROOT, 'public', 'product-images', `lima-${productId}.svg`);
-  const svg = await readFile(file, 'utf8');
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+function limaImagePath(productId) {
+  return `/product-images/lima-${productId}.svg`;
 }
 
 function arg(name) {
@@ -121,7 +119,7 @@ const LIMA_PRODUCTS = [
 ];
 
 for (const p of LIMA_PRODUCTS) {
-  p.imageUrl = await limaImageDataUrl(p.id);
+  p.imageUrl = limaImagePath(p.id);
 }
 
 let store;
