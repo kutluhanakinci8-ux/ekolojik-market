@@ -2,7 +2,8 @@
 # Repo → Settings → Secrets → Actions:
 #   VPS_HOST    = 168.231.109.27
 #   VPS_USER    = root
-#   VPS_SSH_KEY = sunucu SSH private key (parola yerine)
+#   VPS_SSH_KEY       = önerilen (private key)
+#   VPS_SSH_PASSWORD  = yalnızca key yoksa (root parolası)
 name: Deploy VPS
 
 on:
