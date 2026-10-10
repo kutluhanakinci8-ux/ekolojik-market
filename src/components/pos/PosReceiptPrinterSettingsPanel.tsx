@@ -8,17 +8,25 @@ import {
 } from '../../types/receiptPrinter';
 import { isPosLiteProfile } from '../../utils/tenantProductProfile';
 import { printTestSaleReceipt } from '../../utils/receiptPrint';
+import { isLimaMacRawPrintAvailable } from '../../utils/limaMacRawPrint';
 import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
 import { loadTenantId } from '../../storage/tenantSession';
 import { APP_BUILD_ID, APP_FEATURE_TAG } from '../../version';
 
 function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
   const [status, setStatus] = useState('');
+  const [bridgeOk, setBridgeOk] = useState<boolean | null>(null);
   const tenant = loadTenantId();
   const logPath =
     tenant === 'main' || !tenant
       ? '/var/www/market-pos/data/receipt-print.log'
       : `/var/www/market-pos/data/tenants/${tenant}/receipt-print.log`;
+
+  const checkBridge = async () => {
+    const ok = await isLimaMacRawPrintAvailable();
+    setBridgeOk(ok);
+    setStatus(ok ? 'Köprü hazır (sessiz yazdırma)' : 'Köprü kapalı — start-lima-receipt-bridge.bat çalıştırın');
+  };
 
   const runTest = async () => {
     setStatus('Test fiş gönderiliyor…');
@@ -35,9 +43,17 @@ function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
   return (
     <div className="settings-subpanel" style={{ marginTop: 12 }}>
       <h3>Fiş teşhis</h3>
-      <button type="button" className="btn btn-outline" onClick={() => void runTest()}>
-        Test fiş yazdır
-      </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="btn btn-outline" onClick={() => void checkBridge()}>
+          Köprü kontrol
+        </button>
+        <button type="button" className="btn btn-outline" onClick={() => void runTest()}>
+          Test fiş yazdır
+        </button>
+      </div>
+      {bridgeOk != null ? (
+        <p className="module-hint">{bridgeOk ? '✓ http://127.0.0.1:18765 hazır' : '✗ Köprü yanıt vermiyor'}</p>
+      ) : null}
       {status ? <p className="module-hint">{status}</p> : null}
       <p className="module-hint">
         <strong>Tarayıcı:</strong> F12 → Konsol → <code>market-pos-fis</code> satırları.
@@ -67,10 +83,10 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
       <section className="settings-panel settings-panel--receipt-printer">
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
-          <strong>Lima Market</strong> — ayrı mağaza, <strong>limaadmin</strong> ile giriş. Satış sonrası
-          otomatik premium fiş. Mac’te <strong>c0/Ç0</strong> için: Terminal’de sürekli çalışan ham yazdır
-          köprüsü (CUPS rastertopos atlanır):{' '}
-          <code>node scripts/lima-mac-raw-print.mjs</code> — sonra test satışı.
+          <strong>Lima Market</strong> — satış sonrası fiş <strong>sessiz</strong> basılır (tarayıcı «Yazdır»
+          penceresi açılmaz). Kasa PC’de köprü sürekli açık olmalı: Windows{' '}
+          <code>scripts\start-lima-receipt-bridge.bat</code> veya{' '}
+          <code>node scripts/lima-raw-print-bridge.mjs</code> (yazıcı adı: <strong>Printer POS-80C</strong>).
         </p>
         <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>

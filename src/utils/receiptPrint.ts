@@ -5,6 +5,7 @@ import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
+import { remindSilentReceiptBridgeMissing } from './receiptPrintBridgeReminder';
 import { tryLimaMacRawReceiptPrint } from './limaMacRawPrint';
 import { applyRetailVat } from './productPricing';
 import { DEFAULT_VAT_RATE, roundMoney } from './vatAnalytics';
@@ -1115,12 +1116,17 @@ export async function printThermalReceipt(
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: receipt.saleId, items: receipt.items.length });
     const plainNoSacrifice = buildPlainTextSaleReceipt(receipt);
+    const limaSilent = isLimaBrandedReceipt(receipt.businessName);
     const rawOk = await tryLimaMacRawReceiptPrint(plainNoSacrifice);
     if (rawOk) {
-      logReceiptPrint('thermal-raw-escpos-ok', { saleId: data.saleId });
+      logReceiptPrint('thermal-raw-escpos-ok', { saleId: receipt.saleId });
       return;
     }
-    logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed' });
+    logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed', limaSilent });
+    if (limaSilent) {
+      remindSilentReceiptBridgeMissing();
+      return;
+    }
     remindChromeReceiptPrintSettings();
     await printHtmlReceiptIsolatedWindow(buildGreenleafPremiumReceiptHtml(receipt));
     return;

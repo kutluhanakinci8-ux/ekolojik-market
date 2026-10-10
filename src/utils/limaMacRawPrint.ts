@@ -4,7 +4,7 @@ const LIMA_RAW_PRINT_URL =
     ? import.meta.env.VITE_LIMA_RAW_PRINT_URL
     : 'http://127.0.0.1:18765/print';
 
-const RAW_PRINT_TIMEOUT_MS = 2500;
+const RAW_PRINT_TIMEOUT_MS = 4500;
 
 /** Mac’te lima-mac-raw-print.mjs — CUPS rastertopos (c0) atlanır */
 export async function tryLimaMacRawReceiptPrint(text: string): Promise<boolean> {
