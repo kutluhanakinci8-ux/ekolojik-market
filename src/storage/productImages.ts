@@ -1,8 +1,12 @@
-const STORAGE_KEY = 'market-pos-images';
+import { posLocalStorageKeys } from './posLocalStorageKeys';
+
+function storageKey(): string {
+  return posLocalStorageKeys().productImages;
+}
 
 export function loadAllImages(): Record<number, string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, string>;
     const result: Record<number, string> = {};
@@ -19,7 +23,7 @@ export function saveProductImage(productId: number, dataUrl: string): void {
   const all = loadAllImages();
   all[productId] = dataUrl;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    localStorage.setItem(storageKey(), JSON.stringify(all));
   } catch (e) {
     console.error('Resim kaydedilemedi (depolama dolu):', e);
     throw new Error('Depolama dolu — daha küçük resim deneyin');
@@ -29,7 +33,7 @@ export function saveProductImage(productId: number, dataUrl: string): void {
 export function removeProductImage(productId: number): void {
   const all = loadAllImages();
   delete all[productId];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  localStorage.setItem(storageKey(), JSON.stringify(all));
 }
 
 export function migrateImagesFromProducts(products: { id: number; imageUrl?: string }[]): void {
@@ -43,7 +47,7 @@ export function migrateImagesFromProducts(products: { id: number; imageUrl?: str
   }
   if (changed) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      localStorage.setItem(storageKey(), JSON.stringify(all));
     } catch {
       /* ignore migration failure */
     }

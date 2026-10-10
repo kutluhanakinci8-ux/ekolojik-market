@@ -6,6 +6,15 @@
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+async function limaImageDataUrl(productId) {
+  const file = join(REPO_ROOT, 'public', 'product-images', `lima-${productId}.svg`);
+  const svg = await readFile(file, 'utf8');
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -42,7 +51,6 @@ const LIMA_PRODUCTS = [
     stock: 36,
     isSample: false,
     sampleStock: 0,
-    imageUrl: '/product-images/lima-1001.svg',
   },
   {
     id: 1002,
@@ -67,7 +75,6 @@ const LIMA_PRODUCTS = [
     stock: 42,
     isSample: false,
     sampleStock: 0,
-    imageUrl: '/product-images/lima-1002.svg',
   },
   {
     id: 1003,
@@ -92,7 +99,6 @@ const LIMA_PRODUCTS = [
     stock: 28,
     isSample: false,
     sampleStock: 0,
-    imageUrl: '/product-images/lima-1003.svg',
   },
   {
     id: 1004,
@@ -117,9 +123,12 @@ const LIMA_PRODUCTS = [
     stock: 31,
     isSample: false,
     sampleStock: 0,
-    imageUrl: '/product-images/lima-1004.svg',
   },
 ];
+
+for (const p of LIMA_PRODUCTS) {
+  p.imageUrl = await limaImageDataUrl(p.id);
+}
 
 let store;
 try {

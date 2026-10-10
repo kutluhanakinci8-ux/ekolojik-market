@@ -1,5 +1,7 @@
 import type { Product } from '../types/product';
 import { getCatalogImagePath } from '../data/productImages';
+import { isTenantCatalogIsolated } from './tenantCatalogIsolation';
+import { resolveLimaProductImagePath } from './limaProductImages';
 
 const BRAND_COLORS: Record<string, [number, number]> = {
   ilife: [200, 55],
@@ -65,8 +67,13 @@ export function getPlaceholderImage(product: Product): string {
 }
 
 export function getProductImageUrl(product: Product): string {
-  const catalogPath = getCatalogImagePath(product.id);
-  return product.imageUrl || catalogPath || getPlaceholderImage(product);
+  const limaPath = resolveLimaProductImagePath(product);
+  const isolated = isTenantCatalogIsolated();
+  const catalogPath = isolated ? undefined : getCatalogImagePath(product.id);
+  if (product.imageUrl && (!isolated || !product.imageUrl.includes('/product-images/p-'))) {
+    return product.imageUrl;
+  }
+  return limaPath || catalogPath || getPlaceholderImage(product);
 }
 
 export function isCustomImage(product: Product): boolean {

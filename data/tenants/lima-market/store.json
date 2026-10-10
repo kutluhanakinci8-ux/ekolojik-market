@@ -23,7 +23,7 @@
       "stock": 36,
       "isSample": false,
       "sampleStock": 0,
-      "imageUrl": "/product-images/lima-1001.svg"
+      "imageUrl": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22400%22%20viewBox%3D%220%200%20400%20400%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23fef9c3%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23facc15%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22400%22%20height%3D%22400%22%20fill%3D%22%23f8fafc%22%2F%3E%0A%20%20%3Crect%20x%3D%22120%22%20y%3D%2240%22%20width%3D%22160%22%20height%3D%22320%22%20rx%3D%2224%22%20fill%3D%22url(%23bg)%22%20stroke%3D%22%23ca8a04%22%20stroke-width%3D%223%22%2F%3E%0A%20%20%3Crect%20x%3D%22155%22%20y%3D%2220%22%20width%3D%2290%22%20height%3D%2236%22%20rx%3D%228%22%20fill%3D%22%23ca8a04%22%2F%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22200%22%20text-anchor%3D%22middle%22%20font-size%3D%2272%22%3E%3CK%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2218%22%20font-weight%3D%22700%22%20fill%3D%22%23422006%22%3ELIMA%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22305%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2213%22%20fill%3D%22%23713f12%22%3ELimon%20Du_%20Jeli%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22378%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2212%22%20fill%3D%22%2364748b%22%3E500%20ml%3C%2Ftext%3E%0A%3C%2Fsvg%3E%0A"
     },
     {
       "id": 1002,
@@ -48,7 +48,7 @@
       "stock": 42,
       "isSample": false,
       "sampleStock": 0,
-      "imageUrl": "/product-images/lima-1002.svg"
+      "imageUrl": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22400%22%20viewBox%3D%220%200%20400%20400%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ede9fe%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23a78bfa%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22400%22%20height%3D%22400%22%20fill%3D%22%23f8fafc%22%2F%3E%0A%20%20%3Crect%20x%3D%22120%22%20y%3D%2240%22%20width%3D%22160%22%20height%3D%22320%22%20rx%3D%2224%22%20fill%3D%22url(%23bg)%22%20stroke%3D%22%237c3aed%22%20stroke-width%3D%223%22%2F%3E%0A%20%20%3Crect%20x%3D%22155%22%20y%3D%2220%22%20width%3D%2290%22%20height%3D%2236%22%20rx%3D%228%22%20fill%3D%22%237c3aed%22%2F%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22200%22%20text-anchor%3D%22middle%22%20font-size%3D%2272%22%3E%3D%EF%BF%BD%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2218%22%20font-weight%3D%22700%22%20fill%3D%22%233b0764%22%3ELIMA%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22305%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2213%22%20fill%3D%22%235b21b6%22%3ELavanta%20Du_%20Jeli%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22378%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2212%22%20fill%3D%22%2364748b%22%3E500%20ml%3C%2Ftext%3E%0A%3C%2Fsvg%3E%0A"
     },
     {
       "id": 1003,
@@ -73,7 +73,7 @@
       "stock": 28,
       "isSample": false,
       "sampleStock": 0,
-      "imageUrl": "/product-images/lima-1003.svg"
+      "imageUrl": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22400%22%20viewBox%3D%220%200%20400%20400%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23cffafe%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%2322d3ee%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22400%22%20height%3D%22400%22%20fill%3D%22%23f8fafc%22%2F%3E%0A%20%20%3Crect%20x%3D%22130%22%20y%3D%2250%22%20width%3D%22140%22%20height%3D%22300%22%20rx%3D%2220%22%20fill%3D%22url(%23bg)%22%20stroke%3D%22%230891b2%22%20stroke-width%3D%223%22%2F%3E%0A%20%20%3Crect%20x%3D%22165%22%20y%3D%2228%22%20width%3D%2270%22%20height%3D%2240%22%20rx%3D%2210%22%20fill%3D%22%230891b2%22%2F%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22195%22%20text-anchor%3D%22middle%22%20font-size%3D%2264%22%3E%3E%EF%BF%BD%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22275%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2218%22%20font-weight%3D%22700%22%20fill%3D%22%23164e63%22%3ELIMA%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2213%22%20fill%3D%22%23155e75%22%3EArgan%20Sa%EF%BF%BD%20%5Eampuan1%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22378%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2212%22%20fill%3D%22%2364748b%22%3E400%20ml%3C%2Ftext%3E%0A%3C%2Fsvg%3E%0A"
     },
     {
       "id": 1004,
@@ -98,7 +98,7 @@
       "stock": 31,
       "isSample": false,
       "sampleStock": 0,
-      "imageUrl": "/product-images/lima-1004.svg"
+      "imageUrl": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22400%22%20viewBox%3D%220%200%20400%20400%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23dcfce7%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%234ade80%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22400%22%20height%3D%22400%22%20fill%3D%22%23f8fafc%22%2F%3E%0A%20%20%3Crect%20x%3D%22135%22%20y%3D%2280%22%20width%3D%22130%22%20height%3D%22260%22%20rx%3D%2228%22%20fill%3D%22url(%23bg)%22%20stroke%3D%22%2316a34a%22%20stroke-width%3D%223%22%2F%3E%0A%20%20%3Cellipse%20cx%3D%22200%22%20cy%3D%2275%22%20rx%3D%2245%22%20ry%3D%2218%22%20fill%3D%22%2316a34a%22%2F%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22210%22%20text-anchor%3D%22middle%22%20font-size%3D%2264%22%3E%3C%3F%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22285%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2218%22%20font-weight%3D%22700%22%20fill%3D%22%2314532d%22%3ELIMA%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22310%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2213%22%20fill%3D%22%23166534%22%3EAloe%20V%EF%BF%BDcut%20Losyonu%3C%2Ftext%3E%0A%20%20%3Ctext%20x%3D%22200%22%20y%3D%22378%22%20text-anchor%3D%22middle%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-size%3D%2212%22%20fill%3D%22%2364748b%22%3E250%20ml%3C%2Ftext%3E%0A%3C%2Fsvg%3E%0A"
     }
   ],
   "productSets": [],
@@ -107,5 +107,51 @@
     "productProfile": "pos-lite",
     "lowStockThreshold": 10
   },
-  "updatedAt": "2026-10-10T11:24:27.792Z"
+  "updatedAt": "2026-10-10T11:32:49.157Z",
+  "stockMovements": [
+    {
+      "id": "M-seed-1001",
+      "productId": 1001,
+      "productName": "Lima Limon Aromalı Duş Jeli",
+      "type": "in",
+      "quantity": 36,
+      "previousStock": 0,
+      "newStock": 36,
+      "note": "Lima başlangıç stok girişi",
+      "createdAt": "2026-10-10T11:32:49.157Z"
+    },
+    {
+      "id": "M-seed-1002",
+      "productId": 1002,
+      "productName": "Lima Lavanta Duş Jeli",
+      "type": "in",
+      "quantity": 42,
+      "previousStock": 0,
+      "newStock": 42,
+      "note": "Lima başlangıç stok girişi",
+      "createdAt": "2026-10-10T11:32:49.157Z"
+    },
+    {
+      "id": "M-seed-1003",
+      "productId": 1003,
+      "productName": "Lima Argan Özlü Saç Şampuanı",
+      "type": "in",
+      "quantity": 28,
+      "previousStock": 0,
+      "newStock": 28,
+      "note": "Lima başlangıç stok girişi",
+      "createdAt": "2026-10-10T11:32:49.157Z"
+    },
+    {
+      "id": "M-seed-1004",
+      "productId": 1004,
+      "productName": "Lima Aloe Vücut Losyonu",
+      "type": "in",
+      "quantity": 31,
+      "previousStock": 0,
+      "newStock": 31,
+      "note": "Lima başlangıç stok girişi",
+      "createdAt": "2026-10-10T11:32:49.157Z"
+    }
+  ]
 }

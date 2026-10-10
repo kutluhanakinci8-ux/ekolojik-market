@@ -201,6 +201,7 @@ import {
   looksLikeMainGreenleafCatalog,
   resolveEffectiveTenantId,
 } from '../utils/tenantCatalogIsolation';
+import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
 import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
 function storageKeys() {
@@ -722,6 +723,22 @@ function createSetMovement(
   };
 }
 
+function serializeProductsForSnapshot(products: Product[], settings: AppSettings): Product[] {
+  const isolated = isTenantCatalogIsolated(undefined, settings);
+  return products.map((p) => {
+    if (!isolated) {
+      const { imageUrl: _, ...rest } = p;
+      return rest as Product;
+    }
+    const url = p.imageUrl ?? resolveLimaProductImagePath(p);
+    if (url && isLimaOwnedImageUrl(url)) {
+      return { ...p, imageUrl: url };
+    }
+    const { imageUrl: _, ...rest } = p;
+    return rest as Product;
+  });
+}
+
 function buildLocalSnapshot(
   products: Product[],
   productSets: ProductSet[],
@@ -754,7 +771,7 @@ function buildLocalSnapshot(
 ): PersistedStoreSnapshot {
   return {
     updatedAt: new Date().toISOString(),
-    products: products.map(({ imageUrl: _, ...rest }) => rest),
+    products: serializeProductsForSnapshot(products, settings),
     productSets,
     sales,
     saleReturns,
@@ -862,9 +879,11 @@ export function usePosStoreState() {
     users?: PosUser[];
     cashSessions?: DailyCashSession[];
   }): PersistedStoreSnapshot => {
-    const { products: irsaliyeProducts } = applyIrsaliyeStockToProducts(products);
+    const snapshotProducts = isIsolatedStoreContext(settings)
+      ? products
+      : applyIrsaliyeStockToProducts(products).products;
     return buildLocalSnapshot(
-      irsaliyeProducts,
+      snapshotProducts,
       productSets,
       sales,
       saleReturns,
