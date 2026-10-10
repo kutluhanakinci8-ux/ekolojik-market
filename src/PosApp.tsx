@@ -11,7 +11,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { StockScreen } from './components/StockScreen';
 import { EkolojikPostaHubScreen } from './components/posta/EkolojikPostaHubScreen';
 import { useIdleLogout } from './hooks/useIdleLogout';
-import { useStore } from './store/useStore';
+import { useStore } from './store/StoreProvider';
 import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './utils/userAccess';
 import { resolveTopNavHighlight } from './data/navigation';
 import type { AppPage } from './components/AppShell';
@@ -196,7 +196,7 @@ export function PosApp() {
     return <Navigate to="/giris" replace />;
   }
 
-  if (!store.syncReady) {
+  if (!store.catalogDisplayReady) {
     return <PosTenantBootstrap settings={store.settings} />;
   }
 

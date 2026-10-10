@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SEED_PRODUCTS } from '../data/seedProducts';
 import { GREENLEAF_PRODUCTS } from '../data/greenleafCatalog';
 import { PRODUCT_CATEGORIES } from '../data/categories';
@@ -194,7 +194,7 @@ import {
 } from '../storage/crmAttachments';
 
 import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
-import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId } from '../storage/tenantSession';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
 
 function storageKeys() {
@@ -214,6 +214,9 @@ function usesIsolatedProductCatalog(): boolean {
   if (loadTenantId() !== DEFAULT_TENANT_ID) return true;
   return isPosLiteProfile(loadSettings());
 }
+
+/** mergeWithSeed tam katalog ~135+ ürün; izole tenant’ta bu sayı yanlış yerel önbelleği işaret eder */
+const GREENLEAF_SEED_CATALOG_MIN = 80;
 
 function mergeWithSeed(stored: Product[] | null): Product[] {
   const storedMap = new Map((stored ?? []).map((p) => [p.id, p]));
@@ -808,7 +811,7 @@ function buildSnapshotFromStorage(): PersistedStoreSnapshot {
   };
 }
 
-export function useStore() {
+export function usePosStoreState() {
   syncPosLocalStorageKeys();
   const [products, setProducts] = useState<Product[]>(loadProducts);
   const [productSets, setProductSets] = useState<ProductSet[]>(loadProductSets);
@@ -975,11 +978,16 @@ export function useStore() {
 
     (async () => {
       syncPosLocalStorageKeys();
-      const tenant = loadTenantId();
+      const tenantAtStart = loadTenantId();
       const localSnapshot = buildSnapshotFromStorage();
       const remote = await fetchStoreSnapshot();
 
       if (cancelled) return;
+      if (loadTenantId() !== tenantAtStart) {
+        setSyncReady(true);
+        return;
+      }
+      const tenant = tenantAtStart;
 
       if (tenant !== DEFAULT_TENANT_ID && remote) {
         applySnapshot(remote);
@@ -2939,8 +2947,37 @@ export function useStore() {
     ) => {
       clearLoginLockout(user.username);
       const sessionId = `S${Date.now()}`;
-      const session = buildAuthSession(user, sessionId, settings);
       lastTrackedPageRef.current = null;
+      setSyncStatus('loading');
+      setSyncReady(false);
+
+      await exchangePosApiToken({
+        username: user.username,
+        password: credentials?.password,
+        pin: credentials?.pin,
+      });
+
+      const claims = decodePosApiTokenClaims(loadPosApiToken());
+      if (claims?.tenantId?.trim()) {
+        saveTenantId(claims.tenantId.trim());
+      }
+      syncPosLocalStorageKeys();
+
+      let sessionSettings = settings;
+      try {
+        const remote = await fetchStoreSnapshot();
+        if (remote) {
+          applySnapshot(remote);
+          sessionSettings = snapshotMergedSettings(remote);
+          setSyncStatus('synced');
+        } else {
+          setSyncStatus('local-only');
+        }
+      } finally {
+        setSyncReady(true);
+      }
+
+      const session = buildAuthSession(user, sessionId, sessionSettings);
       saveAuthSession(session);
       setAuthSession(session);
       saveLastQuickUser(user.username);
@@ -2958,16 +2995,6 @@ export function useStore() {
         `${method === 'pin' ? 'PIN' : 'Şifre'} ile oturum başlatıldı`,
         { method },
       );
-      await exchangePosApiToken({
-        username: user.username,
-        password: credentials?.password,
-        pin: credentials?.pin,
-      });
-      const remote = await fetchStoreSnapshot();
-      if (remote) {
-        applySnapshot(remote);
-        setSyncStatus('synced');
-      }
     },
     [appendLoginAudit, logActivity, applySnapshot, settings],
   );
@@ -4567,6 +4594,12 @@ export function useStore() {
   const weekRefundTotal = weekReturns.reduce((sum, entry) => sum + entry.refundTotal, 0);
   const weekTotal = weekGrossTotal - weekRefundTotal;
 
+  const catalogDisplayReady = useMemo(() => {
+    if (!syncReady) return false;
+    if (!isIsolatedStoreContext(settings)) return true;
+    return products.length < GREENLEAF_SEED_CATALOG_MIN;
+  }, [syncReady, settings, products.length]);
+
   return {
     products,
     productSets,
@@ -4707,6 +4740,7 @@ export function useStore() {
     persistStoreNow,
     syncStatus,
     syncReady,
+    catalogDisplayReady,
     cartTotal,
     cartSampleCount,
     cartItemCount,
@@ -4768,4 +4802,4 @@ export function useStore() {
   };
 }
 
-export type Store = ReturnType<typeof useStore>;
+export type Store = ReturnType<typeof usePosStoreState>;

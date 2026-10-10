@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useStore } from '../store/useStore';
+import { useStore } from '../store/StoreProvider';
 import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
 import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';

@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import { StoreProvider } from './store/StoreProvider';
 import './styles/global.css';
 import './styles/posta-yazisma.css';
 import './styles/posta-klasor.css';
@@ -10,7 +11,9 @@ import './styles/landing.css';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <StoreProvider>
+        <App />
+      </StoreProvider>
     </BrowserRouter>
   </StrictMode>,
 );
