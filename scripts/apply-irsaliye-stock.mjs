@@ -7,6 +7,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readTenantStore, writeTenantStore } from '../server/tenantAuth.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from '../server/irsaliyeStock.mjs';
+import { shouldSkipIrsaliyeStockMigration } from '../server/tenantStoreGuard.mjs';
 
 const dataDir = process.argv[2] || join(process.cwd(), 'data');
 
