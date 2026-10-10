@@ -6,6 +6,15 @@ import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
 import { tryLimaMacRawReceiptPrint } from './limaMacRawPrint';
+import {
+  escapeReceiptHtml as escapeHtml,
+  formatReceiptBrandName,
+  formatReceiptDateTime,
+  formatReceiptMoneyPlain,
+  RECEIPT_DRIVER_SACRIFICE_LINES,
+  RECEIPT_SACRIFICE_FILL,
+  truncateReceiptName as truncateName,
+} from './receiptFormat';
 
 /** Termal sürücüde \u200b başlık kenarda «c0» / bozuk karakter basabiliyor */
 const BLANK_PRINT_TITLE = '';
@@ -52,40 +61,12 @@ const PAYMENT_LABELS: Record<SaleReceiptData['paymentMethod'], string> = {
   credit: 'Veresiye',
 };
 
-/** Mac rastertopos: c0 ilk satırlara basılır — markadan önce atıl satırlar */
-const RECEIPT_DRIVER_SACRIFICE_LINES = 4;
-const RECEIPT_SACRIFICE_FILL = '-';
-
 function formatReceiptMoney(amount: number): string {
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency: 'TRY',
     minimumFractionDigits: 2,
   }).format(amount);
-}
-
-/** Termal düz metin — ₺ yerine TL (bazı ESC/POS sürücülerde sembol bozulmasın) */
-function formatReceiptMoneyPlain(amount: number): string {
-  return `${new Intl.NumberFormat('tr-TR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)} TL`;
-}
-
-function formatReceiptDateTime(date: Date): string {
-  return new Intl.DateTimeFormat('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(date);
-}
-
-function truncateName(name: string, max = 32): string {
-  if (name.length <= max) return name;
-  return `${name.slice(0, max - 1)}…`;
 }
 
 export function buildReceiptFromCart(
@@ -373,13 +354,6 @@ function scheduleThermalPrintInWindow(win: ReceiptPrintWindow, onError?: () => v
   } else {
     win.addEventListener('load', () => window.setTimeout(afterLayout, 120), { once: true });
   }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 function wrapPlainReceiptBody(
@@ -737,18 +711,6 @@ function receiptPremiumStyles(): string {
       body.receipt-premium::after { content: none !important; display: none !important; }
     }
   `;
-}
-
-function sanitizeReceiptVisibleText(text: string): string {
-  return text
-    .normalize('NFKC')
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\ufeff]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function formatReceiptBrandName(name: string): string {
-  return sanitizeReceiptVisibleText(name).toLocaleUpperCase('tr-TR');
 }
 
 function buildDriverSacrificeLinesHtml(): string {

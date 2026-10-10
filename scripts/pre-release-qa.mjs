@@ -74,6 +74,14 @@ async function staticGate() {
   const chk = await run('node', ['--check', 'server.mjs']);
   if (chk.code === 0) pass('static', 'node --check server.mjs');
   else fail('static', 'node --check server.mjs', chk.out);
+
+  const limaPos = await run(process.execPath, [join(REPO, 'scripts/unit/lima-pos.mjs')]);
+  if (limaPos.code === 0) pass('lima', 'tenant guard + receiptPrinter strip');
+  else fail('lima', 'unit lima-pos', limaPos.out.slice(-300));
+
+  const limaRcpt = await run('npx', ['tsx', join(REPO, 'scripts/unit/lima-receipt.ts')]);
+  if (limaRcpt.code === 0) pass('lima', 'fiş format birim testleri');
+  else fail('lima', 'unit lima-receipt', limaRcpt.out.slice(-300));
 }
 
 async function connectivityGate() {
