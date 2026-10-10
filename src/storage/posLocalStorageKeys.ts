@@ -30,6 +30,7 @@ const BASE_STORAGE_KEYS = {
   loginAuditLog: 'market-pos-login-audit',
   activityAuditLog: 'market-pos-activity-audit',
   productSets: 'market-pos-product-sets',
+  productImages: 'market-pos-images',
 } as const;
 
 export type PosLocalStorageKeyId = keyof typeof BASE_STORAGE_KEYS;

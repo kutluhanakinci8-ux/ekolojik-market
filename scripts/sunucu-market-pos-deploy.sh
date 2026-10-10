@@ -30,14 +30,19 @@ fi
 
 cd "${REPO_ROOT}"
 echo "==> Git güncelleniyor (${GIT_REMOTE}/${BRANCH})..."
-git fetch "${GIT_REMOTE}" "${BRANCH}"
-git checkout "${BRANCH}" 2>/dev/null || git checkout -B "${BRANCH}" "${GIT_REMOTE}/${BRANCH}"
-# npm build tsbuildinfo dosyası pull'u bloklamasın
+# npm build tsbuildinfo checkout'u bloklamasın (önce temizle)
 git checkout -- tsconfig.tsbuildinfo 2>/dev/null || true
+git restore --staged --worktree tsconfig.tsbuildinfo 2>/dev/null || true
+git fetch "${GIT_REMOTE}" "${BRANCH}"
+if ! git checkout "${BRANCH}" 2>/dev/null; then
+  git checkout -- tsconfig.tsbuildinfo 2>/dev/null || true
+  git checkout -B "${BRANCH}" "${GIT_REMOTE}/${BRANCH}" || git reset --hard "${GIT_REMOTE}/${BRANCH}"
+fi
 git pull --ff-only "${GIT_REMOTE}" "${BRANCH}" || {
   echo "    pull ff-only başarısız — yerel build artığı temizleniyor..."
   git reset --hard "${GIT_REMOTE}/${BRANCH}"
 }
+git checkout -- tsconfig.tsbuildinfo 2>/dev/null || true
 echo "    Commit : $(git -C "${REPO_ROOT}" rev-parse --short HEAD) ($(git -C "${REPO_ROOT}" log -1 --format=%s))"
 
 if [[ ! -f "${APP_SRC}/package.json" ]]; then

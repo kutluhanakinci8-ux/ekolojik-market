@@ -321,7 +321,8 @@ async function readStoreData(tenantId = 'main') {
 
   let persist = false;
 
-  if (data?.products?.length) {
+  const { shouldSkipIrsaliyeStockMigration } = await import('./server/tenantStoreGuard.mjs');
+  if (data?.products?.length && !shouldSkipIrsaliyeStockMigration(tenantId, data)) {
     const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
     data = snapshot;
     if (stockChanged) persist = true;
@@ -2948,8 +2949,10 @@ const server = createServer(async (req, res) => {
       const tenantId = resolveTenantId(url);
       if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
       const data = await readStoreData(tenantId);
+      const { sanitizeIsolatedTenantStoreRead } = await import('./server/tenantStoreGuard.mjs');
+      const tenantSafe = sanitizeIsolatedTenantStoreRead(tenantId, data ?? {});
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(sanitizeStoreSnapshotForClient(data ?? {})));
+      res.end(JSON.stringify(sanitizeStoreSnapshotForClient(tenantSafe)));
       return;
     }
 

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CATEGORIES } from '../data/categories';
 import type { Store } from '../store/useStore';
 import { buildReceiptFromCart, printThermalReceipt } from '../utils/receiptPrint';
 import { DEFAULT_POS_CHECKOUT_SETTINGS, type CompleteSaleOptions } from '../types/pos';
@@ -22,12 +21,20 @@ import type { PremiumProductSearchHandle } from './PremiumProductSearch';
 import { usePosBarcodeWedge } from '../hooks/usePosBarcodeWedge';
 import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import {
+  categoriesForTenantSales,
+  isTenantCatalogIsolated,
+  resolveEffectiveTenantId,
+} from '../utils/tenantCatalogIsolation';
 
 interface SalesScreenProps {
   store: Store;
 }
 
 export function SalesScreen({ store }: SalesScreenProps) {
+  const posLiteCheckout = isPosLiteProfile(store.settings)
+    || isTenantCatalogIsolated(resolveEffectiveTenantId(), store.settings);
   const posCheckout = useMemo(
     () => ({ ...DEFAULT_POS_CHECKOUT_SETTINGS, ...store.settings.posCheckout }),
     [store.settings.posCheckout],
@@ -152,6 +159,11 @@ export function SalesScreen({ store }: SalesScreenProps) {
     counts.setler = activeSets.length;
     return counts;
   }, [store.products, activeSets.length]);
+
+  const salesCategories = useMemo(
+    () => categoriesForTenantSales(store.products, activeSets.length, posLiteCheckout),
+    [store.products, activeSets.length, posLiteCheckout],
+  );
 
   const lastTodaySale = store.todaySales[0];
 
@@ -394,7 +406,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
             </div>
 
             <div className="product-grid-categories">
-              {CATEGORIES.map((cat) => (
+              {salesCategories.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"

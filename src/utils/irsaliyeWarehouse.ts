@@ -4,7 +4,9 @@ import {
 } from '../data/irsaliyeLuy2026000000002';
 import { PRICE_CATALOG_BY_CODE } from '../data/priceCatalogBatch1';
 import type { Product } from '../types/product';
+import type { AppSettings } from '../types/business';
 import { resolveProductStockCode } from './applyIrsaliyeStock';
+import { isTenantCatalogIsolated } from './tenantCatalogIsolation';
 
 /** PDF’teki satır sayısı (aynı stok kodu birden fazla satırda gelebilir) */
 export const IRSALIYE_PDF_LINE_COUNT = 39;
@@ -39,6 +41,51 @@ export function countIrsaliyeWarehouseProducts(products: Product[]): number {
 /** Stok ekranı / depo: yalnızca irsaliyede stok kodu olan kartlar */
 export function getIrsaliyeWarehouseProducts(products: Product[]): Product[] {
   return products.filter(isIrsaliyeWarehouseProduct);
+}
+
+/** POS Lite / Lima — tüm tenant ürünleri; main — irsaliye depo listesi */
+export function getStockCatalogProducts(
+  products: Product[],
+  settings?: AppSettings | null,
+): Product[] {
+  if (isTenantCatalogIsolated(undefined, settings)) {
+    return products;
+  }
+  return getIrsaliyeWarehouseProducts(products);
+}
+
+export function getStockCatalogMetrics(
+  products: Product[],
+  lowStockThreshold: number,
+  settings?: AppSettings | null,
+): {
+  products: Product[];
+  totalStockUnits: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  inStockCount: number;
+  healthPercent: number;
+} {
+  const catalogProducts = getStockCatalogProducts(products, settings);
+  const totalStockUnits = catalogProducts.reduce((sum, p) => sum + p.stock, 0);
+  const lowStockCount = catalogProducts.filter(
+    (p) => p.stock > 0 && p.stock <= lowStockThreshold,
+  ).length;
+  const outOfStockCount = catalogProducts.filter((p) => p.stock <= 0).length;
+  const inStockCount = catalogProducts.length - outOfStockCount;
+  const healthPercent =
+    catalogProducts.length === 0
+      ? 0
+      : Math.round((inStockCount / catalogProducts.length) * 100);
+
+  return {
+    products: catalogProducts,
+    totalStockUnits,
+    lowStockCount,
+    outOfStockCount,
+    inStockCount,
+    healthPercent,
+  };
 }
 
 export function getIrsaliyeWarehouseStockMetrics(

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useStore } from '../store/useStore';
+import { useStore } from '../store/StoreProvider';
 import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
 import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
@@ -62,8 +62,13 @@ export function LandingLogin() {
     setBusy(true);
     setError(null);
 
-    const resolvedTenant = tenantId.trim() || DEFAULT_TENANT_ID;
+    const loginUser = (pendingTotpUserId ? pendingUsername : username).trim().toLowerCase();
+    let resolvedTenant = tenantId.trim() || DEFAULT_TENANT_ID;
+    if (resolvedTenant === DEFAULT_TENANT_ID && loginUser.startsWith('lima')) {
+      resolvedTenant = 'lima-market';
+    }
     saveTenantId(resolvedTenant);
+    setTenantId(resolvedTenant);
     await store.refreshTenantData();
 
     try {

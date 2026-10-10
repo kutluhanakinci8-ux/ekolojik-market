@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dcfce7"/>
+      <stop offset="100%" stop-color="#4ade80"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="#f8fafc"/>
+  <rect x="135" y="80" width="130" height="260" rx="28" fill="url(#bg)" stroke="#16a34a" stroke-width="3"/>
+  <ellipse cx="200" cy="75" rx="45" ry="18" fill="#16a34a"/>
+  <text x="200" y="210" text-anchor="middle" font-size="64"><?</text>
+  <text x="200" y="285" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#14532d">LIMA</text>
+  <text x="200" y="310" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="#166534">Aloe Vücut Losyonu</text>
+  <text x="200" y="378" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#64748b">250 ml</text>
+</svg>

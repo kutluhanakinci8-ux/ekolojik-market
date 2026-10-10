@@ -22,10 +22,10 @@ import {
   type MessagingPublicConfigHub,
   type PostaOnboardingHub,
 } from '../../services/postaOnboardingService';
-import type { useStore } from '../../store/useStore';
+import type { Store } from '../../store/useStore';
 
 type Props = {
-  store: ReturnType<typeof useStore>;
+  store: Store;
   onFinished: () => void;
 };
 

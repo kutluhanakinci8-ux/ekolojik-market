@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SEED_PRODUCTS } from '../data/seedProducts';
 import { GREENLEAF_PRODUCTS } from '../data/greenleafCatalog';
 import { PRODUCT_CATEGORIES } from '../data/categories';
@@ -194,8 +194,15 @@ import {
 } from '../storage/crmAttachments';
 
 import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
-import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
-import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId } from '../storage/tenantSession';
+import {
+  coerceTenantCatalogProducts,
+  isTenantCatalogIsolated,
+  looksLikeMainGreenleafCatalog,
+  resolveEffectiveTenantId,
+} from '../utils/tenantCatalogIsolation';
+import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
+import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
 function storageKeys() {
   return posLocalStorageKeys();
@@ -248,15 +255,18 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
 }
 
 function loadProducts(): Product[] {
+  const isolated = isTenantCatalogIsolated(loadTenantId(), loadSettings());
   const stored = localStorage.getItem(storageKeys().products);
   if (stored) {
     try {
-      return mergeWithSeed(JSON.parse(stored) as Product[]);
+      const parsed = JSON.parse(stored) as Product[];
+      if (isolated) return coerceTenantCatalogProducts(parsed, true);
+      return mergeWithSeed(parsed);
     } catch {
       /* fall through */
     }
   }
-  return mergeWithSeed(null);
+  return isolated ? [] : mergeWithSeed(null);
 }
 
 function mergeProductSets(stored: ProductSet[] | null | undefined): ProductSet[] {
@@ -286,15 +296,17 @@ function mergeProductSets(stored: ProductSet[] | null | undefined): ProductSet[]
 }
 
 function loadProductSets(): ProductSet[] {
+  const isolated = isTenantCatalogIsolated(loadTenantId(), loadSettings());
   const stored = localStorage.getItem(storageKeys().productSets);
   if (stored) {
     try {
-      return mergeProductSets(JSON.parse(stored) as ProductSet[]);
+      const parsed = JSON.parse(stored) as ProductSet[];
+      return isolated ? parsed : mergeProductSets(parsed);
     } catch {
       /* fall through */
     }
   }
-  return mergeProductSets(null);
+  return isolated ? [] : mergeProductSets(null);
 }
 
 function loadCart(): CartItem[] {
@@ -576,7 +588,7 @@ function snapshotMergedSettings(snapshot: PersistedStoreSnapshot): AppSettings {
 
 /** Ayrı tenant / POS Lite — Greenleaf kataloğu ve demo kullanıcıları karışmaz */
 function isIsolatedStoreContext(settings: AppSettings): boolean {
-  return isPosLiteProfile(settings) || loadTenantId() !== DEFAULT_TENANT_ID;
+  return isTenantCatalogIsolated(loadTenantId(), settings);
 }
 
 function resolveUsersFromSnapshot(
@@ -711,6 +723,22 @@ function createSetMovement(
   };
 }
 
+function serializeProductsForSnapshot(products: Product[], settings: AppSettings): Product[] {
+  const isolated = isTenantCatalogIsolated(undefined, settings);
+  return products.map((p) => {
+    if (!isolated) {
+      const { imageUrl: _, ...rest } = p;
+      return rest as Product;
+    }
+    const url = p.imageUrl ?? resolveLimaProductImagePath(p);
+    if (url && isLimaOwnedImageUrl(url)) {
+      return { ...p, imageUrl: url };
+    }
+    const { imageUrl: _, ...rest } = p;
+    return rest as Product;
+  });
+}
+
 function buildLocalSnapshot(
   products: Product[],
   productSets: ProductSet[],
@@ -743,7 +771,7 @@ function buildLocalSnapshot(
 ): PersistedStoreSnapshot {
   return {
     updatedAt: new Date().toISOString(),
-    products: products.map(({ imageUrl: _, ...rest }) => rest),
+    products: serializeProductsForSnapshot(products, settings),
     productSets,
     sales,
     saleReturns,
@@ -798,7 +826,8 @@ function buildSnapshotFromStorage(): PersistedStoreSnapshot {
   };
 }
 
-export function useStore() {
+export function usePosStoreState() {
+  syncPosLocalStorageKeys();
   const [products, setProducts] = useState<Product[]>(loadProducts);
   const [productSets, setProductSets] = useState<ProductSet[]>(loadProductSets);
   const [cart, setCart] = useState<CartItem[]>(loadCart);
@@ -850,9 +879,11 @@ export function useStore() {
     users?: PosUser[];
     cashSessions?: DailyCashSession[];
   }): PersistedStoreSnapshot => {
-    const { products: irsaliyeProducts } = applyIrsaliyeStockToProducts(products);
+    const snapshotProducts = isIsolatedStoreContext(settings)
+      ? products
+      : applyIrsaliyeStockToProducts(products).products;
     return buildLocalSnapshot(
-      irsaliyeProducts,
+      snapshotProducts,
       productSets,
       sales,
       saleReturns,
@@ -893,7 +924,11 @@ export function useStore() {
     const mergedSettings = snapshotMergedSettings(snapshot);
     const isolated = isIsolatedStoreContext(mergedSettings);
 
-    setProducts(isolated ? (snapshot.products ?? []) : mergeWithSeed(snapshot.products));
+    setProducts(
+      isolated
+        ? coerceTenantCatalogProducts(snapshot.products ?? [], true)
+        : mergeWithSeed(snapshot.products),
+    );
     setProductSets(isolated ? (snapshot.productSets ?? []) : mergeProductSets(snapshot.productSets));
     setSales(repairSaleCustomerLinks(snapshot.sales ?? [], snapshot.customers ?? []));
     setSaleReturns(snapshot.saleReturns ?? []);
@@ -964,16 +999,31 @@ export function useStore() {
 
     (async () => {
       syncPosLocalStorageKeys();
-      const tenant = loadTenantId();
+      const tenantAtStart = loadTenantId();
       const localSnapshot = buildSnapshotFromStorage();
       const remote = await fetchStoreSnapshot();
 
       if (cancelled) return;
+      if (loadTenantId() !== tenantAtStart) {
+        setSyncReady(true);
+        return;
+      }
+      const tenant = tenantAtStart;
 
-      if (tenant !== DEFAULT_TENANT_ID && remote) {
-        applySnapshot(remote);
-        setSyncStatus('synced');
-      } else if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
+      if (tenant !== DEFAULT_TENANT_ID) {
+        if (remote) {
+          applySnapshot(remote);
+          setSyncStatus('synced');
+        } else {
+          setProducts([]);
+          setProductSets([]);
+          setSyncStatus('local-only');
+        }
+        setSyncReady(true);
+        return;
+      }
+
+      if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
         const remoteUsers = (remote.users ?? []).map((user) => normalizeUser(user as unknown as Record<string, unknown>));
         const localUsers = loadUsers();
         const mergedUsers = mergeUserLists(remoteUsers, localUsers);
@@ -1024,9 +1074,15 @@ export function useStore() {
 
   useEffect(() => {
     if (!syncReady) return;
+    if (
+      isTenantCatalogIsolated(resolveEffectiveTenantId(), settings)
+      && looksLikeMainGreenleafCatalog(products)
+    ) {
+      return;
+    }
     const toSave = products.map(({ imageUrl: _, ...rest }) => rest);
     localStorage.setItem(storageKeys().products, JSON.stringify(toSave));
-  }, [products, syncReady]);
+  }, [products, syncReady, settings]);
 
   useEffect(() => {
     if (!syncReady) return;
@@ -2088,6 +2144,10 @@ export function useStore() {
 
   useEffect(() => {
     if (!syncReady || irsaliyeStockMigrationRef.current) return;
+    if (isIsolatedStoreContext(settings)) {
+      irsaliyeStockMigrationRef.current = true;
+      return;
+    }
     if (localStorage.getItem(IRSALIYE_STOCK_MIGRATION_KEY)) {
       irsaliyeStockMigrationRef.current = true;
       return;
@@ -2111,7 +2171,7 @@ export function useStore() {
         { irsaliye: 'LUY2026000000002' },
       );
     }
-  }, [syncReady, products, authSession, logActivity]);
+  }, [syncReady, products, authSession, logActivity, settings]);
 
   const refreshExchangeRatesFromTcmb = useCallback(async () => {
     const tcmb = await fetchTcmbRates();
@@ -2928,8 +2988,37 @@ export function useStore() {
     ) => {
       clearLoginLockout(user.username);
       const sessionId = `S${Date.now()}`;
-      const session = buildAuthSession(user, sessionId, settings);
       lastTrackedPageRef.current = null;
+      setSyncStatus('loading');
+      setSyncReady(false);
+
+      await exchangePosApiToken({
+        username: user.username,
+        password: credentials?.password,
+        pin: credentials?.pin,
+      });
+
+      const claims = decodePosApiTokenClaims(loadPosApiToken());
+      if (claims?.tenantId?.trim()) {
+        saveTenantId(claims.tenantId.trim());
+      }
+      syncPosLocalStorageKeys();
+
+      let sessionSettings = settings;
+      try {
+        const remote = await fetchStoreSnapshot();
+        if (remote) {
+          applySnapshot(remote);
+          sessionSettings = snapshotMergedSettings(remote);
+          setSyncStatus('synced');
+        } else {
+          setSyncStatus('local-only');
+        }
+      } finally {
+        setSyncReady(true);
+      }
+
+      const session = buildAuthSession(user, sessionId, sessionSettings);
       saveAuthSession(session);
       setAuthSession(session);
       saveLastQuickUser(user.username);
@@ -2947,28 +3036,37 @@ export function useStore() {
         `${method === 'pin' ? 'PIN' : 'Şifre'} ile oturum başlatıldı`,
         { method },
       );
-      await exchangePosApiToken({
-        username: user.username,
-        password: credentials?.password,
-        pin: credentials?.pin,
-      });
-      const remote = await fetchStoreSnapshot();
-      if (remote) {
-        applySnapshot(remote);
-        setSyncStatus('synced');
-      }
     },
     [appendLoginAudit, logActivity, applySnapshot, settings],
   );
 
   const refreshTenantData = useCallback(async (): Promise<void> => {
     syncPosLocalStorageKeys();
-    const remote = await fetchStoreSnapshot();
-    if (remote) {
-      applySnapshot(remote);
-      setSyncStatus('synced');
+    setSyncStatus('loading');
+    setSyncReady(false);
+    try {
+      const remote = await fetchStoreSnapshot();
+      if (remote) {
+        applySnapshot(remote);
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('local-only');
+      }
+    } finally {
+      setSyncReady(true);
     }
   }, [applySnapshot]);
+
+  useEffect(() => {
+    const onTenantChanged = () => {
+      syncPosLocalStorageKeys();
+      setProducts(loadProducts());
+      setProductSets(loadProductSets());
+      void refreshTenantData();
+    };
+    window.addEventListener(TENANT_ID_CHANGED_EVENT, onTenantChanged);
+    return () => window.removeEventListener(TENANT_ID_CHANGED_EVENT, onTenantChanged);
+  }, [refreshTenantData]);
 
   const logout = useCallback((reason: 'manual' | 'idle' = 'manual') => {
     if (authSession) {
@@ -3004,6 +3102,11 @@ export function useStore() {
       let user: PosUser | undefined;
       const remoteAuth = await exchangePosApiToken({ username: normalized, password });
       if (remoteAuth.ok) {
+        const claims = decodePosApiTokenClaims(loadPosApiToken());
+        if (claims?.tenantId?.trim()) {
+          saveTenantId(claims.tenantId.trim());
+          syncPosLocalStorageKeys();
+        }
         const remote = await fetchStoreSnapshot();
         if (remote?.users?.length) {
           const remoteUsers = remote.users.map((u) =>
@@ -3100,6 +3203,11 @@ export function useStore() {
       let user: PosUser | undefined;
       const remoteAuth = await exchangePosApiToken({ username: normalized, pin });
       if (remoteAuth.ok) {
+        const claims = decodePosApiTokenClaims(loadPosApiToken());
+        if (claims?.tenantId?.trim()) {
+          saveTenantId(claims.tenantId.trim());
+          syncPosLocalStorageKeys();
+        }
         const remote = await fetchStoreSnapshot();
         if (remote?.users?.length) {
           const remoteUsers = remote.users.map((u) =>
@@ -4548,6 +4656,13 @@ export function useStore() {
   const weekRefundTotal = weekReturns.reduce((sum, entry) => sum + entry.refundTotal, 0);
   const weekTotal = weekGrossTotal - weekRefundTotal;
 
+  const catalogDisplayReady = useMemo(() => {
+    if (!syncReady) return false;
+    const tenantId = resolveEffectiveTenantId();
+    if (!isTenantCatalogIsolated(tenantId, settings)) return true;
+    return !looksLikeMainGreenleafCatalog(products);
+  }, [syncReady, settings, products]);
+
   return {
     products,
     productSets,
@@ -4687,6 +4802,8 @@ export function useStore() {
     pushStoreToServer,
     persistStoreNow,
     syncStatus,
+    syncReady,
+    catalogDisplayReady,
     cartTotal,
     cartSampleCount,
     cartItemCount,
@@ -4748,4 +4865,4 @@ export function useStore() {
   };
 }
 
-export type Store = ReturnType<typeof useStore>;
+export type Store = ReturnType<typeof usePosStoreState>;
