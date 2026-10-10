@@ -3,6 +3,9 @@
  * Lima Market — 4 özgün stok (Greenleaf’ten bağımsız, fotoğraflı, tam fiyat)
  *
  *   node scripts/seed-lima-demo-products.mjs --data-dir /var/www/market-pos/data
+ *
+ * UYARI: Üretimde çalıştırmayın — mevcut lima-market store.json üzerine yazır.
+ * Demo referans: backups/seeds/lima-market.demo-store.json
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';

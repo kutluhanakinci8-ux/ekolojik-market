@@ -110,12 +110,19 @@ echo "==> Sunucu modül kontrolü..."
 node --check "${INSTALL_DIR}/server.mjs"
 
 export PORT
+
+echo "==> Canlı data yedeği (deploy veri dokunmaz politikası)..."
+bash "${REPO_ROOT}/scripts/backup-market-pos-data.sh" "${INSTALL_DIR}/data"
+
 bash "${INSTALL_DIR}/kur.sh"
 
-echo "==> Sunucu verisi: irsaliye stokları..."
-node "${APP_SRC}/scripts/apply-irsaliye-stock.mjs" "${INSTALL_DIR}/data" || echo "    (veri migrasyonu atlandı — data/ henüz yok olabilir)"
-echo "==> Sunucu verisi: Posta onboarding (Faz 3)..."
-node "${APP_SRC}/scripts/migrate-posta-onboarding.mjs" "${INSTALL_DIR}/data" || echo "    (posta onboarding migrasyonu atlandı)"
+if [[ "${EKOLOJIK_DEPLOY_DATA_MIGRATIONS:-0}" == "1" ]]; then
+  echo "==> Veri migrasyonları (EKOLOJIK_DEPLOY_DATA_MIGRATIONS=1)..."
+  node "${APP_SRC}/scripts/apply-irsaliye-stock.mjs" "${INSTALL_DIR}/data" || echo "    (irsaliye atlandı)"
+  node "${APP_SRC}/scripts/migrate-posta-onboarding.mjs" "${INSTALL_DIR}/data" || echo "    (posta onboarding atlandı)"
+else
+  echo "==> Veri migrasyonları atlandı (canlı data korunur). Zorunluysa: EKOLOJIK_DEPLOY_DATA_MIGRATIONS=1"
+fi
 
 echo "==> Build doğrulama..."
 VERIFY_TMP="$(mktemp)"
