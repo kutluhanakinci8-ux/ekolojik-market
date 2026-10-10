@@ -60,6 +60,8 @@ interface CartPanelProps {
   scanSearchRef?: RefObject<PremiumProductSearchHandle>;
   onBarcodeScan?: (normalized: string) => BarcodeScanApplyResult;
   onBarcodeScanFeedback?: (result: BarcodeScanApplyResult) => void;
+  /** POS Lite: kupon/puan kapalı, ödeme alanı kompakt */
+  compactCheckout?: boolean;
 }
 
 type CustomerStatus = 'registered' | 'new-registration' | 'gl-linked' | 'partner-only' | 'name-only' | 'none';
@@ -106,6 +108,7 @@ export function CartPanel({
   scanSearchRef,
   onBarcodeScan,
   onBarcodeScanFeedback,
+  compactCheckout = false,
 }: CartPanelProps) {
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerQuery, setCustomerQuery] = useState('');
@@ -180,8 +183,14 @@ export function CartPanel({
   const hasCartItems = cart.length > 0;
   const samplesOnly = hasCartItems && total === 0 && sampleCount > 0;
 
+  const showCrmCheckout =
+    !compactCheckout && onCrmCouponChange && !samplesOnly;
+  const crmHint = compactCheckout ? '' : crmDiscountLabel;
+
   return (
-    <aside className="cart-panel">
+    <aside
+      className={`cart-panel${compactCheckout ? ' cart-panel--compact-checkout' : ''}${hasCartItems ? ' cart-panel--has-items' : ''}`}
+    >
       <div className={`cart-panel-top ${hasCartItems ? 'cart-panel-top--compact' : ''}`}>
         <div className="cart-panel-search">
           <PremiumProductSearch
@@ -198,7 +207,19 @@ export function CartPanel({
         </div>
 
         <div className="cart-panel-header-row">
-          <h2>Sepet</h2>
+          <div className="cart-panel-header-title">
+            <h2>Sepet</h2>
+            {hasCartItems && (
+              <button
+                type="button"
+                className="cart-panel-header-clear"
+                onClick={onClear}
+                disabled={checkoutBusy}
+              >
+                Temizle
+              </button>
+            )}
+          </div>
           <div className="cart-panel-header-actions">
             {partnerLocked && (
               <span className="cart-panel-partner-chip">Partner</span>
@@ -253,11 +274,6 @@ export function CartPanel({
             >
               {customerSearchOpen ? 'Müşteri aramasını kapat' : 'Kayıtlı müşteri ara'}
             </button>
-            {hasCartItems && (
-              <button type="button" className="cart-panel-toolbar__clear" onClick={onClear}>
-                Temizle
-              </button>
-            )}
           </div>
 
           {customerSearchOpen && (
@@ -437,13 +453,13 @@ export function CartPanel({
 
       {cart.length > 0 && (
         <div className={`cart-panel-footer ${sampleCount > 0 ? 'cart-panel-footer--has-sample' : ''}`}>
-          {onCrmCouponChange && !samplesOnly && (
+          {showCrmCheckout && (
             <div className="cart-crm-row">
               <input
                 className="cart-crm-input"
                 placeholder="Kupon kodu"
                 value={crmCouponCode}
-                onChange={(e) => onCrmCouponChange(e.target.value.toUpperCase())}
+                onChange={(e) => onCrmCouponChange!(e.target.value.toUpperCase())}
               />
               {onCrmPointsChange && (
                 <input
@@ -457,7 +473,7 @@ export function CartPanel({
               )}
             </div>
           )}
-          {crmDiscountLabel && <p className="cart-crm-hint">{crmDiscountLabel}</p>}
+          {crmHint && <p className="cart-crm-hint">{crmHint}</p>}
           <div className="cart-total">
             <span>Toplam</span>
             <strong>{samplesOnly ? 'Ücretsiz' : formatCurrency(total)}</strong>
@@ -474,6 +490,18 @@ export function CartPanel({
 
           {cashDayClosed && (
             <p className="cart-day-closed-warn" role="alert">Kasa günü kapalı — satış kapalı (Ayarlar’dan kuralı değiştirebilirsiniz).</p>
+          )}
+          {compactCheckout && (
+            <div className="cart-payment-toolbar">
+              <button
+                type="button"
+                className="cart-footer-clear"
+                onClick={onClear}
+                disabled={checkoutBusy}
+              >
+                Temizle
+              </button>
+            </div>
           )}
           <div className="payment-buttons payment-buttons--pos">
             <button type="button" className="btn btn-payment cash" onClick={() => onCheckout('cash')} disabled={checkoutBusy || cashDayClosed}>

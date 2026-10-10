@@ -11,6 +11,8 @@ import { UsersManagement } from './UsersManagement';
 import { CurrencyRatesSettings } from './CurrencyRatesSettings';
 import { CrmSettingsPanel } from './crm/CrmSettingsPanel';
 import { PosCheckoutSettingsPanel } from './pos/PosCheckoutSettingsPanel';
+import { PosReceiptPrinterSettingsPanel } from './pos/PosReceiptPrinterSettingsPanel';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import { EmailOutboxSettingsPanel } from './settings/EmailOutboxSettingsPanel';
 
 interface SettingsScreenProps {
@@ -264,6 +266,10 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
                 Değişiklikleri Kaydet
               </button>
             </div>
+
+            {isAdmin && (
+              <PosReceiptPrinterSettingsPanel store={store} />
+            )}
           </section>
         )}
 
@@ -271,11 +277,15 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
           <CurrencyRatesSettings store={store} />
         )}
 
-        {activeTab === 'crm' && isAdmin && (
+        {activeTab === 'crm' && isAdmin && !isPosLiteProfile(store.settings) && (
           <>
             <CrmSettingsPanel store={store} />
             <PosCheckoutSettingsPanel store={store} />
           </>
+        )}
+
+        {activeTab === 'crm' && isAdmin && isPosLiteProfile(store.settings) && (
+          <PosCheckoutSettingsPanel store={store} />
         )}
 
         {activeTab === 'notes' && (
