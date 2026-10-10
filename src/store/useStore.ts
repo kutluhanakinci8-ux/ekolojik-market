@@ -209,6 +209,12 @@ const CATALOG_PRODUCTS: Array<Omit<Product, 'stock'>> = [
   ...GREENLEAF_PRODUCTS,
 ];
 
+/** Lima / POS Lite — Greenleaf demo kataloğu ilk karede gösterilmez */
+function usesIsolatedProductCatalog(): boolean {
+  if (loadTenantId() !== DEFAULT_TENANT_ID) return true;
+  return isPosLiteProfile(loadSettings());
+}
+
 function mergeWithSeed(stored: Product[] | null): Product[] {
   const storedMap = new Map((stored ?? []).map((p) => [p.id, p]));
   const images = loadAllImages();
@@ -248,15 +254,17 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
 }
 
 function loadProducts(): Product[] {
+  const isolated = usesIsolatedProductCatalog();
   const stored = localStorage.getItem(storageKeys().products);
   if (stored) {
     try {
-      return mergeWithSeed(JSON.parse(stored) as Product[]);
+      const parsed = JSON.parse(stored) as Product[];
+      return isolated ? parsed : mergeWithSeed(parsed);
     } catch {
       /* fall through */
     }
   }
-  return mergeWithSeed(null);
+  return isolated ? [] : mergeWithSeed(null);
 }
 
 function mergeProductSets(stored: ProductSet[] | null | undefined): ProductSet[] {
@@ -286,15 +294,17 @@ function mergeProductSets(stored: ProductSet[] | null | undefined): ProductSet[]
 }
 
 function loadProductSets(): ProductSet[] {
+  const isolated = usesIsolatedProductCatalog();
   const stored = localStorage.getItem(storageKeys().productSets);
   if (stored) {
     try {
-      return mergeProductSets(JSON.parse(stored) as ProductSet[]);
+      const parsed = JSON.parse(stored) as ProductSet[];
+      return isolated ? parsed : mergeProductSets(parsed);
     } catch {
       /* fall through */
     }
   }
-  return mergeProductSets(null);
+  return isolated ? [] : mergeProductSets(null);
 }
 
 function loadCart(): CartItem[] {
@@ -799,6 +809,7 @@ function buildSnapshotFromStorage(): PersistedStoreSnapshot {
 }
 
 export function useStore() {
+  syncPosLocalStorageKeys();
   const [products, setProducts] = useState<Product[]>(loadProducts);
   const [productSets, setProductSets] = useState<ProductSet[]>(loadProductSets);
   const [cart, setCart] = useState<CartItem[]>(loadCart);
@@ -2963,10 +2974,18 @@ export function useStore() {
 
   const refreshTenantData = useCallback(async (): Promise<void> => {
     syncPosLocalStorageKeys();
-    const remote = await fetchStoreSnapshot();
-    if (remote) {
-      applySnapshot(remote);
-      setSyncStatus('synced');
+    setSyncStatus('loading');
+    setSyncReady(false);
+    try {
+      const remote = await fetchStoreSnapshot();
+      if (remote) {
+        applySnapshot(remote);
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('local-only');
+      }
+    } finally {
+      setSyncReady(true);
     }
   }, [applySnapshot]);
 
@@ -4687,6 +4706,7 @@ export function useStore() {
     pushStoreToServer,
     persistStoreNow,
     syncStatus,
+    syncReady,
     cartTotal,
     cartSampleCount,
     cartItemCount,

@@ -25,6 +25,7 @@ import {
   shouldForcePostaOnboardingOpen,
 } from './storage/postaOnboardingSession';
 import { filterTabsForProductProfile, isPosLiteProfile } from './utils/tenantProductProfile';
+import { PosTenantBootstrap } from './components/PosTenantBootstrap';
 
 function renderPage(
   page: AppPage,
@@ -193,6 +194,10 @@ export function PosApp() {
 
   if (!store.authSession) {
     return <Navigate to="/giris" replace />;
+  }
+
+  if (!store.syncReady) {
+    return <PosTenantBootstrap settings={store.settings} />;
   }
 
   if (store.authSession.mustChangePassword) {
