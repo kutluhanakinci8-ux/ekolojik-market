@@ -85,8 +85,8 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         <p className="module-hint">
           <strong>Lima Market</strong> — fiş <strong>doğrudan POS-80C</strong> (ESC/POS); tarayıcı yazdır
           penceresi <strong>açılmaz</strong>. Sıra: kasa PC <code>127.0.0.1:18765</code>, sonra sunucu API köprüsü.
-          Windows: <code>start-lima-receipt-bridge.bat</code> veya{' '}
-          <code>install-lima-bridge-windows-task.ps1</code> (oturum açılışında).
+          Windows: <code>start-lima-receipt-bridge.bat</code> · Mac/Linux:{' '}
+          <code>bash scripts/start-lima-receipt-bridge.sh</code> (VPS’te SSH — .bat/.ps1 Linux’ta çalışmaz).
         </p>
         <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
