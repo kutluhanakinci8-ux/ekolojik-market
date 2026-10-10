@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="72" viewBox="0 0 240 72">
+  <g fill="none" stroke="#000" stroke-width="2.5">
+    <circle cx="36" cy="36" r="30"/>
+    <path d="M36 14c-14 18-14 26 0 44 14-18 14-26 0-44z" fill="#000" stroke="none"/>
+    <path d="M36 22v28M28 30c6-4 12-4 16 0M28 42c6 4 12 4 16 0" stroke-width="2"/>
+  </g>
+  <text x="78" y="40" font-family="Arial,Helvetica,sans-serif" font-size="26" font-weight="700" fill="#000">Lima</text>
+  <text x="78" y="58" font-family="Arial,Helvetica,sans-serif" font-size="13" font-weight="600" fill="#000">Market</text>
+</svg>

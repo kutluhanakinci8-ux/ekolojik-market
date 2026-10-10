@@ -52,9 +52,18 @@ const PAYMENT_LABELS: Record<SaleReceiptData['paymentMethod'], string> = {
   credit: 'Veresiye',
 };
 
-/** Mac rastertopos: c0 ilk satırlara basılır — markadan önce atıl satırlar */
-const RECEIPT_DRIVER_SACRIFICE_LINES = 4;
-const RECEIPT_SACRIFICE_FILL = '-';
+/** Eski rastertopos yaması — artık fişte gösterilmez (Cû / çizgi kalıntısı) */
+const LIMA_RECEIPT_LOGO_URL = '/lima-receipt-logo.svg';
+
+function isLimaBrandedReceipt(businessName: string): boolean {
+  return sanitizeReceiptVisibleText(businessName).toLocaleLowerCase('tr-TR').includes('lima');
+}
+
+function buildReceiptLogoHtml(businessName: string): string {
+  if (!isLimaBrandedReceipt(businessName)) return '';
+  const src = LIMA_RECEIPT_LOGO_URL;
+  return `<img class="rp-logo" src="${src}" alt="" width="200" height="60" />`;
+}
 
 function formatReceiptMoney(amount: number): string {
   return new Intl.NumberFormat('tr-TR', {
@@ -415,20 +424,9 @@ function wrapPlainReceiptBody(
 </html>`;
 }
 
-export function buildPlainTextSaleReceipt(
-  data: SaleReceiptData,
-  opts?: { sacrificeLines?: boolean },
-): string {
+export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
   const receiptRef = data.receiptNo || data.saleId || '—';
-  const useSacrifice = opts?.sacrificeLines !== false;
-  const sacrifice = useSacrifice
-    ? Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
-        RECEIPT_SACRIFICE_FILL.repeat(30),
-      )
-    : [];
   const lines: string[] = [
-    ...sacrifice,
-    ...(useSacrifice ? [''] : []),
     formatReceiptBrandName(data.businessName),
     'SATIŞ FİŞİ',
     '--------------------------------',
@@ -642,25 +640,13 @@ function receiptPremiumStyles(): string {
       -webkit-font-smoothing: none;
       font-synthesis: none;
     }
-    /* Mac rastertopos: ilk 1–3 metin satırı bozulur (c0) — marka aşağıda başlar */
-    .rp-driver-skip {
+    .rp-logo {
       display: block;
-      height: 10mm;
-      min-height: 10mm;
-      width: 100%;
-    }
-    .rp-sacrifice {
-      display: block;
-      margin: 0;
-      padding: 2px 0;
-      font-size: 9px;
-      line-height: 1.05;
-      font-weight: 400;
-      text-align: center;
-      letter-spacing: 0;
-      color: #000;
-      white-space: nowrap;
-      overflow: hidden;
+      margin: 0 auto 6px;
+      width: 52mm;
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
     }
     .rp-brand {
       text-align: center;
@@ -751,13 +737,6 @@ function formatReceiptBrandName(name: string): string {
   return sanitizeReceiptVisibleText(name).toLocaleUpperCase('tr-TR');
 }
 
-function buildDriverSacrificeLinesHtml(): string {
-  const line = RECEIPT_SACRIFICE_FILL.repeat(30);
-  return Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
-    `<div class="rp-sacrifice">${line}</div>`,
-  ).join('\n');
-}
-
 /** Lima premium termal — hizalı tablo, tek ağırlık (ghost/çift basım yok) */
 export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string {
   const receiptRef = data.receiptNo || data.saleId || '—';
@@ -781,8 +760,7 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
   <style>${receiptPremiumStyles()}</style>
 </head>
 <body class="receipt-premium">
-  <div class="rp-driver-skip" aria-hidden="true"></div>
-  ${buildDriverSacrificeLinesHtml()}
+  ${buildReceiptLogoHtml(data.businessName)}
   <div class="rp-brand">${escapeHtml(formatReceiptBrandName(data.businessName))}</div>
   <div class="rp-kind">SATIŞ FİŞİ</div>
   <hr class="rp-rule" />
@@ -1018,7 +996,7 @@ export async function printThermalReceipt(
 ): Promise<void> {
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
-    const plainNoSacrifice = buildPlainTextSaleReceipt(data, { sacrificeLines: false });
+    const plainNoSacrifice = buildPlainTextSaleReceipt(data);
     const rawOk = await tryLimaMacRawReceiptPrint(plainNoSacrifice);
     if (rawOk) {
       logReceiptPrint('thermal-raw-escpos-ok', { saleId: data.saleId });
