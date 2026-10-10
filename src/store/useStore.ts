@@ -52,9 +52,11 @@ import {
 import {
   DEFAULT_POS_NOTES,
   DEFAULT_SETTINGS,
+  normalizeReceiptPrinterSettings,
   normalizeUtilityBillSubscriptions,
   type PosNote,
 } from '../types/business';
+import { sanitizeReceiptPrinterSettings } from '../utils/greenleafReceipt';
 import { DEFAULT_POS_CHECKOUT_SETTINGS, type CompleteSaleOptions, type HeldPosSale } from '../types/pos';
 import { computeChange, validatePaymentSplits } from '../utils/posCheckout';
 import { loadHeldPosSales, saveHeldPosSales } from '../storage/heldPosSales';
@@ -524,6 +526,10 @@ function loadSettings(): AppSettings {
         customExpenseCategories: normalizeCustomExpenseCategories(parsed.customExpenseCategories),
         crm: { ...DEFAULT_CRM_SETTINGS, ...(parsed.crm ?? {}), automationEnabled: parsed.crm?.automationEnabled ?? DEFAULT_CRM_SETTINGS.automationEnabled },
         posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(parsed.posCheckout ?? {}) },
+        receiptPrinter: sanitizeReceiptPrinterSettings({
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+        } as AppSettings),
       };
     } catch {
       return DEFAULT_SETTINGS;
@@ -983,6 +989,10 @@ export function usePosStoreState() {
       ),
       crm: { ...DEFAULT_CRM_SETTINGS, ...(snapshot.settings?.crm ?? {}) },
       posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(snapshot.settings?.posCheckout ?? {}) },
+      receiptPrinter: sanitizeReceiptPrinterSettings({
+        ...mergedSettings,
+        receiptPrinter: snapshot.settings?.receiptPrinter ?? mergedSettings.receiptPrinter,
+      } as AppSettings),
     });
     if (snapshot.priceType) setPriceType(snapshot.priceType);
     setUsers(resolveUsersFromSnapshot(snapshot, mergedSettings));
@@ -4111,6 +4121,18 @@ export function usePosStoreState() {
     });
   }, [settings.posCheckout, updateSettings]);
 
+  const updateReceiptPrinterSettings = useCallback(
+    (patch: Partial<AppSettings['receiptPrinter']>) => {
+      updateSettings({
+        receiptPrinter: normalizeReceiptPrinterSettings({
+          ...settings.receiptPrinter,
+          ...patch,
+        }),
+      });
+    },
+    [settings.receiptPrinter, updateSettings],
+  );
+
   const processSaleReturn = useCallback((
     saleId: string,
     requestedLines: Array<{ lineKey: string; quantity: number }>,
@@ -4748,6 +4770,7 @@ export function usePosStoreState() {
     heldPosSales,
     recordCashDrawerCount,
     updatePosCheckoutSettings,
+    updateReceiptPrinterSettings,
     processSaleReturn,
     setProductStock,
     updateProductBarcode,

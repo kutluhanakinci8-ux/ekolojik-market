@@ -1,4 +1,4 @@
-import { printFiscalReturnReceipt } from '../services/fiscalBridge';
+import { isRealFiscalDevicePrint, printFiscalReturnReceipt } from '../services/fiscalBridge';
 import type { Product, Sale } from '../types/product';
 import type { ProductSet } from '../types/productSet';
 import type { SaleReturn } from '../types/saleReturn';
@@ -83,7 +83,7 @@ export async function printSaleReturnReceipt(
       });
 
       if (fiscal.success) {
-        fiscalPrinted = !fiscal.simulated;
+        fiscalPrinted = isRealFiscalDevicePrint(fiscal);
         fiscalReceiptNo = fiscal.receiptNo;
       } else if (!options?.skipFiscalConfirm && !confirm(
         `Yazar kasa iade fişi hatası: ${fiscal.message ?? 'Bilinmeyen hata'}\nTermal iade fişi yazdırılsın mı?`,

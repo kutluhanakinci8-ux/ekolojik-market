@@ -2945,6 +2945,21 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/pos/receipt-print-log' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const body = await readRequestBody(req);
+      const { appendReceiptPrintLog } = await import('./server/receiptPrintLog.mjs');
+      await appendReceiptPrintLog(DATA_DIR, tenantId, {
+        phase: body?.phase ?? 'unknown',
+        detail: body?.detail ?? null,
+        userAgent: body?.userAgent ?? null,
+      });
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     if (pathname === '/api/data' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
       if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;

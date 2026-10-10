@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { APP_CATALOG_VERSION, EXPECTED_PRODUCT_COUNT } from '../data/appVersion';
-import { APP_BUILD_ID, APP_FEATURE_TAG } from '../version';
-import { loadTenantId } from '../storage/tenantSession';
-import { isTenantCatalogIsolated } from '../utils/tenantCatalogIsolation';
 import { PRICE_CATALOG_BATCH_ID } from '../data/priceCatalogBatch1';
 import type { Store } from '../store/useStore';
 import type { PriceType } from '../types/product';
@@ -14,6 +11,8 @@ import { UsersManagement } from './UsersManagement';
 import { CurrencyRatesSettings } from './CurrencyRatesSettings';
 import { CrmSettingsPanel } from './crm/CrmSettingsPanel';
 import { PosCheckoutSettingsPanel } from './pos/PosCheckoutSettingsPanel';
+import { PosReceiptPrinterSettingsPanel } from './pos/PosReceiptPrinterSettingsPanel';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import { EmailOutboxSettingsPanel } from './settings/EmailOutboxSettingsPanel';
 
 interface SettingsScreenProps {
@@ -85,8 +84,6 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
         : 'Yalnızca bu cihaz';
 
   const syncHealthy = store.syncStatus === 'synced';
-  const tenantId = loadTenantId();
-  const catalogIsolated = isTenantCatalogIsolated(tenantId, store.settings);
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -269,6 +266,10 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
                 Değişiklikleri Kaydet
               </button>
             </div>
+
+            {isAdmin && (
+              <PosReceiptPrinterSettingsPanel store={store} />
+            )}
           </section>
         )}
 
@@ -276,11 +277,15 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
           <CurrencyRatesSettings store={store} />
         )}
 
-        {activeTab === 'crm' && isAdmin && (
+        {activeTab === 'crm' && isAdmin && !isPosLiteProfile(store.settings) && (
           <>
             <CrmSettingsPanel store={store} />
             <PosCheckoutSettingsPanel store={store} />
           </>
+        )}
+
+        {activeTab === 'crm' && isAdmin && isPosLiteProfile(store.settings) && (
+          <PosCheckoutSettingsPanel store={store} />
         )}
 
         {activeTab === 'notes' && (
@@ -319,19 +324,8 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
                   <strong>{PRICE_CATALOG_BATCH_ID}</strong>
                 </article>
                 <article className="settings-stat-card">
-                  <span className="settings-stat-label">Mağaza kodu</span>
-                  <strong>{tenantId}</strong>
-                </article>
-                <article className="settings-stat-card">
-                  <span className="settings-stat-label">Yazılım</span>
-                  <strong title={APP_BUILD_ID}>{APP_FEATURE_TAG}</strong>
-                </article>
-                <article className="settings-stat-card">
                   <span className="settings-stat-label">Ürün</span>
-                  <strong>
-                    {store.products.length}
-                    {catalogIsolated ? '' : ` / ${EXPECTED_PRODUCT_COUNT}`}
-                  </strong>
+                  <strong>{store.products.length} / {EXPECTED_PRODUCT_COUNT}</strong>
                 </article>
                 <article className="settings-stat-card">
                   <span className="settings-stat-label">Müşteri</span>
