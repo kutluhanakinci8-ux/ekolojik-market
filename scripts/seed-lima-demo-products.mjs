@@ -31,16 +31,18 @@ function wholesaleFromRetailGross(retailGross) {
 function limaProduct(base) {
   const purchasePrice = base.purchasePrice;
   const partnerPrice = base.partnerPrice;
+  /** base.fullSalePrice = perakende liste (KDV hariç); kasa = ×1.2 */
   const fullSalePrice = base.fullSalePrice;
+  const ourPriceWithVat = round2(fullSalePrice * VAT);
   const couponPrice = base.couponPrice ?? round2(partnerPrice * 1.05);
   const ourPercent = round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100);
   return {
     ...base,
     couponPrice,
     ourPercent,
-    ourPriceWithVat: fullSalePrice,
+    ourPriceWithVat,
     partnerPriceWithVat: round2(partnerPrice * VAT),
-    wholesalePrices: wholesaleFromRetailGross(fullSalePrice),
+    wholesalePrices: wholesaleFromRetailGross(ourPriceWithVat),
     boxDimensions: base.boxDimensions ?? '40×25×15 cm',
     weightKg: base.weightKg ?? 0.5,
     desi: 1,

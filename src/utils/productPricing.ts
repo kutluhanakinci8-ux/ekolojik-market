@@ -1,5 +1,38 @@
 import type { Product } from '../types/product';
 import { irsaliyeEanForCode } from '../data/irsaliyeLuy2026000000002';
+import { DEFAULT_VAT_RATE } from './vatAnalytics';
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/** Perakende liste fiyatına %20 KDV ekler (kasa / fiş — KDV dahil). */
+export function applyRetailVat(netPrice: number, vatRate = DEFAULT_VAT_RATE): number {
+  if (netPrice <= 0) return 0;
+  return round2(netPrice * (1 + vatRate / 100));
+}
+
+/**
+ * Kasada kullanılan perakende birim fiyat (KDV dahil).
+ * Greenleaf: fullSalePrice = net liste, ourPriceWithVat = brüt.
+ * Eski Lima kayıtlarında ikisi eşitse net kabul edilir ve KDV eklenir.
+ */
+export function resolveRetailGrossPrice(
+  product: Pick<Product, 'fullSalePrice' | 'ourPriceWithVat'>,
+  vatRate = DEFAULT_VAT_RATE,
+): number {
+  const net = product.fullSalePrice;
+  const storedGross = product.ourPriceWithVat;
+  if (net <= 0) return Math.max(0, storedGross);
+
+  const expectedGross = applyRetailVat(net, vatRate);
+  const grossLooksStored = storedGross >= net * 1.15;
+  if (grossLooksStored) {
+    return storedGross >= expectedGross * 0.98 ? storedGross : expectedGross;
+  }
+  if (Math.abs(storedGross - net) < 0.02 || storedGross <= net * 1.02) {
+    return expectedGross;
+  }
+  return Math.max(storedGross, expectedGross);
+}
 
 export interface PriceCatalogEntry {
   code: string;
