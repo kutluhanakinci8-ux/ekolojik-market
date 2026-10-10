@@ -1,0 +1,41 @@
+# main’e her push → Lima VPS otomatik deploy (test aşaması)
+# Repo → Settings → Secrets → Actions:
+#   VPS_HOST    = 168.231.109.27
+#   VPS_USER    = root
+#   VPS_SSH_KEY = sunucu SSH private key (parola yerine)
+name: Deploy VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.repository == 'kutluhanakinci8-ux/ekolojik-market'
+    steps:
+      - name: Deploy market-pos on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 25m
+          script: |
+            set -euo pipefail
+            REPO=/var/www/ekolojik-market-pos
+            if [[ ! -d "$REPO/.git" ]]; then
+              git clone --branch main https://github.com/kutluhanakinci8-ux/ekolojik-market.git "$REPO"
+            fi
+            cd "$REPO"
+            git fetch origin main
+            git checkout -- tsconfig.tsbuildinfo 2>/dev/null || true
+            git reset --hard origin/main
+            BRANCH=main bash scripts/sunucu-market-pos-deploy.sh
+            echo "Deploy OK: $(git rev-parse --short HEAD)"
