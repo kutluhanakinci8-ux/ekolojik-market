@@ -18,31 +18,29 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
-function wholesaleFromRetailGross(retailGross) {
-  const net = round2(retailGross / VAT);
+function wholesaleFromRetailNet(retailNet) {
   return {
-    qty10: round2(net * 0.92),
-    qty20: round2(net * 0.87),
-    qty50: round2(net * 0.82),
-    qty100: round2(net * 0.76),
+    qty10: round2(retailNet * 0.92),
+    qty20: round2(retailNet * 0.87),
+    qty50: round2(retailNet * 0.82),
+    qty100: round2(retailNet * 0.76),
   };
 }
 
 function limaProduct(base) {
   const purchasePrice = base.purchasePrice;
   const partnerPrice = base.partnerPrice;
-  /** base.fullSalePrice = perakende liste (KDV hariç); kasa = ×1.2 */
+  /** base.fullSalePrice = perakende (KDV hariç); Lima kasa da bu liste ile çalışır */
   const fullSalePrice = base.fullSalePrice;
-  const ourPriceWithVat = round2(fullSalePrice * VAT);
   const couponPrice = base.couponPrice ?? round2(partnerPrice * 1.05);
   const ourPercent = round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100);
   return {
     ...base,
     couponPrice,
     ourPercent,
-    ourPriceWithVat,
+    ourPriceWithVat: fullSalePrice,
     partnerPriceWithVat: round2(partnerPrice * VAT),
-    wholesalePrices: wholesaleFromRetailGross(ourPriceWithVat),
+    wholesalePrices: wholesaleFromRetailNet(fullSalePrice),
     boxDimensions: base.boxDimensions ?? '40×25×15 cm',
     weightKg: base.weightKg ?? 0.5,
     desi: 1,

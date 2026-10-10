@@ -11,11 +11,11 @@ export function applyRetailVat(netPrice: number, vatRate = DEFAULT_VAT_RATE): nu
 }
 
 /**
- * Kasada kullanılan perakende birim fiyat (KDV dahil).
- * Greenleaf: fullSalePrice = net liste, ourPriceWithVat = brüt.
- * Eski Lima kayıtlarında ikisi eşitse net kabul edilir ve KDV eklenir.
+ * Perakende kasa birim fiyatı.
+ * Greenleaf: fullSalePrice = net liste, ourPriceWithVat = KDV dahil tahsilat.
+ * Lima / brüt ayrı kayıtlı değilse (iki alan yakınsa): KDV hariç liste (fullSalePrice).
  */
-export function resolveRetailGrossPrice(
+export function resolveRetailSaleUnitPrice(
   product: Pick<Product, 'fullSalePrice' | 'ourPriceWithVat'>,
   vatRate = DEFAULT_VAT_RATE,
 ): number {
@@ -28,10 +28,7 @@ export function resolveRetailGrossPrice(
   if (grossLooksStored) {
     return storedGross >= expectedGross * 0.98 ? storedGross : expectedGross;
   }
-  if (Math.abs(storedGross - net) < 0.02 || storedGross <= net * 1.02) {
-    return expectedGross;
-  }
-  return Math.max(storedGross, expectedGross);
+  return net;
 }
 
 export interface PriceCatalogEntry {

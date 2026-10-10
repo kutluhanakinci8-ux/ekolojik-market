@@ -1,6 +1,6 @@
 import type { PriceType, Product, SaleMode } from '../types/product';
 import { isValidGreenleafNumber } from './customerValidation';
-import { resolveRetailGrossPrice } from './productPricing';
+import { resolveRetailSaleUnitPrice } from './productPricing';
 import { getWholesaleUnitPrice, applyWholesaleVat } from './wholesalePricing';
 
 export const SALE_PRICE_LABELS: Record<PriceType, string> = {
@@ -22,9 +22,9 @@ export function getProductSalePrice(product: Product, priceType: PriceType, quan
   if (priceType === 'partner') return product.partnerPriceWithVat;
   if (priceType === 'wholesale') {
     const net = getWholesaleUnitPrice(product, quantity);
-    return net != null ? applyWholesaleVat(net) : product.ourPriceWithVat;
+    return net != null ? applyWholesaleVat(net) : resolveRetailSaleUnitPrice(product);
   }
-  return resolveRetailGrossPrice(product);
+  return resolveRetailSaleUnitPrice(product);
 }
 
 export function getCartUnitPrice(product: Product, quantity: number, priceType: PriceType): number {
