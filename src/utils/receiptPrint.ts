@@ -12,6 +12,8 @@ const BLANK_PRINT_TITLE = '';
 
 export interface ReceiptLineItem {
   name: string;
+  /** Stok kodu (fiş satırının başında) */
+  productCode?: string;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
@@ -97,6 +99,15 @@ function truncateName(name: string, max = 32): string {
   return `${name.slice(0, max - 1)}…`;
 }
 
+function formatReceiptItemLabel(item: Pick<ReceiptLineItem, 'name' | 'productCode'>, max = 32): string {
+  const code = item.productCode?.trim();
+  const name = item.name.trim();
+  if (!code) return truncateName(name, max);
+  const prefix = `${code} `;
+  const nameMax = Math.max(8, max - prefix.length);
+  return prefix + truncateName(name, nameMax);
+}
+
 export function buildReceiptFromCart(
   cart: CartItem[],
   products: Product[],
@@ -112,6 +123,7 @@ export function buildReceiptFromCart(
       const name = set?.name ?? `Set ${item.setId}`;
       return {
         name,
+        productCode: item.setId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.unitPrice * item.quantity,
@@ -119,8 +131,10 @@ export function buildReceiptFromCart(
     }
     const product = products.find((p) => p.id === item.productId);
     const name = product?.name ?? `Ürün #${item.productId}`;
+    const productCode = product?.productCode?.trim() || (product?.id ? String(product.id) : undefined);
     return {
       name,
+      productCode,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       lineTotal: item.unitPrice * item.quantity,
@@ -148,14 +162,19 @@ export function buildReturnReceipt(
 ): ReturnReceiptData {
   const items: ReturnReceiptLineItem[] = returnRecord.items.map((line) => {
     let name: string;
+    let productCode: string | undefined;
     if (line.setId) {
+      productCode = line.setId;
       name = productSets.find((set) => set.id === line.setId)?.name ?? `Set ${line.setId}`;
     } else {
-      name = products.find((product) => product.id === line.productId)?.name ?? `Ürün #${line.productId}`;
+      const product = products.find((p) => p.id === line.productId);
+      name = product?.name ?? `Ürün #${line.productId}`;
+      productCode = product?.productCode?.trim() || (line.productId ? String(line.productId) : undefined);
     }
     const lineTotal = line.priceType === 'sample' ? 0 : line.unitPrice * line.quantity;
     return {
       name,
+      productCode,
       quantity: line.quantity,
       unitPrice: line.unitPrice,
       lineTotal,
@@ -436,7 +455,7 @@ export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
     '--------------------------------',
   ];
   for (const item of data.items) {
-    lines.push(truncateName(item.name, 28));
+    lines.push(formatReceiptItemLabel(item, 28));
     lines.push(`  ${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}`);
     lines.push(`  ${formatReceiptMoneyPlain(item.lineTotal)}`);
   }
@@ -451,7 +470,7 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58
   const lines = data.items
     .map((item) => {
       const sample = item.priceType === 'sample';
-      const left = `${truncateName(item.name)} x${item.quantity}${sample ? ' (Numune)' : ''}`;
+      const left = `${formatReceiptItemLabel(item)} x${item.quantity}${sample ? ' (Numune)' : ''}`;
       const right = sample ? 'NUMUNE' : `-${formatReceiptMoney(item.lineTotal)}`;
       return `
         <tr class="line">
@@ -548,7 +567,7 @@ export function buildReceiptHtml(
 ): string {
   const lines = data.items
     .map((item) => {
-      const left = `${truncateName(item.name)} x${item.quantity}`;
+      const left = `${formatReceiptItemLabel(item)} x${item.quantity}`;
       const right = formatReceiptMoney(item.lineTotal);
       return `
         <tr class="line total-row">
@@ -743,7 +762,7 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
   const itemRows = data.items
     .map(
       (item) => `
-    <tr class="rp-item-name"><td colspan="2">${escapeHtml(item.name)}</td></tr>
+    <tr class="rp-item-name"><td colspan="2">${escapeHtml(formatReceiptItemLabel(item, 36))}</td></tr>
     <tr class="rp-item-detail">
       <td class="rp-sub">${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}</td>
       <td class="rp-amt">${formatReceiptMoneyPlain(item.lineTotal)}</td>
