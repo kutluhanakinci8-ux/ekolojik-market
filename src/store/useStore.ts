@@ -2125,6 +2125,10 @@ export function usePosStoreState() {
 
   useEffect(() => {
     if (!syncReady || irsaliyeStockMigrationRef.current) return;
+    if (isIsolatedStoreContext(settings)) {
+      irsaliyeStockMigrationRef.current = true;
+      return;
+    }
     if (localStorage.getItem(IRSALIYE_STOCK_MIGRATION_KEY)) {
       irsaliyeStockMigrationRef.current = true;
       return;
@@ -2148,7 +2152,7 @@ export function usePosStoreState() {
         { irsaliye: 'LUY2026000000002' },
       );
     }
-  }, [syncReady, products, authSession, logActivity]);
+  }, [syncReady, products, authSession, logActivity, settings]);
 
   const refreshExchangeRatesFromTcmb = useCallback(async () => {
     const tcmb = await fetchTcmbRates();

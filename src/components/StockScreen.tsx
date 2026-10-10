@@ -7,7 +7,7 @@ import type { Product, WholesalePrices } from '../types/product';
 import { formatCurrency, formatDateTime } from '../utils/format';
 import { exportStockCsv, getStockInventoryValue } from '../utils/stockExport';
 import {
-  getIrsaliyeWarehouseStockMetrics,
+  getStockCatalogMetrics,
   IRSALIYE_CODES_WITHOUT_PRODUCT,
   IRSALIYE_LUY2026000000002_ID,
   IRSALIYE_PDF_LINE_COUNT,
@@ -22,6 +22,7 @@ import {
 import { ProductImage } from './ProductImage';
 import { ProductSetModal } from './ProductSetModal';
 import { StockOperationsModal, type StockOperationType } from './StockOperationsModal';
+import { isTenantCatalogIsolated } from '../utils/tenantCatalogIsolation';
 
 interface StockScreenProps {
   store: Store;
@@ -108,9 +109,11 @@ export function StockScreen({ store }: StockScreenProps) {
   const [bulkWholesaleDiscounts, setBulkWholesaleDiscounts] = useState(DEFAULT_WHOLESALE_DISCOUNTS);
   const [wholesaleDisplayTier, setWholesaleDisplayTier] = useState<WholesaleDisplayTier>(10);
 
+  const posLiteStock = isTenantCatalogIsolated(undefined, store.settings);
+
   const warehouse = useMemo(
-    () => getIrsaliyeWarehouseStockMetrics(store.products, store.lowStockThreshold),
-    [store.products, store.lowStockThreshold],
+    () => getStockCatalogMetrics(store.products, store.lowStockThreshold, store.settings),
+    [store.products, store.lowStockThreshold, store.settings],
   );
 
   const warehouseProducts = warehouse.products;
@@ -389,19 +392,28 @@ export function StockScreen({ store }: StockScreenProps) {
         </div>
         {summaryOpen && (
           <div className="stock-summary-strip-detail">
-            <span className="stock-summary-meta">
-              e-İrsaliye <strong>{IRSALIYE_LUY2026000000002_ID}</strong> · {IRSALIYE_PDF_LINE_COUNT} satır ·{' '}
-              {IRSALIYE_WAREHOUSE_CODE_COUNT} kod · hedef{' '}
-              <strong>{IRSALIYE_WAREHOUSE_UNIT_TOTAL.toLocaleString('tr-TR')}</strong> adet · depo{' '}
-              {totalStockUnits.toLocaleString('tr-TR')} · Envanter {formatCurrency(inventoryValue)}
-              {IRSALIYE_CODES_WITHOUT_PRODUCT.length > 0 && (
-                <> · kart eksik: {IRSALIYE_CODES_WITHOUT_PRODUCT.join(', ')}</>
-              )}
-            </span>
-            <span className="stock-summary-meta stock-summary-meta--hint">
-              Stok ekranında yalnızca bu irsaliyedeki ürünler listelenir. Satış kataloğundaki diğer ürünler burada
-              gösterilmez.
-            </span>
+            {posLiteStock ? (
+              <span className="stock-summary-meta stock-summary-meta--hint">
+                Lima stok listesi — giriş için tabloda <strong>İşlem</strong> veya üstte{' '}
+                <strong>+ Stok İşlemleri</strong>. Hareket geçmişi altta listelenir.
+              </span>
+            ) : (
+              <>
+                <span className="stock-summary-meta">
+                  e-İrsaliye <strong>{IRSALIYE_LUY2026000000002_ID}</strong> · {IRSALIYE_PDF_LINE_COUNT} satır ·{' '}
+                  {IRSALIYE_WAREHOUSE_CODE_COUNT} kod · hedef{' '}
+                  <strong>{IRSALIYE_WAREHOUSE_UNIT_TOTAL.toLocaleString('tr-TR')}</strong> adet · depo{' '}
+                  {totalStockUnits.toLocaleString('tr-TR')} · Envanter {formatCurrency(inventoryValue)}
+                  {IRSALIYE_CODES_WITHOUT_PRODUCT.length > 0 && (
+                    <> · kart eksik: {IRSALIYE_CODES_WITHOUT_PRODUCT.join(', ')}</>
+                  )}
+                </span>
+                <span className="stock-summary-meta stock-summary-meta--hint">
+                  Stok ekranında yalnızca bu irsaliyedeki ürünler listelenir. Satış kataloğundaki diğer ürünler burada
+                  gösterilmez.
+                </span>
+              </>
+            )}
             <span className="stock-version">Depo {APP_CATALOG_VERSION}</span>
           </div>
         )}
@@ -411,8 +423,8 @@ export function StockScreen({ store }: StockScreenProps) {
         <div className="stock-table-panel">
           <div className="stock-table-bar">
             <span>
-              <strong>{filtered.length}</strong> / {warehouseProducts.length} irsaliye ürünü · PDF{' '}
-              {IRSALIYE_PDF_LINE_COUNT} satır
+              <strong>{filtered.length}</strong> / {warehouseProducts.length}{' '}
+              {posLiteStock ? 'ürün' : `irsaliye ürünü · PDF ${IRSALIYE_PDF_LINE_COUNT} satır`}
             </span>
             {totalPages > 1 && (
               <div className="pagination">

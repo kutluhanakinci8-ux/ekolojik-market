@@ -142,7 +142,19 @@ try {
 }
 
 const now = new Date().toISOString();
+const movements = LIMA_PRODUCTS.map((p) => ({
+  id: `M-seed-${p.id}`,
+  productId: p.id,
+  productName: p.name,
+  type: 'in',
+  quantity: p.stock,
+  previousStock: 0,
+  newStock: p.stock,
+  note: 'Lima başlangıç stok girişi',
+  createdAt: now,
+}));
 store.products = LIMA_PRODUCTS;
+store.stockMovements = [...movements, ...(store.stockMovements ?? [])].slice(0, 500);
 store.productSets = store.productSets ?? [];
 store.settings = {
   ...store.settings,
