@@ -33,12 +33,8 @@ interface SalesScreenProps {
 }
 
 export function SalesScreen({ store }: SalesScreenProps) {
-<<<<<<< HEAD
   const posLiteCheckout = isPosLiteProfile(store.settings)
     || isTenantCatalogIsolated(resolveEffectiveTenantId(), store.settings);
-=======
-  const posLiteCheckout = isPosLiteProfile(store.settings);
->>>>>>> 1f0d661 (feat(pos-lite): sepette kampanya kaldır, kompakt ödeme ve daha fazla satır)
   const posCheckout = useMemo(
     () => ({ ...DEFAULT_POS_CHECKOUT_SETTINGS, ...store.settings.posCheckout }),
     [store.settings.posCheckout],
