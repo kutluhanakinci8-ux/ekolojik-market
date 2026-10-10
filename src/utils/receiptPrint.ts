@@ -6,6 +6,8 @@ import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
 import { tryLimaMacRawReceiptPrint } from './limaMacRawPrint';
+import { applyRetailVat } from './productPricing';
+import { DEFAULT_VAT_RATE, roundMoney } from './vatAnalytics';
 
 /** Termal sürücüde \u200b başlık kenarda «c0» / bozuk karakter basabiliyor */
 const BLANK_PRINT_TITLE = '';
@@ -19,6 +21,13 @@ export interface ReceiptLineItem {
   lineTotal: number;
 }
 
+export interface SaleReceiptVatBreakdown {
+  vatRate: number;
+  netTotal: number;
+  vatAmount: number;
+  grossTotal: number;
+}
+
 export interface SaleReceiptData {
   businessName: string;
   receiptNo?: string;
@@ -26,7 +35,10 @@ export interface SaleReceiptData {
   createdAt: Date;
   paymentMethod: 'cash' | 'card' | 'transfer' | 'credit';
   items: ReceiptLineItem[];
+  /** Tahsil edilen tutar (KDV dahil ise grossTotal ile aynı) */
   total: number;
+  /** Satır fiyatları KDV hariç ise fiş altında net + KDV + brüt */
+  vat?: SaleReceiptVatBreakdown;
 }
 
 export interface ReturnReceiptLineItem extends ReceiptLineItem {
@@ -59,6 +71,95 @@ const LIMA_RECEIPT_LOGO_URL = '/lima-receipt-logo.svg';
 
 function isLimaBrandedReceipt(businessName: string): boolean {
   return sanitizeReceiptVisibleText(businessName).toLocaleLowerCase('tr-TR').includes('lima');
+}
+
+export function buildSaleReceiptVatBreakdown(
+  netTotal: number,
+  vatRate = DEFAULT_VAT_RATE,
+): SaleReceiptVatBreakdown {
+  const net = roundMoney(netTotal);
+  const grossTotal = applyRetailVat(net, vatRate);
+  const vatAmount = roundMoney(grossTotal - net);
+  return { vatRate, netTotal: net, vatAmount, grossTotal };
+}
+
+export function resolveSaleReceiptVat(data: SaleReceiptData): SaleReceiptVatBreakdown | undefined {
+  if (!isLimaBrandedReceipt(data.businessName)) return undefined;
+  const netFromItems = roundMoney(data.items.reduce((sum, item) => sum + item.lineTotal, 0));
+  const netTotal = netFromItems > 0 ? netFromItems : roundMoney(data.total);
+  if (netTotal <= 0) return undefined;
+  return buildSaleReceiptVatBreakdown(netTotal);
+}
+
+export function withSaleReceiptVatBreakdown(data: SaleReceiptData): SaleReceiptData {
+  const vat = data.vat ?? resolveSaleReceiptVat(data);
+  if (!vat) return data;
+  return { ...data, vat, total: vat.grossTotal };
+}
+
+function receiptVatFor(data: SaleReceiptData): SaleReceiptVatBreakdown | undefined {
+  return data.vat ?? resolveSaleReceiptVat(data);
+}
+
+function buildReceiptVatPlainLines(data: SaleReceiptData): string[] {
+  const vat = receiptVatFor(data);
+  if (!vat) return [`TOPLAM  ${formatReceiptMoneyPlain(data.total)}`];
+  return [
+    `Ara toplam (KDV hariç)  ${formatReceiptMoneyPlain(vat.netTotal)}`,
+    `KDV (%${vat.vatRate})  ${formatReceiptMoneyPlain(vat.vatAmount)}`,
+    `TOPLAM (KDV dahil)  ${formatReceiptMoneyPlain(vat.grossTotal)}`,
+  ];
+}
+
+function buildReceiptVatHtmlRows(
+  data: SaleReceiptData,
+  formatMoney: (amount: number) => string,
+): string {
+  const vat = receiptVatFor(data);
+  if (!vat) {
+    return `
+      <tr class="total-row line">
+        <td class="line-name bold">TOPLAM</td>
+        <td class="line-price">${formatMoney(data.total)}</td>
+      </tr>`;
+  }
+  return `
+      <tr class="line-sub total-row">
+        <td class="line-name">Ara toplam (KDV hariç)</td>
+        <td class="line-price">${formatMoney(vat.netTotal)}</td>
+      </tr>
+      <tr class="line-sub total-row">
+        <td class="line-name">KDV (%${vat.vatRate})</td>
+        <td class="line-price">${formatMoney(vat.vatAmount)}</td>
+      </tr>
+      <tr class="total-row line">
+        <td class="line-name bold">TOPLAM (KDV dahil)</td>
+        <td class="line-price">${formatMoney(vat.grossTotal)}</td>
+      </tr>`;
+}
+
+function buildReceiptVatPremiumRows(data: SaleReceiptData): string {
+  const vat = receiptVatFor(data);
+  if (!vat) {
+    return `
+    <tr>
+      <td class="rp-total-label">TOPLAM</td>
+      <td class="rp-total-amt">${formatReceiptMoneyPlain(data.total)}</td>
+    </tr>`;
+  }
+  return `
+    <tr>
+      <td class="rp-total-label">Ara toplam (KDV hariç)</td>
+      <td class="rp-total-amt">${formatReceiptMoneyPlain(vat.netTotal)}</td>
+    </tr>
+    <tr>
+      <td class="rp-total-label">KDV (%${vat.vatRate})</td>
+      <td class="rp-total-amt">${formatReceiptMoneyPlain(vat.vatAmount)}</td>
+    </tr>
+    <tr>
+      <td class="rp-total-label">TOPLAM (KDV dahil)</td>
+      <td class="rp-total-amt">${formatReceiptMoneyPlain(vat.grossTotal)}</td>
+    </tr>`;
 }
 
 function buildReceiptLogoHtml(businessName: string): string {
@@ -141,7 +242,7 @@ export function buildReceiptFromCart(
     };
   });
 
-  return {
+  return withSaleReceiptVatBreakdown({
     businessName,
     receiptNo: meta?.receiptNo,
     saleId: meta?.saleId,
@@ -149,7 +250,7 @@ export function buildReceiptFromCart(
     paymentMethod,
     items,
     total,
-  };
+  });
 }
 
 export function buildReturnReceipt(
@@ -460,7 +561,7 @@ export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
     lines.push(`  ${formatReceiptMoneyPlain(item.lineTotal)}`);
   }
   lines.push('--------------------------------');
-  lines.push(`TOPLAM  ${formatReceiptMoneyPlain(data.total)}`);
+  lines.push(...buildReceiptVatPlainLines(data));
   lines.push('');
   lines.push('Teşekkürler.');
   return lines.join('\n');
@@ -604,10 +705,7 @@ export function buildReceiptHtml(
   <table>
     <tbody>
       ${lines}
-      <tr class="total-row line">
-        <td class="line-name bold">TOPLAM</td>
-        <td class="line-price">${formatReceiptMoney(data.total)}</td>
-      </tr>
+      ${buildReceiptVatHtmlRows(data, formatReceiptMoney)}
     </tbody>
   </table>
   <hr class="divider" />
@@ -718,9 +816,11 @@ function receiptPremiumStyles(): string {
       font-size: 13px;
     }
     .rp-total { width: 100%; border-collapse: collapse; margin-top: 2px; }
-    .rp-total td { padding: 8px 0 4px; font-size: 16px; font-weight: 800; }
-    .rp-total .rp-total-label { text-align: left; letter-spacing: 0.05em; }
+    .rp-total td { padding: 4px 0; font-size: 13px; font-weight: 700; }
+    .rp-total tr:last-child td { padding-top: 8px; font-size: 16px; font-weight: 800; }
+    .rp-total .rp-total-label { text-align: left; letter-spacing: 0.03em; }
     .rp-total .rp-total-amt { text-align: right; white-space: nowrap; }
+    .rp-vat-note { font-size: 11px; font-weight: 600; margin: 4px 0 0; color: #333; }
     .rp-footer {
       text-align: center;
       font-size: 12px;
@@ -790,12 +890,10 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
   </table>
   <hr class="rp-rule" />
   <table class="rp-items" role="presentation">${itemRows}</table>
+  ${receiptVatFor(data) ? '<div class="rp-vat-note">Satır fiyatları KDV hariçtir.</div>' : ''}
   <hr class="rp-rule rp-rule--thick" />
   <table class="rp-total" role="presentation">
-    <tr>
-      <td class="rp-total-label">TOPLAM</td>
-      <td class="rp-total-amt">${formatReceiptMoneyPlain(data.total)}</td>
-    </tr>
+    ${buildReceiptVatPremiumRows(data)}
   </table>
   <hr class="rp-rule" />
   <div class="rp-footer">
@@ -1013,9 +1111,10 @@ export async function printThermalReceipt(
   data: SaleReceiptData,
   options?: ThermalReceiptPrintOptions,
 ): Promise<void> {
+  const receipt = withSaleReceiptVatBreakdown(data);
   if (options === undefined) {
-    logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
-    const plainNoSacrifice = buildPlainTextSaleReceipt(data);
+    logReceiptPrint('thermal-classic-path', { saleId: receipt.saleId, items: receipt.items.length });
+    const plainNoSacrifice = buildPlainTextSaleReceipt(receipt);
     const rawOk = await tryLimaMacRawReceiptPrint(plainNoSacrifice);
     if (rawOk) {
       logReceiptPrint('thermal-raw-escpos-ok', { saleId: data.saleId });
@@ -1023,12 +1122,12 @@ export async function printThermalReceipt(
     }
     logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed' });
     remindChromeReceiptPrintSettings();
-    await printHtmlReceiptIsolatedWindow(buildGreenleafPremiumReceiptHtml(data));
+    await printHtmlReceiptIsolatedWindow(buildGreenleafPremiumReceiptHtml(receipt));
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);
   logReceiptPrint('thermal-advanced-path', {
-    saleId: data.saleId,
+    saleId: receipt.saleId,
     printMode: normalized.printMode,
     paperWidthMm: normalized.paperWidthMm,
   });
@@ -1038,8 +1137,8 @@ export async function printThermalReceipt(
   const mode = normalized.printMode === 'plain' ? 'plain' : 'html';
   const html =
     mode === 'plain'
-      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(data), paper, margin)
-      : buildReceiptHtml(data, paper, margin);
+      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(receipt), paper, margin)
+      : buildReceiptHtml(receipt, paper, margin);
   for (let i = 0; i < copies; i += 1) {
     await printHtmlReceipt(html);
   }

@@ -202,7 +202,9 @@ import {
   isTenantCatalogIsolated,
   looksLikeMainGreenleafCatalog,
   resolveEffectiveTenantId,
+  usesNetRetailWithVatBreakdown,
 } from '../utils/tenantCatalogIsolation';
+import { applyRetailVat } from '../utils/productPricing';
 import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
 import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
@@ -3695,7 +3697,7 @@ export function usePosStoreState() {
     const paidItems = cart.filter((item) => item.priceType !== 'sample');
     const subtotal = paidItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
     const customer = resolveCheckoutCustomer();
-    return buildCheckoutPreview(
+    const preview = buildCheckoutPreview(
       subtotal,
       cart,
       products,
@@ -3710,6 +3712,8 @@ export function usePosStoreState() {
       saleLoyaltyPointsToRedeem,
       paymentMethod,
     );
+    if (!usesNetRetailWithVatBreakdown(settings)) return preview;
+    return { ...preview, total: applyRetailVat(preview.total) };
   }, [
     cart,
     products,
@@ -3722,6 +3726,7 @@ export function usePosStoreState() {
     saleCouponCode,
     saleLoyaltyPointsToRedeem,
     resolveCheckoutCustomer,
+    settings,
   ]);
 
   const completeSale = useCallback(
@@ -3869,7 +3874,9 @@ export function usePosStoreState() {
         return null;
       }
 
-      const total = finalPreview.total;
+      const total = usesNetRetailWithVatBreakdown(settings)
+        ? applyRetailVat(finalPreview.total)
+        : finalPreview.total;
       const crmDiscountTotal = finalPreview.campaignDiscount
         + finalPreview.couponDiscount
         + finalPreview.loyaltyDiscount;

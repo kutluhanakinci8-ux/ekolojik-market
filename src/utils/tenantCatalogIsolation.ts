@@ -21,6 +21,11 @@ function isLimaBrandedSettings(settings?: AppSettings | null): boolean {
   return name.includes('lima');
 }
 
+/** Perakende liste KDV hariç; fişte KDV dökümü ve kasada brüt tahsilat */
+export function usesNetRetailWithVatBreakdown(settings?: AppSettings | null): boolean {
+  return isPosLiteProfile(settings) || isLimaBrandedSettings(settings);
+}
+
 /** main tenant anahtarında yanlışlıkla Lima ayarı + Greenleaf kataloğu birleşmesini engelle */
 export function isTenantCatalogIsolated(
   tenantId: string = loadTenantId(),
