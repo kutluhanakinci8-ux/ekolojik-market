@@ -195,7 +195,13 @@ import {
 
 import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
 import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId } from '../storage/tenantSession';
-import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import {
+  coerceTenantCatalogProducts,
+  isTenantCatalogIsolated,
+  looksLikeMainGreenleafCatalog,
+  resolveEffectiveTenantId,
+} from '../utils/tenantCatalogIsolation';
+import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
 function storageKeys() {
   return posLocalStorageKeys();
@@ -208,15 +214,6 @@ const CATALOG_PRODUCTS: Array<Omit<Product, 'stock'>> = [
   })),
   ...GREENLEAF_PRODUCTS,
 ];
-
-/** Lima / POS Lite — Greenleaf demo kataloğu ilk karede gösterilmez */
-function usesIsolatedProductCatalog(): boolean {
-  if (loadTenantId() !== DEFAULT_TENANT_ID) return true;
-  return isPosLiteProfile(loadSettings());
-}
-
-/** mergeWithSeed tam katalog ~135+ ürün; izole tenant’ta bu sayı yanlış yerel önbelleği işaret eder */
-const GREENLEAF_SEED_CATALOG_MIN = 80;
 
 function mergeWithSeed(stored: Product[] | null): Product[] {
   const storedMap = new Map((stored ?? []).map((p) => [p.id, p]));
@@ -257,12 +254,13 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
 }
 
 function loadProducts(): Product[] {
-  const isolated = usesIsolatedProductCatalog();
+  const isolated = isTenantCatalogIsolated(loadTenantId(), loadSettings());
   const stored = localStorage.getItem(storageKeys().products);
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as Product[];
-      return isolated ? parsed : mergeWithSeed(parsed);
+      if (isolated) return coerceTenantCatalogProducts(parsed, true);
+      return mergeWithSeed(parsed);
     } catch {
       /* fall through */
     }
@@ -297,7 +295,7 @@ function mergeProductSets(stored: ProductSet[] | null | undefined): ProductSet[]
 }
 
 function loadProductSets(): ProductSet[] {
-  const isolated = usesIsolatedProductCatalog();
+  const isolated = isTenantCatalogIsolated(loadTenantId(), loadSettings());
   const stored = localStorage.getItem(storageKeys().productSets);
   if (stored) {
     try {
@@ -589,7 +587,7 @@ function snapshotMergedSettings(snapshot: PersistedStoreSnapshot): AppSettings {
 
 /** Ayrı tenant / POS Lite — Greenleaf kataloğu ve demo kullanıcıları karışmaz */
 function isIsolatedStoreContext(settings: AppSettings): boolean {
-  return isPosLiteProfile(settings) || loadTenantId() !== DEFAULT_TENANT_ID;
+  return isTenantCatalogIsolated(loadTenantId(), settings);
 }
 
 function resolveUsersFromSnapshot(
@@ -907,7 +905,11 @@ export function usePosStoreState() {
     const mergedSettings = snapshotMergedSettings(snapshot);
     const isolated = isIsolatedStoreContext(mergedSettings);
 
-    setProducts(isolated ? (snapshot.products ?? []) : mergeWithSeed(snapshot.products));
+    setProducts(
+      isolated
+        ? coerceTenantCatalogProducts(snapshot.products ?? [], true)
+        : mergeWithSeed(snapshot.products),
+    );
     setProductSets(isolated ? (snapshot.productSets ?? []) : mergeProductSets(snapshot.productSets));
     setSales(repairSaleCustomerLinks(snapshot.sales ?? [], snapshot.customers ?? []));
     setSaleReturns(snapshot.saleReturns ?? []);
@@ -989,10 +991,20 @@ export function usePosStoreState() {
       }
       const tenant = tenantAtStart;
 
-      if (tenant !== DEFAULT_TENANT_ID && remote) {
-        applySnapshot(remote);
-        setSyncStatus('synced');
-      } else if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
+      if (tenant !== DEFAULT_TENANT_ID) {
+        if (remote) {
+          applySnapshot(remote);
+          setSyncStatus('synced');
+        } else {
+          setProducts([]);
+          setProductSets([]);
+          setSyncStatus('local-only');
+        }
+        setSyncReady(true);
+        return;
+      }
+
+      if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
         const remoteUsers = (remote.users ?? []).map((user) => normalizeUser(user as unknown as Record<string, unknown>));
         const localUsers = loadUsers();
         const mergedUsers = mergeUserLists(remoteUsers, localUsers);
@@ -1043,9 +1055,15 @@ export function usePosStoreState() {
 
   useEffect(() => {
     if (!syncReady) return;
+    if (
+      isTenantCatalogIsolated(resolveEffectiveTenantId(), settings)
+      && looksLikeMainGreenleafCatalog(products)
+    ) {
+      return;
+    }
     const toSave = products.map(({ imageUrl: _, ...rest }) => rest);
     localStorage.setItem(storageKeys().products, JSON.stringify(toSave));
-  }, [products, syncReady]);
+  }, [products, syncReady, settings]);
 
   useEffect(() => {
     if (!syncReady) return;
@@ -3016,6 +3034,17 @@ export function usePosStoreState() {
     }
   }, [applySnapshot]);
 
+  useEffect(() => {
+    const onTenantChanged = () => {
+      syncPosLocalStorageKeys();
+      setProducts(loadProducts());
+      setProductSets(loadProductSets());
+      void refreshTenantData();
+    };
+    window.addEventListener(TENANT_ID_CHANGED_EVENT, onTenantChanged);
+    return () => window.removeEventListener(TENANT_ID_CHANGED_EVENT, onTenantChanged);
+  }, [refreshTenantData]);
+
   const logout = useCallback((reason: 'manual' | 'idle' = 'manual') => {
     if (authSession) {
       logActivity(
@@ -3050,6 +3079,11 @@ export function usePosStoreState() {
       let user: PosUser | undefined;
       const remoteAuth = await exchangePosApiToken({ username: normalized, password });
       if (remoteAuth.ok) {
+        const claims = decodePosApiTokenClaims(loadPosApiToken());
+        if (claims?.tenantId?.trim()) {
+          saveTenantId(claims.tenantId.trim());
+          syncPosLocalStorageKeys();
+        }
         const remote = await fetchStoreSnapshot();
         if (remote?.users?.length) {
           const remoteUsers = remote.users.map((u) =>
@@ -3146,6 +3180,11 @@ export function usePosStoreState() {
       let user: PosUser | undefined;
       const remoteAuth = await exchangePosApiToken({ username: normalized, pin });
       if (remoteAuth.ok) {
+        const claims = decodePosApiTokenClaims(loadPosApiToken());
+        if (claims?.tenantId?.trim()) {
+          saveTenantId(claims.tenantId.trim());
+          syncPosLocalStorageKeys();
+        }
         const remote = await fetchStoreSnapshot();
         if (remote?.users?.length) {
           const remoteUsers = remote.users.map((u) =>
@@ -4596,9 +4635,10 @@ export function usePosStoreState() {
 
   const catalogDisplayReady = useMemo(() => {
     if (!syncReady) return false;
-    if (!isIsolatedStoreContext(settings)) return true;
-    return products.length < GREENLEAF_SEED_CATALOG_MIN;
-  }, [syncReady, settings, products.length]);
+    const tenantId = resolveEffectiveTenantId();
+    if (!isTenantCatalogIsolated(tenantId, settings)) return true;
+    return !looksLikeMainGreenleafCatalog(products);
+  }, [syncReady, settings, products]);
 
   return {
     products,

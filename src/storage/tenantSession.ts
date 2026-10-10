@@ -13,10 +13,15 @@ export function loadTenantId(): string {
   }
 }
 
+export const TENANT_ID_CHANGED_EVENT = 'market-pos-tenant-id-changed';
+
 export function saveTenantId(tenantId: string): void {
   try {
     localStorage.setItem(TENANT_KEY, tenantId);
     syncPosLocalStorageKeys(tenantId);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(TENANT_ID_CHANGED_EVENT, { detail: { tenantId } }));
+    }
   } catch {
     /* ignore */
   }

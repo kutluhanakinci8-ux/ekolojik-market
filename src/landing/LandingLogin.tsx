@@ -62,8 +62,13 @@ export function LandingLogin() {
     setBusy(true);
     setError(null);
 
-    const resolvedTenant = tenantId.trim() || DEFAULT_TENANT_ID;
+    const loginUser = (pendingTotpUserId ? pendingUsername : username).trim().toLowerCase();
+    let resolvedTenant = tenantId.trim() || DEFAULT_TENANT_ID;
+    if (resolvedTenant === DEFAULT_TENANT_ID && loginUser.startsWith('lima')) {
+      resolvedTenant = 'lima-market';
+    }
     saveTenantId(resolvedTenant);
+    setTenantId(resolvedTenant);
     await store.refreshTenantData();
 
     try {
