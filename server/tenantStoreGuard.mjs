@@ -65,6 +65,7 @@ export function guardIsolatedTenantStoreWrite(tenantId, existing, incoming) {
 }
 
 export function shouldSkipIrsaliyeStockMigration(tenantId, store) {
-  if (tenantId && tenantId !== 'main') return isPosLiteStore(store);
+  if (tenantId && tenantId !== 'main') return true;
+  if (isPosLiteStore(store)) return true;
   return false;
 }

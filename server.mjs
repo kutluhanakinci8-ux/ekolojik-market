@@ -321,7 +321,8 @@ async function readStoreData(tenantId = 'main') {
 
   let persist = false;
 
-  if (data?.products?.length) {
+  const { shouldSkipIrsaliyeStockMigration } = await import('./server/tenantStoreGuard.mjs');
+  if (data?.products?.length && !shouldSkipIrsaliyeStockMigration(tenantId, data)) {
     const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
     data = snapshot;
     if (stockChanged) persist = true;
