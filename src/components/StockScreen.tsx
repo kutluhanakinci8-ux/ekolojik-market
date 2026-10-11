@@ -732,6 +732,11 @@ export function StockScreen({ store }: StockScreenProps) {
           store.removeProductImage(productId);
           showToast('Ürün fotoğrafı kaldırıldı');
         }}
+        onUpdatePricing={(productId, input) => {
+          store.updateProductPricing(productId, input);
+          showToast('Ürün fiyatları kaydedildi');
+        }}
+        perakendeKdvHaric={posLiteStock}
       />
 
       {bulkWholesaleOpen && (

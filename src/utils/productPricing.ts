@@ -41,6 +41,40 @@ export interface PriceCatalogEntry {
   retailPrice: number;
 }
 
+export interface ProductPricingInput {
+  purchasePrice?: number;
+  partnerPrice?: number;
+  couponPrice?: number;
+  fullSalePrice?: number;
+}
+
+/** Stok ekranı / giriş — alış, partner, perakende; KDV alanları otomatik */
+export function mergeProductPricing(
+  product: Product,
+  input: ProductPricingInput,
+  retailNetEqualsSale: boolean,
+): Product {
+  const purchasePrice = round2(Math.max(0, input.purchasePrice ?? product.purchasePrice));
+  const partnerPrice = round2(Math.max(0, input.partnerPrice ?? product.partnerPrice));
+  const couponPrice = round2(Math.max(0, input.couponPrice ?? product.couponPrice ?? partnerPrice));
+  const fullSalePrice = round2(Math.max(0, input.fullSalePrice ?? product.fullSalePrice));
+  const ourPriceWithVat = retailNetEqualsSale ? fullSalePrice : applyRetailVat(fullSalePrice);
+  const partnerPriceWithVat = applyRetailVat(partnerPrice);
+  const ourPercent = purchasePrice > 0
+    ? round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100)
+    : product.ourPercent;
+  return {
+    ...product,
+    purchasePrice,
+    partnerPrice,
+    couponPrice,
+    fullSalePrice,
+    ourPriceWithVat,
+    partnerPriceWithVat,
+    ourPercent,
+  };
+}
+
 export function computeDerivedPrices(partnerPrice: number, retailPrice: number) {
   const ourPercent = Math.max(100, Math.round((retailPrice / partnerPrice - 1) * 100));
   return {

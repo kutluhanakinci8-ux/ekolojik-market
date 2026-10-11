@@ -204,7 +204,7 @@ import {
   resolveEffectiveTenantId,
   usesNetRetailWithVatBreakdown,
 } from '../utils/tenantCatalogIsolation';
-import { applyRetailVat } from '../utils/productPricing';
+import { applyRetailVat, mergeProductPricing, type ProductPricingInput } from '../utils/productPricing';
 import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
 import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
@@ -1460,6 +1460,34 @@ export function usePosStoreState() {
       )),
     );
   }, []);
+
+  const updateProductPricing = useCallback((productId: number, input: ProductPricingInput) => {
+    const retailNet = usesNetRetailWithVatBreakdown(settings);
+    const product = products.find((p) => p.id === productId);
+    setProducts((prev) => {
+      const next = prev.map((p) => {
+        if (p.id !== productId) return p;
+        return mergeProductPricing(p, input, retailNet);
+      });
+      setCart((cartPrev) =>
+        cartPrev.map((item) => {
+          if (item.productId !== productId) return item;
+          const updated = next.find((p) => p.id === productId);
+          if (!updated) return item;
+          return {
+            ...item,
+            unitPrice: getCartUnitPrice(updated, item.quantity, item.priceType),
+          };
+        }),
+      );
+      return next;
+    });
+    if (authSession && product) {
+      logActivity(authSession, 'settings_update', `Ürün fiyatları güncellendi: ${product.name}`, {
+        urun: product.name,
+      });
+    }
+  }, [authSession, logActivity, products, settings]);
 
   const setProductSampleFlag = useCallback((productId: number, isSample: boolean) => {
     setProducts((prev) =>
@@ -4781,6 +4809,7 @@ export function usePosStoreState() {
     processSaleReturn,
     setProductStock,
     updateProductBarcode,
+    updateProductPricing,
     adjustProductStock,
     setBulkStock,
     getUnitPrice,

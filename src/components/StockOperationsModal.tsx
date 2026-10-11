@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategoryLabel } from '../data/categories';
 import type { Product, WholesalePrices } from '../types/product';
+import type { ProductPricingInput } from '../utils/productPricing';
 import type { ProductSet, ProductSetItem } from '../types/productSet';
 import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
@@ -37,6 +38,9 @@ interface StockOperationsModalProps {
   onUpdateBarcode?: (productId: number, barcode: string) => void;
   onUploadImage?: (productId: number, imageUrl: string) => void;
   onRemoveImage?: (productId: number) => void;
+  onUpdatePricing?: (productId: number, input: ProductPricingInput) => void;
+  /** Lima / pos-lite: perakende KDV hariç */
+  perakendeKdvHaric?: boolean;
 }
 
 const OPERATIONS: Array<{
@@ -99,6 +103,8 @@ export function StockOperationsModal({
   onUpdateBarcode,
   onUploadImage,
   onRemoveImage,
+  onUpdatePricing,
+  perakendeKdvHaric = false,
 }: StockOperationsModalProps) {
   const [operation, setOperation] = useState<StockOperationType>(initialOperation);
   const [productId, setProductId] = useState('');
@@ -106,6 +112,10 @@ export function StockOperationsModal({
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
   const [barcodeDraft, setBarcodeDraft] = useState('');
+  const [purchaseDraft, setPurchaseDraft] = useState('');
+  const [partnerDraft, setPartnerDraft] = useState('');
+  const [couponDraft, setCouponDraft] = useState('');
+  const [retailDraft, setRetailDraft] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -125,6 +135,58 @@ export function StockOperationsModal({
   useEffect(() => {
     setBarcodeDraft(selectedProduct?.barcode ?? '');
   }, [selectedProduct?.id, selectedProduct?.barcode]);
+
+  useEffect(() => {
+    if (!selectedProduct) {
+      setPurchaseDraft('');
+      setPartnerDraft('');
+      setCouponDraft('');
+      setRetailDraft('');
+      return;
+    }
+    setPurchaseDraft(selectedProduct.purchasePrice > 0 ? String(selectedProduct.purchasePrice) : '');
+    setPartnerDraft(selectedProduct.partnerPrice > 0 ? String(selectedProduct.partnerPrice) : '');
+    setCouponDraft(
+      (selectedProduct.couponPrice ?? 0) > 0 ? String(selectedProduct.couponPrice) : '',
+    );
+    setRetailDraft(selectedProduct.fullSalePrice > 0 ? String(selectedProduct.fullSalePrice) : '');
+  }, [
+    selectedProduct?.id,
+    selectedProduct?.purchasePrice,
+    selectedProduct?.partnerPrice,
+    selectedProduct?.couponPrice,
+    selectedProduct?.fullSalePrice,
+  ]);
+
+  const parsePriceDraft = (draft: string): number | undefined => {
+    const normalized = draft.trim().replace(',', '.');
+    if (!normalized) return undefined;
+    const value = Number.parseFloat(normalized);
+    if (!Number.isFinite(value) || value < 0) return undefined;
+    return value;
+  };
+
+  const buildPricingPatch = (): ProductPricingInput | null => {
+    if (!selectedProduct || !onUpdatePricing) return null;
+    const patch: ProductPricingInput = {};
+    const purchase = parsePriceDraft(purchaseDraft);
+    const partner = parsePriceDraft(partnerDraft);
+    const coupon = parsePriceDraft(couponDraft);
+    const retail = parsePriceDraft(retailDraft);
+    if (purchase != null && purchase !== selectedProduct.purchasePrice) patch.purchasePrice = purchase;
+    if (partner != null && partner !== selectedProduct.partnerPrice) patch.partnerPrice = partner;
+    const couponBase = selectedProduct.couponPrice ?? selectedProduct.partnerPrice;
+    if (coupon != null && coupon !== couponBase) patch.couponPrice = coupon;
+    if (retail != null && retail !== selectedProduct.fullSalePrice) patch.fullSalePrice = retail;
+    return Object.keys(patch).length > 0 ? patch : null;
+  };
+
+  const applyPricingDraft = () => {
+    const id = Number.parseInt(productId, 10);
+    if (Number.isNaN(id) || !onUpdatePricing) return;
+    const patch = buildPricingPatch();
+    if (patch) onUpdatePricing(id, patch);
+  };
 
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -181,6 +243,8 @@ export function StockOperationsModal({
   const handleSubmit = () => {
     const id = Number.parseInt(productId, 10);
     if (Number.isNaN(id) || !selectedProduct) return;
+
+    applyPricingDraft();
 
     const trimmedNote = note.trim() || defaultNote(operation);
 
@@ -395,6 +459,65 @@ export function StockOperationsModal({
                   })
                 )}
               </div>
+            )}
+
+            {selectedProduct && onUpdatePricing && (
+              <fieldset className="stock-ops-dialog__pricing">
+                <legend>Fiyatlar (₺)</legend>
+                <p className="stock-ops-dialog__pricing-hint">
+                  Mevcut ürün ve stok girişinde aynı kayıt güncellenir.
+                  {perakendeKdvHaric ? ' Perakende — KDV hariç (kasa ile uyumlu).' : ' Perakende — liste (KDV hariç); kasa KDV dahil.'}
+                </p>
+                <div className="stock-ops-dialog__pricing-grid">
+                  <label className="stock-ops-dialog__field">
+                    <span>Alış</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={purchaseDraft}
+                      placeholder="0,00"
+                      onChange={(e) => setPurchaseDraft(e.target.value)}
+                    />
+                  </label>
+                  <label className="stock-ops-dialog__field">
+                    <span>Partner</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={partnerDraft}
+                      placeholder="0,00"
+                      onChange={(e) => setPartnerDraft(e.target.value)}
+                    />
+                  </label>
+                  <label className="stock-ops-dialog__field">
+                    <span>Kupon</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={couponDraft}
+                      placeholder="0,00"
+                      onChange={(e) => setCouponDraft(e.target.value)}
+                    />
+                  </label>
+                  <label className="stock-ops-dialog__field">
+                    <span>{perakendeKdvHaric ? 'Perakende (KDV hariç)' : 'Perakende'}</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={retailDraft}
+                      placeholder="0,00"
+                      onChange={(e) => setRetailDraft(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="stock-ops-dialog__pricing-save"
+                  onClick={applyPricingDraft}
+                >
+                  Fiyatları kaydet
+                </button>
+              </fieldset>
             )}
 
             {operation === 'clear' && selectedProduct && (
