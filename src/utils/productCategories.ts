@@ -1,4 +1,4 @@
-import { CATEGORIES, type Category } from '../data/categories';
+import { CATEGORIES, type Category } from '../data/categoryDefinitions';
 import type { AppSettings, ProductCategoryDef } from '../types/business';
 import type { Product } from '../types/product';
 
@@ -43,8 +43,7 @@ export function getProductCategoryLabel(categoryId: string, settings?: AppSettin
   const catalog = resolveProductCategoryCatalog(settings);
   const hit = catalog.find((c) => c.id === categoryId);
   if (hit) return hit.label;
-  const builtin = CATEGORIES.find((c) => c.id === categoryId);
-  return builtin?.label ?? categoryId;
+  return CATEGORIES.find((c) => c.id === categoryId)?.label ?? categoryId;
 }
 
 export function productCategoryToChip(def: ProductCategoryDef): Category {
