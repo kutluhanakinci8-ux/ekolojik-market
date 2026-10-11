@@ -7,6 +7,7 @@ import type { ProductSet, ProductSetItem } from '../types/productSet';
 import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
+import { formatCurrency } from '../utils/format';
 import './StockOperationsModal.css';
 
 export type StockOperationType = 'in' | 'out' | 'set' | 'clear' | 'bundle';
@@ -219,6 +220,21 @@ export function StockOperationsModal({
     : 0;
 
   const activeOperation = OPERATIONS.find((item) => item.id === operation)!;
+
+  const previewPricing = useMemo(() => {
+    if (!selectedProduct) return null;
+    return {
+      purchase: parsePriceDraft(purchaseDraft) ?? selectedProduct.purchasePrice,
+      partner: parsePriceDraft(partnerDraft) ?? selectedProduct.partnerPrice,
+      coupon: parsePriceDraft(couponDraft) ?? selectedProduct.couponPrice ?? selectedProduct.partnerPrice,
+      retail: parsePriceDraft(retailDraft) ?? selectedProduct.fullSalePrice,
+    };
+  }, [selectedProduct, purchaseDraft, partnerDraft, couponDraft, retailDraft]);
+
+  const previewStockValue = useMemo(() => {
+    if (!previewPricing || previewStock == null) return null;
+    return previewStock * previewPricing.purchase;
+  }, [previewPricing, previewStock]);
 
   const selectProduct = (product: Product) => {
     setProductId(String(product.id));
@@ -566,33 +582,121 @@ export function StockOperationsModal({
 
           <aside className="stock-ops-dialog__aside">
             <div className="stock-ops-dialog__preview">
-              <p className="stock-ops-dialog__preview-label">İşlem Özeti</p>
-              <span className={`stock-ops-dialog__preview-badge stock-ops-dialog__preview-badge--${activeOperation.tone}`}>
-                {activeOperation.icon} {activeOperation.label}
-              </span>
+              <div className="stock-ops-dialog__preview-head">
+                <p className="stock-ops-dialog__preview-label">İşlem özeti</p>
+                <span className={`stock-ops-dialog__preview-badge stock-ops-dialog__preview-badge--${activeOperation.tone}`}>
+                  {activeOperation.icon} {activeOperation.label}
+                </span>
+              </div>
 
               {selectedProduct ? (
-                <>
-                  <h4>{selectedProduct.name}</h4>
-                  <div className="stock-ops-dialog__preview-flow">
-                    <div>
-                      <span>Mevcut</span>
-                      <strong>{selectedProduct.stock}</strong>
-                    </div>
-                    <span aria-hidden>→</span>
-                    <div>
-                      <span>Yeni</span>
-                      <strong className={previewDelta < 0 ? 'is-down' : previewDelta > 0 ? 'is-up' : ''}>
-                        {previewStock ?? selectedProduct.stock}
-                      </strong>
+                <div className="stock-ops-dialog__preview-body">
+                  <h4 className="stock-ops-dialog__preview-title" title={selectedProduct.name}>
+                    {selectedProduct.name}
+                  </h4>
+
+                  <div className="stock-ops-dialog__preview-block">
+                    <p className="stock-ops-dialog__preview-block-title">Ürün</p>
+                    <div className="stock-ops-dialog__preview-rows">
+                      <div className="stock-ops-dialog__preview-row">
+                        <span>Kod</span>
+                        <strong>{selectedProduct.productCode?.trim() || '—'}</strong>
+                      </div>
+                      <div className="stock-ops-dialog__preview-row">
+                        <span>No</span>
+                        <strong>{selectedProduct.id}</strong>
+                      </div>
+                      <div className="stock-ops-dialog__preview-row">
+                        <span>Barkod</span>
+                        <strong className="stock-ops-dialog__preview-mono">
+                          {barcodeDraft.trim() || selectedProduct.barcode?.trim() || '—'}
+                        </strong>
+                      </div>
+                      <div className="stock-ops-dialog__preview-row">
+                        <span>Kategori</span>
+                        <strong>{getCategoryLabel(selectedProduct.category)}</strong>
+                      </div>
+                      {selectedStatus && (
+                        <div className="stock-ops-dialog__preview-row">
+                          <span>Durum</span>
+                          <strong>{getStockStatusLabel(selectedStatus)}</strong>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {previewDelta !== 0 && (
-                    <p className={`stock-ops-dialog__preview-delta ${previewDelta > 0 ? 'is-up' : 'is-down'}`}>
-                      {previewDelta > 0 ? '+' : ''}{previewDelta} adet
-                    </p>
+
+                  <div className="stock-ops-dialog__preview-block">
+                    <p className="stock-ops-dialog__preview-block-title">Stok</p>
+                    <div className="stock-ops-dialog__preview-flow">
+                      <div>
+                        <span>Mevcut</span>
+                        <strong>{selectedProduct.stock}</strong>
+                      </div>
+                      <span className="stock-ops-dialog__preview-arrow" aria-hidden>→</span>
+                      <div>
+                        <span>Yeni</span>
+                        <strong className={previewDelta < 0 ? 'is-down' : previewDelta > 0 ? 'is-up' : ''}>
+                          {previewStock ?? selectedProduct.stock}
+                        </strong>
+                      </div>
+                    </div>
+                    {operation !== 'clear' && hasValidQty && (
+                      <p className="stock-ops-dialog__preview-hint">
+                        {operation === 'in' && `+${parsedQty} adet giriş`}
+                        {operation === 'out' && `−${parsedQty} adet çıkış`}
+                        {operation === 'set' && `Sayım: ${parsedQty} adet`}
+                      </p>
+                    )}
+                    {operation === 'clear' && (
+                      <p className="stock-ops-dialog__preview-hint stock-ops-dialog__preview-hint--warn">
+                        Stok sıfırlanacak
+                      </p>
+                    )}
+                    {previewDelta !== 0 && (
+                      <p className={`stock-ops-dialog__preview-delta ${previewDelta > 0 ? 'is-up' : 'is-down'}`}>
+                        Net değişim: {previewDelta > 0 ? '+' : ''}{previewDelta} adet
+                      </p>
+                    )}
+                  </div>
+
+                  {previewPricing && onUpdatePricing && (
+                    <div className="stock-ops-dialog__preview-block">
+                      <p className="stock-ops-dialog__preview-block-title">
+                        Fiyatlar {perakendeKdvHaric ? '(perakende KDV hariç)' : ''}
+                      </p>
+                      <div className="stock-ops-dialog__preview-rows">
+                        <div className="stock-ops-dialog__preview-row">
+                          <span>Alış</span>
+                          <strong>{formatCurrency(previewPricing.purchase)}</strong>
+                        </div>
+                        <div className="stock-ops-dialog__preview-row">
+                          <span>Partner</span>
+                          <strong>{formatCurrency(previewPricing.partner)}</strong>
+                        </div>
+                        <div className="stock-ops-dialog__preview-row">
+                          <span>Kupon</span>
+                          <strong>{formatCurrency(previewPricing.coupon)}</strong>
+                        </div>
+                        <div className="stock-ops-dialog__preview-row stock-ops-dialog__preview-row--accent">
+                          <span>Perakende</span>
+                          <strong>{formatCurrency(previewPricing.retail)}</strong>
+                        </div>
+                      </div>
+                      {previewStockValue != null && previewStockValue > 0 && (
+                        <p className="stock-ops-dialog__preview-hint">
+                          Stok değeri (alış × yeni): {formatCurrency(previewStockValue)}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </>
+
+                  {note.trim() && (
+                    <div className="stock-ops-dialog__preview-block">
+                      <p className="stock-ops-dialog__preview-block-title">Not</p>
+                      <p className="stock-ops-dialog__preview-note">{note.trim()}</p>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <p className="stock-ops-dialog__empty">İşlem için ürün seçin</p>
               )}
