@@ -300,9 +300,20 @@ export function StockScreen({ store }: StockScreenProps) {
             <button
               type="button"
               className={`btn btn-outline ${editingImages ? 'active' : ''}`}
-              onClick={() => setEditingImages((v) => !v)}
+              title="Tablodaki küçük resimlere tıklayıp fotoğraf yükleme modunu aç/kapat"
+              onClick={() => {
+                setEditingImages((v) => {
+                  const next = !v;
+                  showToast(
+                    next
+                      ? 'Resim düzenleme açık — tabloda küçük resme tıklayın'
+                      : 'Resim düzenleme kapalı',
+                  );
+                  return next;
+                });
+              }}
             >
-              {editingImages ? '✓ Resim Kapat' : '📷 Resim'}
+              {editingImages ? '✓ Düzenlemeyi bitir' : '📷 Tabloda resim düzenle'}
             </button>
             <button
               type="button"
@@ -328,6 +339,14 @@ export function StockScreen({ store }: StockScreenProps) {
             </button>
           </div>
         </div>
+
+        {editingImages && (
+          <div className="stock-image-edit-hint" role="status">
+            <strong>Resim düzenleme açık:</strong> Her satırdaki küçük resme tıklayıp fotoğraf yükleyin.
+            Özel fotoğrafı kaldırmak için resmin üzerindeki ✕ kullanın.
+            Bitirmek için <strong>Düzenlemeyi bitir</strong> butonuna basın.
+          </div>
+        )}
 
         <div className="stock-toolbar-row stock-toolbar-row--filters">
           <div className="stock-category-chips">
@@ -544,8 +563,15 @@ export function StockScreen({ store }: StockScreenProps) {
                           product={p}
                           size="sm"
                           editable={editingImages}
-                          onUpload={store.updateProductImage}
-                          onRemove={store.removeProductImage}
+                          editHintAlways={editingImages}
+                          onUpload={(productId, imageUrl) => {
+                            store.updateProductImage(productId, imageUrl);
+                            showToast('Ürün fotoğrafı kaydedildi');
+                          }}
+                          onRemove={(productId) => {
+                            store.removeProductImage(productId);
+                            showToast('Varsayılan resme dönüldü');
+                          }}
                         />
                       </td>
                       <td className="stock-product-code">
