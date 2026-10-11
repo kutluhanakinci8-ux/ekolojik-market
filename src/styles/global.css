@@ -3908,6 +3908,14 @@ input {
   padding: 2px 0;
 }
 
+.stock-category-chips .category-chip--manage {
+  flex-shrink: 0;
+  min-width: 36px;
+  padding-left: 10px;
+  padding-right: 10px;
+  opacity: 0.85;
+}
+
 .stock-status-tabs {
   display: flex;
   gap: 6px;
