@@ -339,16 +339,25 @@ export function StockScreen({ store }: StockScreenProps) {
         </div>
       </div>
 
-      <div className="stock-summary-strip" role="region" aria-label="İrsaliye depo özeti">
+      <div
+        className="stock-summary-strip"
+        role="region"
+        aria-label={posLiteStock ? 'Stok özeti' : 'İrsaliye depo özeti'}
+      >
         <div className="stock-summary-strip-main">
           <button type="button" className="stock-summary-chip active" onClick={() => applyFilter('all')}>
             <span className="stock-summary-chip-label">Ürün</span>
             <strong>{warehouseProducts.length}</strong>
           </button>
-          <span className="stock-summary-chip stock-summary-chip--static">
-            <span className="stock-summary-chip-label">Stok kodu</span>
-            <strong>{IRSALIYE_WAREHOUSE_CODE_COUNT}</strong>
-          </span>
+          {!posLiteStock && (
+            <span
+              className="stock-summary-chip stock-summary-chip--static"
+              title={`e-İrsaliye ${IRSALIYE_LUY2026000000002_ID}: benzersiz stok kodu sayısı (satış kataloğundaki ürün sayısı değil)`}
+            >
+              <span className="stock-summary-chip-label">İrsaliye kodu</span>
+              <strong>{IRSALIYE_WAREHOUSE_CODE_COUNT}</strong>
+            </span>
+          )}
           <button type="button" className="stock-summary-chip stock-summary-chip--green" onClick={() => applyFilter('all')}>
             <span className="stock-summary-chip-label">Toplam stok</span>
             <strong>{totalStockUnits.toLocaleString('tr-TR')}</strong>
