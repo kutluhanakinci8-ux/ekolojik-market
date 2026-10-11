@@ -43,12 +43,14 @@ import type {
   Expense,
   ExpenseCategory,
   CustomExpenseCategory,
+  ProductCategoryDef,
   PurchaseInvoice,
 } from '../types/business';
 import {
   createCustomExpenseCategoryId,
   normalizeCustomExpenseCategories,
 } from '../utils/expenseCategories';
+import { normalizeProductCategoryCatalog } from '../utils/productCategories';
 import {
   DEFAULT_POS_NOTES,
   DEFAULT_SETTINGS,
@@ -526,6 +528,7 @@ function loadSettings(): AppSettings {
           parsed.soleProprietorshipTaxCalendar,
         ),
         customExpenseCategories: normalizeCustomExpenseCategories(parsed.customExpenseCategories),
+        productCategoryCatalog: normalizeProductCategoryCatalog(parsed.productCategoryCatalog),
         crm: { ...DEFAULT_CRM_SETTINGS, ...(parsed.crm ?? {}), automationEnabled: parsed.crm?.automationEnabled ?? DEFAULT_CRM_SETTINGS.automationEnabled },
         posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(parsed.posCheckout ?? {}) },
         receiptPrinter: sanitizeReceiptPrinterSettings({
@@ -988,6 +991,9 @@ export function usePosStoreState() {
       ),
       customExpenseCategories: normalizeCustomExpenseCategories(
         snapshot.settings?.customExpenseCategories,
+      ),
+      productCategoryCatalog: normalizeProductCategoryCatalog(
+        snapshot.settings?.productCategoryCatalog,
       ),
       crm: { ...DEFAULT_CRM_SETTINGS, ...(snapshot.settings?.crm ?? {}) },
       posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(snapshot.settings?.posCheckout ?? {}) },
@@ -1460,6 +1466,53 @@ export function usePosStoreState() {
       )),
     );
   }, []);
+
+  const updateProductCategory = useCallback((productId: number, categoryId: string) => {
+    const trimmed = categoryId.trim();
+    if (!trimmed) return;
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, category: trimmed } : p)),
+    );
+    if (authSession) {
+      const product = products.find((p) => p.id === productId);
+      if (product) {
+        logActivity(authSession, 'settings_update', `Ürün kategorisi güncellendi: ${product.name}`, {
+          urun: product.name,
+          kategori: trimmed,
+        });
+      }
+    }
+  }, [authSession, logActivity, products]);
+
+  const saveProductCategoryCatalog = useCallback((
+    catalog: ProductCategoryDef[],
+    reassignments: Record<string, string> = {},
+  ): { ok: boolean; message?: string } => {
+    const normalized = normalizeProductCategoryCatalog(catalog);
+    if (normalized.length === 0) {
+      return { ok: false, message: 'En az bir kategori gerekli.' };
+    }
+    const allowed = new Set(normalized.map((c) => c.id));
+    const fallback = normalized[0].id;
+    setProducts((prev) =>
+      prev.map((p) => {
+        const reassigned = reassignments[p.category];
+        if (reassigned) return { ...p, category: reassigned };
+        if (allowed.has(p.category)) return p;
+        return { ...p, category: fallback };
+      }),
+    );
+    setSettings((prev) => ({
+      ...prev,
+      productCategoryCatalog: normalized,
+    }));
+    if (authSession) {
+      logActivity(authSession, 'settings_update', 'Ürün kategori listesi güncellendi', {
+        adet: normalized.length,
+      });
+    }
+    return { ok: true };
+  }, [authSession, logActivity]);
 
   const updateProductPricing = useCallback((productId: number, input: ProductPricingInput) => {
     const retailNet = usesNetRetailWithVatBreakdown(settings);
@@ -2293,6 +2346,9 @@ export function usePosStoreState() {
       customExpenseCategories: patch.customExpenseCategories
         ? normalizeCustomExpenseCategories(patch.customExpenseCategories)
         : prev.customExpenseCategories,
+      productCategoryCatalog: patch.productCategoryCatalog
+        ? normalizeProductCategoryCatalog(patch.productCategoryCatalog)
+        : prev.productCategoryCatalog,
       crm: patch.crm ? { ...DEFAULT_CRM_SETTINGS, ...prev.crm, ...patch.crm } : prev.crm,
     }));
     if (authSession) {
@@ -4809,6 +4865,8 @@ export function usePosStoreState() {
     processSaleReturn,
     setProductStock,
     updateProductBarcode,
+    updateProductCategory,
+    saveProductCategoryCatalog,
     updateProductPricing,
     adjustProductStock,
     setBulkStock,

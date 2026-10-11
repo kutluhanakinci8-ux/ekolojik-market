@@ -250,6 +250,13 @@ export interface PosNotesConfig {
 
 export type TenantProductProfile = 'full' | 'pos-lite';
 
+/** Satış / stok ürün kategorisi (Tümü ve Setler ayrı — burada yok) */
+export interface ProductCategoryDef {
+  id: string;
+  label: string;
+  icon: string;
+}
+
 export interface AppSettings {
   businessName: string;
   /** `pos-lite`: stok + satış + sınırlı raporlar; Posta/müşteri modülleri kapalı profil */
@@ -268,6 +275,8 @@ export interface AppSettings {
   billEmailIngestion: BillEmailIngestionSettings;
   soleProprietorshipTaxCalendar: SoleProprietorshipTaxCalendarSettings;
   customExpenseCategories?: CustomExpenseCategory[];
+  /** Boşsa varsayılan Greenleaf/Lima kategori listesi kullanılır */
+  productCategoryCatalog?: ProductCategoryDef[];
   crm?: CrmSettings;
   posCheckout?: PosCheckoutSettings;
   receiptPrinter?: ReceiptPrinterSettings;

@@ -1,0 +1,143 @@
+.product-cat-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.product-cat-modal {
+  width: min(520px, 100%);
+  max-height: min(90vh, 640px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+  padding: 1.25rem 1.35rem 1rem;
+}
+
+.product-cat-modal__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.product-cat-modal__head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.product-cat-modal__head p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.product-cat-modal__close {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.product-cat-modal__list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.product-cat-modal__row {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.product-cat-modal__icon {
+  width: 3rem;
+  text-align: center;
+  padding: 0.45rem 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1.1rem;
+}
+
+.product-cat-modal__label {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.product-cat-modal__count {
+  font-size: 0.75rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.product-cat-modal__remove {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+}
+
+.product-cat-modal__remove:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.product-cat-modal__add {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.product-cat-modal__reassign {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: #fff7ed;
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.product-cat-modal__reassign p {
+  margin: 0;
+  flex: 1 1 100%;
+}
+
+.product-cat-modal__reassign select {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.45rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.product-cat-modal__error {
+  margin: 0 0 0.75rem;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+.product-cat-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}

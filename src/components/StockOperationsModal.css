@@ -377,6 +377,45 @@
   background: #e2f5df;
 }
 
+.stock-ops-dialog__category-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stock-ops-dialog__category-field > span {
+  color: #5b7a58;
+  font-weight: 600;
+}
+
+.stock-ops-dialog__category-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.stock-ops-dialog__category-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.stock-ops-dialog__category-manage {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .stock-ops-dialog__barcode-field {
   display: flex;
   flex-direction: column;

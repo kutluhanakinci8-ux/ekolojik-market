@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { CATEGORIES, getCategoryLabel } from '../data/categories';
+import { getCategoryLabel } from '../data/categories';
+import { ProductCategoryManagerModal } from './ProductCategoryManagerModal';
+import { categoriesForStockFilters, countProductsByCategory } from '../utils/productCategories';
 import { APP_CATALOG_VERSION } from '../data/appVersion';
 import { irsaliyeEanForCode } from '../data/irsaliyeLuy2026000000002';
 import type { Store } from '../store/useStore';
@@ -104,6 +106,8 @@ export function StockScreen({ store }: StockScreenProps) {
   const [stockOpsProductId, setStockOpsProductId] = useState<number | undefined>();
   const [stockOpsMode, setStockOpsMode] = useState<StockOperationType>('in');
 
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+
   const [bulkWholesaleOpen, setBulkWholesaleOpen] = useState(false);
   const [bulkWholesaleBase, setBulkWholesaleBase] = useState<WholesalePriceBase>('retail');
   const [bulkWholesaleDiscounts, setBulkWholesaleDiscounts] = useState(DEFAULT_WHOLESALE_DISCOUNTS);
@@ -125,6 +129,16 @@ export function StockScreen({ store }: StockScreenProps) {
     }
     return counts;
   }, [warehouseProducts]);
+
+  const stockCategoryChips = useMemo(
+    () => categoriesForStockFilters(warehouseProducts, store.settings, posLiteStock),
+    [warehouseProducts, store.settings, posLiteStock],
+  );
+
+  const categoryProductCounts = useMemo(
+    () => countProductsByCategory(warehouseProducts),
+    [warehouseProducts],
+  );
 
   const inventoryValue = useMemo(
     () => getStockInventoryValue(warehouseProducts),
@@ -158,7 +172,10 @@ export function StockScreen({ store }: StockScreenProps) {
           cmp = a.stock - b.stock;
           break;
         case 'category':
-          cmp = getCategoryLabel(a.category).localeCompare(getCategoryLabel(b.category), 'tr');
+          cmp = getCategoryLabel(a.category, store.settings).localeCompare(
+            getCategoryLabel(b.category, store.settings),
+            'tr',
+          );
           break;
         case 'value':
           cmp = a.stock * a.partnerPrice - b.stock * b.partnerPrice;
@@ -170,7 +187,7 @@ export function StockScreen({ store }: StockScreenProps) {
     });
 
     return sorted;
-  }, [warehouseProducts, search, filter, category, sortKey, sortDir, store.lowStockThreshold]);
+  }, [warehouseProducts, search, filter, category, sortKey, sortDir, store.lowStockThreshold, store.settings]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
@@ -300,6 +317,9 @@ export function StockScreen({ store }: StockScreenProps) {
             <button type="button" className="btn btn-outline" onClick={() => setSetModalOpen(true)}>
               🎁 Set Yönetimi
             </button>
+            <button type="button" className="btn btn-outline" onClick={() => setCategoryManagerOpen(true)}>
+              🏷 Kategoriler
+            </button>
             <button type="button" className="btn btn-outline" onClick={() => openStockOps()}>
               ＋ Stok İşlemleri
             </button>
@@ -311,7 +331,7 @@ export function StockScreen({ store }: StockScreenProps) {
 
         <div className="stock-toolbar-row stock-toolbar-row--filters">
           <div className="stock-category-chips">
-            {CATEGORIES.map((cat) => (
+            {stockCategoryChips.map((cat) => (
               <button
                 key={cat.id}
                 type="button"
@@ -323,6 +343,14 @@ export function StockScreen({ store }: StockScreenProps) {
                 <span className="category-count">{categoryCounts[cat.id] ?? 0}</span>
               </button>
             ))}
+            <button
+              type="button"
+              className="category-chip category-chip--manage"
+              onClick={() => setCategoryManagerOpen(true)}
+              title="Kategorileri düzenle"
+            >
+              ✎
+            </button>
           </div>
 
           <div className="stock-status-tabs">
@@ -532,7 +560,7 @@ export function StockScreen({ store }: StockScreenProps) {
                         </div>
                       </td>
                       <td>
-                        <span className="stock-cat-pill">{getCategoryLabel(p.category)}</span>
+                        <span className="stock-cat-pill">{getCategoryLabel(p.category, store.settings)}</span>
                       </td>
                       <td className="stock-name" title={p.name}>
                         {p.isSample && <span className="stock-sample-badge">NUMUNE</span>}
@@ -746,6 +774,20 @@ export function StockScreen({ store }: StockScreenProps) {
           showToast('Ürün fiyatları kaydedildi');
         }}
         perakendeKdvHaric={posLiteStock}
+        settings={store.settings}
+        onUpdateProductCategory={(productId, categoryId) => {
+          store.updateProductCategory(productId, categoryId);
+          showToast('Kategori kaydedildi');
+        }}
+        onManageCategories={() => setCategoryManagerOpen(true)}
+      />
+
+      <ProductCategoryManagerModal
+        open={categoryManagerOpen}
+        settings={store.settings}
+        productCounts={categoryProductCounts}
+        onClose={() => setCategoryManagerOpen(false)}
+        onSave={(catalog, reassignments) => store.saveProductCategoryCatalog(catalog, reassignments)}
       />
 
       {bulkWholesaleOpen && (

@@ -1,3 +1,6 @@
+import type { AppSettings } from '../types/business';
+import { getProductCategoryLabel } from '../utils/productCategories';
+
 export interface Category {
   id: string;
   label: string;
@@ -56,6 +59,7 @@ export const PRODUCT_CATEGORIES: Record<number, string> = {
   137: 'cilt-bakimi',
 };
 
-export function getCategoryLabel(categoryId: string): string {
+export function getCategoryLabel(categoryId: string, settings?: AppSettings | null): string {
+  if (settings) return getProductCategoryLabel(categoryId, settings);
   return CATEGORIES.find((c) => c.id === categoryId)?.label ?? categoryId;
 }

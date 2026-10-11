@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategoryLabel } from '../data/categories';
+import type { AppSettings } from '../types/business';
+import { listProductCategorySelectOptions } from '../utils/productCategories';
 import type { Product, WholesalePrices } from '../types/product';
 import type { ProductPricingInput } from '../utils/productPricing';
 import type { ProductSet, ProductSetItem } from '../types/productSet';
@@ -42,6 +44,9 @@ interface StockOperationsModalProps {
   onUpdatePricing?: (productId: number, input: ProductPricingInput) => void;
   /** Lima / pos-lite: perakende KDV hariç */
   perakendeKdvHaric?: boolean;
+  settings?: AppSettings;
+  onUpdateProductCategory?: (productId: number, categoryId: string) => void;
+  onManageCategories?: () => void;
 }
 
 const OPERATIONS: Array<{
@@ -106,6 +111,9 @@ export function StockOperationsModal({
   onRemoveImage,
   onUpdatePricing,
   perakendeKdvHaric = false,
+  settings,
+  onUpdateProductCategory,
+  onManageCategories,
 }: StockOperationsModalProps) {
   const [operation, setOperation] = useState<StockOperationType>(initialOperation);
   const [productId, setProductId] = useState('');
@@ -117,6 +125,12 @@ export function StockOperationsModal({
   const [partnerDraft, setPartnerDraft] = useState('');
   const [couponDraft, setCouponDraft] = useState('');
   const [retailDraft, setRetailDraft] = useState('');
+  const [categoryDraft, setCategoryDraft] = useState('');
+
+  const categoryOptions = useMemo(
+    () => listProductCategorySelectOptions(settings),
+    [settings],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -136,6 +150,10 @@ export function StockOperationsModal({
   useEffect(() => {
     setBarcodeDraft(selectedProduct?.barcode ?? '');
   }, [selectedProduct?.id, selectedProduct?.barcode]);
+
+  useEffect(() => {
+    setCategoryDraft(selectedProduct?.category ?? '');
+  }, [selectedProduct?.id, selectedProduct?.category]);
 
   useEffect(() => {
     if (!selectedProduct) {
@@ -416,7 +434,40 @@ export function StockOperationsModal({
                 </div>
                 <div className="stock-ops-dialog__selected-info">
                   <div className="stock-ops-dialog__selected-top">
-                    <span className="stock-cat-pill">{getCategoryLabel(selectedProduct.category)}</span>
+                    {onUpdateProductCategory ? (
+                      <label className="stock-ops-dialog__category-field">
+                        <span>Kategori</span>
+                        <div className="stock-ops-dialog__category-row">
+                          <select
+                            value={categoryDraft}
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              setCategoryDraft(next);
+                              onUpdateProductCategory(selectedProduct.id, next);
+                            }}
+                          >
+                            {categoryOptions.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.icon} {cat.label}
+                              </option>
+                            ))}
+                          </select>
+                          {onManageCategories && (
+                            <button
+                              type="button"
+                              className="stock-ops-dialog__category-manage"
+                              onClick={onManageCategories}
+                            >
+                              Düzenle
+                            </button>
+                          )}
+                        </div>
+                      </label>
+                    ) : (
+                      <span className="stock-cat-pill">
+                        {getCategoryLabel(selectedProduct.category, settings)}
+                      </span>
+                    )}
                     {selectedStatus && (
                       <span className={`stock-ops-dialog__status stock-ops-dialog__status--${selectedStatus}`}>
                         {getStockStatusLabel(selectedStatus)}
@@ -614,7 +665,7 @@ export function StockOperationsModal({
                       </div>
                       <div className="stock-ops-dialog__preview-row">
                         <span>Kategori</span>
-                        <strong>{getCategoryLabel(selectedProduct.category)}</strong>
+                        <strong>{getCategoryLabel(selectedProduct.category, settings)}</strong>
                       </div>
                       {selectedStatus && (
                         <div className="stock-ops-dialog__preview-row">

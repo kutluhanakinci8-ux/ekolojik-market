@@ -169,8 +169,13 @@ export function SalesScreen({ store }: SalesScreenProps) {
   }, [store.products, activeSets.length]);
 
   const salesCategories = useMemo(
-    () => categoriesForTenantSales(store.products, activeSets.length, posLiteCheckout),
-    [store.products, activeSets.length, posLiteCheckout],
+    () => categoriesForTenantSales(
+      store.products,
+      activeSets.length,
+      posLiteCheckout,
+      store.settings,
+    ),
+    [store.products, activeSets.length, posLiteCheckout, store.settings],
   );
 
   const lastTodaySale = store.todaySales[0];

@@ -1,5 +1,12 @@
 import { GREENLEAF_PRODUCTS } from '../data/greenleafCatalog';
-import { CATEGORIES, getCategoryLabel, type Category } from '../data/categories';
+import { type Category } from '../data/categories';
+import {
+  getProductCategoryLabel,
+  productCategoryToChip,
+  PRODUCT_CATEGORY_FILTER_ALL,
+  PRODUCT_CATEGORY_SETS,
+  resolveProductCategoryCatalog,
+} from './productCategories';
 import { SEED_PRODUCTS } from '../data/seedProducts';
 import type { AppSettings } from '../types/business';
 import type { Product } from '../types/product';
@@ -85,29 +92,57 @@ export function categoriesForTenantSales(
   products: Product[],
   setCount: number,
   posLite: boolean,
+  settings?: AppSettings | null,
 ): Category[] {
-  if (!posLite) return CATEGORIES;
+  const catalog = resolveProductCategoryCatalog(settings);
+  const hasCustomCatalog = (settings?.productCategoryCatalog?.length ?? 0) > 0;
+
+  if (!posLite) {
+    const base: Category[] = [
+      { id: PRODUCT_CATEGORY_FILTER_ALL, label: 'Tümü', icon: '🏪' },
+      ...catalog.map(productCategoryToChip),
+    ];
+    if (setCount > 0) {
+      base.push({ id: PRODUCT_CATEGORY_SETS, label: 'Setler', icon: '🎁' });
+    }
+    return base;
+  }
 
   const used = new Set(products.map((p) => p.category));
-  const base = CATEGORIES.filter((cat) => {
-    if (cat.id === 'all') return true;
-    if (cat.id === 'setler') return setCount > 0;
-    return used.has(cat.id);
-  });
+  const base: Category[] = [
+    { id: PRODUCT_CATEGORY_FILTER_ALL, label: 'Tümü', icon: '🏪' },
+  ];
+
+  for (const def of catalog) {
+    if (used.has(def.id)) base.push(productCategoryToChip(def));
+  }
 
   for (const catId of used) {
     if (catId && !base.some((c) => c.id === catId)) {
-      base.push({ id: catId, label: getCategoryLabel(catId), icon: '🏷️' });
+      base.push({
+        id: catId,
+        label: getProductCategoryLabel(catId, settings),
+        icon: '🏷️',
+      });
     }
   }
 
-  // Tek kategori varsa "Limo" vb. gereksiz sekme gösterme — yalnızca Tümü
-  const productCats = base.filter((c) => c.id !== 'all' && c.id !== 'setler');
-  if (productCats.length === 1 && setCount === 0) {
-    return base.filter((c) => c.id === 'all');
+  if (setCount > 0) {
+    base.push({ id: PRODUCT_CATEGORY_SETS, label: 'Setler', icon: '🎁' });
   }
 
-  return base.map((c) =>
-    c.id === 'limo' ? { ...c, label: 'Ürünler', icon: '🧴' } : c,
+  const productCats = base.filter(
+    (c) => c.id !== PRODUCT_CATEGORY_FILTER_ALL && c.id !== PRODUCT_CATEGORY_SETS,
   );
+  if (productCats.length === 1 && setCount === 0) {
+    return base.filter((c) => c.id === PRODUCT_CATEGORY_FILTER_ALL);
+  }
+
+  if (!hasCustomCatalog) {
+    return base.map((c) =>
+      c.id === 'limo' ? { ...c, label: 'Ürünler', icon: '🧴' } : c,
+    );
+  }
+
+  return base;
 }
