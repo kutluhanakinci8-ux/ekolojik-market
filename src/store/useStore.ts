@@ -1250,19 +1250,6 @@ export function usePosStoreState() {
     return () => stopPosApiTokenRefreshScheduler();
   }, [authSession]);
 
-  /** Oturum açık ama «yerel» görünüyorsa sunucudan bir kez daha çek */
-  useEffect(() => {
-    if (!authSession || !syncReady || !loadPosApiToken()) return;
-    if (syncStatus !== 'local-only') return;
-    void (async () => {
-      const remote = await fetchStoreSnapshot();
-      if (remote) {
-        applySnapshot(remote);
-        setSyncStatus('synced');
-      }
-    })();
-  }, [authSession, syncReady, syncStatus, applySnapshot]);
-
   useEffect(() => {
     if (!authSession) return;
     const user = users.find((item) => item.id === authSession.userId && item.isActive);
