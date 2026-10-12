@@ -304,7 +304,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
         store.productSets,
       );
       const printerName =
-        store.settings.receiptPrinter?.windowsPrinterName?.trim() || 'Printer POS-80C';
+        store.settings.receiptPrinter?.windowsPrinterName?.trim() || 'Ekolojik POS-80 (Zywell)';
       await printThermalReceipt(receiptData, undefined, printerName);
     }
 

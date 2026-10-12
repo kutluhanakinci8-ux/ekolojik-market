@@ -27,7 +27,9 @@ import {
 } from './storage/postaOnboardingSession';
 import { filterTabsForProductProfile, isPosLiteProfile } from './utils/tenantProductProfile';
 import { PosTenantBootstrap } from './components/PosTenantBootstrap';
+import { WindowsZywellSetupBanner } from './components/pos/WindowsZywellSetupBanner';
 import { useAppReleaseRefresh } from './hooks/useAppReleaseRefresh';
+import { DEFAULT_ZYWELL_RECEIPT_PRINTER } from './types/receiptPrinter';
 
 function renderPage(
   page: AppPage,
@@ -233,7 +235,11 @@ export function PosApp() {
   const shellPage = resolveTopNavHighlight(page, allowedTabs);
 
   return (
-    <AppShell
+    <>
+      <WindowsZywellSetupBanner
+        onApplyPrinterSettings={() => store.updateReceiptPrinterSettings({ ...DEFAULT_ZYWELL_RECEIPT_PRINTER })}
+      />
+      <AppShell
       store={store}
       page={shellPage}
       allowedTabs={allowedTabs}
@@ -247,5 +253,6 @@ export function PosApp() {
         onConsumed: clearPostaDeepLink,
       })}
     </AppShell>
+    </>
   );
 }

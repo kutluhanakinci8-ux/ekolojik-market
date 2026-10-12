@@ -17,11 +17,14 @@ export interface ReceiptPrinterSettings {
   pageMarginMm: number;
 }
 
-/** Greenleaf kasa — POS-80C; «gelişmiş profil» kapalı (çalışan yönetici yolu) */
+/** Standart Windows kuyruk adı — Zywell POS-80 */
+export const STANDARD_WINDOWS_ZYWELL_PRINTER_NAME = 'Ekolojik POS-80 (Zywell)';
+
+/** Greenleaf kasa — Zywell; «gelişmiş profil» kapalı (çalışan yönetici yolu) */
 export const GREENLEAF_KASA_RECEIPT_PRESET: ReceiptPrinterSettings = {
   enabled: false,
   brand: 'zywell',
-  windowsPrinterName: 'POS-80C',
+  windowsPrinterName: STANDARD_WINDOWS_ZYWELL_PRINTER_NAME,
   paperWidthMm: 80,
   autoPrintOnSale: true,
   copies: 1,

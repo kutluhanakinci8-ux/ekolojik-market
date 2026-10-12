@@ -5,8 +5,11 @@
 #   .\scripts\install-windows-receipt-bridge.ps1
 #   .\scripts\install-windows-receipt-bridge.ps1 -PrinterName "POS-80C"
 param(
-  [string]$PrinterName = ''
+  [string]$PrinterName = '',
+  [switch]$SkipZywellPrinterInstall
 )
+
+$StandardZywellName = 'Ekolojik POS-80 (Zywell)'
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -32,9 +35,20 @@ foreach ($f in $files) {
   Copy-Item -LiteralPath $src -Destination (Join-Path $DestDir $f) -Force
 }
 
+if (-not $SkipZywellPrinterInstall) {
+  $zyScript = Join-Path $RepoRoot 'scripts\install-windows-zywell-printer.ps1'
+  if (Test-Path -LiteralPath $zyScript) {
+    $created = & $zyScript -PrinterName $StandardZywellName
+    if ($created) { $PrinterName = $created }
+  }
+}
+
 $printers = @(Get-Printer -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
 if (-not $PrinterName) {
-  $pos80 = @($printers | Where-Object { $_ -match 'pos.?80' })
+  if ($printers -contains $StandardZywellName) {
+    $PrinterName = $StandardZywellName
+  }
+  $pos80 = @($printers | Where-Object { $_ -match 'pos.?80|zywell|ekolojik' })
   if ($pos80.Count -eq 1) {
     $PrinterName = $pos80[0]
   } elseif ($pos80.Count -gt 1) {
@@ -42,8 +56,8 @@ if (-not $PrinterName) {
     Write-Host "Birden fazla POS-80 yazici; ilk secildi: $PrinterName"
     Write-Host "Farkli ad icin: -PrinterName `"tam ad`""
   } else {
-    $PrinterName = 'Printer POS-80C'
-    Write-Host "POS-80 otomatik bulunamadi; varsayilan ad: $PrinterName"
+    $PrinterName = $StandardZywellName
+    Write-Host "POS-80/Zywell otomatik bulunamadi; standart ad: $PrinterName"
     Write-Host "Ayarlar -> Fiş yazicisi adini Windows'taki tam adla ayni yapin."
   }
 }

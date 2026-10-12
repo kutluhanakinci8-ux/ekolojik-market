@@ -17595,3 +17595,23 @@ input {
   padding: 10px;
   resize: vertical;
 }
+
+.zywell-setup-banner {
+  background: linear-gradient(90deg, #fef3c7, #fffbeb);
+  border-bottom: 1px solid #f59e0b;
+  padding: 12px 16px;
+}
+.zywell-setup-banner-inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+.zywell-setup-steps {
+  margin: 8px 0;
+  padding-left: 1.25rem;
+}
+.zywell-setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}

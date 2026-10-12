@@ -17,7 +17,7 @@ import { buildEscPosReceiptBuffer } from './escposTurkish.mjs';
 const PORT = Number(process.env.LIMA_RAW_PRINT_PORT || 18765);
 const QUEUE =
   process.env.POS80_QUEUE_NAME ||
-  (platform() === 'win32' ? 'Printer POS-80C' : 'Printer_POS_80C');
+  (platform() === 'win32' ? 'Ekolojik POS-80 (Zywell)' : 'Printer_POS_80C');
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, '..');

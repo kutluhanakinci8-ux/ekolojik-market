@@ -3,9 +3,12 @@ import type { Store } from '../../store/useStore';
 import {
   DEFAULT_ZYWELL_RECEIPT_PRINTER,
   normalizeReceiptPrinterSettings,
+  STANDARD_WINDOWS_ZYWELL_PRINTER_NAME,
   type ReceiptPrinterBrand,
   type ReceiptPrintMode,
 } from '../../types/receiptPrinter';
+import { WINDOWS_ZYWELL_SETUP_PS1_PATH } from '../../config/standardReceiptPrinter';
+import { WindowsZywellSetupBanner } from './WindowsZywellSetupBanner';
 import { isPosLiteProfile } from '../../utils/tenantProductProfile';
 import { printTestSaleReceipt } from '../../utils/receiptPrint';
 import { isLimaRawPrintReadyForReceipt } from '../../utils/limaRawReceiptPrint';
@@ -102,12 +105,20 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           <strong>Lima Market</strong> — fiş <strong>doğrudan POS-80C</strong> (ESC/POS); tarayıcı yazdır penceresi{' '}
           <strong>açılmaz</strong>. Kasa PC’de fiş servisi <strong>bir kez</strong> kurulur, sonra otomatik çalışır.
         </p>
+        <WindowsZywellSetupBanner
+          onApplyPrinterSettings={() => store.updateReceiptPrinterSettings({ ...DEFAULT_ZYWELL_RECEIPT_PRINTER })}
+        />
         <ReceiptBridgeAutostartHelp />
+        <p className="module-hint">
+          <a href={`${typeof window !== 'undefined' ? window.location.origin : ''}${WINDOWS_ZYWELL_SETUP_PS1_PATH}`} download="ekolojik-zywell-setup.ps1">
+            Windows — Zywell otomatik kurulum (.ps1)
+          </a>
+        </p>
         <ReceiptPrintDebugBlock
           businessName={store.settings.businessName}
           windowsPrinterName={
             normalizeReceiptPrinterSettings(store.settings.receiptPrinter).windowsPrinterName ||
-            'Printer POS-80C'
+            STANDARD_WINDOWS_ZYWELL_PRINTER_NAME
           }
         />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
@@ -129,6 +140,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
 
   return (
     <section className="settings-panel settings-panel--receipt-printer">
+      <WindowsZywellSetupBanner onApplyPrinterSettings={applyZywellPreset} />
       <ReceiptBridgeAutostartHelp />
       <div className="settings-panel-head">
         <div>
@@ -213,7 +225,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
       </p>
       <ReceiptPrintDebugBlock
         businessName={store.settings.businessName}
-        windowsPrinterName={printer.windowsPrinterName || 'Printer POS-80C'}
+        windowsPrinterName={printer.windowsPrinterName || STANDARD_WINDOWS_ZYWELL_PRINTER_NAME}
       />
     </section>
   );
