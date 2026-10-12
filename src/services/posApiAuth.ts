@@ -12,8 +12,8 @@ const SCHEDULER_MS = 5 * 60 * 1000;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let refreshInFlight: Promise<{ ok: boolean; error?: string }> | null = null;
 
-function tenantQuery(): string {
-  const tenant = loadTenantId();
+function tenantQuery(tenantOverride?: string): string {
+  const tenant = tenantOverride ?? loadTenantId();
   if (!tenant || tenant === DEFAULT_TENANT_ID) return '';
   return `?tenant=${encodeURIComponent(tenant)}`;
 }
@@ -163,13 +163,16 @@ export function stopPosApiTokenRefreshScheduler(): void {
   }
 }
 
-export async function exchangePosApiToken(credentials: {
-  username: string;
-  password?: string;
-  pin?: string;
-}): Promise<{ ok: boolean; token?: string; error?: string }> {
+export async function exchangePosApiToken(
+  credentials: {
+    username: string;
+    password?: string;
+    pin?: string;
+  },
+  tenantId?: string,
+): Promise<{ ok: boolean; token?: string; error?: string }> {
   try {
-    const res = await fetch(`/api/auth/pos-token${tenantQuery()}`, {
+    const res = await fetch(`/api/auth/pos-token${tenantQuery(tenantId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(credentials),

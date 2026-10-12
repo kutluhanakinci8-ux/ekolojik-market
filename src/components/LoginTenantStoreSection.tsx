@@ -7,6 +7,8 @@ interface LoginTenantStoreSectionProps {
   onTenantIdChange: (tenantId: string) => void;
   /** URL veya kayıtlı kod ile Lima vb. — alan baştan açık */
   initialExpanded?: boolean;
+  /** Greenleaf sahibi — mağaza kodu gösterilmez, her zaman main */
+  hideForOwnerAccount?: boolean;
 }
 
 /**
@@ -17,10 +19,15 @@ export function LoginTenantStoreSection({
   tenantId,
   onTenantIdChange,
   initialExpanded = false,
+  hideForOwnerAccount = false,
 }: LoginTenantStoreSectionProps) {
   const [expanded, setExpanded] = useState(
     initialExpanded || (tenantId !== DEFAULT_TENANT_ID && tenantId.trim() !== ''),
   );
+
+  if (hideForOwnerAccount) {
+    return null;
+  }
 
   if (!expanded) {
     return (

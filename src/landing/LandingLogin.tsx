@@ -7,6 +7,7 @@ import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../s
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { LoginTenantStoreSection } from '../components/LoginTenantStoreSection';
 import { resolveLoginTenantId } from '../config/loginTenant';
+import { isOwnerAdminUsername } from '../config/ownerAdminUsers';
 import {
   DEFAULT_TENANT_ID,
   normalizeStoreCodeInput,
@@ -36,6 +37,13 @@ export function LandingLogin() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(registerState?.message ?? null);
   const [busy, setBusy] = useState(false);
+  const ownerLogin = isOwnerAdminUsername(username);
+
+  useEffect(() => {
+    if (!isOwnerAdminUsername(username)) return;
+    saveTenantId(DEFAULT_TENANT_ID);
+    setTenantId(DEFAULT_TENANT_ID);
+  }, [username]);
 
   useEffect(() => {
     if (registerState?.message) {
@@ -71,7 +79,10 @@ export function LandingLogin() {
     setError(null);
 
     const loginUser = (pendingTotpUserId ? pendingUsername : username).trim();
-    const resolvedTenant = resolveLoginTenantId(loginUser, normalizeStoreCodeInput(tenantId));
+    const resolvedTenant = resolveLoginTenantId(
+      loginUser,
+      ownerLogin ? DEFAULT_TENANT_ID : normalizeStoreCodeInput(tenantId),
+    );
     const tenantError = validateStoreCodeForLogin(resolvedTenant);
     if (tenantError) {
       setError(tenantError);
@@ -85,7 +96,7 @@ export function LandingLogin() {
     try {
       const result = await store.login(
         pendingTotpUserId ? pendingUsername : username,
-        password,
+        password.trim(),
         totpCode || undefined,
       );
 
@@ -144,7 +155,8 @@ export function LandingLogin() {
                 <LoginTenantStoreSection
                   tenantId={tenantId}
                   onTenantIdChange={setTenantId}
-                  initialExpanded={loginPageTenantFromUrl}
+                  initialExpanded={loginPageTenantFromUrl && !ownerLogin}
+                  hideForOwnerAccount={ownerLogin}
                 />
                 <label>
                   Kullanıcı Adı

@@ -3345,12 +3345,17 @@ export function usePosStoreState() {
     try {
       syncPosLocalStorageKeys();
       const normalized = username.trim().toLowerCase();
+      const passwordTrimmed = password.trim();
       const lockCheck = checkLoginAllowed(normalized);
 
-      saveTenantId(resolveLoginTenantId(normalized, loadTenantId()));
+      const authTenant = resolveLoginTenantId(normalized, loadTenantId());
+      saveTenantId(authTenant);
       syncPosLocalStorageKeys();
 
-      let remoteAuth = await exchangePosApiToken({ username: normalized, password });
+      let remoteAuth = await exchangePosApiToken(
+        { username: normalized, password: passwordTrimmed },
+        authTenant,
+      );
       if (!lockCheck.allowed) {
         if (!remoteAuth.ok) {
           if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
@@ -3386,10 +3391,10 @@ export function usePosStoreState() {
             applySnapshot(remote);
           }
         }
-      } else {
+      } else if (import.meta.env.DEV) {
         user = users.find((item) => item.username === normalized);
         const passwordOk =
-          Boolean(user?.passwordHash) && verifyPassword(password, user!.passwordHash);
+          Boolean(user?.passwordHash) && verifyPassword(passwordTrimmed, user!.passwordHash);
         if (!passwordOk) {
           recordFailedLogin(normalized);
           await appendLoginAudit({
@@ -3400,6 +3405,18 @@ export function usePosStoreState() {
           });
           return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
         }
+      } else {
+        recordFailedLogin(normalized);
+        await appendLoginAudit({
+          username: normalized,
+          success: false,
+          method: 'password',
+          failureReason: remoteAuth.error ?? 'Sunucu girişi reddetti',
+        });
+        return {
+          status: 'error',
+          message: remoteAuth.error ?? 'Kullanıcı adı veya şifre hatalı.',
+        };
       }
 
       if (user && !user.isActive) {
@@ -3446,7 +3463,7 @@ export function usePosStoreState() {
         }
       }
 
-      await finalizeLogin(user, 'password', { password });
+      await finalizeLogin(user, 'password', { password: passwordTrimmed });
       return { status: 'success' };
     } catch {
       return { status: 'error', message: 'Giriş sırasında bir hata oluştu. Sayfayı yenileyip tekrar deneyin.' };
@@ -3461,12 +3478,14 @@ export function usePosStoreState() {
         return { status: 'error', message: 'PIN 6 haneli olmalıdır.' };
       }
 
+      const pinTrimmed = pin.trim();
       const lockCheck = checkLoginAllowed(normalized);
 
-      saveTenantId(resolveLoginTenantId(normalized, loadTenantId()));
+      const authTenant = resolveLoginTenantId(normalized, loadTenantId());
+      saveTenantId(authTenant);
       syncPosLocalStorageKeys();
 
-      let remoteAuth = await exchangePosApiToken({ username: normalized, pin });
+      let remoteAuth = await exchangePosApiToken({ username: normalized, pin: pinTrimmed }, authTenant);
       if (!lockCheck.allowed) {
         if (!remoteAuth.ok) {
           if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
@@ -3502,9 +3521,9 @@ export function usePosStoreState() {
             applySnapshot(remote);
           }
         }
-      } else {
+      } else if (import.meta.env.DEV) {
         user = users.find((item) => item.username === normalized);
-        const pinOk = Boolean(user?.pinHash) && verifyPin(pin, user!.pinHash);
+        const pinOk = Boolean(user?.pinHash) && verifyPin(pinTrimmed, user!.pinHash);
         if (!pinOk) {
           recordFailedLogin(normalized);
           await appendLoginAudit({
@@ -3515,6 +3534,18 @@ export function usePosStoreState() {
           });
           return { status: 'error', message: 'Kullanıcı adı veya PIN hatalı.' };
         }
+      } else {
+        recordFailedLogin(normalized);
+        await appendLoginAudit({
+          username: normalized,
+          success: false,
+          method: 'pin',
+          failureReason: remoteAuth.error ?? 'Sunucu PIN reddetti',
+        });
+        return {
+          status: 'error',
+          message: remoteAuth.error ?? 'Kullanıcı adı veya PIN hatalı.',
+        };
       }
 
       if (user && !user.isActive) {
@@ -3543,7 +3574,7 @@ export function usePosStoreState() {
         return { status: 'error', message: 'Kullanıcı adı veya PIN hatalı.' };
       }
 
-      await finalizeLogin(user, 'pin', { pin });
+      await finalizeLogin(user, 'pin', { pin: pinTrimmed });
       return { status: 'success' };
     } catch {
       return { status: 'error', message: 'PIN girişi sırasında bir hata oluştu.' };
