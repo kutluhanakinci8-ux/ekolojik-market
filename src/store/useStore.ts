@@ -39,6 +39,7 @@ import {
   clearPosApiTokensForAllKnownTenants,
   decodePosApiTokenClaims,
   exchangePosApiToken,
+  syncPosApiTokenToCurrentTenant,
   loadPosApiToken,
   startPosApiTokenRefreshScheduler,
   stopPosApiTokenRefreshScheduler,
@@ -871,11 +872,6 @@ function buildSnapshotFromStorage(): PersistedStoreSnapshot {
     ...accounting,
     crm: loadCrmData(),
   };
-}
-
-/** Bu cihazda kayıtlı mağaza verisi varsa sunucu anlık görüntüsü otomatik uygulanmaz (Ayarlar onayı). */
-function deviceHasLocalStoreData(): boolean {
-  return hasPersistedStoreData(buildSnapshotFromStorage());
 }
 
 function hydrateStoreSlicesFromLocalDisk() {
@@ -3327,7 +3323,7 @@ export function usePosStoreState() {
     async (
       user: PosUser,
       method: LoginMethod,
-      credentials?: { password?: string; pin?: string },
+      _credentials?: { password?: string; pin?: string },
     ) => {
       clearLoginLockout(user.username);
       const sessionId = `S${Date.now()}`;
@@ -3336,13 +3332,17 @@ export function usePosStoreState() {
       setSyncStatus('loading');
       setSyncReady(false);
 
-      await exchangePosApiToken({
-        username: user.username,
-        password: credentials?.password,
-        pin: credentials?.pin,
-      });
+      syncPosApiTokenToCurrentTenant();
+      const token = loadPosApiToken();
+      if (!token) {
+        setSyncStatus('local-only');
+        setSyncFetchError('no_token');
+        setSyncServerReachable(false);
+        setSyncReady(true);
+        throw new Error('API oturumu oluşturulamadı — tekrar giriş yapın');
+      }
 
-      const claims = decodePosApiTokenClaims(loadPosApiToken());
+      const claims = decodePosApiTokenClaims(token);
       if (claims?.tenantId?.trim()) {
         saveTenantId(claims.tenantId.trim());
       }
@@ -3350,7 +3350,8 @@ export function usePosStoreState() {
 
       let sessionSettings = settings;
       try {
-        const remote = await fetchStoreSnapshot();
+        const { snapshot: remote, error } = await fetchStoreSnapshotWithDiagnostics();
+        setSyncFetchError(error ?? null);
         setSyncServerReachable(remote != null);
         if (remote) {
           const localSnapshot = buildSnapshotFromStorage();
@@ -3358,6 +3359,7 @@ export function usePosStoreState() {
           applySnapshot(merged);
           sessionSettings = snapshotMergedSettings(merged);
           setSyncStatus('synced');
+          setSyncFetchError(null);
         } else {
           setSyncStatus('local-only');
         }
@@ -3428,6 +3430,7 @@ export function usePosStoreState() {
   }, [applySnapshot]);
 
   const refreshTenantData = useCallback(async (): Promise<boolean> => {
+    if (!loadPosApiToken()) return false;
     return forceServerAuthoritativeResync();
   }, [forceServerAuthoritativeResync]);
 
@@ -3441,15 +3444,19 @@ export function usePosStoreState() {
   }, [authSession?.sessionId, forceServerAuthoritativeResync, syncReady]);
 
   useEffect(() => {
-    if (!authSession || !syncReady) return;
+    if (!authSession || !syncReady || syncStatus === 'loading') return;
     if (loadPosApiToken()) return;
-    clearAuthSession();
-    clearPosApiToken();
-    setAuthSession(null);
-    setSyncFetchError('no_token');
-    setSyncStatus('local-only');
-    setSyncServerReachable(false);
-  }, [authSession, syncReady]);
+    const timer = window.setTimeout(() => {
+      if (loadPosApiToken()) return;
+      clearAuthSession();
+      clearPosApiToken();
+      setAuthSession(null);
+      setSyncFetchError('no_token');
+      setSyncStatus('local-only');
+      setSyncServerReachable(false);
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [authSession, syncReady, syncStatus]);
 
   useEffect(() => {
     const onTenantChanged = () => {
@@ -3564,19 +3571,21 @@ export function usePosStoreState() {
           saveTenantId(claims.tenantId.trim());
           syncPosLocalStorageKeys();
         }
+        syncPosApiTokenToCurrentTenant(authTenant);
         const remote = await fetchStoreSnapshot();
-        if (remote?.users?.length) {
-          const remoteUsers = remote.users.map((u) =>
-            normalizeUser(u as unknown as Record<string, unknown>),
-          );
-          setUsers(remoteUsers);
-          user = remoteUsers.find((item) => item.username === normalized) ?? user;
-          if (!user && claims?.userId) {
-            user = remoteUsers.find((item) => item.id === claims.userId);
+        if (remote) {
+          if (remote.users?.length) {
+            const remoteUsers = remote.users.map((u) =>
+              normalizeUser(u as unknown as Record<string, unknown>),
+            );
+            setUsers(remoteUsers);
+            user = remoteUsers.find((item) => item.username === normalized) ?? user;
+            if (!user && claims?.userId) {
+              user = remoteUsers.find((item) => item.id === claims.userId);
+            }
           }
-          if (!deviceHasLocalStoreData()) {
-            applySnapshot(remote);
-          }
+          const localSnapshot = buildSnapshotFromStorage();
+          applySnapshot(mergeServerAuthoritativeSnapshot(localSnapshot, remote));
         }
       } else if (import.meta.env.DEV) {
         user = users.find((item) => item.username === normalized);
@@ -3701,19 +3710,21 @@ export function usePosStoreState() {
           saveTenantId(claims.tenantId.trim());
           syncPosLocalStorageKeys();
         }
+        syncPosApiTokenToCurrentTenant(authTenant);
         const remote = await fetchStoreSnapshot();
-        if (remote?.users?.length) {
-          const remoteUsers = remote.users.map((u) =>
-            normalizeUser(u as unknown as Record<string, unknown>),
-          );
-          setUsers(remoteUsers);
-          user = remoteUsers.find((item) => item.username === normalized) ?? user;
-          if (!user && claims?.userId) {
-            user = remoteUsers.find((item) => item.id === claims.userId);
+        if (remote) {
+          if (remote.users?.length) {
+            const remoteUsers = remote.users.map((u) =>
+              normalizeUser(u as unknown as Record<string, unknown>),
+            );
+            setUsers(remoteUsers);
+            user = remoteUsers.find((item) => item.username === normalized) ?? user;
+            if (!user && claims?.userId) {
+              user = remoteUsers.find((item) => item.id === claims.userId);
+            }
           }
-          if (!deviceHasLocalStoreData()) {
-            applySnapshot(remote);
-          }
+          const localSnapshot = buildSnapshotFromStorage();
+          applySnapshot(mergeServerAuthoritativeSnapshot(localSnapshot, remote));
         }
       } else if (import.meta.env.DEV) {
         user = users.find((item) => item.username === normalized);

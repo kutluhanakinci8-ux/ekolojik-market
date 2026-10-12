@@ -49,7 +49,6 @@ export function LoginScreen({ store }: LoginScreenProps) {
     }
     saveTenantId(resolvedTenant);
     setTenantId(resolvedTenant);
-    await store.refreshTenantData();
 
     try {
       const result = await store.login(
