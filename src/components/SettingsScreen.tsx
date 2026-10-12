@@ -339,8 +339,9 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
               <p className="module-hint" style={{ marginBottom: 12 }}>
                 <strong>Uygulama</strong> satırı tarayıcıdaki güncel programı gösterir.{' '}
                 <strong>Katalog</strong> ürün/fiyat paketinin kod içi kimliğidir (tarih eski sürüm anlamına
-                gelmez). Mac ve Windows aynı <code>www.ekolojikmarket.com.tr</code> + senkron ile aynı veriyi
-                görür.
+                gelmez).                 Mağaza verisi GitHub’da değil; sunucu + bu cihazın tarayıcısındadır. Sunucu ile
+                birleştirme yalnızca <strong>Sunucuya Yükle</strong> / <strong>Sunucudan yenile</strong> ile
+                yapılır (giriş veya sayfa yenileme veriyi otomatik ezmez).
               </p>
               <div className="settings-stat-grid">
                 <article className="settings-stat-card">

@@ -842,6 +842,11 @@ function buildSnapshotFromStorage(): PersistedStoreSnapshot {
   };
 }
 
+/** Bu cihazda kayıtlı mağaza verisi varsa sunucu anlık görüntüsü otomatik uygulanmaz (Ayarlar onayı). */
+function deviceHasLocalStoreData(): boolean {
+  return hasPersistedStoreData(buildSnapshotFromStorage());
+}
+
 export function usePosStoreState() {
   syncPosLocalStorageKeys();
   const [products, setProducts] = useState<Product[]>(loadProducts);
@@ -1047,39 +1052,29 @@ export function usePosStoreState() {
       }
 
       if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
-        const remoteUsers = (remote.users ?? []).map((user) => normalizeUser(user as unknown as Record<string, unknown>));
-        const localUsers = loadUsers();
-        const mergedUsers = mergeUserLists(remoteUsers, localUsers);
-        const { products: migratedRemoteProducts } = applyIrsaliyeStockToProducts(remote.products ?? []);
-        const mergedSnapshot = {
-          ...(mergedUsers.length !== remoteUsers.length
-            ? { ...remote, users: mergedUsers, updatedAt: new Date().toISOString() }
-            : remote),
-          products: migratedRemoteProducts,
-          updatedAt: new Date().toISOString(),
-        };
-
-        applySnapshot(mergedSnapshot);
-        if (loadPosApiToken()) {
-          void saveStoreSnapshot(mergedSnapshot);
-          setSyncStatus('synced');
-        } else {
+        if (deviceHasLocalStoreData()) {
           setSyncStatus('local-only');
+        } else {
+          const remoteUsers = (remote.users ?? []).map((user) =>
+            normalizeUser(user as unknown as Record<string, unknown>),
+          );
+          const localUsers = loadUsers();
+          const mergedUsers = mergeUserLists(remoteUsers, localUsers);
+          const { products: migratedRemoteProducts } = applyIrsaliyeStockToProducts(remote.products ?? []);
+          const mergedSnapshot = {
+            ...(mergedUsers.length !== remoteUsers.length
+              ? { ...remote, users: mergedUsers, updatedAt: new Date().toISOString() }
+              : remote),
+            products: migratedRemoteProducts,
+            updatedAt: new Date().toISOString(),
+          };
+          applySnapshot(mergedSnapshot);
+          setSyncStatus('synced');
         }
       } else if (hasPersistedStoreData(localSnapshot) && tenant === DEFAULT_TENANT_ID) {
         const { products: migratedLocal } = applyIrsaliyeStockToProducts(localSnapshot.products ?? []);
-        const localFixed = {
-          ...localSnapshot,
-          products: migratedLocal,
-          updatedAt: new Date().toISOString(),
-        };
         setProducts(mergeWithSeed(migratedLocal));
-        if (loadPosApiToken()) {
-          const saved = await saveStoreSnapshot(localFixed);
-          setSyncStatus(saved ? 'synced' : 'local-only');
-        } else {
-          setSyncStatus('local-only');
-        }
+        setSyncStatus('local-only');
       } else if (remote) {
         applySnapshot(remote);
         setSyncStatus('synced');
@@ -3108,10 +3103,12 @@ export function usePosStoreState() {
       let sessionSettings = settings;
       try {
         const remote = await fetchStoreSnapshot();
-        if (remote) {
+        if (remote && !deviceHasLocalStoreData()) {
           applySnapshot(remote);
           sessionSettings = snapshotMergedSettings(remote);
           setSyncStatus('synced');
+        } else if (remote) {
+          setSyncStatus('local-only');
         } else {
           setSyncStatus('local-only');
         }
@@ -3216,7 +3213,9 @@ export function usePosStoreState() {
           );
           setUsers(remoteUsers);
           user = remoteUsers.find((item) => item.username === normalized);
-          applySnapshot(remote);
+          if (!deviceHasLocalStoreData()) {
+            applySnapshot(remote);
+          }
         }
       } else {
         user = users.find((item) => item.username === normalized);
@@ -3317,7 +3316,9 @@ export function usePosStoreState() {
           );
           setUsers(remoteUsers);
           user = remoteUsers.find((item) => item.username === normalized);
-          applySnapshot(remote);
+          if (!deviceHasLocalStoreData()) {
+            applySnapshot(remote);
+          }
         }
       } else {
         user = users.find((item) => item.username === normalized);
