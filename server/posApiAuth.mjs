@@ -188,6 +188,7 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
     role: user.role,
   });
   const exp = Date.now() + TOKEN_TTL_MS;
+  const { passwordHash, pinHash, totpSecret, ...publicUser } = user;
   return {
     ok: true,
     token,
@@ -195,6 +196,7 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
     expiresAt: new Date(exp).toISOString(),
     role: user.role,
     userId: user.id,
+    user: publicUser,
   };
 }
 

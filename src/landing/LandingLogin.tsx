@@ -3,7 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/StoreProvider';
 import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
-import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
+import {
+  clearPosApiToken,
+  clearPosApiTokensForAllKnownTenants,
+  decodePosApiTokenClaims,
+  loadPosApiToken,
+} from '../services/posApiAuth';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { LoginTenantStoreSection } from '../components/LoginTenantStoreSection';
 import { resolveLoginTenantId } from '../config/loginTenant';
@@ -54,6 +59,7 @@ export function LandingLogin() {
 
   useEffect(() => {
     purgeLegacyLoginLockouts();
+    clearPosApiTokensForAllKnownTenants();
     const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
     const resolved = resolveTenantIdForLoginPage();
     if (fromUrl) {
@@ -196,7 +202,7 @@ export function LandingLogin() {
                 Şifre
                 <input
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete="off"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"

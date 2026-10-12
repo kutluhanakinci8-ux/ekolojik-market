@@ -1,8 +1,8 @@
 import { tenantLocalStorageSuffix } from '../storage/posLocalStorageKeys';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 
-function tokenStorageKey(): string {
-  return `market-pos-api-token${tenantLocalStorageSuffix()}`;
+function tokenStorageKey(tenantId?: string): string {
+  return `market-pos-api-token${tenantLocalStorageSuffix(tenantId)}`;
 }
 const TOKEN_VERSION = 'v1';
 /** Sunucu TTL 24h — bitime 4h kala yenile */
@@ -18,17 +18,17 @@ function tenantQuery(tenantOverride?: string): string {
   return `?tenant=${encodeURIComponent(tenant)}`;
 }
 
-export function loadPosApiToken(): string | null {
+export function loadPosApiToken(tenantId?: string): string | null {
   try {
-    const raw = sessionStorage.getItem(tokenStorageKey());
+    const raw = sessionStorage.getItem(tokenStorageKey(tenantId));
     return raw?.trim() || null;
   } catch {
     return null;
   }
 }
 
-export function savePosApiToken(token: string): void {
-  sessionStorage.setItem(tokenStorageKey(), token);
+export function savePosApiToken(token: string, tenantId?: string): void {
+  sessionStorage.setItem(tokenStorageKey(tenantId), token);
 }
 
 export function clearPosApiToken(): void {
@@ -170,20 +170,26 @@ export async function exchangePosApiToken(
     pin?: string;
   },
   tenantId?: string,
-): Promise<{ ok: boolean; token?: string; error?: string }> {
+): Promise<{ ok: boolean; token?: string; error?: string; user?: Record<string, unknown> }> {
   try {
-    const res = await fetch(`/api/auth/pos-token${tenantQuery(tenantId)}`, {
+    const authTenant = tenantId ?? loadTenantId();
+    const res = await fetch(`/api/auth/pos-token${tenantQuery(authTenant)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(credentials),
     });
-    const data = (await res.json()) as { ok?: boolean; token?: string; message?: string };
+    const data = (await res.json()) as {
+      ok?: boolean;
+      token?: string;
+      message?: string;
+      user?: Record<string, unknown>;
+    };
     if (!res.ok || !data.ok || !data.token) {
       return { ok: false, error: data.message ?? 'API token alınamadı' };
     }
-    savePosApiToken(data.token);
+    savePosApiToken(data.token, authTenant);
     startPosApiTokenRefreshScheduler();
-    return { ok: true, token: data.token };
+    return { ok: true, token: data.token, user: data.user };
   } catch {
     return { ok: false, error: 'API token isteği başarısız' };
   }

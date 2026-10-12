@@ -3372,7 +3372,14 @@ export function usePosStoreState() {
 
       let user: PosUser | undefined;
       if (remoteAuth.ok) {
-        const claims = decodePosApiTokenClaims(loadPosApiToken());
+        if (remoteAuth.user && typeof remoteAuth.user === 'object') {
+          user = normalizeUser(remoteAuth.user as Record<string, unknown>);
+          setUsers((prev) => {
+            const rest = prev.filter((item) => item.id !== user!.id && item.username !== normalized);
+            return [...rest, user!];
+          });
+        }
+        const claims = decodePosApiTokenClaims(loadPosApiToken(authTenant));
         if (claims?.tenantId?.trim()) {
           saveTenantId(claims.tenantId.trim());
           syncPosLocalStorageKeys();
@@ -3383,7 +3390,7 @@ export function usePosStoreState() {
             normalizeUser(u as unknown as Record<string, unknown>),
           );
           setUsers(remoteUsers);
-          user = remoteUsers.find((item) => item.username === normalized);
+          user = remoteUsers.find((item) => item.username === normalized) ?? user;
           if (!user && claims?.userId) {
             user = remoteUsers.find((item) => item.id === claims.userId);
           }
@@ -3502,7 +3509,14 @@ export function usePosStoreState() {
 
       let user: PosUser | undefined;
       if (remoteAuth.ok) {
-        const claims = decodePosApiTokenClaims(loadPosApiToken());
+        if (remoteAuth.user && typeof remoteAuth.user === 'object') {
+          user = normalizeUser(remoteAuth.user as Record<string, unknown>);
+          setUsers((prev) => {
+            const rest = prev.filter((item) => item.id !== user!.id && item.username !== normalized);
+            return [...rest, user!];
+          });
+        }
+        const claims = decodePosApiTokenClaims(loadPosApiToken(authTenant));
         if (claims?.tenantId?.trim()) {
           saveTenantId(claims.tenantId.trim());
           syncPosLocalStorageKeys();
@@ -3513,7 +3527,7 @@ export function usePosStoreState() {
             normalizeUser(u as unknown as Record<string, unknown>),
           );
           setUsers(remoteUsers);
-          user = remoteUsers.find((item) => item.username === normalized);
+          user = remoteUsers.find((item) => item.username === normalized) ?? user;
           if (!user && claims?.userId) {
             user = remoteUsers.find((item) => item.id === claims.userId);
           }
