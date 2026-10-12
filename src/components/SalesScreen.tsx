@@ -19,7 +19,8 @@ import { SetCard } from './SetCard';
 import { CartPanel } from './CartPanel';
 import type { PremiumProductSearchHandle } from './PremiumProductSearch';
 import { usePosBarcodeWedge } from '../hooks/usePosBarcodeWedge';
-import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
+import { normalizeBarcodeScanInput, type BarcodeScanApplyResult } from '../utils/barcodeScan';
+import { isLikelyBarcodeInput } from '../utils/productBarcode';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import {
@@ -50,7 +51,13 @@ export function SalesScreen({ store }: SalesScreenProps) {
   const [scanFlash, setScanFlash] = useState<{ ok: boolean; text: string } | null>(null);
   const [paymentModal, setPaymentModal] = useState<'cash' | 'split' | null>(null);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
-  const hideProductGrid = posCheckout.hideGridWhenSearching && Boolean(search.trim());
+  /** Metin/stok kodu aramasında grid filtreli kalır; yalnızca EAN benzeri rakam girişinde gizlenir */
+  const hideProductGrid = useMemo(() => {
+    if (!posCheckout.hideGridWhenSearching) return false;
+    const trimmed = search.trim();
+    if (!trimmed) return false;
+    return isLikelyBarcodeInput(normalizeBarcodeScanInput(trimmed));
+  }, [posCheckout.hideGridWhenSearching, search]);
   const scanSearchRef = useRef<PremiumProductSearchHandle>(null);
   const lastScanRef = useRef<{ code: string; at: number }>({ code: '', at: 0 });
 
@@ -497,7 +504,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
           )}
 
           {hideProductGrid && (
-            <p className="sales-scan-focus-hint">Barkod modu — ürün listesi gizli. Listeyi görmek için aramayı temizleyin.</p>
+            <p className="sales-scan-focus-hint">Barkod okutma — ürün listesi gizli. Stok kodu veya isim aramak için metin yazın veya aramayı temizleyin.</p>
           )}
 
           {!hideProductGrid && (

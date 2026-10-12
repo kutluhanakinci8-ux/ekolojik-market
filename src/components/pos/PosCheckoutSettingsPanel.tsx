@@ -36,7 +36,7 @@ export function PosCheckoutSettingsPanel({ store }: PosCheckoutSettingsPanelProp
             checked={pos.hideGridWhenSearching ?? true}
             onChange={(e) => set({ hideGridWhenSearching: e.target.checked })}
           />
-          <span>Arama/barkod varken ürün gridini gizle</span>
+          <span>Barkod okuturken (8–14 rakam) ürün gridini gizle</span>
         </label>
         <label className="settings-field">
           <span>Ürün grid sayfa boyutu</span>
