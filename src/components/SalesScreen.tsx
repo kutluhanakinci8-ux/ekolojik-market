@@ -86,6 +86,30 @@ export function SalesScreen({ store }: SalesScreenProps) {
     }
   }, []);
 
+  const handleAddProductToCart = useCallback((productId: number): BarcodeScanApplyResult => {
+    const product = store.products.find((p) => p.id === productId);
+    if (!product) {
+      const fail = { ok: false as const, reason: 'not_found' as const, message: 'Ürün bulunamadı' };
+      playBarcodeErrorTone();
+      setScanFlash({ ok: false, text: fail.message });
+      window.setTimeout(() => setScanFlash(null), 2800);
+      return fail;
+    }
+    if (product.isSample) {
+      const fail = {
+        ok: false as const,
+        reason: 'not_found' as const,
+        message: 'Numune ürün — stok ekranından işlem yapın',
+      };
+      playBarcodeErrorTone();
+      setScanFlash({ ok: false, text: fail.message });
+      window.setTimeout(() => setScanFlash(null), 2800);
+      return fail;
+    }
+    const scanKey = product.productCode?.trim() || String(product.id);
+    return handleBarcodeScan(scanKey);
+  }, [store.products, handleBarcodeScan]);
+
   usePosBarcodeWedge(true, (code) => {
     const result = handleBarcodeScan(code);
     if (result.ok) {
@@ -567,6 +591,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
             posNotesRepeatIntervalMin={store.settings.posNotes.repeatIntervalMin}
             scanSearchRef={scanSearchRef}
             onBarcodeScan={handleBarcodeScan}
+            onAddProductToCart={handleAddProductToCart}
             onBarcodeScanFeedback={onBarcodeScanFeedback}
           />
         </aside>

@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import type { Product } from '../types/product';
 import {
   buildSearchSuggestions,
+  searchProducts,
   type SearchHint,
   type SearchSuggestion,
 } from '../utils/productSearch';
@@ -23,6 +24,8 @@ interface PremiumProductSearchProps {
   onClear: () => void;
   /** Enter veya tam barkod eşleşmesi — sepete ekle */
   onBarcodeScan?: (normalized: string) => BarcodeScanApplyResult;
+  /** Ürün önerisi veya tek sonuç — sepete ekle */
+  onAddProduct?: (productId: number) => BarcodeScanApplyResult;
   onScanFeedback?: (result: BarcodeScanApplyResult) => void;
 }
 
@@ -36,6 +39,7 @@ export const PremiumProductSearch = forwardRef<PremiumProductSearchHandle, Premi
       onChange,
       onClear,
       onBarcodeScan,
+      onAddProduct,
       onScanFeedback,
     },
     ref,
@@ -95,7 +99,35 @@ export const PremiumProductSearch = forwardRef<PremiumProductSearchHandle, Premi
       return () => document.removeEventListener('mousedown', handlePointerDown);
     }, []);
 
+    const applyAddProductResult = (result: BarcodeScanApplyResult): boolean => {
+      onScanFeedback?.(result);
+      if (result.ok) {
+        onClear();
+        setOpen(false);
+        lastAutoScanRef.current = '';
+        inputRef.current?.focus();
+        return true;
+      }
+      return false;
+    };
+
+    const tryAddProduct = (productId: number): boolean => {
+      if (!onAddProduct) return false;
+      return applyAddProductResult(onAddProduct(productId));
+    };
+
+    const resolveProductIdFromSuggestion = (suggestion: SearchSuggestion): number | null => {
+      if (suggestion.type !== 'product') return null;
+      if (suggestion.productId != null) return suggestion.productId;
+      const match = /^product-(\d+)$/.exec(suggestion.id);
+      return match ? Number(match[1]) : null;
+    };
+
     const applySuggestion = (suggestion: SearchSuggestion) => {
+      const productId = resolveProductIdFromSuggestion(suggestion);
+      if (productId != null && tryAddProduct(productId)) {
+        return;
+      }
       onChange(suggestion.insertValue);
       setOpen(false);
     };
@@ -115,12 +147,42 @@ export const PremiumProductSearch = forwardRef<PremiumProductSearchHandle, Premi
       return false;
     };
 
+    const tryAddFromNameSearch = (): boolean => {
+      if (!onAddProduct) return false;
+      const trimmed = value.trim();
+      if (trimmed.length < 2) return false;
+
+      if (open && suggestions.length > 0) {
+        const active = suggestions[activeIndex];
+        const activeId = active ? resolveProductIdFromSuggestion(active) : null;
+        if (activeId != null) {
+          return tryAddProduct(activeId);
+        }
+        const productSuggestions = suggestions.filter((s) => s.type === 'product');
+        if (productSuggestions.length === 1) {
+          const onlyId = resolveProductIdFromSuggestion(productSuggestions[0]);
+          if (onlyId != null) return tryAddProduct(onlyId);
+        }
+      }
+
+      const hits = searchProducts(products, trimmed, { lowStockThreshold }).filter(
+        (hit) => !hit.product.isSample && hit.product.stock > 0,
+      );
+      if (hits.length === 1) {
+        return tryAddProduct(hits[0].product.id);
+      }
+      return false;
+    };
+
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
-        if (tryScanFromInput()) {
-          event.preventDefault();
-          return;
+        event.preventDefault();
+        if (tryScanFromInput()) return;
+        if (tryAddFromNameSearch()) return;
+        if (open && suggestions[activeIndex]) {
+          applySuggestion(suggestions[activeIndex]);
         }
+        return;
       }
 
       if (!open || suggestions.length === 0) return;
@@ -131,9 +193,6 @@ export const PremiumProductSearch = forwardRef<PremiumProductSearchHandle, Premi
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveIndex((index) => (index - 1 + suggestions.length) % suggestions.length);
-      } else if (event.key === 'Enter' && suggestions[activeIndex]) {
-        event.preventDefault();
-        applySuggestion(suggestions[activeIndex]);
       } else if (event.key === 'Escape') {
         setOpen(false);
       }

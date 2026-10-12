@@ -59,6 +59,7 @@ interface CartPanelProps {
   posNotesRepeatIntervalMin: number;
   scanSearchRef?: RefObject<PremiumProductSearchHandle>;
   onBarcodeScan?: (normalized: string) => BarcodeScanApplyResult;
+  onAddProductToCart?: (productId: number) => BarcodeScanApplyResult;
   onBarcodeScanFeedback?: (result: BarcodeScanApplyResult) => void;
   /** POS Lite: kupon/puan kapalı, ödeme alanı kompakt */
   compactCheckout?: boolean;
@@ -109,6 +110,7 @@ export function CartPanel({
   posNotesRepeatIntervalMin,
   scanSearchRef,
   onBarcodeScan,
+  onAddProductToCart,
   onBarcodeScanFeedback,
   compactCheckout = false,
   hasHeldSales = false,
@@ -227,6 +229,7 @@ export function CartPanel({
             onChange={onSearchChange}
             onClear={onSearchClear}
             onBarcodeScan={onBarcodeScan}
+            onAddProduct={onAddProductToCart}
             onScanFeedback={onBarcodeScanFeedback}
           />
         </div>

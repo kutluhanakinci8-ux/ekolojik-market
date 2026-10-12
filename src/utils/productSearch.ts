@@ -398,6 +398,7 @@ export interface SearchSuggestion {
   hint: string;
   insertValue: string;
   type: 'brand' | 'category' | 'stock' | 'set' | 'product';
+  productId?: number;
 }
 
 export function buildSearchSuggestions(
@@ -481,6 +482,7 @@ export function buildSearchSuggestions(
         hint: hit.matchedBrand ? `${hit.matchedBrand} · No ${hit.product.id}` : `No ${hit.product.id}`,
         insertValue: hit.product.name,
         type: 'product',
+        productId: hit.product.id,
       });
     }
   }
