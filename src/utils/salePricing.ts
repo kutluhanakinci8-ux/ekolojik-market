@@ -30,3 +30,14 @@ export function getProductSalePrice(product: Product, priceType: PriceType, quan
 export function getCartUnitPrice(product: Product, quantity: number, priceType: PriceType): number {
   return getProductSalePrice(product, priceType, quantity);
 }
+
+/** Sepet üstü — hangi stok kolonunun kasaya yansıdığı */
+export function getSalePriceModeHint(saleMode: SaleMode, partnerLocked: boolean): string {
+  if (saleMode === 'wholesale') {
+    return 'Toptan: stok Toptan kademesi (KDV hariç) + %20 KDV. Adet arttıkça kademe değişir.';
+  }
+  if (partnerLocked) {
+    return 'Partner: stok Partner kolonu + %20 KDV (Greenleaf numarası girildi).';
+  }
+  return 'Perakende: stok Perakende kolonu + %20 KDV = kasada tahsil edilen tutar.';
+}

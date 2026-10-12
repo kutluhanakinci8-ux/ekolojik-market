@@ -12,7 +12,7 @@ import {
   normalizeGreenleafNumber,
 } from '../utils/customerValidation';
 import { formatCurrency } from '../utils/format';
-import { SALE_PRICE_LABELS } from '../utils/salePricing';
+import { getSalePriceModeHint, SALE_PRICE_LABELS } from '../utils/salePricing';
 import { getWholesaleTierLabel } from '../utils/wholesalePricing';
 import type { PosNote } from '../types/business';
 import { CartIdleStage } from './CartIdleStage';
@@ -277,6 +277,10 @@ export function CartPanel({
           </div>
         </div>
 
+        <p className="sale-price-mode-hint" role="note">
+          {getSalePriceModeHint(saleMode, partnerLocked)}
+        </p>
+
         {searchActive && saleGreenleafNumber.trim() && (
           <p className="cart-gl-active-pill" title="Greenleaf numarası kayıtlı — aramayı temizleyince alan geri gelir">
             GL {saleGreenleafNumber.trim()}
@@ -468,6 +472,10 @@ export function CartPanel({
                       <span className={`cart-item-type ${isSampleLine ? 'cart-item-type--sample' : ''}`}>
                         {SALE_PRICE_LABELS[item.priceType]}
                         {tierLabel ? ` · ${tierLabel}` : ''}
+                        {item.priceType === 'our' && product.fullSalePrice > 0
+                          && Math.abs(item.unitPrice - product.fullSalePrice) > 0.01
+                          ? ` · liste ${formatCurrency(product.fullSalePrice)} + KDV`
+                          : ''}
                       </span>
                     </div>
                   </div>

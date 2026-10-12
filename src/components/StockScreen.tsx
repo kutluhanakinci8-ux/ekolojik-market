@@ -25,6 +25,7 @@ import { ProductImage } from './ProductImage';
 import { ProductSetModal } from './ProductSetModal';
 import { StockOperationsModal, type StockOperationType } from './StockOperationsModal';
 import { isTenantCatalogIsolated } from '../utils/tenantCatalogIsolation';
+import { resolveRetailSaleUnitPrice } from '../utils/productPricing';
 
 interface StockScreenProps {
   store: Store;
@@ -516,9 +517,14 @@ export function StockScreen({ store }: StockScreenProps) {
                   <th>Alış</th>
                   <th>Partner</th>
                   <th>Kupon</th>
-                  <th title={posLiteStock ? 'KDV hariç liste fiyatı' : 'Liste fiyatı (KDV hariç)'}>
-                    Perakende
+                  <th title="Satış kasası için KDV hariç liste fiyatı">
+                    Perakende (KDV hariç)
                   </th>
+                  {!posLiteStock && (
+                    <th className="stock-th-kasa" title="Perakende + %20 KDV — satış ekranı Perakende modu">
+                      Kasa (KDV dahil)
+                    </th>
+                  )}
                     <th className="stock-th-wholesale">
                       <label className="stock-wholesale-th">
                         <span>Toptan</span>
@@ -597,6 +603,9 @@ export function StockScreen({ store }: StockScreenProps) {
                       <td className="stock-num">{formatCurrency(p.partnerPrice)}</td>
                       <td className="stock-num">{p.couponPrice != null ? formatCurrency(p.couponPrice) : '—'}</td>
                       <td className="stock-num stock-sale-price">{formatCurrency(p.fullSalePrice)}</td>
+                      {!posLiteStock && (
+                        <td className="stock-num stock-kasa-price">{formatCurrency(resolveRetailSaleUnitPrice(p))}</td>
+                      )}
                       <td className="stock-num stock-wholesale-price">
                         {wholesalePrice != null ? formatCurrency(wholesalePrice) : '—'}
                       </td>

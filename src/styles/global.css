@@ -1900,6 +1900,14 @@ input {
   white-space: nowrap;
 }
 
+.sale-price-mode-hint {
+  margin: 0 0 8px;
+  padding: 0 2px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
 .sale-price-mode-btn {
   border: 1px solid var(--border);
   background: #fff;
@@ -4294,6 +4302,12 @@ input {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   opacity: 0.85;
+}
+
+.stock-kasa-price {
+  font-weight: 700;
+  color: var(--primary-dark, #0f766e);
+  white-space: nowrap;
 }
 
 .stock-sale-price {
