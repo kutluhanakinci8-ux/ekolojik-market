@@ -159,7 +159,8 @@ export async function rotateMessagingPublicKey(): Promise<MessagingPublicConfigH
 }
 
 export function buildMessagingEmbedSnippet(tenantId: string, apiKey: string): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ekolojikmarket.com.tr';
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'https://www.ekolojikmarket.com.tr';
   const key = apiKey || 'API_ANAHTARI';
   const tenantLine =
     tenantId && tenantId !== 'main' ? `\n    tenantId: '${tenantId}',` : `\n    tenantId: 'main',`;

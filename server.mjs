@@ -438,9 +438,22 @@ function notifyMessagingRealtime(tenantId, signal, extra = {}) {
   postaWsBroadcast(tenantId, 'messaging', { signal, ...extra });
 }
 
+const CANONICAL_WWW_HOST = 'www.ekolojikmarket.com.tr';
+const APEX_HOST = 'ekolojikmarket.com.tr';
+
+function maybeRedirectApexToWww(req, res, url) {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  if (host !== APEX_HOST) return false;
+  const target = `https://${CANONICAL_WWW_HOST}${url.pathname}${url.search}`;
+  res.writeHead(301, { Location: target, 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('Moved Permanently');
+  return true;
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
+    if (maybeRedirectApexToWww(req, res, url)) return;
     let pathname = decodeURIComponent(url.pathname);
 
     if (pathname === '/api/exchange-rates/tcmb' && req.method === 'GET') {

@@ -6,12 +6,19 @@ CONF="/etc/nginx/sites-available/ekolojikmarket.com.tr.conf"
 ENABLED="/etc/nginx/sites-enabled/ekolojikmarket.com.tr.conf"
 
 cat > "$CONF" <<'NGINX'
-# ekolojikmarket.com.tr — Market POS (port 5180)
+# ekolojikmarket.com.tr — standart adres: https://www.ekolojikmarket.com.tr
 
 server {
     listen 80;
     listen [::]:80;
-    server_name ekolojikmarket.com.tr www.ekolojikmarket.com.tr;
+    server_name ekolojikmarket.com.tr;
+    return 301 https://www.ekolojikmarket.com.tr$request_uri;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name www.ekolojikmarket.com.tr;
 
     client_max_body_size 32m;
     access_log /var/log/nginx/ekolojikmarket.access.log;
@@ -27,6 +34,9 @@ server {
         proxy_read_timeout 120s;
     }
 }
+
+# certbot sonrası SSL bloğuna ekleyin (apex HTTPS → www):
+# server { listen 443 ssl; server_name ekolojikmarket.com.tr; return 301 https://www.ekolojikmarket.com.tr$request_uri; }
 NGINX
 
 ln -sf "$CONF" "$ENABLED"

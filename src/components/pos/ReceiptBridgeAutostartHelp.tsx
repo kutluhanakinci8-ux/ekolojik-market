@@ -6,6 +6,7 @@ export function ReceiptBridgeAutostartHelp() {
       <p className="module-hint">
         Site buluttan açılır; yazıcı USB ile <strong>bu kasa bilgisayarına</strong> bağlıdır. Fiş servisi
         bilgisayar açıldığında arka planda çalışır — satışta tarayıcı <code>127.0.0.1:18765</code> adresine bağlanır.
+        Mağazayı her zaman <strong>https://www.ekolojikmarket.com.tr/app</strong> adresinden açın (www olmadan adres otomatik yönlenir).
       </p>
       <ul className="module-hint receipt-bridge-steps">
         <li>

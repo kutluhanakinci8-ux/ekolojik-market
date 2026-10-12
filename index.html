@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="tr">
   <head>
+    <script>
+      (function () {
+        if (location.hostname === 'ekolojikmarket.com.tr') {
+          location.replace(
+            'https://www.ekolojikmarket.com.tr' + location.pathname + location.search + location.hash,
+          );
+        }
+      })();
+    </script>
+    <link rel="canonical" href="https://www.ekolojikmarket.com.tr/app" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ekolojik Market POS — Doğal Ürün Mağazası Yönetimi</title>
