@@ -56,9 +56,9 @@ cat > "${PLIST}" <<EOF
 EOF
 
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "${PLIST}"
-launchctl enable "gui/$(id -u)/${LABEL}"
-launchctl kickstart -k "gui/$(id -u)/${LABEL}"
+launchctl bootstrap "gui/$(id -u)" "${PLIST}" 2>/dev/null || launchctl load "${PLIST}" 2>/dev/null || true
+launchctl enable "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+launchctl kickstart -k "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 
 sleep 1
 if curl -fsS "http://127.0.0.1:18765/health" | grep -q '"ok"'; then

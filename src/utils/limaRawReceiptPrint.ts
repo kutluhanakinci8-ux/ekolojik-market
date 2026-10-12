@@ -44,10 +44,18 @@ async function postRawReceipt(
           body,
           signal: AbortSignal.timeout(RAW_PRINT_TIMEOUT_MS),
         });
-    if (!res.ok) return false;
-    const data = (await res.json()) as { ok?: boolean };
-    return data.ok === true;
-  } catch {
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || data.ok !== true) {
+      if (typeof console !== 'undefined' && data.error) {
+        console.warn('[market-pos-fis] raw print:', data.error);
+      }
+      return false;
+    }
+    return true;
+  } catch (err) {
+    if (typeof console !== 'undefined') {
+      console.warn('[market-pos-fis] raw print failed:', err);
+    }
     return false;
   }
 }

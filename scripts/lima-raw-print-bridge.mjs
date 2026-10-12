@@ -7,7 +7,7 @@
  *   set POS80_QUEUE_NAME=Printer POS-80C   (Windows, Ayarlar’daki tam ad)
  */
 import { createServer } from 'node:http';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir, platform } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -19,6 +19,39 @@ const QUEUE =
   (platform() === 'win32' ? 'Printer POS-80C' : 'Printer_POS_80C');
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+function listDarwinPrintQueues() {
+  try {
+    const names = [];
+    for (const line of execSync('lpstat -p', { encoding: 'utf8' }).split('\n')) {
+      const en = /^printer\s+(\S+)/i.exec(line.trim());
+      if (en) {
+        names.push(en[1]);
+        continue;
+      }
+      const first = line.trim().split(/\s+/)[0];
+      if (first && first.toLowerCase() !== 'printer') names.push(first);
+    }
+    return names;
+  } catch {
+    return [];
+  }
+}
+
+/** Ayarlardaki «Printer POS-80C» → CUPS «Printer_POS_80C» */
+function resolveDarwinQueue(requested) {
+  const want = String(requested || QUEUE).trim();
+  const queues = listDarwinPrintQueues();
+  if (queues.includes(want)) return want;
+  const underscored = want.replace(/\s+/g, '_');
+  if (queues.includes(underscored)) return underscored;
+  const norm = (s) => s.toLowerCase().replace(/[\s_-]/g, '');
+  const hit = queues.find((q) => norm(q) === norm(want));
+  if (hit) return hit;
+  const pos80 = queues.find((q) => /pos.?80/i.test(q));
+  if (pos80 && /pos.?80/i.test(want)) return pos80;
+  return underscored || QUEUE;
+}
 
 function escposPayload(text) {
   const init = Buffer.from([0x1b, 0x40]);
@@ -118,9 +151,13 @@ const server = createServer(async (req, res) => {
 
   try {
     const printer = body.printer ? String(body.printer).trim() : '';
-    await sendRaw(escposPayload(body.text ?? ''), printer || QUEUE);
+    const queue =
+      platform() === 'darwin'
+        ? resolveDarwinQueue(printer || QUEUE)
+        : printer || QUEUE;
+    await sendRaw(escposPayload(body.text ?? ''), queue);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, queue: printer || QUEUE }));
+    res.end(JSON.stringify({ ok: true, queue }));
   } catch (e) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: String(e) }));
