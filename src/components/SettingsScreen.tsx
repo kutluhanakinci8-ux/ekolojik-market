@@ -87,11 +87,22 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
   const syncHealthy = store.syncStatus === 'synced';
 
   const retryServerSync = async () => {
+    const macMayHaveNewer =
+      store.syncStatus !== 'synced' && store.products.length > 0;
+    if (macMayHaveNewer) {
+      const proceed = window.confirm(
+        'Sunucudan yenileme, bu Mac’teki veriyi sunucudaki kopya ile değiştirir.\n\n'
+          + 'Mac’teki son değişiklikler henüz sunucuya gitmediyse KAYBOLUR.\n\n'
+          + 'Önce «Sunucuya Yükle» yapın veya «Tam Yedek» indirin.\n\n'
+          + 'Yine de sunucudan çekmek istiyor musunuz? (Windows’taki veri Mac’e gelir)',
+      );
+      if (!proceed) return;
+    }
     setBackupMessage('Sunucudan veri çekiliyor…');
     const ok = await store.refreshTenantData();
     setBackupMessage(
       ok
-        ? 'Sunucu ile senkron — Mac ve Windows aynı veriyi görmeli.'
+        ? 'Sunucu ile senkron — Mac artık sunucudaki (Windows ile aynı) veriyi gösteriyor.'
         : 'Sunucuya bağlanılamadı. Çıkış yapıp tekrar giriş yapın (şifre/PIN).',
     );
   };
@@ -363,13 +374,13 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
               </div>
               {!syncHealthy ? (
                 <p className="module-hint" style={{ marginTop: 12 }}>
-                  Mac’te «yalnızca bu cihaz» görünüyorsa bu bilgisayar sunucudaki stok/satışları
-                  görmüyor olabilir. Önce{' '}
+                  Mac güncel, Windows eskiyse: önce <strong>Sunucuya Yükle</strong> (alttaki Bulut kartı),
+                  sonra Windows’ta sayfayı yenileyin — Mac’te <em>önce</em> «Sunucudan yenile» yapmayın (Mac
+                  verisi silinir). Windows’u Mac’e uydurmak için:{' '}
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => void retryServerSync()}>
                     Sunucudan yenile
                   </button>
-                  ; olmazsa çıkış → tekrar giriş. Windows’taki değişiklikler için Mac de{' '}
-                  <strong>Sunucu ile senkron</strong> olmalı.
+                  (önce Tam Yedek önerilir).
                 </p>
               ) : null}
             </section>
