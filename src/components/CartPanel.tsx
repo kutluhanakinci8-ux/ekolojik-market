@@ -542,6 +542,7 @@ export function CartPanel({
 
       {cart.length > 0 && (
         <div className={`cart-panel-footer ${sampleCount > 0 ? 'cart-panel-footer--has-sample' : ''}`}>
+          <div className="cart-panel-footer-meta">
           {showCrmCheckout && (
             <div className="cart-crm-collapsible">
               <button
@@ -593,6 +594,13 @@ export function CartPanel({
               </div>
             </div>
           )}
+
+          {cashDayClosed && (
+            <p className="cart-day-closed-warn" role="alert">Kasa günü kapalı — satış kapalı (Ayarlar’dan kuralı değiştirebilirsiniz).</p>
+          )}
+          </div>
+
+          <div className="cart-panel-footer-pay">
           <div className="cart-total">
             <span>Toplam (KDV dahil)</span>
             <strong>{samplesOnly ? 'Ücretsiz' : formatCurrency(total)}</strong>
@@ -605,10 +613,6 @@ export function CartPanel({
               🎁 {sampleCount} adet numune ücretsiz
               {!samplesOnly && ' · satış stokundan düşmez'}
             </p>
-          )}
-
-          {cashDayClosed && (
-            <p className="cart-day-closed-warn" role="alert">Kasa günü kapalı — satış kapalı (Ayarlar’dan kuralı değiştirebilirsiniz).</p>
           )}
           {compactCheckout && (
             <div className="cart-payment-toolbar">
@@ -665,6 +669,7 @@ export function CartPanel({
                 ↩ Bekleyen F8
               </button>
             )}
+          </div>
           </div>
         </div>
       )}

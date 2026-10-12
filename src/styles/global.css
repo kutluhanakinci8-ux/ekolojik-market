@@ -2062,7 +2062,10 @@ input {
 
 .cart-panel--cart-focus .cart-panel-footer {
   flex-shrink: 0;
-  padding: 10px 12px 8px;
+}
+
+.cart-panel--cart-focus .cart-panel-footer-pay {
+  padding: 8px 12px 10px;
 }
 
 .cart-panel--cart-focus .cart-crm-row {
@@ -2087,9 +2090,26 @@ input {
 .cart-panel--has-items .cart-panel-footer {
   display: flex;
   flex-direction: column;
-  max-height: min(46vh, 420px);
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.cart-panel-footer-meta {
+  flex-shrink: 1;
+  min-height: 0;
+  max-height: min(22vh, 200px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding: 10px 14px 6px;
+}
+
+.cart-panel-footer-pay {
+  flex-shrink: 0;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
 }
 
 .cart-footer-actions {
@@ -3006,8 +3026,8 @@ input {
   -webkit-line-clamp: 2;
 }
 
-.cart-panel--has-items:not(.cart-panel--compact-checkout) .cart-panel-footer {
-  padding: 12px 14px 10px;
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .cart-panel-footer-pay {
+  padding: 10px 14px 12px;
 }
 
 .cart-panel--has-items:not(.cart-panel--compact-checkout) .payment-buttons--pos {
