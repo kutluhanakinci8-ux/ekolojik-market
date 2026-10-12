@@ -303,7 +303,13 @@ async function serveFile(path, res) {
     headers['Content-Type'] = 'application/x-javascript; charset=utf-8';
     headers['Content-Disposition'] = 'inline; filename="market-pos-fatura-kopru.user.js"';
   }
-  if (ext === '.html' || ext === '.js' || ext === '.css') {
+  if (
+    ext === '.html' ||
+    ext === '.js' ||
+    ext === '.css' ||
+    ext === '.json' ||
+    path.endsWith('app-release.json')
+  ) {
     headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
     headers.Pragma = 'no-cache';
     headers.Expires = '0';

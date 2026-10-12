@@ -10,6 +10,39 @@
         }
       })();
     </script>
+    <script>
+      (function () {
+        var SYNC_KEY = 'ek-pos-build-sync';
+        function go(remoteId) {
+          try {
+            sessionStorage.setItem(SYNC_KEY, remoteId);
+          } catch (e) {}
+          var u = new URL(location.href);
+          u.searchParams.set('_build', remoteId);
+          location.replace(u.toString());
+        }
+        fetch('/app-release.json?nocache=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (remote) {
+            if (!remote || !remote.buildId) return;
+            var meta = document.querySelector('meta[name="ek-pos-build"]');
+            var embedded = meta ? meta.getAttribute('content') : '';
+            if (embedded && embedded === remote.buildId) return;
+            var tries = 0;
+            try {
+              tries = parseInt(sessionStorage.getItem('ek-pos-build-tries') || '0', 10);
+            } catch (e) {}
+            if (tries > 3) return;
+            try {
+              sessionStorage.setItem('ek-pos-build-tries', String(tries + 1));
+            } catch (e) {}
+            go(remote.buildId);
+          })
+          .catch(function () {});
+      })();
+    </script>
     <link rel="canonical" href="https://www.ekolojikmarket.com.tr/app" />
     <meta charset="UTF-8" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />

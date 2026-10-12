@@ -13,6 +13,18 @@ export default defineConfig({
     react(),
     {
       name: 'write-app-release-json',
+      transformIndexHtml(html) {
+        if (html.includes('name="ek-pos-build"')) {
+          return html.replace(
+            /name="ek-pos-build" content="[^"]*"/,
+            `name="ek-pos-build" content="${buildId}"`,
+          );
+        }
+        return html.replace(
+          '<meta charset="UTF-8" />',
+          `<meta name="ek-pos-build" content="${buildId}" />\n    <meta charset="UTF-8" />`,
+        );
+      },
       closeBundle() {
         writeFileSync(
           'dist/app-release.json',
