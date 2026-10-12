@@ -1908,6 +1908,58 @@ input {
   color: var(--text-muted);
 }
 
+.cart-item-price-net {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cart-item-price-tag {
+  margin-left: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cart-item-total--vat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 4.5rem;
+}
+
+.cart-item-vat-part {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cart-vat-summary {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.cart-vat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  color: var(--text-muted);
+}
+
+.cart-vat-row span:last-child {
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
 .sale-price-mode-btn {
   border: 1px solid var(--border);
   background: #fff;

@@ -13,6 +13,7 @@ import {
 } from '../utils/customerValidation';
 import { formatCurrency } from '../utils/format';
 import { getSalePriceModeHint, SALE_PRICE_LABELS } from '../utils/salePricing';
+import { DEFAULT_VAT_RATE, splitGrossAmount } from '../utils/vatAnalytics';
 import { getWholesaleTierLabel } from '../utils/wholesalePricing';
 import type { PosNote } from '../types/business';
 import { CartIdleStage } from './CartIdleStage';
@@ -190,6 +191,10 @@ export function CartPanel({
 
   const hasCartItems = cart.length > 0;
   const samplesOnly = hasCartItems && total === 0 && sampleCount > 0;
+  const cartVatBreakdown = useMemo(() => {
+    if (samplesOnly || total <= 0) return { netAmount: 0, vatAmount: 0, grossAmount: 0 };
+    return splitGrossAmount(total, DEFAULT_VAT_RATE);
+  }, [total, samplesOnly]);
   const cartFocusLayout = hasCartItems && !compactCheckout;
   const searchActive = search.trim().length > 0;
   const showCustomerExtra = compactCheckout || customerExtraOpen || !hasCartItems;
@@ -401,7 +406,9 @@ export function CartPanel({
         ) : (
           cart.map((item) => {
             const isSampleLine = item.priceType === 'sample';
-            const lineTotal = item.unitPrice * item.quantity;
+            const lineGross = item.unitPrice * item.quantity;
+            const lineVat = isSampleLine ? null : splitGrossAmount(lineGross, DEFAULT_VAT_RATE);
+            const unitNet = lineVat ? lineVat.netAmount / item.quantity : 0;
             const tierLabel = item.priceType === 'wholesale' ? getWholesaleTierLabel(item.quantity) : null;
 
             if (item.setId) {
@@ -414,7 +421,10 @@ export function CartPanel({
                     <div>
                       <div className="cart-item-name">{set.name}</div>
                       <div className="cart-item-price">
-                        {formatCurrency(item.unitPrice)}
+                        <span className="cart-item-price-net">
+                          {formatCurrency(lineVat ? lineVat.netAmount / item.quantity : item.unitPrice)}
+                          <span className="cart-item-price-tag">KDV hariç</span>
+                        </span>
                         <span className="cart-item-type">
                           Set · {SALE_PRICE_LABELS[item.priceType]}
                           {tierLabel ? ` · ${tierLabel}` : ''}
@@ -441,7 +451,12 @@ export function CartPanel({
                         +
                       </button>
                     </div>
-                    <div className="cart-item-total">{formatCurrency(lineTotal)}</div>
+                    <div className="cart-item-total cart-item-total--vat">
+                      {lineVat && (
+                        <span className="cart-item-vat-part">+KDV {formatCurrency(lineVat.vatAmount)}</span>
+                      )}
+                      <strong>{formatCurrency(lineGross)}</strong>
+                    </div>
                     <button
                       type="button"
                       className="cart-item-remove"
@@ -467,15 +482,14 @@ export function CartPanel({
                       {isSampleLine ? (
                         <span className="cart-item-price-free">Ücretsiz</span>
                       ) : (
-                        formatCurrency(item.unitPrice)
+                        <span className="cart-item-price-net">
+                          {formatCurrency(unitNet)}
+                          <span className="cart-item-price-tag">KDV hariç</span>
+                        </span>
                       )}
                       <span className={`cart-item-type ${isSampleLine ? 'cart-item-type--sample' : ''}`}>
                         {SALE_PRICE_LABELS[item.priceType]}
                         {tierLabel ? ` · ${tierLabel}` : ''}
-                        {item.priceType === 'our' && product.fullSalePrice > 0
-                          && Math.abs(item.unitPrice - product.fullSalePrice) > 0.01
-                          ? ` · liste ${formatCurrency(product.fullSalePrice)} + KDV`
-                          : ''}
                       </span>
                     </div>
                   </div>
@@ -499,8 +513,17 @@ export function CartPanel({
                       +
                     </button>
                   </div>
-                  <div className="cart-item-total">
-                    {isSampleLine ? '—' : formatCurrency(lineTotal)}
+                  <div className="cart-item-total cart-item-total--vat">
+                    {isSampleLine ? (
+                      '—'
+                    ) : lineVat ? (
+                      <>
+                        <span className="cart-item-vat-part">+KDV {formatCurrency(lineVat.vatAmount)}</span>
+                        <strong>{formatCurrency(lineGross)}</strong>
+                      </>
+                    ) : (
+                      formatCurrency(lineGross)
+                    )}
                   </div>
                   <button
                     type="button"
@@ -558,8 +581,20 @@ export function CartPanel({
               )}
             </div>
           )}
+          {!samplesOnly && total > 0 && (
+            <div className="cart-vat-summary" aria-label="KDV dökümü">
+              <div className="cart-vat-row">
+                <span>Ara toplam (KDV hariç)</span>
+                <span>{formatCurrency(cartVatBreakdown.netAmount)}</span>
+              </div>
+              <div className="cart-vat-row">
+                <span>KDV (%{DEFAULT_VAT_RATE})</span>
+                <span>{formatCurrency(cartVatBreakdown.vatAmount)}</span>
+              </div>
+            </div>
+          )}
           <div className="cart-total">
-            <span>Toplam</span>
+            <span>Toplam (KDV dahil)</span>
             <strong>{samplesOnly ? 'Ücretsiz' : formatCurrency(total)}</strong>
             {!samplesOnly && cartSubtotal != null && cartSubtotal > total && (
               <small className="cart-subtotal-struck">{formatCurrency(cartSubtotal)}</small>

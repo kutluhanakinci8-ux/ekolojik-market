@@ -39,5 +39,5 @@ export function getSalePriceModeHint(saleMode: SaleMode, partnerLocked: boolean)
   if (partnerLocked) {
     return 'Partner: stok Partner kolonu + %20 KDV (Greenleaf numarası girildi).';
   }
-  return 'Perakende: stok Perakende kolonu + %20 KDV = kasada tahsil edilen tutar.';
+  return 'Perakende: stok Perakende (KDV hariç) + %20 KDV. Sepette önce KDV hariç, sonra KDV ve toplam görünür.';
 }
