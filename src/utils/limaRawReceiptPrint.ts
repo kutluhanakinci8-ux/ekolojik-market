@@ -9,7 +9,7 @@ const LOCAL_PRINT_URL =
 
 const LOCAL_HEALTH_URL = LOCAL_PRINT_URL.replace(/\/print\/?$/, '/health');
 
-const RAW_PRINT_TIMEOUT_MS = 6000;
+const RAW_PRINT_TIMEOUT_MS = 15000;
 
 export interface LimaBridgeHealth {
   ok?: boolean;
@@ -120,7 +120,7 @@ export async function tryLimaRawReceiptPrint(
 
   if (typeof window !== 'undefined' && isWindowsDesktop()) {
     lastRawPrintError = localLooksOffline
-      ? 'Bu bilgisayarda fiş servisi kapalı (127.0.0.1:18765). Uygulama üstündeki sarı banddan «Zywell kurulum» dosyasını indirip PowerShell ile bir kez çalıştırın.'
+      ? 'Bu bilgisayarda fiş servisi kapalı. Ayarlar → Fiş yazıcısı → Zywell kurulum (.ps1) dosyasını bir kez çalıştırın; sonra bilgisayar her açıldığında arka planda otomatik başlar (terminal gerekmez).'
       : localErr;
     return false;
   }

@@ -79,8 +79,8 @@ export function WindowsZywellSetupBanner({ onApplyPrinterSettings }: WindowsZywe
               Kurulum dosyasını indir
             </a>
           </li>
-          <li>İndirilen dosyaya sağ tık → <strong>PowerShell ile Çalıştır</strong> (Node.js LTS gerekir).</li>
-          <li>USB Zywell takılı olsun; bir kez kurulduktan sonra her oturum açılışında fiş servisi otomatik başlar.</li>
+          <li>İndirilen dosyaya sağ tık → <strong>PowerShell ile Çalıştır</strong> (Node.js LTS; sadece kurulum için).</li>
+          <li>USB Zywell takılı olsun. Kurulumdan sonra fiş servisi <strong>arka planda</strong> çalışır; kasiyer terminal açmaz.</li>
         </ol>
         <div className="zywell-setup-actions">
           <button type="button" className="btn btn-outline" onClick={() => void recheck()}>

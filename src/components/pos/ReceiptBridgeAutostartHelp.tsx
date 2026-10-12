@@ -4,8 +4,9 @@ export function ReceiptBridgeAutostartHelp() {
     <div className="settings-subpanel receipt-bridge-autostart">
       <h3>Otomatik fiş servisi (bir kez kurulum)</h3>
       <p className="module-hint">
-        Site buluttan açılır; yazıcı USB ile <strong>bu kasa bilgisayarına</strong> bağlıdır. Fiş servisi
-        bilgisayar açıldığında arka planda çalışır — satışta tarayıcı <code>127.0.0.1:18765</code> adresine bağlanır.
+        Site buluttan açılır; yazıcı USB ile <strong>bu kasa bilgisayarına</strong> bağlıdır. Kurulum dosyası
+        fiş servisini <strong>arka planda</strong> kaydeder (pencere açılmaz); her oturum açılışında otomatik
+        çalışır — tarayıcı <code>127.0.0.1:18765</code> adresine bağlanır.
         Mağaza adresi: <strong>https://www.ekolojikmarket.com.tr/app</strong> (tek site; eski adres otomatik yönlenir).
       </p>
       <ul className="module-hint receipt-bridge-steps">
