@@ -394,7 +394,10 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
               <div className="settings-panel-head">
                 <div>
                   <h2>Veri Yedekleme</h2>
-                  <p>Stok ve satışlar sunucuda paylaşılır; tüm cihazlar aynı veriyi görür</p>
+                  <p>
+                    Her mağaza sunucuda ayrı dosyada tutulur; yönetici değişiklikleri ~5 sn içinde otomatik
+                    sunucuya yazılır + sunucu dönen yedek (`auto-tenant`). Tam Yedek ekstra cihaz kopyasıdır.
+                  </p>
                 </div>
               </div>
 

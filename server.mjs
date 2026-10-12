@@ -383,6 +383,12 @@ async function maybeMigrateLegacyPostaOnboardingStore(tenantId) {
 async function writeStoreData(data, tenantId = 'main') {
   await mkdir(DATA_DIR, { recursive: true });
   await writeTenantStore(DATA_DIR, tenantId, data);
+  try {
+    const { archiveTenantStoreAfterWrite } = await import('./server/tenantStoreAutoBackup.mjs');
+    await archiveTenantStoreAfterWrite(DATA_DIR, tenantId, data);
+  } catch (error) {
+    console.warn('tenant auto-backup:', error instanceof Error ? error.message : error);
+  }
 }
 
 async function readRequestBody(req) {

@@ -4,8 +4,9 @@
 
 1. **Deploy = sadece kod** (`dist`, `server`, `package.json`, PM2 restart). `/var/www/market-pos/data` **üzerine yazılmaz**.
 2. **Her deploy öncesi** `scripts/backup-market-pos-data.sh` çalışır → `data-backups/market-pos-data-*.tar.gz`.
-3. **Veri migrasyonları** (irsaliye stok, posta onboarding, seed) deploy sırasında **varsayılan kapalı**. Açmak için: `EKOLOJIK_DEPLOY_DATA_MIGRATIONS=1`.
-4. **CI / GitHub Actions** seed veya data script çalıştırmaz.
+3. **Çalışma anında** her mağaza kaydı → `data/backups/auto-tenant/<tenantId>/store-*.json` (son 48; bkz. `TENANT-AUTO-SAVE-POLICY.md`).
+4. **Veri migrasyonları** (irsaliye stok, posta onboarding, seed) deploy sırasında **varsayılan kapalı**. Açmak için: `EKOLOJIK_DEPLOY_DATA_MIGRATIONS=1`.
+5. **CI / GitHub Actions** seed veya data script çalıştırmaz.
 
 ## GitHub vs canlı Lima
 

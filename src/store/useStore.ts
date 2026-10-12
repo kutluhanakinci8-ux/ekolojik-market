@@ -898,6 +898,7 @@ export function usePosStoreState() {
     (overrides?: { users?: PosUser[]; cashSessions?: DailyCashSession[] }) => Promise<boolean>
   >(async () => false);
   const serverSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tenantAutoSaveArmedRef = useRef(false);
   const [crmData, setCrmData] = useState<CrmPersistedData>(loadCrmData);
   const [saleCouponCode, setSaleCouponCode] = useState('');
   const [saleLoyaltyPointsToRedeem, setSaleLoyaltyPointsToRedeem] = useState(0);
@@ -2991,8 +2992,36 @@ export function usePosStoreState() {
     serverSyncTimerRef.current = setTimeout(() => {
       serverSyncTimerRef.current = null;
       void persistStoreNowRef.current();
-    }, 2000);
+    }, 5000);
   }, [authSession, syncReady]);
+
+  /** Sayfa açılışından sonra yönetici mağaza verisi değişince otomatik sunucu kaydı (tenant bazlı). */
+  useEffect(() => {
+    if (!syncReady) return;
+    const id = window.setTimeout(() => {
+      tenantAutoSaveArmedRef.current = true;
+    }, 4000);
+    return () => window.clearTimeout(id);
+  }, [syncReady]);
+
+  useEffect(() => {
+    if (!tenantAutoSaveArmedRef.current) return;
+    scheduleAdminServerSync();
+  }, [
+    products,
+    sales,
+    saleReturns,
+    stockMovements,
+    customers,
+    expenses,
+    productSets,
+    settings,
+    priceType,
+    purchaseInvoices,
+    cashSessions,
+    cashHandovers,
+    scheduleAdminServerSync,
+  ]);
 
   const closeCashDay = useCallback((): {
     ok: boolean;

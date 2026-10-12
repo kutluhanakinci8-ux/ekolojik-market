@@ -47,9 +47,11 @@ Deploy öncesi **data yedekleri:** `/var/www/market-pos/data-backups/market-pos-
 ## Veri kaybını önleyen ürün kuralları (main’de)
 
 - Sunucu dosyaları tenant’a göre ayrı.
+- **Otomatik tenant yedek:** her sunucu kaydında `data/backups/auto-tenant/<tenantId>/` (`TENANT-AUTO-SAVE-POLICY.md`).
 - Girişte / sayfa açılışında **yerel veri varsa sunucu otomatik ezilmez** (#75).
-- Greenleaf özel fotoğraflar sunucuya yazılır (#76); yönetici değişikliklerinde gecikmeli otomatik push.
-- «Sunucudan yenile» Mac’te **uyarı** ile.
+- Yönetici mağaza verisi değişince **~5 sn** otomatik sunucu senkronu (sepet hariç).
+- Greenleaf özel fotoğraflar sunucuya yazılır (#76).
+- «Sunucudan yenile» **uyarı** ile.
 - Deploy **veri klasörünü silmez** (`DEPLOY-DATA-POLICY.md`).
 
 ## Kalan riskler (tazminat için kritik)

@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -19,7 +19,7 @@ import { assertTenantStoreWriteAllowed } from '../server/tenantWritePolicy.mjs';
 import { readTenantStore, writeTenantStore } from '../server/tenantAuth.mjs';
 
 const REPO = join(import.meta.dirname, '..');
-const PORT = Number(process.env.EKOLOJIK_MT_PORT || 5198);
+const PORT = Number(process.env.EKOLOJIK_MT_PORT || 59123);
 const BASE = `http://127.0.0.1:${PORT}`;
 
 function hashPassword(password) {
@@ -188,7 +188,11 @@ assert.equal(gMainAfter.json.settings.businessName, mainMarker, 'main ayar sunuc
 const gLimaAfter = await getStore('lima-market', limaToken);
 assert.equal(gLimaAfter.json.products[0].name, limaMarker, 'lima ürün sunucuya yazıldı (GET)');
 
-console.log('OK    HTTP tenant izolasyonu + ayrı PUT + kutluhan lima engeli');
+const autoDir = join(dataDir, 'backups', 'auto-tenant', 'lima-market');
+const autoFiles = await readdir(autoDir);
+assert.ok(autoFiles.some((f) => f.startsWith('store-') && f.endsWith('.json')), 'sunucu otomatik tenant yedek');
+
+console.log('OK    HTTP tenant izolasyonu + ayrı PUT + kutluhan lima engeli + auto-backup');
 
 server.kill();
 console.log('\nmulti-tenant data safety smoke: PASS');
