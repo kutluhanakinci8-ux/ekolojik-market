@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { loadMarketPosEnv } from './server/loadEnv.mjs';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -252,6 +253,22 @@ try {
 }
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+/** Ham fiş köprüsü script yolu (kurulum / deploy) */
+function resolveReceiptBridgeRepoRoot() {
+  if (existsSync(join(__dirname, 'scripts', 'lima-raw-print-bridge.mjs'))) {
+    return __dirname;
+  }
+  const fromEnv = process.env.RECEIPT_BRIDGE_REPO_ROOT?.trim();
+  if (fromEnv && existsSync(join(fromEnv, 'scripts', 'lima-raw-print-bridge.mjs'))) {
+    return fromEnv;
+  }
+  const sibling = join(__dirname, '..', 'ekolojik-market-pos');
+  if (existsSync(join(sibling, 'scripts', 'lima-raw-print-bridge.mjs'))) {
+    return sibling;
+  }
+  return __dirname;
+}
 const envBootstrap = loadMarketPosEnv(__dirname);
 if (envBootstrap.loaded) {
   console.log(`Ekolojik env: ${envBootstrap.count} değişken yüklendi (${envBootstrap.path})`);
@@ -2981,7 +2998,7 @@ const server = createServer(async (req, res) => {
       if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
       const body = await readRequestBody(req);
       const { forwardLimaThermalPrint } = await import('./server/limaThermalPrint.mjs');
-      const result = await forwardLimaThermalPrint(body);
+      const result = await forwardLimaThermalPrint(body, resolveReceiptBridgeRepoRoot());
       res.writeHead(result.ok ? 200 : result.status || 500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(result));
       return;
@@ -3128,5 +3145,12 @@ server.listen(PORT, HOST, () => {
     console.log('Ekolojik mail outbox: SMTP aktif, kuyruk drain 30s');
   } else {
     console.log('Ekolojik mail outbox: SMTP yok — EKOLOJIK_SMTP_* tanımlayın');
+  }
+  if (process.env.RECEIPT_BRIDGE_AUTOSTART !== '0') {
+    import('./server/receiptBridgeAutostart.mjs')
+      .then(({ ensureReceiptBridgeRunning }) =>
+        ensureReceiptBridgeRunning(resolveReceiptBridgeRepoRoot()),
+      )
+      .catch((err) => console.warn('[receipt-bridge] otomatik başlatma:', err));
   }
 });

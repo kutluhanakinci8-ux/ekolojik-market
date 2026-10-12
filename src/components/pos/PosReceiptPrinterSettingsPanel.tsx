@@ -12,6 +12,7 @@ import { isLimaMacRawPrintAvailable } from '../../utils/limaMacRawPrint';
 import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
 import { loadTenantId } from '../../storage/tenantSession';
 import { APP_BUILD_ID, APP_FEATURE_TAG } from '../../version';
+import { ReceiptBridgeAutostartHelp } from './ReceiptBridgeAutostartHelp';
 
 function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
   const [status, setStatus] = useState('');
@@ -83,11 +84,10 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
       <section className="settings-panel settings-panel--receipt-printer">
         <h2>Fiş yazıcısı</h2>
         <p className="module-hint">
-          <strong>Lima Market</strong> — fiş <strong>doğrudan POS-80C</strong> (ESC/POS); tarayıcı yazdır
-          penceresi <strong>açılmaz</strong>. Sıra: kasa PC <code>127.0.0.1:18765</code>, sonra sunucu API köprüsü.
-          Windows: <code>start-lima-receipt-bridge.bat</code> · Mac/Linux:{' '}
-          <code>bash scripts/start-lima-receipt-bridge.sh</code> (VPS’te SSH — .bat/.ps1 Linux’ta çalışmaz).
+          <strong>Lima Market</strong> — fiş <strong>doğrudan POS-80C</strong> (ESC/POS); tarayıcı yazdır penceresi{' '}
+          <strong>açılmaz</strong>. Kasa PC’de fiş servisi <strong>bir kez</strong> kurulur, sonra otomatik çalışır.
         </p>
+        <ReceiptBridgeAutostartHelp />
         <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
           Yüklü sürüm: {APP_FEATURE_TAG} · {APP_BUILD_ID}
@@ -109,10 +109,11 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
 
   return (
     <section className="settings-panel settings-panel--receipt-printer">
+      <ReceiptBridgeAutostartHelp />
       <div className="settings-panel-head">
         <div>
           <h2>Fiş yazıcısı</h2>
-          <p>Termal fiş (Zywell 80mm) — Windows’ta yazıcı adı Chrome ile eşleşmeli</p>
+          <p>Termal fiş (POS-80C) — sessiz yazdırma; kasada otomatik fiş servisi kurulumu yukarıda</p>
         </div>
         <button type="button" className="btn btn-outline" onClick={applyZywellPreset}>
           POS-80C / Zywell varsayılanı

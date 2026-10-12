@@ -9,12 +9,11 @@ export function remindSilentReceiptBridgeMissing(): void {
     return;
   }
   window.alert(
-    'Fiş doğrudan yazıcıya gönderilemedi (köprü kapalı).\n\n'
-      + 'USB yazıcı hangi makinede, köprü ORADA çalışmalı:\n'
-      + '• Windows kasa: scripts\\start-lima-receipt-bridge.bat\n'
-      + '• Mac + USB: Terminal → node scripts/lima-raw-print-bridge.mjs\n'
-      + '• Linux VPS (yazıcı sunucuda): cd repo && bash scripts/start-lima-receipt-bridge.sh\n'
-      + '   veya: pm2 start lima-receipt-bridge (deploy sonrası)\n\n'
-      + 'SSH sunucuda .bat / .ps1 ÇALIŞMAZ. Tarayıcı «Yazdır» penceresi açılmaz — köprü şart.',
+    'Fiş doğrudan yazıcıya gönderilemedi (bu bilgisayarda fiş servisi kapalı).\n\n'
+      + 'USB yazıcı hangi kasa PC/Mac’teyse, orada BİR KEZ otomatik kurulum yapın (her gün Terminal açmaya gerek yok):\n'
+      + '• Mac: repo klasöründe → bash scripts/install-macos-receipt-bridge-launchd.sh\n'
+      + '• Windows: PowerShell → scripts\\install-lima-bridge-windows-task.ps1\n'
+      + '• Sunucuda yazıcı varsa: deploy sonrası pm2 lima-receipt-bridge otomatik.\n\n'
+      + 'Ayarlar → Fiş yazıcısı bölümünde adımlar ve test fiş var.',
   );
 }

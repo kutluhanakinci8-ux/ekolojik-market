@@ -82,6 +82,9 @@ for required in asatClient.mjs tenantAuth.mjs crmOutreach.mjs; do
     exit 1
   fi
 done
+mkdir -p "${INSTALL_DIR}/scripts"
+cp scripts/lima-raw-print-bridge.mjs "${INSTALL_DIR}/scripts/"
+cp scripts/win-raw-escpos.ps1 "${INSTALL_DIR}/scripts/" 2>/dev/null || true
 cp scripts/sunucu-kur.sh "${INSTALL_DIR}/kur.sh"
 chmod +x "${INSTALL_DIR}/kur.sh"
 if [[ -f .env.example ]] && [[ ! -f "${INSTALL_DIR}/.env" ]]; then
@@ -173,17 +176,14 @@ else
   exit 1
 fi
 
-echo "==> Lima ham fiş köprüsü (sessiz termal)..."
+echo "==> Lima ham fiş köprüsü (sessiz termal, pm2 ecosystem)..."
 if command -v pm2 >/dev/null 2>&1; then
-  pm2 delete lima-receipt-bridge 2>/dev/null || true
-  POS80_QUEUE_NAME="${POS80_QUEUE_NAME:-Printer_POS_80C}" \
-    pm2 start "${REPO_ROOT}/scripts/lima-raw-print-bridge.mjs" \
-    --name lima-receipt-bridge \
-    --cwd "${REPO_ROOT}" \
-    --interpreter node || echo "    UYARI: lima-receipt-bridge başlatılamadı"
+  cp -f "${REPO_ROOT}/ecosystem.config.cjs" "${INSTALL_DIR}/ecosystem.config.cjs"
+  (cd "${INSTALL_DIR}" && POS80_QUEUE_NAME="${POS80_QUEUE_NAME:-Printer_POS_80C}" pm2 start ecosystem.config.cjs --only lima-receipt-bridge --update-env) \
+    || echo "    UYARI: lima-receipt-bridge başlatılamadı"
   pm2 save 2>/dev/null || true
 else
-  echo "    pm2 yok — köprü: node ${REPO_ROOT}/scripts/lima-raw-print-bridge.mjs"
+  echo "    pm2 yok — köprü market-pos ile otomatik başlar (RECEIPT_BRIDGE_AUTOSTART)"
 fi
 
 echo "Not: Mali yazıcı köprüsü (inpos-bridge) VPS'te çalışmaz."
