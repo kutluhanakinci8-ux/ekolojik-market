@@ -37,6 +37,14 @@ function ReceiptPrintDebugBlock({
 
   const checkBridge = async (full = false) => {
     const health = full ? await fetchLimaBridgeHealth(true) : await fetchLimaBridgeHealth(false);
+    const workerHint =
+      health?.platform === 'win32'
+        ? health.fastPrintWorker !== true || !health.bridgeVersion
+          ? '\n\n⚠ Eski fiş köprüsü — PowerShell ile lima-raw-print-bridge.mjs indirip servisi yeniden başlatın (aşağıdaki onarım .ps1).'
+          : health.workerReady === true
+            ? '\n\nHızlı yazdırma worker: hazır.'
+            : '\n\nHızlı yazdırma worker: hazırlanıyor (10 sn sonra tekrar test fiş).'
+        : '';
     const ready = health?.ok
       ? {
           bridgeUp: true,
@@ -44,7 +52,9 @@ function ReceiptPrintDebugBlock({
           message:
             health.printerReady === false
               ? (health.printerError ?? 'Yazıcı kuyruğu hazır değil')
-              : `Köprü hazır → ${health.resolvedQueue ?? health.queue ?? 'yazıcı'}`,
+              : `Köprü hazır → ${health.resolvedQueue ?? health.queue ?? 'yazıcı'}${
+                  health.bridgeVersion ? ` (${health.bridgeVersion})` : ''
+                }${workerHint}`,
         }
       : await isLimaRawPrintReadyForReceipt();
     setBridgeOk(ready.bridgeUp);

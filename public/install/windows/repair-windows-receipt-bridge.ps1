@@ -28,4 +28,9 @@ Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 4
 $h = Invoke-RestMethod -Uri 'http://127.0.0.1:18765/health' -TimeoutSec 8
 Write-Host "OK health: $($h | ConvertTo-Json -Compress)"
+if (-not $h.bridgeVersion) {
+  Write-Host 'UYARI: bridgeVersion yok — lima-raw-print-bridge.mjs eski olabilir; gorev yeniden baslatildi mi kontrol edin.'
+} elseif ($h.fastPrintWorker -and -not $h.workerReady) {
+  Write-Host 'Worker hazirlaniyor; 10 sn bekleyip test fis deneyin.'
+}
 Write-Host "Dosyalar: $DestDir"

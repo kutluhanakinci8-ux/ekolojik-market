@@ -21,6 +21,9 @@ export interface LimaBridgeHealth {
   printerCount?: number;
   printers?: string[];
   printerError?: string;
+  bridgeVersion?: string;
+  fastPrintWorker?: boolean;
+  workerReady?: boolean;
 }
 
 let lastRawPrintError: string | null = null;
