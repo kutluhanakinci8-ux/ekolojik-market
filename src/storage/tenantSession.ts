@@ -17,6 +17,17 @@ export function loadTenantId(): string {
   }
 }
 
+/**
+ * /giris — URL'de ?tenant= yoksa her zaman Greenleaf (main).
+ * Eski localStorage (ör. lima-market) kutluhan08 girişini bozmasın.
+ */
+export function resolveTenantIdForLoginPage(): string {
+  if (typeof window === 'undefined') return DEFAULT_TENANT_ID;
+  const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
+  if (fromUrl) return normalizeStoreCodeInput(fromUrl);
+  return DEFAULT_TENANT_ID;
+}
+
 export const TENANT_ID_CHANGED_EVENT = 'market-pos-tenant-id-changed';
 
 export function saveTenantId(tenantId: string): void {

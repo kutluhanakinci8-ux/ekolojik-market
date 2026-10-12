@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId, normalizeStoreCodeInput } from './storage/tenantSession';
+import { saveTenantId, normalizeStoreCodeInput } from './storage/tenantSession';
 import { setCurrencyDisplaySettings } from './utils/format';
 import { AppShell } from './components/AppShell';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
@@ -205,10 +205,7 @@ export function PosApp() {
   }, [store.authSession, allowedTabs]);
 
   if (!store.authSession) {
-    const tenant = loadTenantId();
-    const tenantQuery =
-      tenant && tenant !== DEFAULT_TENANT_ID ? `?tenant=${encodeURIComponent(tenant)}` : '';
-    return <Navigate to={`/giris${tenantQuery}`} replace />;
+    return <Navigate to="/giris" replace />;
   }
 
   if (!store.catalogDisplayReady) {

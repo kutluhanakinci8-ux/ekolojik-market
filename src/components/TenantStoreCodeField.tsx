@@ -12,7 +12,7 @@ export function TenantStoreCodeField({ tenantId, onTenantIdChange, disabled }: T
 
   return (
     <label>
-      Mağaza Kodu
+      Mağaza Kodu <span className="module-hint">(Greenleaf: boş bırakın)</span>
       <input
         type="text"
         value={display}

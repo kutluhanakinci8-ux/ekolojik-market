@@ -7,7 +7,12 @@ import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../s
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { TenantStoreCodeField } from '../components/TenantStoreCodeField';
 import { resolveLoginTenantId } from '../config/loginTenant';
-import { DEFAULT_TENANT_ID, loadTenantId, normalizeStoreCodeInput, saveTenantId } from '../storage/tenantSession';
+import {
+  DEFAULT_TENANT_ID,
+  normalizeStoreCodeInput,
+  resolveTenantIdForLoginPage,
+  saveTenantId,
+} from '../storage/tenantSession';
 
 type LoginMode = 'password' | 'pin';
 
@@ -23,14 +28,7 @@ export function LandingLogin() {
   const [totpCode, setTotpCode] = useState('');
   const [pendingTotpUserId, setPendingTotpUserId] = useState<string | null>(null);
   const [pendingUsername, setPendingUsername] = useState('');
-  const [tenantId, setTenantId] = useState(() => {
-    const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
-    if (fromUrl) {
-      saveTenantId(fromUrl);
-      return fromUrl;
-    }
-    return loadTenantId();
-  });
+  const [tenantId, setTenantId] = useState(() => resolveTenantIdForLoginPage());
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(registerState?.message ?? null);
   const [busy, setBusy] = useState(false);
@@ -44,16 +42,18 @@ export function LandingLogin() {
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
-    if (!fromUrl) return;
-    const claims = decodePosApiTokenClaims(loadPosApiToken());
-    const tokenTenant = claims?.tenantId ?? DEFAULT_TENANT_ID;
-    if (loadPosApiToken() && tokenTenant !== fromUrl) {
-      clearPosApiToken();
+    const resolved = resolveTenantIdForLoginPage();
+    if (fromUrl) {
+      const claims = decodePosApiTokenClaims(loadPosApiToken());
+      const tokenTenant = claims?.tenantId ?? DEFAULT_TENANT_ID;
+      if (loadPosApiToken() && tokenTenant !== fromUrl) {
+        clearPosApiToken();
+      }
     }
-    saveTenantId(fromUrl);
-    setTenantId(fromUrl);
+    saveTenantId(resolved);
+    setTenantId(resolved);
     void store.refreshTenantData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnızca URL tenant ile ilk yükleme
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- giriş sayfası ilk yükleme
   }, []);
 
   const goToApp = () => {
