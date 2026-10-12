@@ -1,4 +1,4 @@
-import { useMemo, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { Customer } from '../types/business';
 import type { CartItem, PriceType, Product, SaleMode } from '../types/product';
 import type { ProductSet } from '../types/productSet';
@@ -112,6 +112,8 @@ export function CartPanel({
 }: CartPanelProps) {
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerQuery, setCustomerQuery] = useState('');
+  /** Sepet doluysa ürün listesine yer açmak için müşteri alanını daralt */
+  const [customerExtraOpen, setCustomerExtraOpen] = useState(true);
   const getProduct = (id: number) => products.find((p) => p.id === id);
   const getSet = (id: string) => productSets.find((set) => set.id === id);
 
@@ -182,6 +184,21 @@ export function CartPanel({
 
   const hasCartItems = cart.length > 0;
   const samplesOnly = hasCartItems && total === 0 && sampleCount > 0;
+  const cartFocusLayout = hasCartItems && !compactCheckout;
+  const showCustomerExtra = compactCheckout || customerExtraOpen || !hasCartItems;
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      setCustomerExtraOpen(true);
+    } else if (!compactCheckout) {
+      setCustomerExtraOpen(false);
+    }
+  }, [cart.length, compactCheckout]);
+
+  const cartLineCount = useMemo(
+    () => cart.reduce((sum, line) => sum + line.quantity, 0),
+    [cart],
+  );
 
   const showCrmCheckout =
     !compactCheckout && onCrmCouponChange && !samplesOnly;
@@ -189,7 +206,7 @@ export function CartPanel({
 
   return (
     <aside
-      className={`cart-panel${compactCheckout ? ' cart-panel--compact-checkout' : ''}${hasCartItems ? ' cart-panel--has-items' : ''}`}
+      className={`cart-panel${compactCheckout ? ' cart-panel--compact-checkout' : ''}${hasCartItems ? ' cart-panel--has-items' : ''}${cartFocusLayout ? ' cart-panel--cart-focus' : ''}`}
     >
       <div className={`cart-panel-top ${hasCartItems ? 'cart-panel-top--compact' : ''}`}>
         <div className="cart-panel-search">
@@ -208,7 +225,14 @@ export function CartPanel({
 
         <div className="cart-panel-header-row">
           <div className="cart-panel-header-title">
-            <h2>Sepet</h2>
+            <h2>
+              Sepet
+              {hasCartItems && (
+                <span className="cart-panel-count" title="Sepet satırı / adet">
+                  {cart.length} · {cartLineCount} adet
+                </span>
+              )}
+            </h2>
             {hasCartItems && (
               <button
                 type="button"
@@ -243,7 +267,7 @@ export function CartPanel({
           </div>
         </div>
 
-        <div className="sale-customer-bar">
+        <div className={`sale-customer-bar ${cartFocusLayout && !showCustomerExtra ? 'sale-customer-bar--slim' : ''}`}>
           <input
             type="text"
             className="sale-greenleaf-input"
@@ -256,6 +280,17 @@ export function CartPanel({
             onChange={(e) => onGreenleafChange(e.target.value)}
           />
 
+          {cartFocusLayout && (
+            <button
+              type="button"
+              className="cart-customer-toggle"
+              onClick={() => setCustomerExtraOpen((open) => !open)}
+            >
+              {showCustomerExtra ? 'Müşteri alanını gizle ▴' : 'Müşteri alanı ▾'}
+            </button>
+          )}
+
+          {showCustomerExtra && (
           <label className="sale-customer-field">
             <span>Müşteri adı</span>
             <input
@@ -265,7 +300,9 @@ export function CartPanel({
               onChange={(e) => onCustomerNameChange(e.target.value)}
             />
           </label>
+          )}
 
+          {showCustomerExtra && (
           <div className="cart-panel-toolbar">
             <button
               type="button"
@@ -275,8 +312,9 @@ export function CartPanel({
               {customerSearchOpen ? 'Müşteri aramasını kapat' : 'Kayıtlı müşteri ara'}
             </button>
           </div>
+          )}
 
-          {customerSearchOpen && (
+          {showCustomerExtra && customerSearchOpen && (
             <>
               <label className="sale-customer-field">
                 <span>Kayıtlı müşteri ara</span>
@@ -316,7 +354,7 @@ export function CartPanel({
             </>
           )}
 
-          {statusMessage && (
+          {showCustomerExtra && statusMessage && (
             <div className={`sale-customer-status ${statusMessage.className} ${hasCartItems ? 'sale-customer-status--compact' : ''}`}>
               {statusMessage.text}
             </div>
@@ -324,7 +362,10 @@ export function CartPanel({
         </div>
       </div>
 
-      <div className={`cart-panel-items ${cart.length === 0 ? 'cart-panel-items--idle' : ''}`}>
+      <div
+        className={`cart-panel-items ${cart.length === 0 ? 'cart-panel-items--idle' : ''}`}
+        aria-label={hasCartItems ? `Sepet ürünleri, ${cart.length} satır` : undefined}
+      >
         {cart.length === 0 ? (
           <div className="cart-panel-idle-wrap">
             <CartIdleStage
