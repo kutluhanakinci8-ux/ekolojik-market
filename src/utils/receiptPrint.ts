@@ -216,6 +216,27 @@ function truncateName(name: string, max = 32): string {
   return `${name.slice(0, max - 1)}…`;
 }
 
+/** 80 mm termal Font A ≈ 48 karakter; 58 mm ≈ 32 */
+function plainReceiptLineWidth(paperWidthMm: 58 | 80): number {
+  return paperWidthMm === 58 ? 32 : 48;
+}
+
+function wrapPlainReceiptText(text: string, maxWidth: number): string[] {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return [''];
+  if (normalized.length <= maxWidth) return [normalized];
+  const lines: string[] = [];
+  let rest = normalized;
+  while (rest.length > maxWidth) {
+    let breakAt = rest.lastIndexOf(' ', maxWidth);
+    if (breakAt < Math.floor(maxWidth * 0.35)) breakAt = maxWidth;
+    lines.push(rest.slice(0, breakAt).trim());
+    rest = rest.slice(breakAt).trim();
+  }
+  if (rest) lines.push(rest);
+  return lines;
+}
+
 function formatReceiptItemLabel(item: Pick<ReceiptLineItem, 'name' | 'productCode'>, max = 32): string {
   const code = item.productCode?.trim();
   const name = item.name.trim();
@@ -223,6 +244,16 @@ function formatReceiptItemLabel(item: Pick<ReceiptLineItem, 'name' | 'productCod
   const prefix = `${code} `;
   const nameMax = Math.max(8, max - prefix.length);
   return prefix + truncateName(name, nameMax);
+}
+
+function buildPlainReceiptItemLines(item: ReceiptLineItem, lineWidth: number): string[] {
+  const code = item.productCode?.trim();
+  const name = item.name.trim();
+  const head = code ? `${code} ${name}` : name;
+  const lines = wrapPlainReceiptText(head, lineWidth);
+  lines.push(`  ${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}`);
+  lines.push(`  ${formatReceiptMoneyPlain(item.lineTotal)}`);
+  return lines;
 }
 
 export function buildReceiptFromCart(
@@ -571,23 +602,23 @@ function plainReceiptPaymentLabel(method: SaleReceiptData['paymentMethod']): str
   return map[method];
 }
 
-export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
+export function buildPlainTextSaleReceipt(data: SaleReceiptData, paperWidthMm: 58 | 80 = 80): string {
+  const lineWidth = plainReceiptLineWidth(paperWidthMm);
+  const rule = '-'.repeat(Math.min(lineWidth, 48));
   const receiptRef = data.receiptNo || data.saleId || '—';
   const lines: string[] = [
     formatReceiptBrandName(data.businessName),
     'SATIS FISI',
-    '--------------------------------',
+    rule,
     `Tarih: ${formatReceiptDateTime(data.createdAt)}`,
     `Fis No: ${receiptRef}`,
     `Odeme: ${plainReceiptPaymentLabel(data.paymentMethod)}`,
-    '--------------------------------',
+    rule,
   ];
   for (const item of data.items) {
-    lines.push(formatReceiptItemLabel(item, 28));
-    lines.push(`  ${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}`);
-    lines.push(`  ${formatReceiptMoneyPlain(item.lineTotal)}`);
+    lines.push(...buildPlainReceiptItemLines(item, lineWidth));
   }
-  lines.push('--------------------------------');
+  lines.push(rule);
   lines.push(...buildReceiptVatPlainLines(data));
   lines.push('');
   lines.push('Tesekkurler.');
@@ -1100,9 +1131,10 @@ export async function printThermalReceipt(
   printerName = 'Printer POS-80C',
 ): Promise<void> {
   const receipt = withSaleReceiptVatBreakdown(data);
+  const classicPaperWidth: 58 | 80 = 80;
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: receipt.saleId, items: receipt.items.length });
-    const plainNoSacrifice = buildPlainTextSaleReceipt(receipt);
+    const plainNoSacrifice = buildPlainTextSaleReceipt(receipt, classicPaperWidth);
     const rawOk = await tryLimaRawReceiptPrint(plainNoSacrifice, printerName);
     if (rawOk) {
       logReceiptPrint('thermal-raw-escpos-ok', { saleId: receipt.saleId });
@@ -1133,7 +1165,7 @@ export async function printThermalReceipt(
   const mode = normalized.printMode === 'plain' ? 'plain' : 'html';
   const html =
     mode === 'plain'
-      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(receipt), paper, margin)
+      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(receipt, paper), paper, margin)
       : buildReceiptHtml(receipt, paper, margin);
   for (let i = 0; i < copies; i += 1) {
     await printHtmlReceipt(html);

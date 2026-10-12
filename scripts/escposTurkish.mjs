@@ -88,7 +88,9 @@ export function buildEscPosReceiptBuffer(text, opts = {}) {
   const asciiBody = receiptTextToAsciiFallback(normalized);
 
   const init = Buffer.from([0x1b, 0x40]);
-  const parts = [init];
+  /** Font A (48 char / 80mm), sol hizalı, normal satır aralığı */
+  const layout = Buffer.from([0x1b, 0x61, 0x00, 0x1b, 0x21, 0x00, 0x1b, 0x32]);
+  const parts = [init, layout];
 
   if (charset === 'ascii' || charset === 'cp857') {
     parts.push(Buffer.from(`${asciiBody}\n`, 'latin1'));
