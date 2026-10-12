@@ -180,6 +180,12 @@ else
   exit 1
 fi
 
+if curl -fsS "http://127.0.0.1:${PORT}/app-release.json" 2>/dev/null | tee "${VERIFY_TMP}.release" | grep -q buildId; then
+  echo "✓ Tek web sürümü (Mac=Windows): $(tr -d '\n' < "${VERIFY_TMP}.release")"
+else
+  echo "UYARI: app-release.json okunamadı — istemci sürüm senkronu çalışmayabilir"
+fi
+
 echo "==> Lima ham fiş köprüsü (sessiz termal, pm2 ecosystem)..."
 if command -v pm2 >/dev/null 2>&1; then
   cp -f "${REPO_ROOT}/ecosystem.config.cjs" "${INSTALL_DIR}/ecosystem.config.cjs"

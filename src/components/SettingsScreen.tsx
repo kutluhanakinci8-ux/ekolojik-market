@@ -14,7 +14,8 @@ import { PosCheckoutSettingsPanel } from './pos/PosCheckoutSettingsPanel';
 import { PosReceiptPrinterSettingsPanel } from './pos/PosReceiptPrinterSettingsPanel';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import { EmailOutboxSettingsPanel } from './settings/EmailOutboxSettingsPanel';
-import { APP_BUILD_ID, APP_VERSION } from '../version';
+import { APP_RELEASE_CHANNEL, formatAppReleaseLabel } from '../version';
+import { CANONICAL_SITE_ORIGIN } from '../config/canonicalSite';
 
 interface SettingsScreenProps {
   store: Store;
@@ -339,16 +340,16 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
               <p className="module-hint" style={{ marginBottom: 12 }}>
                 <strong>Uygulama</strong> satırı tarayıcıdaki güncel programı gösterir.{' '}
                 <strong>Katalog</strong> ürün/fiyat paketinin kod içi kimliğidir (tarih eski sürüm anlamına
-                gelmez).                 Tek program sürümü: <code>www.ekolojikmarket.com.tr</code> (deploy). Mağaza verisi (stok,
-                fiyat, özel ürün fotoğrafları, fiş ayarları) <strong>sunucuda</strong> tutulur — Greenleaf
-                (<code>kutluhan08</code>) yalnızca Greenleaf; Lima ayrı tenant. Platform yöneticisi (
-                <code>yonetici</code>) tüm mağazaları güncelleyebilir. Yönetici fotoğraf değiştirirse ~2 sn
-                içinde sunucuya yazılır; diğer kasalar giriş/yenilemede aynı veriyi alır.
+                gelmez).                 <strong>Tek program:</strong> Mac ve Windows aynı web sürümünü kullanır (
+                <code>{APP_RELEASE_CHANNEL}</code>) — ayrı Mac/Windows POS yok. Adres:{' '}
+                <code>{CANONICAL_SITE_ORIGIN}/app</code>. Deploy sonrası tüm kasalar otomatik aynı derlemeyi
+                alır (Ayarlar’daki sürüm satırı her cihazda eşleşmeli). Mağaza verisi (stok, fotoğraf, fiş
+                ayarı) sunucuda; yalnızca yazıcı köprüsü (Node script) kasa PC’de yerel kalır.
               </p>
               <div className="settings-stat-grid">
                 <article className="settings-stat-card">
                   <span className="settings-stat-label">Uygulama (canlı)</span>
-                  <strong>{APP_VERSION} · {APP_BUILD_ID}</strong>
+                  <strong>{formatAppReleaseLabel()}</strong>
                 </article>
                 <article className="settings-stat-card">
                   <span className="settings-stat-label">Katalog paketi</span>
