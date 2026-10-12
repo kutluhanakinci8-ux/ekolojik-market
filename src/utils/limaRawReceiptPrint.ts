@@ -100,25 +100,36 @@ async function postRawReceipt(
  * Sessiz termal fiş — önce kasa PC köprüsü (127.0.0.1), sonra sunucu API (VPS’teki köprü).
  * Tarayıcı «Yazdır» penceresi açılmaz.
  */
+function isWindowsDesktop(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Win/i.test(navigator.userAgent) || /Windows/i.test(navigator.platform);
+}
+
 export async function tryLimaRawReceiptPrint(
   text: string,
   printerName?: string,
 ): Promise<boolean> {
   lastRawPrintError = null;
-  const attempts: { url: string; auth: boolean }[] = [
-    { url: LOCAL_PRINT_URL, auth: false },
-  ];
-  if (typeof window !== 'undefined') {
-    attempts.push({
-      url: `${window.location.origin}${serverThermalPrintPath()}`,
-      auth: true,
-    });
+  const local = await postRawReceipt(LOCAL_PRINT_URL, text, printerName, false);
+  if (local.ok) return true;
+
+  const localErr = local.error;
+  const localLooksOffline =
+    /failed to fetch|networkerror|fetch/i.test(localErr) ||
+    /ECONNREFUSED|127\.0\.0\.1|18765/i.test(localErr);
+
+  if (typeof window !== 'undefined' && isWindowsDesktop()) {
+    lastRawPrintError = localLooksOffline
+      ? 'Bu bilgisayarda fiş servisi kapalı (127.0.0.1:18765). Uygulama üstündeki sarı banddan «Zywell kurulum» dosyasını indirip PowerShell ile bir kez çalıştırın.'
+      : localErr;
+    return false;
   }
-  for (const { url, auth } of attempts) {
-    const result = await postRawReceipt(url, text, printerName, auth);
-    if (result.ok) return true;
-    lastRawPrintError = result.error;
-  }
+
+  const serverUrl = `${window.location.origin}${serverThermalPrintPath()}`;
+  const server = await postRawReceipt(serverUrl, text, printerName, true);
+  if (server.ok) return true;
+
+  lastRawPrintError = localLooksOffline ? localErr : server.error || localErr;
   return false;
 }
 
