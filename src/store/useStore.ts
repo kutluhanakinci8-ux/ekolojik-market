@@ -3510,6 +3510,15 @@ export function usePosStoreState() {
     return () => window.removeEventListener(TENANT_ID_CHANGED_EVENT, onTenantChanged);
   }, [refreshTenantData]);
 
+  /** Giriş sonrası React state gecikmesinde /app oturumu sessionStorage'dan yükler. */
+  const rehydrateAuthSessionFromStorage = useCallback((): boolean => {
+    if (authSession) return true;
+    const persisted = loadAuthSession();
+    if (!persisted || !loadPosApiToken()) return false;
+    setAuthSession(persisted);
+    return true;
+  }, [authSession]);
+
   const logout = useCallback((reason: 'manual' | 'idle' = 'manual') => {
     if (authSession) {
       logActivity(
@@ -5256,6 +5265,7 @@ export function usePosStoreState() {
     toggleCostProfitReveal,
     login,
     loginWithPin,
+    rehydrateAuthSessionFromStorage,
     refreshTenantData,
     forceServerAuthoritativeResync,
     syncServerReachable,
