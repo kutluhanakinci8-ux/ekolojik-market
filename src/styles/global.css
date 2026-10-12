@@ -329,7 +329,8 @@ input {
 }
 
 .sales-sidebar {
-  width: 380px;
+  width: min(440px, 34vw);
+  min-width: 400px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -2801,6 +2802,43 @@ input {
   padding-bottom: 6px;
 }
 
+/* Tam kasa (Greenleaf): Lima’daki sıkı sepet/ödeme düzeni — müşteri alanı kalır */
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .cart-item {
+  padding: 8px 10px;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .cart-item-name {
+  font-size: 12px;
+  -webkit-line-clamp: 2;
+}
+
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .cart-panel-footer {
+  padding: 12px 14px 10px;
+}
+
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .payment-buttons--pos {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .btn-payment {
+  padding: 10px 6px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .cart-total strong {
+  font-size: 22px;
+}
+
+.cart-panel--has-items:not(.cart-panel--compact-checkout) .cart-park-btn {
+  margin-top: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
 .cart-total {
   display: flex;
   justify-content: space-between;
@@ -2875,7 +2913,8 @@ input {
   }
 
   .sales-sidebar {
-    width: 320px;
+    width: min(380px, 42vw);
+    min-width: 300px;
   }
 }
 
