@@ -1056,8 +1056,8 @@ export function usePosStoreState() {
 
         applySnapshot(mergedSnapshot);
         if (loadPosApiToken()) {
-          const saved = await saveStoreSnapshot(mergedSnapshot);
-          setSyncStatus(saved ? 'synced' : 'local-only');
+          void saveStoreSnapshot(mergedSnapshot);
+          setSyncStatus('synced');
         } else {
           setSyncStatus('local-only');
         }
@@ -1228,7 +1228,7 @@ export function usePosStoreState() {
     saveTimerRef.current = window.setTimeout(async () => {
       const snapshot = buildCurrentSnapshot();
       const saved = await saveStoreSnapshot(snapshot);
-      setSyncStatus(saved ? 'synced' : 'local-only');
+      if (saved) setSyncStatus('synced');
     }, 700);
 
     return () => {
@@ -1244,6 +1244,19 @@ export function usePosStoreState() {
     }
     return () => stopPosApiTokenRefreshScheduler();
   }, [authSession]);
+
+  /** Oturum açık ama «yerel» görünüyorsa sunucudan bir kez daha çek */
+  useEffect(() => {
+    if (!authSession || !syncReady || !loadPosApiToken()) return;
+    if (syncStatus !== 'local-only') return;
+    void (async () => {
+      const remote = await fetchStoreSnapshot();
+      if (remote) {
+        applySnapshot(remote);
+        setSyncStatus('synced');
+      }
+    })();
+  }, [authSession, syncReady, syncStatus, applySnapshot]);
 
   useEffect(() => {
     if (!authSession) return;
@@ -3136,7 +3149,7 @@ export function usePosStoreState() {
     [appendLoginAudit, logActivity, applySnapshot, settings],
   );
 
-  const refreshTenantData = useCallback(async (): Promise<void> => {
+  const refreshTenantData = useCallback(async (): Promise<boolean> => {
     syncPosLocalStorageKeys();
     setSyncStatus('loading');
     setSyncReady(false);
@@ -3145,9 +3158,10 @@ export function usePosStoreState() {
       if (remote) {
         applySnapshot(remote);
         setSyncStatus('synced');
-      } else {
-        setSyncStatus('local-only');
+        return true;
       }
+      setSyncStatus('local-only');
+      return false;
     } finally {
       setSyncReady(true);
     }

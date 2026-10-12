@@ -82,9 +82,19 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
       ? 'Senkron yükleniyor'
       : store.syncStatus === 'synced'
         ? 'Sunucu ile senkron'
-        : 'Yalnızca bu cihaz';
+        : 'Yalnızca bu cihaz (sunucu verisi alınamadı)';
 
   const syncHealthy = store.syncStatus === 'synced';
+
+  const retryServerSync = async () => {
+    setBackupMessage('Sunucudan veri çekiliyor…');
+    const ok = await store.refreshTenantData();
+    setBackupMessage(
+      ok
+        ? 'Sunucu ile senkron — Mac ve Windows aynı veriyi görmeli.'
+        : 'Sunucuya bağlanılamadı. Çıkış yapıp tekrar giriş yapın (şifre/PIN).',
+    );
+  };
 
   const handleImport = async (file: File | undefined) => {
     if (!file) return;
@@ -351,6 +361,17 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
                   <strong className={syncHealthy ? 'is-ok' : ''}>{syncLabel}</strong>
                 </article>
               </div>
+              {!syncHealthy ? (
+                <p className="module-hint" style={{ marginTop: 12 }}>
+                  Mac’te «yalnızca bu cihaz» görünüyorsa bu bilgisayar sunucudaki stok/satışları
+                  görmüyor olabilir. Önce{' '}
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => void retryServerSync()}>
+                    Sunucudan yenile
+                  </button>
+                  ; olmazsa çıkış → tekrar giriş. Windows’taki değişiklikler için Mac de{' '}
+                  <strong>Sunucu ile senkron</strong> olmalı.
+                </p>
+              ) : null}
             </section>
 
             <section className="settings-panel settings-panel--backup">
