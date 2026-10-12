@@ -241,7 +241,7 @@ export function PosApp() {
       page={shellPage}
       allowedTabs={allowedTabs}
       onForceServerSync={() => {
-        void store.refreshTenantData();
+        void store.forceServerAuthoritativeResync();
       }}
       onPageChange={setPage}
       onLogout={store.logout}

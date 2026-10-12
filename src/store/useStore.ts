@@ -22,17 +22,16 @@ import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '.
 import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import {
   buildMergedSnapshotForSave,
-  fetchMergedWithLocal,
   fetchStoreSnapshot,
   putStoreSnapshot,
   saveStoreSnapshot,
 } from '../services/storeApi';
 import { mergeSalesById } from '../utils/mergeStoreSnapshots';
+import { localSnapshotHasStaleSales } from '../utils/salesHistoryClear';
 import {
-  applySalesHistoryClearToSnapshot,
-  localSnapshotHasStaleSales,
-  shouldForceServerSalesSnapshot,
-} from '../utils/salesHistoryClear';
+  mergeServerAuthoritativeSnapshot,
+  wipeOperationalLocalStorageOnDisk,
+} from '../utils/serverAuthoritativeSync';
 import {
   clearPosApiToken,
   clearPosApiTokensForAllKnownTenants,
@@ -954,6 +953,7 @@ export function usePosStoreState() {
   const [costProfitRevealed, setCostProfitRevealed] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'loading' | 'synced' | 'local-only'>('loading');
+  const [syncServerReachable, setSyncServerReachable] = useState(true);
   const persistStoreNowRef = useRef<
     (overrides?: { users?: PosUser[]; cashSessions?: DailyCashSession[] }) => Promise<boolean>
   >(async () => false);
@@ -1126,34 +1126,39 @@ export function usePosStoreState() {
 
       if (cancelled) return;
 
-      if (remote && shouldForceServerSalesSnapshot(localSnapshot, remote)) {
-        applySnapshot(
-          applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
-        );
-        setSyncStatus('synced');
-        setSyncReady(true);
-        return;
-      }
       if (loadTenantId() !== tenantAtStart) {
         setSyncReady(true);
         return;
       }
       const tenant = tenantAtStart;
+      const hasToken = Boolean(loadPosApiToken());
+
+      setSyncServerReachable(remote != null);
+
+      if (hasToken && remote) {
+        const merged = mergeServerAuthoritativeSnapshot(localSnapshot, remote);
+        if (tenant === DEFAULT_TENANT_ID) {
+          const remoteUsers = (remote.users ?? []).map((user) =>
+            normalizeUser(user as unknown as Record<string, unknown>),
+          );
+          const localUsers = loadUsers();
+          const mergedUsers = mergeUserLists(remoteUsers, localUsers);
+          if (mergedUsers.length !== remoteUsers.length) {
+            merged.users = mergedUsers;
+          }
+          const { products: migratedRemoteProducts } = applyIrsaliyeStockToProducts(merged.products ?? []);
+          merged.products = migratedRemoteProducts;
+        }
+        applySnapshot(merged);
+        setSyncStatus('synced');
+        setSyncReady(true);
+        return;
+      }
 
       if (tenant !== DEFAULT_TENANT_ID) {
         if (remote) {
-          const staleSales = localSnapshotHasStaleSales(
-            localSnapshot.sales ?? [],
-            remote.settings?.salesHistoryClearedAt,
-          );
-          if (staleSales || !deviceHasLocalStoreData()) {
-            applySnapshot(
-              applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
-            );
-            setSyncStatus('synced');
-          } else {
-            setSyncStatus('local-only');
-          }
+          applySnapshot(mergeServerAuthoritativeSnapshot(localSnapshot, remote));
+          setSyncStatus('synced');
         } else {
           setProducts([]);
           setProductSets([]);
@@ -1163,36 +1168,7 @@ export function usePosStoreState() {
         return;
       }
 
-      if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
-        const staleSales = localSnapshotHasStaleSales(
-          localSnapshot.sales ?? [],
-          remote.settings?.salesHistoryClearedAt,
-        );
-        if (staleSales) {
-          applySnapshot(
-            applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
-          );
-          setSyncStatus('synced');
-        } else if (deviceHasLocalStoreData()) {
-          setSyncStatus('local-only');
-        } else {
-          const remoteUsers = (remote.users ?? []).map((user) =>
-            normalizeUser(user as unknown as Record<string, unknown>),
-          );
-          const localUsers = loadUsers();
-          const mergedUsers = mergeUserLists(remoteUsers, localUsers);
-          const { products: migratedRemoteProducts } = applyIrsaliyeStockToProducts(remote.products ?? []);
-          const mergedSnapshot = {
-            ...(mergedUsers.length !== remoteUsers.length
-              ? { ...remote, users: mergedUsers, updatedAt: new Date().toISOString() }
-              : remote),
-            products: migratedRemoteProducts,
-            updatedAt: new Date().toISOString(),
-          };
-          applySnapshot(mergedSnapshot);
-          setSyncStatus('synced');
-        }
-      } else if (hasPersistedStoreData(localSnapshot) && tenant === DEFAULT_TENANT_ID) {
+      if (hasPersistedStoreData(localSnapshot) && tenant === DEFAULT_TENANT_ID) {
         const { products: migratedLocal } = applyIrsaliyeStockToProducts(localSnapshot.products ?? []);
         setProducts(mergeWithSeed(migratedLocal));
         setSyncStatus('local-only');
@@ -1200,7 +1176,7 @@ export function usePosStoreState() {
         applySnapshot(remote);
         setSyncStatus('synced');
       } else {
-        setSyncStatus('synced');
+        setSyncStatus(hasToken ? 'local-only' : 'synced');
       }
 
       setSyncReady(true);
@@ -1366,25 +1342,23 @@ export function usePosStoreState() {
     if (!syncReady || !authSession) return;
 
     const pullRemoteSales = async () => {
-      const local = buildCurrentSnapshot();
       const remote = await fetchStoreSnapshot();
-      if (remote && shouldForceServerSalesSnapshot(local, remote)) {
-        applySnapshot(
-          applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
-        );
-        setSyncStatus('synced');
+      setSyncServerReachable(remote != null);
+      if (!remote) return;
+      const local = buildCurrentSnapshot();
+      const merged = mergeServerAuthoritativeSnapshot(local, remote);
+      if (saleIdsSignature(merged.sales) === saleIdsSignature(local.sales)
+        && saleIdsSignature(merged.saleReturns ?? []) === saleIdsSignature(local.saleReturns ?? [])
+        && merged.updatedAt === local.updatedAt) {
         return;
       }
-      const merged = await fetchMergedWithLocal(local);
-      if (!merged) return;
-      if (saleIdsSignature(merged.sales) === saleIdsSignature(local.sales)) return;
-      applyMergedOperationalSlices(merged);
+      applySnapshot(merged);
       setSyncStatus('synced');
     };
 
     const intervalId = window.setInterval(() => {
       void pullRemoteSales();
-    }, 12_000);
+    }, 5_000);
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void pullRemoteSales();
@@ -3372,18 +3346,13 @@ export function usePosStoreState() {
       let sessionSettings = settings;
       try {
         const remote = await fetchStoreSnapshot();
-        const localSales = loadSales();
-        const staleSales = remote
-          ? localSnapshotHasStaleSales(localSales, remote.settings?.salesHistoryClearedAt)
-          : false;
-        if (remote && (staleSales || !deviceHasLocalStoreData())) {
-          applySnapshot(
-            applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
-          );
-          sessionSettings = snapshotMergedSettings(remote);
+        setSyncServerReachable(remote != null);
+        if (remote) {
+          const localSnapshot = buildSnapshotFromStorage();
+          const merged = mergeServerAuthoritativeSnapshot(localSnapshot, remote);
+          applySnapshot(merged);
+          sessionSettings = snapshotMergedSettings(merged);
           setSyncStatus('synced');
-        } else if (remote) {
-          setSyncStatus('local-only');
         } else {
           setSyncStatus('local-only');
         }
@@ -3413,23 +3382,31 @@ export function usePosStoreState() {
     [appendLoginAudit, logActivity, applySnapshot, settings],
   );
 
-  const refreshTenantData = useCallback(async (): Promise<boolean> => {
+  const forceServerAuthoritativeResync = useCallback(async (): Promise<boolean> => {
     syncPosLocalStorageKeys();
     setSyncStatus('loading');
     setSyncReady(false);
     try {
       const remote = await fetchStoreSnapshot();
-      if (remote) {
-        applySnapshot(remote);
-        setSyncStatus('synced');
-        return true;
+      setSyncServerReachable(remote != null);
+      if (!remote) {
+        setSyncStatus('local-only');
+        return false;
       }
-      setSyncStatus('local-only');
-      return false;
+      wipeOperationalLocalStorageOnDisk();
+      const local = buildSnapshotFromStorage();
+      const merged = mergeServerAuthoritativeSnapshot(local, remote);
+      applySnapshot(merged);
+      setSyncStatus('synced');
+      return true;
     } finally {
       setSyncReady(true);
     }
   }, [applySnapshot]);
+
+  const refreshTenantData = useCallback(async (): Promise<boolean> => {
+    return forceServerAuthoritativeResync();
+  }, [forceServerAuthoritativeResync]);
 
   useEffect(() => {
     const onTenantChanged = () => {
@@ -5225,6 +5202,8 @@ export function usePosStoreState() {
     login,
     loginWithPin,
     refreshTenantData,
+    forceServerAuthoritativeResync,
+    syncServerReachable,
     changePassword,
     verifyAdminCredentials,
     unlockUserLogin,

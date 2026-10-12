@@ -82,8 +82,10 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
     store.syncStatus === 'loading'
       ? 'Senkron yükleniyor'
       : store.syncStatus === 'synced'
-        ? 'Sunucu ile senkron'
-        : 'Yalnızca bu cihaz (sunucu verisi alınamadı)';
+        ? 'Sunucu ile senkron (kurumsal — tek kaynak)'
+        : store.syncServerReachable === false
+          ? 'Sunucuya bağlanılamadı — çıkış yapıp tekrar giriş deneyin'
+          : 'Eşitleme bekleniyor';
 
   const syncHealthy = store.syncStatus === 'synced';
 
@@ -379,15 +381,17 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
               </div>
               {!syncHealthy ? (
                 <p className="module-hint" style={{ marginTop: 12 }}>
-                  Mac güncel, Windows eskiyse: önce <strong>Sunucuya Yükle</strong> (alttaki Bulut kartı),
-                  sonra Windows’ta sayfayı yenileyin — Mac’te <em>önce</em> «Sunucudan yenile» yapmayın (Mac
-                  verisi silinir). Windows’u Mac’e uydurmak için:{' '}
+                  İki ekran farklı görünüyorsa bu cihazı sunucudaki tek kaynakla eşitleyin:{' '}
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => void retryServerSync()}>
                     Sunucudan yenile
                   </button>
-                  (önce Tam Yedek önerilir).
+                  (üstteki kırmızı şeritteki «Sunucudan temizle» de aynı işlemi yapar).
                 </p>
-              ) : null}
+              ) : (
+                <p className="module-hint" style={{ marginTop: 12 }}>
+                  Satış ve kasa tüm cihazlarda sunucu kaydıyla eşitlenir (otomatik, ~5 sn).
+                </p>
+              )}
             </section>
 
             <section className="settings-panel settings-panel--backup">

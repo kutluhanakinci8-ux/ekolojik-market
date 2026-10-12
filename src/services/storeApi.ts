@@ -1,6 +1,6 @@
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
-import { mergeStoreSnapshots } from '../utils/mergeStoreSnapshots';
+import { mergeServerAuthoritativeSnapshot } from '../utils/serverAuthoritativeSync';
 import { posApiAuthHeaders, posApiFetch } from './posApiAuth';
 
 function apiUrl(): string {
@@ -43,7 +43,7 @@ export async function buildMergedSnapshotForSave(
   local: PersistedStoreSnapshot,
 ): Promise<PersistedStoreSnapshot> {
   const remote = await fetchStoreSnapshot();
-  return remote ? mergeStoreSnapshots(local, remote) : local;
+  return remote ? mergeServerAuthoritativeSnapshot(local, remote) : local;
 }
 
 export async function saveStoreSnapshot(snapshot: PersistedStoreSnapshot): Promise<boolean> {
@@ -57,5 +57,5 @@ export async function fetchMergedWithLocal(
 ): Promise<PersistedStoreSnapshot | null> {
   const remote = await fetchStoreSnapshot();
   if (!remote) return null;
-  return mergeStoreSnapshots(local, remote);
+  return mergeServerAuthoritativeSnapshot(local, remote);
 }

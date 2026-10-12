@@ -40,7 +40,8 @@ export function AppShell({
   const visibleNavItems = buildVisibleNavItems(allowedTabs);
 
   const showSalesSyncAlert =
-    store.hasStaleLocalSalesData || store.syncStatus === 'local-only';
+    Boolean(store.authSession)
+    && (store.hasStaleLocalSalesData || store.syncStatus !== 'synced');
 
   return (
     <div className="app-shell">
