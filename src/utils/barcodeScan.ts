@@ -1,6 +1,7 @@
 import type { Product } from '../types/product';
 import type { ProductSet } from '../types/productSet';
 import { foldTurkish } from './productSearch';
+import { resolveSaleBarcode } from './productBarcode';
 
 export type BarcodeScanFailureReason =
   | 'empty'
@@ -46,10 +47,11 @@ function codeVariants(code: string): string[] {
 
 function productCodes(product: Product): string[] {
   const list: string[] = [];
-  if (product.barcode?.trim()) list.push(product.barcode.trim());
+  const saleBarcode = resolveSaleBarcode(product);
+  if (saleBarcode) list.push(saleBarcode);
   if (product.productCode?.trim()) list.push(product.productCode.trim());
   list.push(String(product.id));
-  return list;
+  return [...new Set(list)];
 }
 
 function setCodes(set: ProductSet): string[] {

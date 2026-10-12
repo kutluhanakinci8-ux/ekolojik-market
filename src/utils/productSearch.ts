@@ -1,6 +1,7 @@
 import { CATEGORIES, getCategoryLabel } from '../data/categories';
 import type { Product } from '../types/product';
 import type { ProductSet } from '../types/productSet';
+import { resolveSaleBarcode } from './productBarcode';
 
 export type StockSearchFilter = 'all' | 'low' | 'out' | 'sample' | 'in_stock';
 
@@ -216,12 +217,15 @@ function buildSearchableText(product: Product, lowStockThreshold: number): strin
       : 'stokta mevcut';
   const sampleWords = product.isSample ? 'numune ornek ucretsiz' : '';
 
+  const saleBarcode = resolveSaleBarcode(product) ?? '';
+
   return foldTurkish([
     product.name,
     brand,
     categoryLabel,
     product.category.replace(/-/g, ' '),
     product.productCode ?? '',
+    saleBarcode,
     String(product.id),
     statusWords,
     sampleWords,
@@ -234,11 +238,13 @@ function scoreProduct(product: Product, tokens: string[]): number {
   const foldedName = foldTurkish(product.name);
   const foldedBrand = foldTurkish(extractBrand(product.name));
   const foldedCode = foldTurkish(product.productCode ?? '');
+  const foldedBarcode = foldTurkish(resolveSaleBarcode(product) ?? '');
   const foldedCategory = foldTurkish(getCategoryLabel(product.category));
   const fullQuery = tokens.join(' ');
 
   let score = 0;
 
+  if (foldedBarcode && (foldedBarcode === fullQuery || fullQuery === foldedBarcode)) score += 130;
   if (foldedName === fullQuery) score += 120;
   if (foldedName.startsWith(fullQuery)) score += 90;
   if (foldedBrand === fullQuery) score += 85;
@@ -269,6 +275,11 @@ function scoreProduct(product: Product, tokens: string[]): number {
     if (foldedCode.includes(token)) {
       matchedTokens += 1;
       score += 18;
+      continue;
+    }
+    if (foldedBarcode && foldedBarcode.includes(token)) {
+      matchedTokens += 1;
+      score += token.length >= 4 ? 72 : 20;
       continue;
     }
     if (String(product.id).includes(token)) {

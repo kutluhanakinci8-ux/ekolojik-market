@@ -7,6 +7,7 @@ import {
 } from '../utils/productSearch';
 import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
 import { normalizeBarcodeScanInput } from '../utils/barcodeScan';
+import { isLikelyBarcodeInput } from '../utils/productBarcode';
 
 export interface PremiumProductSearchHandle {
   focus: () => void;
@@ -43,6 +44,7 @@ export const PremiumProductSearch = forwardRef<PremiumProductSearchHandle, Premi
     const [activeIndex, setActiveIndex] = useState(0);
     const wrapRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const lastAutoScanRef = useRef('');
 
     useImperativeHandle(ref, () => ({
       focus: () => inputRef.current?.focus(),
@@ -57,6 +59,31 @@ export const PremiumProductSearch = forwardRef<PremiumProductSearchHandle, Premi
     useEffect(() => {
       setActiveIndex(0);
     }, [value, suggestions.length]);
+
+    /** Tam EAN yazıldığında veya okutulduğunda Enter beklemeden sepete ekle */
+    useEffect(() => {
+      if (!onBarcodeScan) return;
+      const normalized = normalizeBarcodeScanInput(value);
+      if (!isLikelyBarcodeInput(normalized)) {
+        lastAutoScanRef.current = '';
+        return;
+      }
+      const timer = window.setTimeout(() => {
+        const current = normalizeBarcodeScanInput(value);
+        if (!isLikelyBarcodeInput(current) || current !== normalized) return;
+        if (lastAutoScanRef.current === normalized) return;
+        lastAutoScanRef.current = normalized;
+        const result = onBarcodeScan(normalized);
+        onScanFeedback?.(result);
+        if (result.ok) {
+          onClear();
+          setOpen(false);
+          lastAutoScanRef.current = '';
+          inputRef.current?.focus();
+        }
+      }, 400);
+      return () => window.clearTimeout(timer);
+    }, [value, onBarcodeScan, onClear, onScanFeedback]);
 
     useEffect(() => {
       const handlePointerDown = (event: MouseEvent) => {
