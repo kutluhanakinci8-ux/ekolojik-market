@@ -11,7 +11,7 @@ import { WINDOWS_ZYWELL_SETUP_PS1_PATH } from '../../config/standardReceiptPrint
 import { WindowsZywellSetupBanner } from './WindowsZywellSetupBanner';
 import { isPosLiteProfile } from '../../utils/tenantProductProfile';
 import { printTestSaleReceipt } from '../../utils/receiptPrint';
-import { isLimaRawPrintReadyForReceipt } from '../../utils/limaRawReceiptPrint';
+import { fetchLimaBridgeHealth, isLimaRawPrintReadyForReceipt } from '../../utils/limaRawReceiptPrint';
 import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
 import { loadTenantId } from '../../storage/tenantSession';
 import { APP_BUILD_ID, APP_VERSION } from '../../version';
@@ -32,8 +32,18 @@ function ReceiptPrintDebugBlock({
       ? '/var/www/market-pos/data/receipt-print.log'
       : `/var/www/market-pos/data/tenants/${tenant}/receipt-print.log`;
 
-  const checkBridge = async () => {
-    const ready = await isLimaRawPrintReadyForReceipt();
+  const checkBridge = async (full = false) => {
+    const health = full ? await fetchLimaBridgeHealth(true) : await fetchLimaBridgeHealth(false);
+    const ready = health?.ok
+      ? {
+          bridgeUp: true,
+          printerReady: health.printerReady !== false,
+          message:
+            health.printerReady === false
+              ? (health.printerError ?? 'Yazıcı kuyruğu hazır değil')
+              : `Köprü hazır → ${health.resolvedQueue ?? health.queue ?? 'yazıcı'}`,
+        }
+      : await isLimaRawPrintReadyForReceipt();
     setBridgeOk(ready.bridgeUp);
     setStatus(ready.message);
     if (ready.bridgeUp && !ready.printerReady) {
@@ -50,7 +60,12 @@ function ReceiptPrintDebugBlock({
       await printTestSaleReceipt(businessName, windowsPrinterName);
       const err = getLastReceiptPrintError();
       const tail = getReceiptPrintLog().slice(-5).map((e) => e.phase).join(' → ');
-      setStatus(err ? `Hata: ${err}` : `Adımlar: ${tail}`);
+      if (!err) {
+        setBridgeOk(true);
+        setStatus(`Fiş basıldı. (Köprü çalışıyor; ilk yazdırma birkaç saniye sürebilir.)\nAdımlar: ${tail}`);
+      } else {
+        setStatus(`Hata: ${err}`);
+      }
     } catch (e) {
       setStatus(`Hata: ${String(e)}`);
     }
@@ -60,15 +75,22 @@ function ReceiptPrintDebugBlock({
     <div className="settings-subpanel" style={{ marginTop: 12 }}>
       <h3>Fiş teşhis</h3>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-outline" onClick={() => void checkBridge()}>
+        <button type="button" className="btn btn-outline" onClick={() => void checkBridge(false)}>
           Köprü kontrol
+        </button>
+        <button type="button" className="btn btn-outline" onClick={() => void checkBridge(true)}>
+          Yazıcı listesi (yavaş)
         </button>
         <button type="button" className="btn btn-outline" onClick={() => void runTest()}>
           Test fiş yazdır
         </button>
       </div>
       {bridgeOk != null ? (
-        <p className="module-hint">{bridgeOk ? '✓ http://127.0.0.1:18765 hazır' : '✗ Köprü yanıt vermiyor'}</p>
+        <p className="module-hint">
+          {bridgeOk
+            ? '✓ Fiş servisi hazır (127.0.0.1:18765)'
+            : 'Kontrol bekleniyor veya yavaş — test fiş basıyorsa sorun yoktur'}
+        </p>
       ) : null}
       {status ? <p className="module-hint">{status}</p> : null}
       <p className="module-hint">

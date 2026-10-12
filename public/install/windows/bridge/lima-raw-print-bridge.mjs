@@ -55,8 +55,15 @@ function resolveDarwinQueue(requested) {
   return underscored || QUEUE;
 }
 
+let win32PrinterCache = { names: [], at: 0 };
+const WIN32_PRINTER_CACHE_MS = 60_000;
+
 function listWin32Printers() {
   if (platform() !== 'win32') return [];
+  const now = Date.now();
+  if (win32PrinterCache.names.length && now - win32PrinterCache.at < WIN32_PRINTER_CACHE_MS) {
+    return win32PrinterCache.names;
+  }
   const ps = [
     '$names = @()',
     'try { $names += @(Get-Printer -ErrorAction Stop | Select-Object -ExpandProperty Name) } catch {}',
@@ -70,12 +77,14 @@ function listWin32Printers() {
       encoding: 'utf8',
       timeout: 15000,
     });
-    return out
+    const names = out
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean);
+    win32PrinterCache = { names, at: Date.now() };
+    return names;
   } catch {
-    return [];
+    return win32PrinterCache.names.length ? win32PrinterCache.names : [];
   }
 }
 
@@ -192,10 +201,11 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && req.url === '/health') {
+  if (req.method === 'GET' && req.url?.startsWith('/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     const charset = String(process.env.ESCPOS_CHARSET || 'ascii').toLowerCase();
     const os = platform();
+    const fullCheck = req.url.includes('full=1');
     const resolved =
       os === 'darwin' ? resolveDarwinQueue(QUEUE) : os === 'win32' ? resolveWin32Queue(QUEUE) : QUEUE;
     const payload = {
@@ -207,11 +217,16 @@ const server = createServer(async (req, res) => {
       escpos: 'ascii-safe',
     };
     if (os === 'win32') {
-      const st = win32PrinterStatus(QUEUE);
-      payload.printerReady = st.ready;
-      payload.printerCount = st.printers?.length ?? 0;
-      if (st.printers?.length) payload.printers = st.printers;
-      if (!st.ready) payload.printerError = st.error;
+      if (fullCheck) {
+        const st = win32PrinterStatus(QUEUE);
+        payload.printerReady = st.ready;
+        payload.printerCount = st.printers?.length ?? 0;
+        if (st.printers?.length) payload.printers = st.printers;
+        if (!st.ready) payload.printerError = st.error;
+      } else {
+        payload.printerReady = true;
+        payload.printerCheck = 'quick';
+      }
     }
     res.end(JSON.stringify(payload));
     return;

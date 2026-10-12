@@ -133,10 +133,11 @@ export async function tryLimaRawReceiptPrint(
   return false;
 }
 
-export async function fetchLimaBridgeHealth(): Promise<LimaBridgeHealth | null> {
+export async function fetchLimaBridgeHealth(full = false): Promise<LimaBridgeHealth | null> {
   try {
-    const res = await fetch(LOCAL_HEALTH_URL, {
-      signal: AbortSignal.timeout(2500),
+    const url = full ? `${LOCAL_HEALTH_URL}?full=1` : LOCAL_HEALTH_URL;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(full ? 12000 : 6000),
     });
     if (!res.ok) return null;
     return (await res.json()) as LimaBridgeHealth;
