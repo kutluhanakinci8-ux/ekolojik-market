@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Store } from '../store/useStore';
-import { APP_BUILD_ID, APP_FEATURE_TAG } from '../version';
+import { APP_BUILD_ID, APP_VERSION } from '../version';
 
 interface PosNotesSettingsProps {
   store: Store;
@@ -109,7 +109,7 @@ export function PosNotesSettings({ store }: PosNotesSettingsProps) {
       </div>
 
       <p className="pos-notes-build-tag">
-        Sürüm: {APP_FEATURE_TAG} · {APP_BUILD_ID}
+        Sürüm: {APP_VERSION} · derleme {APP_BUILD_ID}
       </p>
 
       <div className="pos-notes-list">

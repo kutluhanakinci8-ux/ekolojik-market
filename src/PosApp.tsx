@@ -26,6 +26,7 @@ import {
 } from './storage/postaOnboardingSession';
 import { filterTabsForProductProfile, isPosLiteProfile } from './utils/tenantProductProfile';
 import { PosTenantBootstrap } from './components/PosTenantBootstrap';
+import { useAppReleaseRefresh } from './hooks/useAppReleaseRefresh';
 
 function renderPage(
   page: AppPage,
@@ -73,6 +74,7 @@ function renderPage(
 }
 
 export function PosApp() {
+  useAppReleaseRefresh();
   const store = useStore();
   const allowedTabs = store.authSession
     ? filterTabsForProductProfile(store.authSession.allowedTabs, store.settings)

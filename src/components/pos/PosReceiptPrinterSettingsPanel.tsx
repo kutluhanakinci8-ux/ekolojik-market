@@ -11,7 +11,7 @@ import { printTestSaleReceipt } from '../../utils/receiptPrint';
 import { isLimaRawPrintReadyForReceipt } from '../../utils/limaRawReceiptPrint';
 import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
 import { loadTenantId } from '../../storage/tenantSession';
-import { APP_BUILD_ID, APP_FEATURE_TAG } from '../../version';
+import { APP_BUILD_ID, APP_VERSION } from '../../version';
 import { ReceiptBridgeAutostartHelp } from './ReceiptBridgeAutostartHelp';
 
 function ReceiptPrintDebugBlock({
@@ -111,8 +111,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           }
         />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
-          Yüklü sürüm: {APP_FEATURE_TAG} · {APP_BUILD_ID}
-          {APP_FEATURE_TAG !== 'receipt-print-debug' ? ' — sayfayı Cmd+Shift+R ile yenileyin' : null}
+          Yüklü sürüm: {APP_VERSION} · derleme {APP_BUILD_ID}
         </p>
       </section>
     );
