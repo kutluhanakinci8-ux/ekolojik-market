@@ -20,11 +20,29 @@ function tenantQuery(tenantOverride?: string): string {
 
 export function loadPosApiToken(tenantId?: string): string | null {
   try {
-    const raw = sessionStorage.getItem(tokenStorageKey(tenantId));
-    return raw?.trim() || null;
+    if (tenantId !== undefined) {
+      const raw = sessionStorage.getItem(tokenStorageKey(tenantId));
+      return raw?.trim() || null;
+    }
+    const active = sessionStorage.getItem(tokenStorageKey(loadTenantId()));
+    if (active?.trim()) return active.trim();
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (!key?.startsWith('market-pos-api-token')) continue;
+      const raw = sessionStorage.getItem(key);
+      if (raw?.trim()) return raw.trim();
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+/** Girişten sonra token aktif mağaza anahtarına kopyalanır (tenant değişiminde kaybolmasın). */
+export function syncPosApiTokenToCurrentTenant(savedUnderTenant?: string): void {
+  const token = (savedUnderTenant ? loadPosApiToken(savedUnderTenant) : null) ?? loadPosApiToken();
+  if (!token) return;
+  savePosApiToken(token, loadTenantId());
 }
 
 export function savePosApiToken(token: string, tenantId?: string): void {
@@ -188,6 +206,7 @@ export async function exchangePosApiToken(
       return { ok: false, error: data.message ?? 'API token alınamadı' };
     }
     savePosApiToken(data.token, authTenant);
+    syncPosApiTokenToCurrentTenant(authTenant);
     startPosApiTokenRefreshScheduler();
     return { ok: true, token: data.token, user: data.user };
   } catch {

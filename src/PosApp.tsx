@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { saveTenantId, normalizeStoreCodeInput } from './storage/tenantSession';
 import { setCurrencyDisplaySettings } from './utils/format';
@@ -80,6 +80,10 @@ export function PosApp() {
   useAppReleaseRefresh();
   const store = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useLayoutEffect(() => {
+    store.rehydrateAuthSessionFromStorage();
+  }, [store]);
 
   useEffect(() => {
     const fromUrl = searchParams.get('tenant')?.trim();

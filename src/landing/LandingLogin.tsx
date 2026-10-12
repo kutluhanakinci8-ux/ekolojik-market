@@ -5,7 +5,6 @@ import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
 import {
   clearPosApiToken,
-  clearPosApiTokensForAllKnownTenants,
   decodePosApiTokenClaims,
   loadPosApiToken,
 } from '../services/posApiAuth';
@@ -59,7 +58,6 @@ export function LandingLogin() {
 
   useEffect(() => {
     purgeLegacyLoginLockouts();
-    clearPosApiTokensForAllKnownTenants();
     const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
     const resolved = resolveTenantIdForLoginPage();
     if (fromUrl) {
@@ -71,7 +69,6 @@ export function LandingLogin() {
     }
     saveTenantId(resolved);
     setTenantId(resolved);
-    void store.refreshTenantData();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- giriş sayfası ilk yükleme
   }, []);
 
@@ -97,7 +94,6 @@ export function LandingLogin() {
     }
     saveTenantId(resolvedTenant);
     setTenantId(resolvedTenant);
-    await store.refreshTenantData();
 
     try {
       const result = await store.login(
