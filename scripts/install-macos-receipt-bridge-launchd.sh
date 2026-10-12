@@ -47,6 +47,10 @@ cat > "${PLIST}" <<EOF
     <string>${QUEUE}</string>
     <key>LIMA_RAW_PRINT_PORT</key>
     <string>18765</string>
+    <key>ESCPOS_CHARSET</key>
+    <string>ascii</string>
+    <key>ESCPOS_FEED_LINES</key>
+    <string>10</string>
   </dict>
   <key>StandardOutPath</key>
   <string>${DEST_DIR}/bridge.log</string>

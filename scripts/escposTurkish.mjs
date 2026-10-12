@@ -1,5 +1,6 @@
 /**
- * ESC/POS termal — Türkçe (PC857) + kesim öncesi besleme
+ * ESC/POS termal — varsayılan ASCII Türkçe (POS-80C / Mac raw güvenli)
+ * CP857 bazı yazıcılarda Kiril benzeri bozuk basar; ascii mod önerilir.
  */
 
 const CP857 = new Map([
@@ -15,10 +16,24 @@ const CP857 = new Map([
   ['ğ', 0xa7],
   ['Ğ', 0xa6],
   ['ö', 0x94],
-  ['¢', 0x9b],
 ]);
 
-/** Yazıcı CP857 desteklemezse okunaklı ASCII */
+const CP1254 = new Map([
+  ['Ç', 0xc7],
+  ['ç', 0xe7],
+  ['Ğ', 0xd0],
+  ['ğ', 0xf0],
+  ['İ', 0xdd],
+  ['ı', 0xfd],
+  ['Ö', 0xd6],
+  ['ö', 0xf6],
+  ['Ş', 0xde],
+  ['ş', 0xfe],
+  ['Ü', 0xdc],
+  ['ü', 0xfc],
+]);
+
+/** Termal fiş — Türkçe harfleri okunaklı ASCII */
 export function receiptTextToAsciiFallback(text) {
   return String(text)
     .replace(/₺/g, 'TL')
@@ -33,50 +48,57 @@ export function receiptTextToAsciiFallback(text) {
     .replace(/ö/g, 'o')
     .replace(/Ö/g, 'O')
     .replace(/ç/g, 'c')
-    .replace(/Ç/g, 'C');
+    .replace(/Ç/g, 'C')
+    .replace(/[^\x00-\x7F]/g, '?');
 }
 
-export function encodePc857(text) {
+function encodeMap(text, map) {
   const bytes = [];
   for (const ch of String(text)) {
-    if (CP857.has(ch)) {
-      bytes.push(CP857.get(ch));
+    if (map.has(ch)) {
+      bytes.push(map.get(ch));
       continue;
     }
     const code = ch.codePointAt(0);
-    if (code <= 0x7f) {
-      bytes.push(code);
-    } else if (code <= 0xff) {
-      bytes.push(code);
-    } else {
-      bytes.push(0x3f);
-    }
+    if (code <= 0x7f) bytes.push(code);
+    else if (code <= 0xff) bytes.push(code);
+    else bytes.push(0x3f);
   }
   return Buffer.from(bytes);
 }
 
+function resolveCharset() {
+  const raw = String(process.env.ESCPOS_CHARSET || 'ascii').toLowerCase();
+  if (raw === 'cp857' || raw === '857') return 'cp857';
+  if (raw === 'cp1254' || raw === '1254' || raw === 'win') return 'cp1254';
+  return 'ascii';
+}
+
 /**
  * @param {string} text düz metin fiş
- * @param {{ asciiOnly?: boolean, feedLines?: number }} opts
  */
 export function buildEscPosReceiptBuffer(text, opts = {}) {
-  const feedLines = Math.min(12, Math.max(4, opts.feedLines ?? 8));
-  const asciiOnly = opts.asciiOnly === true || process.env.ESCPOS_ASCII_ONLY === '1';
+  const feedLines = Math.min(
+    14,
+    Math.max(6, Number(process.env.ESCPOS_FEED_LINES) || opts.feedLines || 10),
+  );
+  const charset = opts.charset || resolveCharset();
   const normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const payload = asciiOnly ? receiptTextToAsciiFallback(normalized) : normalized;
+  /** CP857/UTF-8 karışımı POS-80C’de Kiril benzeri bozuk basar — her zaman ASCII gövde */
+  const asciiBody = receiptTextToAsciiFallback(normalized);
 
   const init = Buffer.from([0x1b, 0x40]);
   const parts = [init];
 
-  if (!asciiOnly) {
-    // PC857 Türkçe (Epson ESC/POS n=61)
-    parts.push(Buffer.from([0x1b, 0x74, 0x3d]));
-    parts.push(encodePc857(`${payload}\n`));
+  if (charset === 'ascii' || charset === 'cp857') {
+    parts.push(Buffer.from(`${asciiBody}\n`, 'latin1'));
+  } else if (charset === 'cp1254') {
+    parts.push(Buffer.from([0x1b, 0x74, 0x2f]));
+    parts.push(encodeMap(`${asciiBody}\n`, CP1254));
   } else {
-    parts.push(Buffer.from(`${payload}\n`, 'latin1'));
+    parts.push(Buffer.from(`${asciiBody}\n`, 'latin1'));
   }
 
-  // Alt boşluk + kesimden önce besleme (erken kesimi önler)
   parts.push(Buffer.from([0x1b, 0x64, feedLines]));
   parts.push(Buffer.from([0x1d, 0x56, 0x00]));
 

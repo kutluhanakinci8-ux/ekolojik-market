@@ -122,7 +122,16 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, queue: QUEUE, platform: platform() }));
+    const charset = String(process.env.ESCPOS_CHARSET || 'ascii').toLowerCase();
+    res.end(
+      JSON.stringify({
+        ok: true,
+        queue: QUEUE,
+        platform: platform(),
+        charset,
+        escpos: 'ascii-safe',
+      }),
+    );
     return;
   }
 

@@ -6,6 +6,7 @@ import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindSilentReceiptBridgeMissing } from './receiptPrintBridgeReminder';
 import { tryLimaRawReceiptPrint } from './limaRawReceiptPrint';
+import { toThermalReceiptAscii } from './thermalReceiptAscii';
 import { applyRetailVat } from './productPricing';
 import { DEFAULT_VAT_RATE, roundMoney, splitGrossAmount } from './vatAnalytics';
 
@@ -120,7 +121,7 @@ function buildReceiptVatPlainLines(data: SaleReceiptData): string[] {
   const vat = receiptVatFor(data);
   if (!vat) return [`TOPLAM  ${formatReceiptMoneyPlain(data.total)}`];
   return [
-    `Ara toplam (KDV hariç)  ${formatReceiptMoneyPlain(vat.netTotal)}`,
+    `Ara toplam (KDV haric)  ${formatReceiptMoneyPlain(vat.netTotal)}`,
     `KDV (%${vat.vatRate})  ${formatReceiptMoneyPlain(vat.vatAmount)}`,
     `TOPLAM (KDV dahil)  ${formatReceiptMoneyPlain(vat.grossTotal)}`,
   ];
@@ -559,15 +560,26 @@ function wrapPlainReceiptBody(
 </html>`;
 }
 
+/** Ham ESC/POS fiş — Türkçe karakterler köprüde ASCII’ye çevrilir */
+function plainReceiptPaymentLabel(method: SaleReceiptData['paymentMethod']): string {
+  const map: Record<SaleReceiptData['paymentMethod'], string> = {
+    cash: 'Nakit',
+    card: 'Kredi Karti',
+    transfer: 'Havale/EFT',
+    credit: 'Veresiye',
+  };
+  return map[method];
+}
+
 export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
   const receiptRef = data.receiptNo || data.saleId || '—';
   const lines: string[] = [
     formatReceiptBrandName(data.businessName),
-    'SATIŞ FİŞİ',
+    'SATIS FISI',
     '--------------------------------',
     `Tarih: ${formatReceiptDateTime(data.createdAt)}`,
-    `Fiş No: ${receiptRef}`,
-    `Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}`,
+    `Fis No: ${receiptRef}`,
+    `Odeme: ${plainReceiptPaymentLabel(data.paymentMethod)}`,
     '--------------------------------',
   ];
   for (const item of data.items) {
@@ -578,8 +590,8 @@ export function buildPlainTextSaleReceipt(data: SaleReceiptData): string {
   lines.push('--------------------------------');
   lines.push(...buildReceiptVatPlainLines(data));
   lines.push('');
-  lines.push('Teşekkürler.');
-  return lines.join('\n');
+  lines.push('Tesekkurler.');
+  return toThermalReceiptAscii(lines.join('\n'));
 }
 
 export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58 | 80 = 80): string {
