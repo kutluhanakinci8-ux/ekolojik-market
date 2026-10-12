@@ -13,6 +13,8 @@ const BRIDGE_FILES = [
   'lima-raw-print-bridge.mjs',
   'escposTurkish.mjs',
   'win-raw-escpos.ps1',
+  'win-raw-escpos-lib.ps1',
+  'win-raw-escpos-worker.ps1',
   'install-windows-zywell-printer.ps1',
 ];
 

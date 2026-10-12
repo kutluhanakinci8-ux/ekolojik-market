@@ -157,31 +157,113 @@ function lpRaw(buffer, queueName) {
   });
 }
 
-function winRaw(buffer, queueName) {
-  const q = queueName || QUEUE;
+let winPrintWorker = null;
+let winWorkerReady = false;
+let winWorkerBuf = '';
+let winPrintChain = Promise.resolve();
+
+function ensureWinPrintWorker() {
+  if (platform() !== 'win32') return;
+  if (winPrintWorker && winPrintWorker.exitCode === null) return;
+  const workerPs1 = join(SCRIPT_DIR, 'win-raw-escpos-worker.ps1');
+  winPrintWorker = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', workerPs1],
+    { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true },
+  );
+  winWorkerReady = false;
+  winWorkerBuf = '';
+  winPrintWorker.stdout.on('data', (chunk) => {
+    winWorkerBuf += chunk.toString('utf8');
+  });
+  winPrintWorker.stderr.on('data', (c) => {
+    console.warn('[fis-worker]', c.toString());
+  });
+  winPrintWorker.on('exit', () => {
+    winPrintWorker = null;
+    winWorkerReady = false;
+  });
+}
+
+function takeWorkerLine(timeoutMs = 45_000) {
   return new Promise((resolve, reject) => {
-    const file = join(tmpdir(), `lima-raw-${Date.now()}.bin`);
-    writeFileSync(file, buffer);
+    const started = Date.now();
+    const poll = () => {
+      const nl = winWorkerBuf.indexOf('\n');
+      if (nl >= 0) {
+        const line = winWorkerBuf.slice(0, nl).replace(/\r$/, '').trim();
+        winWorkerBuf = winWorkerBuf.slice(nl + 1);
+        resolve(line);
+        return;
+      }
+      if (Date.now() - started > timeoutMs) {
+        reject(new Error('Print worker timeout'));
+        return;
+      }
+      setTimeout(poll, 8);
+    };
+    poll();
+  });
+}
+
+function winRawOneShot(file, q) {
+  return new Promise((resolve, reject) => {
     const ps1 = join(SCRIPT_DIR, 'win-raw-escpos.ps1');
     const child = spawn(
       'powershell.exe',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-PrinterName', q, '-FilePath', file],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
     );
     let err = '';
     child.stderr.on('data', (c) => {
       err += c;
     });
     child.on('close', (code) => {
-      try {
-        unlinkSync(file);
-      } catch {
-        /* ignore */
-      }
       if (code === 0) resolve();
       else reject(new Error(err || `powershell exit ${code}`));
     });
   });
+}
+
+async function winRawViaWorker(file, q) {
+  ensureWinPrintWorker();
+  if (!winPrintWorker?.stdin) throw new Error('Print worker not running');
+  if (!winWorkerReady) {
+    const ready = await takeWorkerLine(90_000);
+    if (ready !== 'READY') throw new Error(ready || 'Worker failed to start');
+    winWorkerReady = true;
+  }
+  const payload = `${JSON.stringify({ printer: q, file })}\n`;
+  winPrintWorker.stdin.write(payload);
+  const line = await takeWorkerLine(45_000);
+  if (line === 'OK') return;
+  if (line.startsWith('ERR ')) throw new Error(line.slice(4));
+  throw new Error(line || 'Print worker error');
+}
+
+function winRaw(buffer, queueName) {
+  const q = queueName || QUEUE;
+  const file = join(tmpdir(), `lima-raw-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`);
+  writeFileSync(file, buffer);
+  const cleanup = () => {
+    try {
+      unlinkSync(file);
+    } catch {
+      /* ignore */
+    }
+  };
+  const job = (async () => {
+    try {
+      await winRawViaWorker(file, q);
+    } catch {
+      await winRawOneShot(file, q);
+    } finally {
+      cleanup();
+    }
+  })();
+  const scheduled = winPrintChain.then(() => job);
+  winPrintChain = scheduled.catch(() => {});
+  return scheduled;
 }
 
 async function sendRaw(buffer, queueName) {
@@ -259,21 +341,7 @@ const server = createServer(async (req, res) => {
           ? resolveWin32Queue(printer || QUEUE)
           : printer || QUEUE;
     if (os === 'win32') {
-      const st = win32PrinterStatus(printer || QUEUE);
-      if (!st.ready) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            ok: false,
-            error: st.error,
-            requested: st.requested,
-            resolvedQueue: st.resolvedQueue,
-            printers: st.printers ?? [],
-          }),
-        );
-        return;
-      }
-      queue = st.resolvedQueue;
+      queue = resolveWin32Queue(printer || QUEUE);
     }
     await sendRaw(buildEscPosReceiptBuffer(body.text ?? ''), queue);
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -286,5 +354,9 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Lima sessiz fiş: http://127.0.0.1:${PORT}/print  yazıcı="${QUEUE}"  os=${platform()}`);
-  console.log('Bu pencere açık kalsın; satışta tarayıcı yazdır diyaloğu açılmaz.');
+  if (platform() === 'win32') {
+    ensureWinPrintWorker();
+    void listWin32Printers();
+    console.log('Windows: hizli yazdirma worker hazirlaniyor (ilk READY bir kez).');
+  }
 });

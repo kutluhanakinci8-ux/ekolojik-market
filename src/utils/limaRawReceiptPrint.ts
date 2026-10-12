@@ -9,7 +9,7 @@ const LOCAL_PRINT_URL =
 
 const LOCAL_HEALTH_URL = LOCAL_PRINT_URL.replace(/\/print\/?$/, '/health');
 
-const RAW_PRINT_TIMEOUT_MS = 15000;
+const RAW_PRINT_TIMEOUT_MS = 8000;
 
 export interface LimaBridgeHealth {
   ok?: boolean;

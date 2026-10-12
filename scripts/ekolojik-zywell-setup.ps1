@@ -12,7 +12,14 @@ if (-not $Node) {
 }
 
 New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
-$files = @('lima-raw-print-bridge.mjs', 'escposTurkish.mjs', 'win-raw-escpos.ps1', 'install-windows-zywell-printer.ps1')
+$files = @(
+  'lima-raw-print-bridge.mjs',
+  'escposTurkish.mjs',
+  'win-raw-escpos.ps1',
+  'win-raw-escpos-lib.ps1',
+  'win-raw-escpos-worker.ps1',
+  'install-windows-zywell-printer.ps1'
+)
 foreach ($f in $files) {
   $url = "$BaseUrl/install/windows/bridge/$f"
   $out = Join-Path $DestDir $f
@@ -52,7 +59,7 @@ Set sh = CreateObject("WScript.Shell")
 Set env = sh.Environment("PROCESS")
 env("POS80_QUEUE_NAME") = "$printer"
 env("ESCPOS_CHARSET") = "ascii"
-env("ESCPOS_FEED_LINES") = "10"
+env("ESCPOS_FEED_LINES") = "6"
 env("LIMA_RAW_PRINT_PORT") = "18765"
 sh.CurrentDirectory = "$($DestDir.Replace('\', '\\'))"
 sh.Run Chr(34) & "$($Node.Replace('\', '\\'))" & Chr(34) & " " & Chr(34) & "$($bridgeJs.Replace('\', '\\'))" & Chr(34), 0, False
