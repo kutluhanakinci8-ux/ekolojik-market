@@ -14,6 +14,7 @@ import { PosCheckoutSettingsPanel } from './pos/PosCheckoutSettingsPanel';
 import { PosReceiptPrinterSettingsPanel } from './pos/PosReceiptPrinterSettingsPanel';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
 import { EmailOutboxSettingsPanel } from './settings/EmailOutboxSettingsPanel';
+import { APP_BUILD_ID, APP_VERSION } from '../version';
 
 interface SettingsScreenProps {
   store: Store;
@@ -314,9 +315,19 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
                 </div>
               </div>
 
+              <p className="module-hint" style={{ marginBottom: 12 }}>
+                <strong>Uygulama</strong> satırı tarayıcıdaki güncel programı gösterir.{' '}
+                <strong>Katalog</strong> ürün/fiyat paketinin kod içi kimliğidir (tarih eski sürüm anlamına
+                gelmez). Mac ve Windows aynı <code>www.ekolojikmarket.com.tr</code> + senkron ile aynı veriyi
+                görür.
+              </p>
               <div className="settings-stat-grid">
                 <article className="settings-stat-card">
-                  <span className="settings-stat-label">Katalog</span>
+                  <span className="settings-stat-label">Uygulama (canlı)</span>
+                  <strong>{APP_VERSION} · {APP_BUILD_ID}</strong>
+                </article>
+                <article className="settings-stat-card">
+                  <span className="settings-stat-label">Katalog paketi</span>
                   <strong>{APP_CATALOG_VERSION}</strong>
                 </article>
                 <article className="settings-stat-card">
