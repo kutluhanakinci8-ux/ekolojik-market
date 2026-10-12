@@ -83,9 +83,13 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
       ? 'Senkron yükleniyor'
       : store.syncStatus === 'synced'
         ? 'Sunucu ile senkron (kurumsal — tek kaynak)'
-        : store.syncServerReachable === false
-          ? 'Sunucuya bağlanılamadı — çıkış yapıp tekrar giriş deneyin'
-          : 'Eşitleme bekleniyor';
+        : store.syncFetchError === 'no_token' || store.syncFetchError === 'unauthorized'
+          ? 'Oturum süresi doldu — Çıkış yapın, şifre/PIN ile tekrar giriş yapın'
+          : store.syncFetchError === 'forbidden'
+            ? 'Mağaza kodu ile oturum uyuşmuyor — çıkış yapıp doğru mağazada giriş yapın'
+            : store.syncServerReachable === false
+              ? 'Sunucuya bağlanılamadı — ağı kontrol edin veya tekrar giriş yapın'
+              : 'Eşitleme bekleniyor';
 
   const syncHealthy = store.syncStatus === 'synced';
 

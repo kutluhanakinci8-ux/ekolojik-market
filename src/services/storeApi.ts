@@ -1,7 +1,7 @@
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 import { mergeServerAuthoritativeSnapshot } from '../utils/serverAuthoritativeSync';
-import { posApiAuthHeaders, posApiFetch } from './posApiAuth';
+import { loadPosApiToken, posApiAuthHeaders, posApiFetch } from './posApiAuth';
 
 function apiUrl(): string {
   const tenant = loadTenantId();
@@ -10,19 +10,57 @@ function apiUrl(): string {
   return `${base}?tenant=${encodeURIComponent(tenant)}`;
 }
 
-export async function fetchStoreSnapshot(): Promise<PersistedStoreSnapshot | null> {
-  try {
-    const res = await posApiFetch(apiUrl(), {
-      headers: posApiAuthHeaders(),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as PersistedStoreSnapshot | Record<string, never>;
-    if (!data || !data.updatedAt) return null;
-    return data as PersistedStoreSnapshot;
-  } catch {
-    return null;
+export type StoreSnapshotFetchError =
+  | 'no_token'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'invalid_payload'
+  | 'network';
+
+export async function fetchStoreSnapshotWithDiagnostics(): Promise<{
+  snapshot: PersistedStoreSnapshot | null;
+  error?: StoreSnapshotFetchError;
+  httpStatus?: number;
+}> {
+  if (!loadPosApiToken()) {
+    return { snapshot: null, error: 'no_token' };
   }
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const res = await posApiFetch(apiUrl(), {
+        headers: posApiAuthHeaders(),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (res.status === 401) {
+        return { snapshot: null, error: 'unauthorized', httpStatus: 401 };
+      }
+      if (res.status === 403) {
+        return { snapshot: null, error: 'forbidden', httpStatus: 403 };
+      }
+      if (res.status === 404) {
+        return { snapshot: null, error: 'not_found', httpStatus: 404 };
+      }
+      if (!res.ok) {
+        return { snapshot: null, error: 'network', httpStatus: res.status };
+      }
+      const data = (await res.json()) as PersistedStoreSnapshot | Record<string, never>;
+      if (!data || !data.updatedAt) {
+        return { snapshot: null, error: 'invalid_payload', httpStatus: res.status };
+      }
+      return { snapshot: data as PersistedStoreSnapshot };
+    } catch {
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+      }
+    }
+  }
+  return { snapshot: null, error: 'network' };
+}
+
+export async function fetchStoreSnapshot(): Promise<PersistedStoreSnapshot | null> {
+  const result = await fetchStoreSnapshotWithDiagnostics();
+  return result.snapshot;
 }
 
 export async function putStoreSnapshot(snapshot: PersistedStoreSnapshot): Promise<boolean> {

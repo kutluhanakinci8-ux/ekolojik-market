@@ -23,8 +23,10 @@ import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import {
   buildMergedSnapshotForSave,
   fetchStoreSnapshot,
+  fetchStoreSnapshotWithDiagnostics,
   putStoreSnapshot,
   saveStoreSnapshot,
+  type StoreSnapshotFetchError,
 } from '../services/storeApi';
 import { mergeSalesById } from '../utils/mergeStoreSnapshots';
 import { localSnapshotHasStaleSales } from '../utils/salesHistoryClear';
@@ -954,6 +956,8 @@ export function usePosStoreState() {
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'loading' | 'synced' | 'local-only'>('loading');
   const [syncServerReachable, setSyncServerReachable] = useState(true);
+  const [syncFetchError, setSyncFetchError] = useState<StoreSnapshotFetchError | null>(null);
+  const postLoginSyncSessionRef = useRef<string | null>(null);
   const persistStoreNowRef = useRef<
     (overrides?: { users?: PosUser[]; cashSessions?: DailyCashSession[] }) => Promise<boolean>
   >(async () => false);
@@ -3327,6 +3331,7 @@ export function usePosStoreState() {
     ) => {
       clearLoginLockout(user.username);
       const sessionId = `S${Date.now()}`;
+      postLoginSyncSessionRef.current = null;
       lastTrackedPageRef.current = null;
       setSyncStatus('loading');
       setSyncReady(false);
@@ -3387,7 +3392,24 @@ export function usePosStoreState() {
     setSyncStatus('loading');
     setSyncReady(false);
     try {
-      const remote = await fetchStoreSnapshot();
+      const token = loadPosApiToken();
+      const tenant = loadTenantId();
+      const claims = decodePosApiTokenClaims(token);
+      const tokenTenant = claims?.tenantId ?? DEFAULT_TENANT_ID;
+      if (!token) {
+        setSyncFetchError('no_token');
+        setSyncServerReachable(false);
+        setSyncStatus('local-only');
+        return false;
+      }
+      if (tokenTenant !== tenant) {
+        setSyncFetchError('forbidden');
+        setSyncServerReachable(false);
+        setSyncStatus('local-only');
+        return false;
+      }
+      const { snapshot: remote, error } = await fetchStoreSnapshotWithDiagnostics();
+      setSyncFetchError(error ?? null);
       setSyncServerReachable(remote != null);
       if (!remote) {
         setSyncStatus('local-only');
@@ -3398,6 +3420,7 @@ export function usePosStoreState() {
       const merged = mergeServerAuthoritativeSnapshot(local, remote);
       applySnapshot(merged);
       setSyncStatus('synced');
+      setSyncFetchError(null);
       return true;
     } finally {
       setSyncReady(true);
@@ -3409,11 +3432,32 @@ export function usePosStoreState() {
   }, [forceServerAuthoritativeResync]);
 
   useEffect(() => {
+    if (!authSession?.sessionId || !syncReady) return;
+    if (postLoginSyncSessionRef.current === authSession.sessionId) return;
+    postLoginSyncSessionRef.current = authSession.sessionId;
+    void forceServerAuthoritativeResync().then((ok) => {
+      if (!ok) postLoginSyncSessionRef.current = null;
+    });
+  }, [authSession?.sessionId, forceServerAuthoritativeResync, syncReady]);
+
+  useEffect(() => {
+    if (!authSession || !syncReady) return;
+    if (loadPosApiToken()) return;
+    clearAuthSession();
+    clearPosApiToken();
+    setAuthSession(null);
+    setSyncFetchError('no_token');
+    setSyncStatus('local-only');
+    setSyncServerReachable(false);
+  }, [authSession, syncReady]);
+
+  useEffect(() => {
     const onTenantChanged = () => {
       syncPosLocalStorageKeys();
       stopPosApiTokenRefreshScheduler();
       clearAuthSessionsForAllKnownTenants();
       clearPosApiTokensForAllKnownTenants();
+      postLoginSyncSessionRef.current = null;
       setAuthSession(null);
       const slices = hydrateStoreSlicesFromLocalDisk();
       setProducts(slices.products);
@@ -5204,6 +5248,7 @@ export function usePosStoreState() {
     refreshTenantData,
     forceServerAuthoritativeResync,
     syncServerReachable,
+    syncFetchError,
     changePassword,
     verifyAdminCredentials,
     unlockUserLogin,
