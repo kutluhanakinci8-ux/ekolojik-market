@@ -1,10 +1,13 @@
 import type { HeldPosSale } from '../types/pos';
+import { tenantLocalStorageSuffix } from './posLocalStorageKeys';
 
-const KEY = 'market-pos-held-sales';
+function storageKey(): string {
+  return `market-pos-held-sales${tenantLocalStorageSuffix()}`;
+}
 
 export function loadHeldPosSales(): HeldPosSale[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return [];
     const parsed = JSON.parse(raw) as HeldPosSale[];
     return Array.isArray(parsed) ? parsed : [];
@@ -14,5 +17,5 @@ export function loadHeldPosSales(): HeldPosSale[] {
 }
 
 export function saveHeldPosSales(items: HeldPosSale[]): void {
-  localStorage.setItem(KEY, JSON.stringify(items.slice(0, 20)));
+  localStorage.setItem(storageKey(), JSON.stringify(items.slice(0, 20)));
 }

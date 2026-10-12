@@ -1,10 +1,14 @@
-const STORAGE_KEY = 'market-pos-crm-attachments';
+import { tenantLocalStorageSuffix } from './posLocalStorageKeys';
+
+function storageKey(): string {
+  return `market-pos-crm-attachments${tenantLocalStorageSuffix()}`;
+}
 
 type AttachmentStore = Record<string, string>;
 
 function loadAll(): AttachmentStore {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return {};
     return JSON.parse(raw) as AttachmentStore;
   } catch {
@@ -13,7 +17,7 @@ function loadAll(): AttachmentStore {
 }
 
 function saveAll(data: AttachmentStore) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(storageKey(), JSON.stringify(data));
 }
 
 export function crmAttachmentKey(customerId: string, documentId: string): string {

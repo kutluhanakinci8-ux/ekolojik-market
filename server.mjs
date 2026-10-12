@@ -651,6 +651,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/bill-email/inbox' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
       const limit = Number(url.searchParams.get('limit') || 50);
       const sourceId = url.searchParams.get('sourceId')?.trim() || undefined;
       try {

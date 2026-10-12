@@ -56,3 +56,9 @@ export function syncPosLocalStorageKeys(tenantId?: string): void {
 export function posLocalStorageKeys(): PosLocalStorageKeys {
   return activeKeys;
 }
+
+/** Muhasebe, CRM, bekleyen satış vb. — tenant suffix (main boş, lima-market ::lima-market) */
+export function tenantLocalStorageSuffix(tenantId?: string): string {
+  const tid = tenantId ?? readTenantId();
+  return tid === DEFAULT_TENANT_ID ? '' : `::${tid}`;
+}

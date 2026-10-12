@@ -1,23 +1,28 @@
 import { createDefaultEquityPartners } from '../data/defaultEquityPartners';
 import type { AccountingSnapshot } from '../types/accounting';
 import { EMPTY_ACCOUNTING_SNAPSHOT } from '../types/accounting';
+import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { tenantLocalStorageSuffix } from '../storage/posLocalStorageKeys';
 
 const STORAGE_PREFIX = 'market-pos-accounting-';
 
-const KEYS = {
-  suppliers: `${STORAGE_PREFIX}suppliers`,
-  customerLedger: `${STORAGE_PREFIX}customer-ledger`,
-  supplierLedger: `${STORAGE_PREFIX}supplier-ledger`,
-  bankAccounts: `${STORAGE_PREFIX}bank-accounts`,
-  bankTransactions: `${STORAGE_PREFIX}bank-transactions`,
-  periodClosures: `${STORAGE_PREFIX}period-closures`,
-  cashCountVariances: `${STORAGE_PREFIX}cash-count-variances`,
-  checkNotes: `${STORAGE_PREFIX}check-notes`,
-  stockAdjustments: `${STORAGE_PREFIX}stock-adjustments`,
-  journalVouchers: `${STORAGE_PREFIX}journal-vouchers`,
-  equityPartners: `${STORAGE_PREFIX}equity-partners`,
-  capitalContributions: `${STORAGE_PREFIX}capital-contributions`,
-} as const;
+type AccountingKeyId =
+  | 'suppliers'
+  | 'customerLedger'
+  | 'supplierLedger'
+  | 'bankAccounts'
+  | 'bankTransactions'
+  | 'periodClosures'
+  | 'cashCountVariances'
+  | 'checkNotes'
+  | 'stockAdjustments'
+  | 'journalVouchers'
+  | 'equityPartners'
+  | 'capitalContributions';
+
+function storageKey(id: AccountingKeyId): string {
+  return `${STORAGE_PREFIX}${id}${tenantLocalStorageSuffix()}`;
+}
 
 function loadArray<T>(key: string): T[] {
   const stored = localStorage.getItem(key);
@@ -31,44 +36,62 @@ function loadArray<T>(key: string): T[] {
 
 export function loadAccountingSnapshot(): AccountingSnapshot {
   return {
-    suppliers: loadArray(KEYS.suppliers),
-    customerLedger: loadArray(KEYS.customerLedger),
-    supplierLedger: loadArray(KEYS.supplierLedger),
-    bankAccounts: loadArray(KEYS.bankAccounts),
-    bankTransactions: loadArray(KEYS.bankTransactions),
-    periodClosures: loadArray(KEYS.periodClosures),
-    cashCountVariances: loadArray(KEYS.cashCountVariances),
-    checkNotes: loadArray(KEYS.checkNotes),
-    stockAdjustments: loadArray(KEYS.stockAdjustments),
-    journalVouchers: loadArray(KEYS.journalVouchers),
+    suppliers: loadArray(storageKey('suppliers')),
+    customerLedger: loadArray(storageKey('customerLedger')),
+    supplierLedger: loadArray(storageKey('supplierLedger')),
+    bankAccounts: loadArray(storageKey('bankAccounts')),
+    bankTransactions: loadArray(storageKey('bankTransactions')),
+    periodClosures: loadArray(storageKey('periodClosures')),
+    cashCountVariances: loadArray(storageKey('cashCountVariances')),
+    checkNotes: loadArray(storageKey('checkNotes')),
+    stockAdjustments: loadArray(storageKey('stockAdjustments')),
+    journalVouchers: loadArray(storageKey('journalVouchers')),
     equityPartners: loadEquityPartners(),
-    capitalContributions: loadArray(KEYS.capitalContributions),
+    capitalContributions: loadArray(storageKey('capitalContributions')),
   };
 }
 
 function loadEquityPartners() {
-  const stored = loadArray<AccountingSnapshot['equityPartners'][number]>(KEYS.equityPartners);
+  const stored = loadArray<AccountingSnapshot['equityPartners'][number]>(storageKey('equityPartners'));
   return stored.length > 0 ? stored : createDefaultEquityPartners();
 }
 
 export function saveAccountingSnapshot(snapshot: AccountingSnapshot): void {
-  localStorage.setItem(KEYS.suppliers, JSON.stringify(snapshot.suppliers));
-  localStorage.setItem(KEYS.customerLedger, JSON.stringify(snapshot.customerLedger));
-  localStorage.setItem(KEYS.supplierLedger, JSON.stringify(snapshot.supplierLedger));
-  localStorage.setItem(KEYS.bankAccounts, JSON.stringify(snapshot.bankAccounts));
-  localStorage.setItem(KEYS.bankTransactions, JSON.stringify(snapshot.bankTransactions));
-  localStorage.setItem(KEYS.periodClosures, JSON.stringify(snapshot.periodClosures));
-  localStorage.setItem(KEYS.cashCountVariances, JSON.stringify(snapshot.cashCountVariances));
-  localStorage.setItem(KEYS.checkNotes, JSON.stringify(snapshot.checkNotes));
-  localStorage.setItem(KEYS.stockAdjustments, JSON.stringify(snapshot.stockAdjustments));
-  localStorage.setItem(KEYS.journalVouchers, JSON.stringify(snapshot.journalVouchers));
-  localStorage.setItem(KEYS.equityPartners, JSON.stringify(snapshot.equityPartners));
-  localStorage.setItem(KEYS.capitalContributions, JSON.stringify(snapshot.capitalContributions));
+  localStorage.setItem(storageKey('suppliers'), JSON.stringify(snapshot.suppliers));
+  localStorage.setItem(storageKey('customerLedger'), JSON.stringify(snapshot.customerLedger));
+  localStorage.setItem(storageKey('supplierLedger'), JSON.stringify(snapshot.supplierLedger));
+  localStorage.setItem(storageKey('bankAccounts'), JSON.stringify(snapshot.bankAccounts));
+  localStorage.setItem(storageKey('bankTransactions'), JSON.stringify(snapshot.bankTransactions));
+  localStorage.setItem(storageKey('periodClosures'), JSON.stringify(snapshot.periodClosures));
+  localStorage.setItem(storageKey('cashCountVariances'), JSON.stringify(snapshot.cashCountVariances));
+  localStorage.setItem(storageKey('checkNotes'), JSON.stringify(snapshot.checkNotes));
+  localStorage.setItem(storageKey('stockAdjustments'), JSON.stringify(snapshot.stockAdjustments));
+  localStorage.setItem(storageKey('journalVouchers'), JSON.stringify(snapshot.journalVouchers));
+  localStorage.setItem(storageKey('equityPartners'), JSON.stringify(snapshot.equityPartners));
+  localStorage.setItem(storageKey('capitalContributions'), JSON.stringify(snapshot.capitalContributions));
 }
 
 export function mergeAccountingFromPersisted(
   remote: Partial<AccountingSnapshot> | undefined,
 ): AccountingSnapshot {
+  const isolated = loadTenantId() !== DEFAULT_TENANT_ID;
+  if (isolated) {
+    if (!remote) return loadAccountingSnapshot();
+    return {
+      suppliers: remote.suppliers ?? [],
+      customerLedger: remote.customerLedger ?? [],
+      supplierLedger: remote.supplierLedger ?? [],
+      bankAccounts: remote.bankAccounts ?? [],
+      bankTransactions: remote.bankTransactions ?? [],
+      periodClosures: remote.periodClosures ?? [],
+      cashCountVariances: remote.cashCountVariances ?? [],
+      checkNotes: remote.checkNotes ?? [],
+      stockAdjustments: remote.stockAdjustments ?? [],
+      journalVouchers: remote.journalVouchers ?? [],
+      equityPartners: remote.equityPartners?.length ? remote.equityPartners : createDefaultEquityPartners(),
+      capitalContributions: remote.capitalContributions ?? [],
+    };
+  }
   const local = loadAccountingSnapshot();
   if (!remote) return local;
   return {
@@ -91,4 +114,4 @@ export function accountingFieldsFromSnapshot(snapshot: AccountingSnapshot) {
   return { ...snapshot };
 }
 
-export { EMPTY_ACCOUNTING_SNAPSHOT, KEYS as ACCOUNTING_STORAGE_KEYS };
+export { EMPTY_ACCOUNTING_SNAPSHOT };

@@ -4,7 +4,11 @@ import { normalizeEmailTemplates } from '../utils/crm/emailTemplates';
 import type { AppSettings } from '../types/business';
 import { DEFAULT_SETTINGS } from '../types/business';
 
-const CRM_STORAGE_KEY = 'market-pos-crm';
+import { tenantLocalStorageSuffix } from '../storage/posLocalStorageKeys';
+
+function crmStorageKey(): string {
+  return `market-pos-crm${tenantLocalStorageSuffix()}`;
+}
 
 export function normalizeCrmData(raw?: Partial<CrmPersistedData> | null): CrmPersistedData {
   if (!raw) return { ...EMPTY_CRM_DATA };
@@ -28,7 +32,7 @@ export function getCrmSettings(settings: AppSettings) {
 }
 
 export function loadCrmData(): CrmPersistedData {
-  const stored = localStorage.getItem(CRM_STORAGE_KEY);
+  const stored = localStorage.getItem(crmStorageKey());
   if (!stored) return { ...EMPTY_CRM_DATA };
   try {
     return normalizeCrmData(JSON.parse(stored) as CrmPersistedData);
@@ -38,5 +42,5 @@ export function loadCrmData(): CrmPersistedData {
 }
 
 export function saveCrmDataLocal(data: CrmPersistedData) {
-  localStorage.setItem(CRM_STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(crmStorageKey(), JSON.stringify(data));
 }

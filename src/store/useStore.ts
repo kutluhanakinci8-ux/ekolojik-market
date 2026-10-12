@@ -1055,8 +1055,12 @@ export function usePosStoreState() {
 
       if (tenant !== DEFAULT_TENANT_ID) {
         if (remote) {
-          applySnapshot(remote);
-          setSyncStatus('synced');
+          if (deviceHasLocalStoreData()) {
+            setSyncStatus('local-only');
+          } else {
+            applySnapshot(remote);
+            setSyncStatus('synced');
+          }
         } else {
           setProducts([]);
           setProductSets([]);
@@ -2975,6 +2979,10 @@ export function usePosStoreState() {
   const persistStoreNow = useCallback(async (
     overrides?: { users?: PosUser[]; cashSessions?: DailyCashSession[] },
   ): Promise<boolean> => {
+    const token = loadPosApiToken();
+    const claims = decodePosApiTokenClaims(token);
+    const tenant = loadTenantId();
+    if (token && (claims?.tenantId ?? DEFAULT_TENANT_ID) !== tenant) return false;
     const snapshot = buildCurrentSnapshot(overrides);
     const saved = await saveStoreSnapshot(snapshot);
     setSyncStatus(saved ? 'synced' : 'local-only');
@@ -2987,7 +2995,11 @@ export function usePosStoreState() {
     if (!syncReady) return;
     if (!authSession || authSession.role !== 'admin') return;
     if (!loadPosApiToken()) return;
-    if (!canPushTenantDataToServer(authSession.username, loadTenantId())) return;
+    const claims = decodePosApiTokenClaims(loadPosApiToken());
+    const tenant = loadTenantId();
+    const tokenTenant = claims?.tenantId ?? DEFAULT_TENANT_ID;
+    if (tokenTenant !== tenant) return;
+    if (!canPushTenantDataToServer(authSession.username, tenant)) return;
     if (serverSyncTimerRef.current) clearTimeout(serverSyncTimerRef.current);
     serverSyncTimerRef.current = setTimeout(() => {
       serverSyncTimerRef.current = null;
