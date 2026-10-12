@@ -340,11 +340,12 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
               <p className="module-hint" style={{ marginBottom: 12 }}>
                 <strong>Uygulama</strong> satırı tarayıcıdaki güncel programı gösterir.{' '}
                 <strong>Katalog</strong> ürün/fiyat paketinin kod içi kimliğidir (tarih eski sürüm anlamına
-                gelmez).                 <strong>Tek program:</strong> Mac ve Windows aynı web sürümünü kullanır (
-                <code>{APP_RELEASE_CHANNEL}</code>) — ayrı Mac/Windows POS yok. Adres:{' '}
-                <code>{CANONICAL_SITE_ORIGIN}/app</code>. Deploy sonrası tüm kasalar otomatik aynı derlemeyi
-                alır (Ayarlar’daki sürüm satırı her cihazda eşleşmeli). Mağaza verisi (stok, fotoğraf, fiş
-                ayarı) sunucuda; yalnızca yazıcı köprüsü (Node script) kasa PC’de yerel kalır.
+                gelmez). <strong>Tek program:</strong> Mac ve Windows aynı web sürümünü kullanır (
+                <code>{APP_RELEASE_CHANNEL}</code>) — adres{' '}
+                <code>{CANONICAL_SITE_ORIGIN}/app</code>. Mağaza verisi GitHub’da değil; sunucuda tutulur.
+                Sunucu ile birleştirme <strong>Sunucuya Yükle</strong> / <strong>Sunucudan yenile</strong> ile
+                yapılır; giriş veya sayfa yenileme yerel veriyi otomatik ezmez. Yazıcı köprüsü (Node) yalnızca
+                kasa PC’de yerel kalır.
               </p>
               <div className="settings-stat-grid">
                 <article className="settings-stat-card">
