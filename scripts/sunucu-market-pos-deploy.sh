@@ -84,6 +84,7 @@ for required in asatClient.mjs tenantAuth.mjs crmOutreach.mjs; do
 done
 mkdir -p "${INSTALL_DIR}/scripts"
 cp scripts/lima-raw-print-bridge.mjs "${INSTALL_DIR}/scripts/"
+cp scripts/escposTurkish.mjs "${INSTALL_DIR}/scripts/"
 cp scripts/win-raw-escpos.ps1 "${INSTALL_DIR}/scripts/" 2>/dev/null || true
 cp scripts/sunucu-kur.sh "${INSTALL_DIR}/kur.sh"
 chmod +x "${INSTALL_DIR}/kur.sh"

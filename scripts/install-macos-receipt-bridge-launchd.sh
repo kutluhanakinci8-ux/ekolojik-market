@@ -18,6 +18,7 @@ fi
 
 mkdir -p "${DEST_DIR}" "${HOME}/Library/LaunchAgents"
 cp "${REPO_ROOT}/scripts/lima-raw-print-bridge.mjs" "${DEST_DIR}/lima-raw-print-bridge.mjs"
+cp "${REPO_ROOT}/scripts/escposTurkish.mjs" "${DEST_DIR}/escposTurkish.mjs"
 if [[ -f "${REPO_ROOT}/scripts/win-raw-escpos.ps1" ]]; then
   cp "${REPO_ROOT}/scripts/win-raw-escpos.ps1" "${DEST_DIR}/" 2>/dev/null || true
 fi

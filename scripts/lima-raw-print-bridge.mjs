@@ -12,6 +12,7 @@ import { writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir, platform } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildEscPosReceiptBuffer } from './escposTurkish.mjs';
 
 const PORT = Number(process.env.LIMA_RAW_PRINT_PORT || 18765);
 const QUEUE =
@@ -51,13 +52,6 @@ function resolveDarwinQueue(requested) {
   const pos80 = queues.find((q) => /pos.?80/i.test(q));
   if (pos80 && /pos.?80/i.test(want)) return pos80;
   return underscored || QUEUE;
-}
-
-function escposPayload(text) {
-  const init = Buffer.from([0x1b, 0x40]);
-  const body = Buffer.from(String(text).replace(/\r\n/g, '\n') + '\n\n', 'utf8');
-  const cut = Buffer.from([0x1d, 0x56, 0x00]);
-  return Buffer.concat([init, body, cut]);
 }
 
 function lpRaw(buffer, queueName) {
@@ -155,7 +149,7 @@ const server = createServer(async (req, res) => {
       platform() === 'darwin'
         ? resolveDarwinQueue(printer || QUEUE)
         : printer || QUEUE;
-    await sendRaw(escposPayload(body.text ?? ''), queue);
+    await sendRaw(buildEscPosReceiptBuffer(body.text ?? ''), queue);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, queue }));
   } catch (e) {
