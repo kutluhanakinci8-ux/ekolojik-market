@@ -7,7 +7,10 @@ import {
   type ReceiptPrinterBrand,
   type ReceiptPrintMode,
 } from '../../types/receiptPrinter';
-import { WINDOWS_ZYWELL_SETUP_PS1_PATH } from '../../config/standardReceiptPrinter';
+import {
+  WINDOWS_RECEIPT_BRIDGE_REPAIR_PS1_PATH,
+  WINDOWS_ZYWELL_SETUP_PS1_PATH,
+} from '../../config/standardReceiptPrinter';
 import { WindowsZywellSetupBanner } from './WindowsZywellSetupBanner';
 import { isPosLiteProfile } from '../../utils/tenantProductProfile';
 import { printTestSaleReceipt } from '../../utils/receiptPrint';
@@ -134,6 +137,13 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         <p className="module-hint">
           <a href={`${typeof window !== 'undefined' ? window.location.origin : ''}${WINDOWS_ZYWELL_SETUP_PS1_PATH}`} download="ekolojik-zywell-setup.ps1">
             Windows — Zywell otomatik kurulum (.ps1)
+          </a>
+          {' · '}
+          <a
+            href={`${typeof window !== 'undefined' ? window.location.origin : ''}${WINDOWS_RECEIPT_BRIDGE_REPAIR_PS1_PATH}`}
+            download="repair-windows-receipt-bridge.ps1"
+          >
+            Eksik dosya / fiş hatası — onarım (.ps1)
           </a>
         </p>
         <ReceiptPrintDebugBlock
