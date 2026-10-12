@@ -40,6 +40,7 @@ import {
   decodePosApiTokenClaims,
   exchangePosApiToken,
   syncPosApiTokenToCurrentTenant,
+  savePosApiToken,
   loadPosApiToken,
   startPosApiTokenRefreshScheduler,
   stopPosApiTokenRefreshScheduler,
@@ -3323,7 +3324,7 @@ export function usePosStoreState() {
     async (
       user: PosUser,
       method: LoginMethod,
-      _credentials?: { password?: string; pin?: string },
+      credentials?: { password?: string; pin?: string; apiToken?: string },
     ) => {
       clearLoginLockout(user.username);
       const sessionId = `S${Date.now()}`;
@@ -3332,8 +3333,11 @@ export function usePosStoreState() {
       setSyncStatus('loading');
       setSyncReady(false);
 
+      if (credentials?.apiToken?.trim()) {
+        savePosApiToken(credentials.apiToken.trim(), loadTenantId());
+      }
       syncPosApiTokenToCurrentTenant();
-      const token = loadPosApiToken();
+      const token = loadPosApiToken() ?? credentials?.apiToken?.trim() ?? null;
       if (!token) {
         setSyncStatus('local-only');
         setSyncFetchError('no_token');
@@ -3668,7 +3672,10 @@ export function usePosStoreState() {
         }
       }
 
-      await finalizeLogin(user, 'password', { password: passwordTrimmed });
+      await finalizeLogin(user, 'password', {
+        password: passwordTrimmed,
+        apiToken: remoteAuth.ok ? remoteAuth.token : undefined,
+      });
       return { status: 'success' };
     } catch {
       return { status: 'error', message: 'Giriş sırasında bir hata oluştu. Sayfayı yenileyip tekrar deneyin.' };
@@ -3788,7 +3795,10 @@ export function usePosStoreState() {
         return { status: 'error', message: 'Kullanıcı adı veya PIN hatalı.' };
       }
 
-      await finalizeLogin(user, 'pin', { pin: pinTrimmed });
+      await finalizeLogin(user, 'pin', {
+        pin: pinTrimmed,
+        apiToken: remoteAuth.ok ? remoteAuth.token : undefined,
+      });
       return { status: 'success' };
     } catch {
       return { status: 'error', message: 'PIN girişi sırasında bir hata oluştu.' };

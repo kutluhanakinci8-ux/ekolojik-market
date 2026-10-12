@@ -38,8 +38,10 @@ export function saveTenantId(tenantId: string): void {
       console.warn('[tenant]', validationError);
       return;
     }
+    const previous = loadTenantId();
     localStorage.setItem(TENANT_KEY, normalized);
     syncPosLocalStorageKeys(normalized);
+    if (previous === normalized) return;
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(TENANT_ID_CHANGED_EVENT, { detail: { tenantId: normalized } }));
     }
