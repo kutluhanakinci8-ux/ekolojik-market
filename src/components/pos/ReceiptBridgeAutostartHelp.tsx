@@ -15,9 +15,12 @@ export POS80_QUEUE_NAME=&quot;Printer_POS_80C&quot;
 bash scripts/install-macos-receipt-bridge-launchd.sh</pre>
         </li>
         <li>
-          <strong>Windows:</strong> PowerShell (yönetici değil, normal kullanıcı):
+          <strong>Windows (USB yazıcı bu PC’de):</strong> Node.js LTS kurulu olmalı. PowerShell (yönetici gerekmez):
           <pre className="receipt-bridge-cmd">cd C:\...\ekolojik-market
-.\scripts\install-lima-bridge-windows-task.ps1 -PrinterName &quot;Printer POS-80C&quot;</pre>
+.\scripts\install-windows-receipt-bridge.ps1
+.\scripts\diag-windows-receipt-bridge.ps1</pre>
+          Yazıcı adı Ayarlar → Fiş yazıcısı ile Windows «Yazıcılar» listesindeki <strong>tam ad</strong> aynı olmalı
+          (ör. <code>POS-80C</code> veya <code>Printer POS-80C</code>). Siteyi sadece tarayıcıda açmak yetmez — köprü bu bilgisayarda kurulmalı.
         </li>
         <li>
           <strong>Test:</strong> Ayarlar → Fiş teşhis → «Köprü kontrol» → «Test fiş yazdır».

@@ -14,7 +14,13 @@ import { loadTenantId } from '../../storage/tenantSession';
 import { APP_BUILD_ID, APP_FEATURE_TAG } from '../../version';
 import { ReceiptBridgeAutostartHelp } from './ReceiptBridgeAutostartHelp';
 
-function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
+function ReceiptPrintDebugBlock({
+  businessName,
+  windowsPrinterName,
+}: {
+  businessName: string;
+  windowsPrinterName: string;
+}) {
   const [status, setStatus] = useState('');
   const [bridgeOk, setBridgeOk] = useState<boolean | null>(null);
   const tenant = loadTenantId();
@@ -26,13 +32,17 @@ function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
   const checkBridge = async () => {
     const ok = await isLimaMacRawPrintAvailable();
     setBridgeOk(ok);
-    setStatus(ok ? 'Köprü hazır (sessiz yazdırma)' : 'Köprü kapalı — start-lima-receipt-bridge.bat çalıştırın');
+    setStatus(
+      ok
+        ? 'Köprü hazır (sessiz yazdırma)'
+        : 'Köprü kapalı — bu kasa PC’de install-windows-receipt-bridge.ps1 (Win) veya Mac kurulum betiği',
+    );
   };
 
   const runTest = async () => {
     setStatus('Test fiş gönderiliyor…');
     try {
-      await printTestSaleReceipt(businessName);
+      await printTestSaleReceipt(businessName, windowsPrinterName);
       const err = getLastReceiptPrintError();
       const tail = getReceiptPrintLog().slice(-5).map((e) => e.phase).join(' → ');
       setStatus(err ? `Hata: ${err}` : `Adımlar: ${tail}`);
@@ -88,7 +98,13 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           <strong>açılmaz</strong>. Kasa PC’de fiş servisi <strong>bir kez</strong> kurulur, sonra otomatik çalışır.
         </p>
         <ReceiptBridgeAutostartHelp />
-        <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
+        <ReceiptPrintDebugBlock
+          businessName={store.settings.businessName}
+          windowsPrinterName={
+            normalizeReceiptPrinterSettings(store.settings.receiptPrinter).windowsPrinterName ||
+            'Printer POS-80C'
+          }
+        />
         <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
           Yüklü sürüm: {APP_FEATURE_TAG} · {APP_BUILD_ID}
           {APP_FEATURE_TAG !== 'receipt-print-debug' ? ' — sayfayı Cmd+Shift+R ile yenileyin' : null}
@@ -191,7 +207,10 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
         <strong>Kapalı</strong> bırakın: diğer kullanıcıdaki (yonetici) gibi HTML fiş + Chrome + POS-80C.
         Sadece özel ihtiyaçta açın. Chrome: hedef POS-80C, üst/alt bilgiler kapalı, kenar yok, sayfa genişliğine sığdır.
       </p>
-      <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
+      <ReceiptPrintDebugBlock
+        businessName={store.settings.businessName}
+        windowsPrinterName={printer.windowsPrinterName || 'Printer POS-80C'}
+      />
     </section>
   );
 }

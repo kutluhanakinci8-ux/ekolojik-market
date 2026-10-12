@@ -1078,7 +1078,10 @@ export function printHtmlReceipt(html: string): Promise<void> {
   });
 }
 
-export async function printTestSaleReceipt(businessName: string): Promise<void> {
+export async function printTestSaleReceipt(
+  businessName: string,
+  printerName = 'Printer POS-80C',
+): Promise<void> {
   const sample: SaleReceiptData = {
     businessName,
     createdAt: new Date(),
@@ -1088,7 +1091,7 @@ export async function printTestSaleReceipt(businessName: string): Promise<void> 
     saleId: 'TEST',
   };
   logReceiptPrint('test-print');
-  await printThermalReceipt(sample);
+  await printThermalReceipt(sample, undefined, printerName.trim() || 'Printer POS-80C');
 }
 
 export async function printThermalReceipt(

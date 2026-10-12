@@ -12,7 +12,7 @@ export function remindSilentReceiptBridgeMissing(): void {
     'Fiş doğrudan yazıcıya gönderilemedi (bu bilgisayarda fiş servisi kapalı).\n\n'
       + 'USB yazıcı hangi kasa PC/Mac’teyse, orada BİR KEZ otomatik kurulum yapın (her gün Terminal açmaya gerek yok):\n'
       + '• Mac: repo klasöründe → bash scripts/install-macos-receipt-bridge-launchd.sh\n'
-      + '• Windows: PowerShell → scripts\\install-lima-bridge-windows-task.ps1\n'
+      + '• Windows: Node.js LTS + PowerShell → scripts\\install-windows-receipt-bridge.ps1\n'
       + '• Sunucuda yazıcı varsa: deploy sonrası pm2 lima-receipt-bridge otomatik.\n\n'
       + 'Ayarlar → Fiş yazıcısı bölümünde adımlar ve test fiş var.',
   );

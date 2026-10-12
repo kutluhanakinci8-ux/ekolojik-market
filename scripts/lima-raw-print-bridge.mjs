@@ -19,7 +19,8 @@ const QUEUE =
   process.env.POS80_QUEUE_NAME ||
   (platform() === 'win32' ? 'Printer POS-80C' : 'Printer_POS_80C');
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(SCRIPT_DIR, '..');
 
 function listDarwinPrintQueues() {
   try {
@@ -54,6 +55,37 @@ function resolveDarwinQueue(requested) {
   return underscored || QUEUE;
 }
 
+function listWin32Printers() {
+  if (platform() !== 'win32') return [];
+  try {
+    const out = execSync(
+      'powershell.exe -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"',
+      { encoding: 'utf8', timeout: 12000 },
+    );
+    return out
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/** Ayarlar / POS80_QUEUE_NAME → Windows «Yazıcılar» tam adı */
+function resolveWin32Queue(requested) {
+  const want = String(requested || QUEUE).trim();
+  const printers = listWin32Printers();
+  if (!printers.length) return want || QUEUE;
+  if (printers.includes(want)) return want;
+  const norm = (s) => s.toLowerCase().replace(/[\s_-]/g, '');
+  const hit = printers.find((p) => norm(p) === norm(want));
+  if (hit) return hit;
+  const pos80 = printers.filter((p) => /pos.?80/i.test(p));
+  if (pos80.length === 1) return pos80[0];
+  if (want && /pos.?80/i.test(want) && pos80.length) return pos80[0];
+  return want || QUEUE;
+}
+
 function lpRaw(buffer, queueName) {
   const q = queueName || QUEUE;
   return new Promise((resolve, reject) => {
@@ -81,7 +113,7 @@ function winRaw(buffer, queueName) {
   return new Promise((resolve, reject) => {
     const file = join(tmpdir(), `lima-raw-${Date.now()}.bin`);
     writeFileSync(file, buffer);
-    const ps1 = join(REPO_ROOT, 'scripts', 'win-raw-escpos.ps1');
+    const ps1 = join(SCRIPT_DIR, 'win-raw-escpos.ps1');
     const child = spawn(
       'powershell.exe',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-PrinterName', q, '-FilePath', file],
@@ -123,15 +155,23 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     const charset = String(process.env.ESCPOS_CHARSET || 'ascii').toLowerCase();
-    res.end(
-      JSON.stringify({
-        ok: true,
-        queue: QUEUE,
-        platform: platform(),
-        charset,
-        escpos: 'ascii-safe',
-      }),
-    );
+    const os = platform();
+    const resolved =
+      os === 'darwin' ? resolveDarwinQueue(QUEUE) : os === 'win32' ? resolveWin32Queue(QUEUE) : QUEUE;
+    const payload = {
+      ok: true,
+      queue: QUEUE,
+      resolvedQueue: resolved,
+      platform: os,
+      charset,
+      escpos: 'ascii-safe',
+    };
+    if (os === 'win32') {
+      const printers = listWin32Printers();
+      payload.printerCount = printers.length;
+      if (printers.length) payload.printers = printers;
+    }
+    res.end(JSON.stringify(payload));
     return;
   }
 
@@ -154,10 +194,13 @@ const server = createServer(async (req, res) => {
 
   try {
     const printer = body.printer ? String(body.printer).trim() : '';
+    const os = platform();
     const queue =
-      platform() === 'darwin'
+      os === 'darwin'
         ? resolveDarwinQueue(printer || QUEUE)
-        : printer || QUEUE;
+        : os === 'win32'
+          ? resolveWin32Queue(printer || QUEUE)
+          : printer || QUEUE;
     await sendRaw(buildEscPosReceiptBuffer(body.text ?? ''), queue);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, queue }));
