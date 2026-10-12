@@ -147,8 +147,17 @@ function assertUserBelongsToTenant(username, tenantId) {
   return { ok: true };
 }
 
+const GREENLEAF_LOGIN_ALIASES = new Map([
+  ['kutluhan', 'kutluhan08'],
+  ['kutluhanakinci8', 'kutluhan08'],
+]);
+
 export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { username, password, pin }) {
-  const normalized = String(username ?? '').trim().toLowerCase();
+  let normalized = String(username ?? '').trim().toLowerCase();
+  const tenant = String(tenantId ?? 'main').trim() || 'main';
+  if (tenant === 'main' && GREENLEAF_LOGIN_ALIASES.has(normalized)) {
+    normalized = GREENLEAF_LOGIN_ALIASES.get(normalized);
+  }
   const tenantAffinity = assertUserBelongsToTenant(normalized, tenantId);
   if (!tenantAffinity.ok) {
     return { ok: false, status: tenantAffinity.status ?? 403, message: tenantAffinity.message };

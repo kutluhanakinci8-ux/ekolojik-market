@@ -217,6 +217,7 @@ import { applyRetailVat, mergeProductPricing, type ProductPricingInput } from '.
 import { isGreenleafPersistedImageUrl } from '../utils/greenleafProductImages';
 import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
 import { canPushTenantDataToServer } from '../config/tenantDataPolicy';
+import { resolveLoginTenantId } from '../config/loginTenant';
 import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
 function storageKeys() {
@@ -3353,6 +3354,9 @@ export function usePosStoreState() {
         };
       }
 
+      saveTenantId(resolveLoginTenantId(normalized, loadTenantId()));
+      syncPosLocalStorageKeys();
+
       let user: PosUser | undefined;
       const remoteAuth = await exchangePosApiToken({ username: normalized, password });
       if (remoteAuth.ok) {
@@ -3368,6 +3372,9 @@ export function usePosStoreState() {
           );
           setUsers(remoteUsers);
           user = remoteUsers.find((item) => item.username === normalized);
+          if (!user && claims?.userId) {
+            user = remoteUsers.find((item) => item.id === claims.userId);
+          }
           if (!deviceHasLocalStoreData()) {
             applySnapshot(remote);
           }
@@ -3456,6 +3463,9 @@ export function usePosStoreState() {
         };
       }
 
+      saveTenantId(resolveLoginTenantId(normalized, loadTenantId()));
+      syncPosLocalStorageKeys();
+
       let user: PosUser | undefined;
       const remoteAuth = await exchangePosApiToken({ username: normalized, pin });
       if (remoteAuth.ok) {
@@ -3471,6 +3481,9 @@ export function usePosStoreState() {
           );
           setUsers(remoteUsers);
           user = remoteUsers.find((item) => item.username === normalized);
+          if (!user && claims?.userId) {
+            user = remoteUsers.find((item) => item.id === claims.userId);
+          }
           if (!deviceHasLocalStoreData()) {
             applySnapshot(remote);
           }

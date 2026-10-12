@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Store } from '../store/useStore';
 import { loadLastQuickUser } from '../storage/quickLogin';
+import { resolveLoginTenantId } from '../config/loginTenant';
 import { saveTenantId } from '../storage/tenantSession';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { TenantStoreCodeField } from './TenantStoreCodeField';
@@ -45,7 +46,8 @@ export function PinLoginPad({
     setBusy(true);
     setError(null);
     try {
-      saveTenantId(tenantId);
+      const resolvedTenant = resolveLoginTenantId(username, tenantId);
+      saveTenantId(resolvedTenant);
       await store.refreshTenantData();
       const result = await store.loginWithPin(username, pin);
       if (result.status === 'error' || result.status === 'locked') {

@@ -6,6 +6,7 @@ import { PinLoginPad } from '../components/PinLoginPad';
 import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { TenantStoreCodeField } from '../components/TenantStoreCodeField';
+import { resolveLoginTenantId } from '../config/loginTenant';
 import { DEFAULT_TENANT_ID, loadTenantId, normalizeStoreCodeInput, saveTenantId } from '../storage/tenantSession';
 
 type LoginMode = 'password' | 'pin';
@@ -64,7 +65,8 @@ export function LandingLogin() {
     setBusy(true);
     setError(null);
 
-    const resolvedTenant = normalizeStoreCodeInput(tenantId);
+    const loginUser = (pendingTotpUserId ? pendingUsername : username).trim();
+    const resolvedTenant = resolveLoginTenantId(loginUser, normalizeStoreCodeInput(tenantId));
     const tenantError = validateStoreCodeForLogin(resolvedTenant);
     if (tenantError) {
       setError(tenantError);
