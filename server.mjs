@@ -15,6 +15,12 @@ import {
   saveContactMessage,
   listContactMessages,
 } from './server/tenantAuth.mjs';
+import {
+  normalizeTenantId,
+  assertTenantResolvable,
+  isPublicTenantRegistrationEnabled,
+} from './server/tenantAllowlist.mjs';
+import { checkRateLimit } from './server/rateLimit.mjs';
 import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
@@ -321,8 +327,17 @@ async function serveFile(path, res) {
 }
 
 function resolveTenantId(url) {
-  const tenant = url.searchParams.get('tenant')?.trim();
-  return tenant && tenant !== 'main' ? tenant : 'main';
+  return normalizeTenantId(url.searchParams.get('tenant'));
+}
+
+async function ensureTenantOrRespond(res, tenantId) {
+  const check = await assertTenantResolvable(DATA_DIR, tenantId);
+  if (!check.ok) {
+    res.writeHead(check.status ?? 404, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: check.error }));
+    return null;
+  }
+  return check.tenantId;
 }
 
 async function publicMessagingCorsGuard(req, res, tenantId) {
@@ -616,6 +631,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/bill-email/test' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       const data = await readRequestBody(req);
       try {
         const result = await testBillEmailConnection(data ?? {});
@@ -632,9 +651,13 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/bill-email/poll' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       const data = await readRequestBody(req);
       try {
-        const result = await pollBillEmails(DATA_DIR, data ?? {}, resolveTenantId(url));
+        const result = await pollBillEmails(DATA_DIR, data ?? {}, resolvedTenant);
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -651,11 +674,13 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/bill-email/inbox' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
-      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       const limit = Number(url.searchParams.get('limit') || 50);
       const sourceId = url.searchParams.get('sourceId')?.trim() || undefined;
       try {
-        const result = await listBillEmailInbox(DATA_DIR, tenantId, { limit, sourceId });
+        const result = await listBillEmailInbox(DATA_DIR, resolvedTenant, { limit, sourceId });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -684,6 +709,24 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/auth/register' && req.method === 'POST') {
+      if (!isPublicTenantRegistrationEnabled()) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: 'Herkese açık kayıt kapalı. Destek ile iletişime geçin.',
+        }));
+        return;
+      }
+      const ip = getRequestIp(req);
+      const rl = checkRateLimit(`register:${ip}`, { limit: 8, windowMs: 60 * 60 * 1000 });
+      if (!rl.ok) {
+        res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.',
+        }));
+        return;
+      }
       const data = await readRequestBody(req);
       try {
         const result = await registerTenant(DATA_DIR, data ?? {});
@@ -701,9 +744,11 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/auth/pos-token' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
       const data = await readRequestBody(req);
       try {
-        const result = await issuePosApiTokenFromCredentials(DATA_DIR, tenantId, {
+        const result = await issuePosApiTokenFromCredentials(DATA_DIR, resolvedTenant, {
           username: data?.username,
           password: data?.password,
           pin: data?.pin,
@@ -722,9 +767,11 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/auth/pos-token/refresh' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
       const token = extractBearerToken(req);
       try {
-        const result = await refreshPosApiTokenFromBearer(DATA_DIR, token, tenantId);
+        const result = await refreshPosApiTokenFromBearer(DATA_DIR, token, resolvedTenant);
         res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
@@ -2358,6 +2405,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/email/outbox/retry' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       const data = await readRequestBody(req);
       const id = data?.id?.trim();
       if (!id) {
@@ -2383,6 +2434,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/email/outbox/') && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       const parts = pathname.split('/').filter(Boolean);
       const outboxId = parts[3];
       if (outboxId && outboxId !== 'recent' && outboxId !== 'process' && outboxId !== 'retry') {
@@ -2399,6 +2454,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/email/outbox/recent' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       const limit = Number(url.searchParams.get('limit') || 30);
       const recent = await listRecentOutbox(DATA_DIR, limit);
       const items = await listMergedRecentOutbox(DATA_DIR, limit);
@@ -2454,6 +2513,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/email/outbox/process' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       try {
         const run = await processPendingOutbox(DATA_DIR, deliverMessage, { limit: 30 });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -2933,6 +2996,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/contact/messages' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
       const limit = Number(url.searchParams.get('limit') || 50);
       try {
         const messages = await listContactMessages(DATA_DIR, limit);
@@ -3041,10 +3108,21 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/data' && req.method === 'GET') {
       const tenantId = resolveTenantId(url);
-      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
-      const data = await readStoreData(tenantId);
-      const { sanitizeIsolatedTenantStoreRead } = await import('./server/tenantStoreGuard.mjs');
-      const tenantSafe = sanitizeIsolatedTenantStoreRead(tenantId, data ?? {});
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const data = await readStoreData(resolvedTenant);
+      if (!data) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Mağaza verisi bulunamadı' }));
+        return;
+      }
+      const {
+        sanitizeIsolatedTenantStoreRead,
+        sanitizeMainTenantStoreRead,
+      } = await import('./server/tenantStoreGuard.mjs');
+      const mainSafe = sanitizeMainTenantStoreRead(resolvedTenant, data);
+      const tenantSafe = sanitizeIsolatedTenantStoreRead(resolvedTenant, mainSafe);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(sanitizeStoreSnapshotForClient(tenantSafe)));
       return;
@@ -3052,12 +3130,14 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/data' && req.method === 'PUT') {
       const tenantId = resolveTenantId(url);
-      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, tenantId);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant);
       if (!authPayload) return;
-      const existingForAuth = await readTenantStore(DATA_DIR, tenantId);
+      const existingForAuth = await readTenantStore(DATA_DIR, resolvedTenant);
       const writer = existingForAuth?.users?.find((u) => u.id === authPayload.userId);
       const { assertTenantStoreWriteAllowed } = await import('./server/tenantWritePolicy.mjs');
-      const writePolicy = assertTenantStoreWriteAllowed(writer?.username, tenantId);
+      const writePolicy = assertTenantStoreWriteAllowed(writer?.username, resolvedTenant);
       if (!writePolicy.ok) {
         res.writeHead(writePolicy.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: writePolicy.error }));
@@ -3069,7 +3149,7 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ ok: false, message: 'Geçersiz veri' }));
         return;
       }
-      const existing = await readTenantStore(DATA_DIR, tenantId);
+      const existing = await readTenantStore(DATA_DIR, resolvedTenant);
       if (existing && typeof existing === 'object') {
         if (!Array.isArray(data.products) && Array.isArray(existing.products)) {
           data.products = existing.products;
@@ -3085,19 +3165,22 @@ const server = createServer(async (req, res) => {
         }
       }
       data.updatedAt = data.updatedAt || new Date().toISOString();
-      const { guardIsolatedTenantStoreWrite, shouldSkipIrsaliyeStockMigration } = await import(
-        './server/tenantStoreGuard.mjs'
-      );
-      const guarded = guardIsolatedTenantStoreWrite(tenantId, existing, data);
+      const {
+        guardIsolatedTenantStoreWrite,
+        guardMainTenantStoreWrite,
+        shouldSkipIrsaliyeStockMigration,
+      } = await import('./server/tenantStoreGuard.mjs');
+      let guarded = guardIsolatedTenantStoreWrite(resolvedTenant, existing, data);
+      guarded = guardMainTenantStoreWrite(resolvedTenant, guarded);
       const withSecrets = mergeStoreUserSecrets(existing, guarded);
       let toSave = withSecrets;
-      if (!shouldSkipIrsaliyeStockMigration(tenantId, existing ?? withSecrets)) {
+      if (!shouldSkipIrsaliyeStockMigration(resolvedTenant, existing ?? withSecrets)) {
         const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);
         toSave = changed ? stockFixed : withSecrets;
       }
       const { elevateOwnerAdminsInStore } = await import('./server/ownerAdminElevate.mjs');
       toSave = elevateOwnerAdminsInStore(toSave).store;
-      await writeStoreData(toSave, tenantId);
+      await writeStoreData(toSave, resolvedTenant);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, updatedAt: toSave.updatedAt }));
       return;

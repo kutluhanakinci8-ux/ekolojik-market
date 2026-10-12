@@ -1,6 +1,7 @@
 /** POS Lite / ayrı tenant — main (Greenleaf) seed verisinin yazılmasını engelle */
 const MAIN_DEMO_USERNAMES = new Set(['yonetici', 'kasiyer']);
 const MAIN_GREENLEAF_CATALOG_MIN = 30;
+const ISOLATED_STORE_USERNAME_PATTERN = /^lima/i;
 
 function isPosLiteStore(store) {
   return store?.settings?.productProfile === 'pos-lite';
@@ -38,6 +39,28 @@ export function filterProductSetsForCatalog(products, productSets) {
     if (!items.length) return false;
     return items.every((line) => ids.has(Number(line?.productId)));
   });
+}
+
+/** main store — Lima hesapları istemciye ve yazmaya karışmasın */
+export function sanitizeMainTenantStoreRead(tenantId, store) {
+  if (tenantId !== 'main' || !store || typeof store !== 'object') return store;
+  if (!Array.isArray(store.users)) return store;
+  const users = store.users.filter(
+    (u) => !ISOLATED_STORE_USERNAME_PATTERN.test(String(u.username ?? '')),
+  );
+  if (users.length === store.users.length) return store;
+  return { ...store, users };
+}
+
+export function guardMainTenantStoreWrite(tenantId, incoming) {
+  if (tenantId !== 'main' || !incoming || typeof incoming !== 'object') return incoming;
+  if (!Array.isArray(incoming.users)) return incoming;
+  return {
+    ...incoming,
+    users: incoming.users.filter(
+      (u) => !ISOLATED_STORE_USERNAME_PATTERN.test(String(u.username ?? '')),
+    ),
+  };
 }
 
 export function sanitizeIsolatedTenantStoreRead(tenantId, store) {

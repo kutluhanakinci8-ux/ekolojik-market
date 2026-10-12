@@ -4,7 +4,9 @@ import { useStore } from '../store/StoreProvider';
 import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
 import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
-import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId } from '../storage/tenantSession';
+import { validateStoreCodeForLogin } from '../config/knownTenants';
+import { TenantStoreCodeField } from '../components/TenantStoreCodeField';
+import { DEFAULT_TENANT_ID, loadTenantId, normalizeStoreCodeInput, saveTenantId } from '../storage/tenantSession';
 
 type LoginMode = 'password' | 'pin';
 
@@ -62,10 +64,12 @@ export function LandingLogin() {
     setBusy(true);
     setError(null);
 
-    const loginUser = (pendingTotpUserId ? pendingUsername : username).trim().toLowerCase();
-    let resolvedTenant = tenantId.trim() || DEFAULT_TENANT_ID;
-    if (resolvedTenant === DEFAULT_TENANT_ID && loginUser.startsWith('lima')) {
-      resolvedTenant = 'lima-market';
+    const resolvedTenant = normalizeStoreCodeInput(tenantId);
+    const tenantError = validateStoreCodeForLogin(resolvedTenant);
+    if (tenantError) {
+      setError(tenantError);
+      setBusy(false);
+      return;
     }
     saveTenantId(resolvedTenant);
     setTenantId(resolvedTenant);
@@ -119,6 +123,8 @@ export function LandingLogin() {
         {mode === 'pin' && !pendingTotpUserId ? (
           <PinLoginPad
             store={store}
+            tenantId={tenantId}
+            onTenantIdChange={setTenantId}
             defaultUsername={lastQuickUser ?? undefined}
             onSwitchToPassword={() => setMode('password')}
             onSuccess={goToApp}
@@ -127,16 +133,7 @@ export function LandingLogin() {
           <form className="landing-form-grid" onSubmit={handlePasswordSubmit}>
             {!pendingTotpUserId && (
               <>
-                <label>
-                  Mağaza Kodu
-                  <input
-                    type="text"
-                    value={tenantId === DEFAULT_TENANT_ID ? '' : tenantId}
-                    onChange={(e) => setTenantId(e.target.value.trim() || DEFAULT_TENANT_ID)}
-                    placeholder="Mevcut kullanıcılar boş bırakın"
-                    autoComplete="off"
-                  />
-                </label>
+                <TenantStoreCodeField tenantId={tenantId} onTenantIdChange={setTenantId} />
                 <label>
                   Kullanıcı Adı
                   <input

@@ -132,12 +132,32 @@ export async function assertPosAdminApiAuth(req, res, dataDir, tenantId) {
   return payload || false;
 }
 
+const ISOLATED_STORE_USERNAME_PATTERN = /^lima/i;
+
+function assertUserBelongsToTenant(username, tenantId) {
+  const name = String(username ?? '').trim().toLowerCase();
+  const tenant = String(tenantId ?? 'main').trim() || 'main';
+  if (tenant === 'main' && ISOLATED_STORE_USERNAME_PATTERN.test(name)) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'Bu hesap Lima Market (lima-market) mağaza kodu ile giriş yapmalıdır.',
+    };
+  }
+  return { ok: true };
+}
+
 export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { username, password, pin }) {
+  const normalized = String(username ?? '').trim().toLowerCase();
+  const tenantAffinity = assertUserBelongsToTenant(normalized, tenantId);
+  if (!tenantAffinity.ok) {
+    return { ok: false, status: tenantAffinity.status ?? 403, message: tenantAffinity.message };
+  }
+
   const store = await readTenantStore(dataDir, tenantId);
   if (!store?.users?.length) {
     return { ok: false, status: 404, message: 'Mağaza bulunamadı' };
   }
-  const normalized = String(username ?? '').trim().toLowerCase();
   const user = store.users.find((u) => u.username === normalized && u.isActive !== false);
   if (!user) {
     return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };

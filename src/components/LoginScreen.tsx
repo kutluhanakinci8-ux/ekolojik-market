@@ -3,6 +3,9 @@ import { useLocation } from 'react-router-dom';
 import type { Store } from '../store/useStore';
 import { formatBusinessBrand } from '../utils/format';
 import { loadLastQuickUser } from '../storage/quickLogin';
+import { loadTenantId, normalizeStoreCodeInput, saveTenantId } from '../storage/tenantSession';
+import { validateStoreCodeForLogin } from '../config/knownTenants';
+import { TenantStoreCodeField } from './TenantStoreCodeField';
 import { PinLoginPad } from './PinLoginPad';
 
 interface LoginScreenProps {
@@ -26,6 +29,7 @@ export function LoginScreen({ store }: LoginScreenProps) {
   const [totpCode, setTotpCode] = useState('');
   const [pendingTotpUserId, setPendingTotpUserId] = useState<string | null>(null);
   const [pendingUsername, setPendingUsername] = useState('');
+  const [tenantId, setTenantId] = useState(() => loadTenantId());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -33,6 +37,17 @@ export function LoginScreen({ store }: LoginScreenProps) {
     event.preventDefault();
     setBusy(true);
     setError(null);
+
+    const resolvedTenant = normalizeStoreCodeInput(tenantId);
+    const tenantError = validateStoreCodeForLogin(resolvedTenant);
+    if (tenantError) {
+      setError(tenantError);
+      setBusy(false);
+      return;
+    }
+    saveTenantId(resolvedTenant);
+    setTenantId(resolvedTenant);
+    await store.refreshTenantData();
 
     try {
       const result = await store.login(
@@ -90,12 +105,16 @@ export function LoginScreen({ store }: LoginScreenProps) {
         {mode === 'pin' && !pendingTotpUserId ? (
           <PinLoginPad
             store={store}
+            tenantId={tenantId}
+            onTenantIdChange={setTenantId}
             defaultUsername={lastQuickUser ?? undefined}
             onSwitchToPassword={() => setMode('password')}
           />
         ) : (
           <form className="login-form" onSubmit={handlePasswordSubmit}>
             {!pendingTotpUserId && (
+              <>
+                <TenantStoreCodeField tenantId={tenantId} onTenantIdChange={setTenantId} />
               <label>
                 Kullanıcı Adı
                 <input
@@ -107,6 +126,7 @@ export function LoginScreen({ store }: LoginScreenProps) {
                   required
                 />
               </label>
+              </>
             )}
 
             {pendingTotpUserId ? (

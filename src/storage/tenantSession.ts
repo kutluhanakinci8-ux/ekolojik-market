@@ -1,3 +1,4 @@
+import { normalizeStoreCodeInput, validateStoreCodeForLogin } from '../config/knownTenants';
 import { syncPosLocalStorageKeys } from './posLocalStorageKeys';
 
 const TENANT_KEY = 'market-pos-tenant-id';
@@ -5,9 +6,12 @@ const TENANT_KEY = 'market-pos-tenant-id';
 /** Varsayılan tenant — mevcut Greenleaf kullanıcıları */
 export const DEFAULT_TENANT_ID = 'main';
 
+export { normalizeStoreCodeInput } from '../config/knownTenants';
+
 export function loadTenantId(): string {
   try {
-    return localStorage.getItem(TENANT_KEY) || DEFAULT_TENANT_ID;
+    const raw = localStorage.getItem(TENANT_KEY);
+    return normalizeStoreCodeInput(raw ?? DEFAULT_TENANT_ID);
   } catch {
     return DEFAULT_TENANT_ID;
   }
@@ -17,10 +21,16 @@ export const TENANT_ID_CHANGED_EVENT = 'market-pos-tenant-id-changed';
 
 export function saveTenantId(tenantId: string): void {
   try {
-    localStorage.setItem(TENANT_KEY, tenantId);
-    syncPosLocalStorageKeys(tenantId);
+    const normalized = normalizeStoreCodeInput(tenantId);
+    const validationError = validateStoreCodeForLogin(normalized);
+    if (validationError) {
+      console.warn('[tenant]', validationError);
+      return;
+    }
+    localStorage.setItem(TENANT_KEY, normalized);
+    syncPosLocalStorageKeys(normalized);
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(TENANT_ID_CHANGED_EVENT, { detail: { tenantId } }));
+      window.dispatchEvent(new CustomEvent(TENANT_ID_CHANGED_EVENT, { detail: { tenantId: normalized } }));
     }
   } catch {
     /* ignore */

@@ -17,6 +17,10 @@ import {
 } from '../server/tenantStoreGuard.mjs';
 import { assertTenantStoreWriteAllowed } from '../server/tenantWritePolicy.mjs';
 import { readTenantStore, writeTenantStore } from '../server/tenantAuth.mjs';
+import {
+  sanitizeMainTenantStoreRead,
+  guardMainTenantStoreWrite,
+} from '../server/tenantStoreGuard.mjs';
 
 const REPO = join(import.meta.dirname, '..');
 const PORT = Number(process.env.EKOLOJIK_MT_PORT || 59123);
@@ -81,6 +85,16 @@ assert.equal(assertTenantStoreWriteAllowed('kutluhan08', 'main').ok, true);
 assert.equal(assertTenantStoreWriteAllowed('kutluhan08', 'lima-market').ok, false);
 assert.equal(assertTenantStoreWriteAllowed('yonetici', 'lima-market').ok, true);
 
+const mainWithLimaUser = sanitizeMainTenantStoreRead('main', {
+  users: [{ username: 'kutluhan08' }, { username: 'limaadmin' }],
+});
+assert.ok(!mainWithLimaUser.users.some((u) => u.username === 'limaadmin'), 'main GET: limaadmin gizlenir');
+
+const mainWrite = guardMainTenantStoreWrite('main', {
+  users: [{ username: 'kutluhan08' }, { username: 'limaadmin' }],
+});
+assert.ok(!mainWrite.users.some((u) => u.username === 'limaadmin'), 'main PUT: lima kullanıcı yazılamaz');
+
 console.log('OK    guard birim testleri (izolasyon + yazma politikası)');
 
 // --- Integration: HTTP + ayrı dosyalar ---
@@ -95,7 +109,14 @@ assert.notEqual(mainDisk.products[0].id, limaDisk.products[0].id, 'Disk: ayrı s
 
 const server = spawn(process.execPath, ['server.mjs'], {
   cwd: REPO,
-  env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', MARKET_POS_DATA_DIR: dataDir },
+  env: {
+    ...process.env,
+    PORT: String(PORT),
+    HOST: '127.0.0.1',
+    MARKET_POS_DATA_DIR: dataDir,
+    EKOLOJIK_TENANT_STRICT: '1',
+    NODE_ENV: 'production',
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
@@ -150,6 +171,13 @@ assert.equal(cross.status, 403, 'main token lima verisine erişemez');
 
 const cross2 = await getStore('main', limaToken);
 assert.equal(cross2.status, 403, 'lima token main verisine erişemez');
+
+const typoRes = await fetch(`${BASE}/api/auth/pos-token?tenant=lima-typo-smoke`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ username: 'limaadmin', password: 'TestPass123!' }),
+});
+assert.equal(typoRes.status, 404, 'bilinmeyen tenant ile giriş 404');
 
 async function putStore(tenant, token, snapshot) {
   const q = tenant === 'main' ? '' : `?tenant=${encodeURIComponent(tenant)}`;

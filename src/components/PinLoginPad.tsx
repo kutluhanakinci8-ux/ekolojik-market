@@ -1,15 +1,27 @@
 import { useState } from 'react';
 import type { Store } from '../store/useStore';
 import { loadLastQuickUser } from '../storage/quickLogin';
+import { saveTenantId } from '../storage/tenantSession';
+import { validateStoreCodeForLogin } from '../config/knownTenants';
+import { TenantStoreCodeField } from './TenantStoreCodeField';
 
 interface PinLoginPadProps {
   store: Store;
+  tenantId: string;
+  onTenantIdChange: (tenantId: string) => void;
   defaultUsername?: string;
   onSwitchToPassword: () => void;
   onSuccess?: () => void;
 }
 
-export function PinLoginPad({ store, defaultUsername, onSwitchToPassword, onSuccess }: PinLoginPadProps) {
+export function PinLoginPad({
+  store,
+  tenantId,
+  onTenantIdChange,
+  defaultUsername,
+  onSwitchToPassword,
+  onSuccess,
+}: PinLoginPadProps) {
   const [username, setUsername] = useState(defaultUsername ?? loadLastQuickUser() ?? '');
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,9 +37,15 @@ export function PinLoginPad({ store, defaultUsername, onSwitchToPassword, onSucc
       setError('PIN 6 haneli olmalıdır.');
       return;
     }
+    const tenantError = validateStoreCodeForLogin(tenantId);
+    if (tenantError) {
+      setError(tenantError);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
+      saveTenantId(tenantId);
       await store.refreshTenantData();
       const result = await store.loginWithPin(username, pin);
       if (result.status === 'error' || result.status === 'locked') {
@@ -45,6 +63,8 @@ export function PinLoginPad({ store, defaultUsername, onSwitchToPassword, onSucc
 
   return (
     <div className="pin-login">
+      <TenantStoreCodeField tenantId={tenantId} onTenantIdChange={onTenantIdChange} />
+
       <label className="pin-login-username">
         Kullanıcı Adı
         <input

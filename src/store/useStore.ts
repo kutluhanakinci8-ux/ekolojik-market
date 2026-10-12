@@ -23,13 +23,19 @@ import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
 import {
   clearPosApiToken,
+  clearPosApiTokensForAllKnownTenants,
   decodePosApiTokenClaims,
   exchangePosApiToken,
   loadPosApiToken,
   startPosApiTokenRefreshScheduler,
   stopPosApiTokenRefreshScheduler,
 } from '../services/posApiAuth';
-import { clearAuthSession, loadAuthSession, saveAuthSession } from '../storage/authSession';
+import {
+  clearAuthSession,
+  clearAuthSessionsForAllKnownTenants,
+  loadAuthSession,
+  saveAuthSession,
+} from '../storage/authSession';
 import {
   loadAllImages,
   migrateImagesFromProducts,
@@ -852,6 +858,43 @@ function buildSnapshotFromStorage(): PersistedStoreSnapshot {
 /** Bu cihazda kayıtlı mağaza verisi varsa sunucu anlık görüntüsü otomatik uygulanmaz (Ayarlar onayı). */
 function deviceHasLocalStoreData(): boolean {
   return hasPersistedStoreData(buildSnapshotFromStorage());
+}
+
+function hydrateStoreSlicesFromLocalDisk() {
+  const customers = loadCustomers();
+  const accounting = loadAccountingSnapshot();
+  return {
+    products: loadProducts(),
+    productSets: loadProductSets(),
+    cart: loadCart(),
+    heldPosSales: loadHeldPosSales(),
+    priceType: loadPriceType(),
+    sales: repairSaleCustomerLinks(loadSales(), customers),
+    saleReturns: loadSaleReturns(),
+    stockMovements: loadStockMovements(),
+    customers,
+    expenses: loadExpenses(),
+    cashHandovers: loadCashHandovers(),
+    cashSessions: loadCashSessions(),
+    purchaseInvoices: loadPurchaseInvoices(),
+    settings: loadSettings(),
+    users: loadUsers(),
+    loginAuditLog: loadLoginAuditLog(),
+    activityAuditLog: loadActivityAuditLog(),
+    crmData: loadCrmData(),
+    suppliers: accounting.suppliers,
+    customerLedger: accounting.customerLedger,
+    supplierLedger: accounting.supplierLedger,
+    bankAccounts: accounting.bankAccounts,
+    bankTransactions: accounting.bankTransactions,
+    periodClosures: accounting.periodClosures,
+    cashCountVariances: accounting.cashCountVariances,
+    checkNotes: accounting.checkNotes,
+    stockAdjustments: accounting.stockAdjustments,
+    journalVouchers: accounting.journalVouchers,
+    equityPartners: accounting.equityPartners,
+    capitalContributions: accounting.capitalContributions,
+  };
 }
 
 export function usePosStoreState() {
@@ -3231,8 +3274,48 @@ export function usePosStoreState() {
   useEffect(() => {
     const onTenantChanged = () => {
       syncPosLocalStorageKeys();
-      setProducts(loadProducts());
-      setProductSets(loadProductSets());
+      stopPosApiTokenRefreshScheduler();
+      clearAuthSessionsForAllKnownTenants();
+      clearPosApiTokensForAllKnownTenants();
+      setAuthSession(null);
+      const slices = hydrateStoreSlicesFromLocalDisk();
+      setProducts(slices.products);
+      setProductSets(slices.productSets);
+      setCart(slices.cart);
+      setHeldPosSales(slices.heldPosSales);
+      setPriceType(slices.priceType);
+      setSales(slices.sales);
+      setSaleReturns(slices.saleReturns);
+      setStockMovements(slices.stockMovements);
+      setCustomers(slices.customers);
+      setExpenses(slices.expenses);
+      setCashHandovers(slices.cashHandovers);
+      setCashSessions(slices.cashSessions);
+      setPurchaseInvoices(slices.purchaseInvoices);
+      setSettings(slices.settings);
+      setUsers(slices.users);
+      setLoginAuditLog(slices.loginAuditLog);
+      setActivityAuditLog(slices.activityAuditLog);
+      setCrmData(slices.crmData);
+      setSuppliers(slices.suppliers);
+      setCustomerLedger(slices.customerLedger);
+      setSupplierLedger(slices.supplierLedger);
+      setBankAccounts(slices.bankAccounts);
+      setBankTransactions(slices.bankTransactions);
+      setPeriodClosures(slices.periodClosures);
+      setCashCountVariances(slices.cashCountVariances);
+      setCheckNotes(slices.checkNotes);
+      setStockAdjustments(slices.stockAdjustments);
+      setJournalVouchers(slices.journalVouchers);
+      setEquityPartners(slices.equityPartners);
+      setCapitalContributions(slices.capitalContributions);
+      setSaleGreenleafNumber('');
+      setSaleCustomerId(undefined);
+      setSaleCustomerName('');
+      setSaleCouponCode('');
+      setSaleLoyaltyPointsToRedeem(0);
+      setCheckoutError(null);
+      setCostProfitRevealed(false);
       void refreshTenantData();
     };
     window.addEventListener(TENANT_ID_CHANGED_EVENT, onTenantChanged);

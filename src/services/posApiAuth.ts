@@ -1,6 +1,9 @@
+import { tenantLocalStorageSuffix } from '../storage/posLocalStorageKeys';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 
-const TOKEN_KEY = 'market-pos-api-token';
+function tokenStorageKey(): string {
+  return `market-pos-api-token${tenantLocalStorageSuffix()}`;
+}
 const TOKEN_VERSION = 'v1';
 /** Sunucu TTL 24h — bitime 4h kala yenile */
 const REFRESH_WITHIN_MS = 4 * 60 * 60 * 1000;
@@ -17,7 +20,7 @@ function tenantQuery(): string {
 
 export function loadPosApiToken(): string | null {
   try {
-    const raw = sessionStorage.getItem(TOKEN_KEY);
+    const raw = sessionStorage.getItem(tokenStorageKey());
     return raw?.trim() || null;
   } catch {
     return null;
@@ -25,11 +28,24 @@ export function loadPosApiToken(): string | null {
 }
 
 export function savePosApiToken(token: string): void {
-  sessionStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(tokenStorageKey(), token);
 }
 
 export function clearPosApiToken(): void {
-  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(tokenStorageKey());
+}
+
+export function clearPosApiTokensForAllKnownTenants(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const k = sessionStorage.key(i);
+      if (k?.startsWith('market-pos-api-token')) keys.push(k);
+    }
+    for (const k of keys) sessionStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
 }
 
 export type PosApiTokenClaims = {

@@ -9,44 +9,40 @@
 - Otomatik tenant yedek: `data/backups/auto-tenant/<id>/`
 - Testler: `multi-tenant-data-safety-smoke.mjs`, `verify-tenant-isolation.mjs`
 
-## Bu turda düzeltilen hatalar
+## Düzeltilen maddeler (tam liste)
 
 | # | Sorun | Düzeltme |
 |---|--------|----------|
-| 1 | Muhasebe localStorage **tüm mağazalar ortak** → Lima snapshot’a Greenleaf muhasebe karışabilirdi | `accountingPersistence.ts` tenant suffix; izole tenant’ta merge yalnızca sunucu |
-| 2 | CRM / bekleyen satış / CRM ekleri ortak anahtar | `crmPersistence`, `heldPosSales`, `crmAttachments` → `tenantLocalStorageSuffix()` |
-| 3 | Lima sayfa açılışında **her zaman** sunucu → yerel eziliyordu | `useStore` boot: `deviceHasLocalStoreData()` (main ile aynı mantık) |
-| 4 | Otomatik sunucu kaydı token≠tenant iken çalışabilirdi | `scheduleAdminServerSync` + `persistStoreNow` token tenant kontrolü |
-| 5 | `GET /api/bill-email/inbox` kimlik doğrulamasız | `assertPosApiAuth` eklendi |
+| 1 | Muhasebe localStorage ortak | `accountingPersistence` tenant suffix |
+| 2 | CRM / bekleyen satış / ekler ortak | tenant suffix |
+| 3 | Lima boot sunucu ezmesi | `deviceHasLocalStoreData()` |
+| 4 | Otomatik senkron token≠tenant | token tenant kontrolü |
+| 5 | bill-email inbox auth’suz | `assertPosApiAuth` |
+| 6 | `/app` + PIN mağaza kodu yok | `TenantStoreCodeField`, `/giris?tenant=`, PosApp yönlendirme |
+| 7 | Tenant değişince kısmi state | `TENANT_ID_CHANGED` → tam local hydrate + oturum temizliği |
+| 8 | `POST /api/auth/register` açık | Prod kapalı + rate limit (`EKOLOJIK_PUBLIC_REGISTER=1` ile açılır) |
+| 9 | Posta outbox / contact listesi zayıf | outbox + `GET /api/contact/messages` admin auth; bill-email test/poll auth |
+| 10 | authSession / quick user / API token ortak | tenant suffix + tenantId oturumda |
+| 11 | `limaadmin` main store | main GET/PUT guard + girişte `lima*` → main engeli |
+| 12 | `lima*` kullanıcı heuristic | Kaldırıldı; explicit mağaza kodu |
+| 13 | bill-email istemci `?tenant=` | `posApiFetch` + tenant query |
+| 14 | Logout / kiosk tenant | Tenant korunur; çapraz mağaza riski scoped session ile giderildi |
+| 15 | Yanlış `?tenant=typo` | `tenantAllowlist` + prod strict; boş tenant 404 |
 
-## Açık kalan riskler (öncelik sırasıyla)
+## Yapılandırma
 
-### Yüksek
+- `config/known-tenants.json` — allowlist ve mağaza etiketleri
+- `EKOLOJIK_TENANT_ALLOWLIST` — ops override (virgülle ayrılmış)
+- `EKOLOJIK_TENANT_STRICT=0` — prod allowlist gevşetme (acil)
+- `EKOLOJIK_PUBLIC_REGISTER=1` — prod kayıt açma
 
-1. **`/app` girişi mağaza kodu sormuyor** — Lima için önce `/giris?tenant=lima-market` veya mağaza kodu gerekir (`LoginScreen` vs `LandingLogin`).
-2. **PIN girişi** landing’de tenant seçimi zayıf (`PinLoginPad`).
-3. **Tenant değişince** sadece `products` yenileniyor; satış/sepet bellekte kalabilir (`TENANT_ID_CHANGED_EVENT` — tam state reset önerilir).
-4. **`POST /api/auth/register`** herkese açık — prod’da rate limit / kapalı kayıt düşünün.
-5. **Email outbox / contact** bazı route’lar global veya zayıf auth — Posta modülü; POS kasa için ayrı.
+## Manuel test checklist
 
-### Orta
-
-6. `authSession` / `lastQuickUser` tenant’a göre ayrılmıyor — tenant değişiminde temizlenmeli.
-7. `main` store’da `limaadmin` kullanıcısı **yasak değil** (canlıda görüldü) — operasyonel temizlik + isteğe bağlı sunucu kuralı.
-8. `lima*` kullanıcı adı → `lima-market` heuristic (`LandingLogin`) — kırılgan; explicit mağaza kodu daha iyi.
-9. Bill-email **istemci** bazı çağrılarda `?tenant=` eksik olabilir — auth sonrası gözden geçirin.
-
-### Düşük
-
-10. Logout tenant id’yi silmiyor (Lima kiosk için kasıtlı olabilir).
-11. Yanlış `?tenant=typo` yeni boş tenant dizini açabilir — prod allowlist.
-
-## Manuel test checklist (mağaza başına)
-
-- [ ] Doğru kullanıcı + tenant ile giriş
-- [ ] Stok/fotoğraf değiştir → diğer cihazda görünür
-- [ ] Diğer mağaza kullanıcısı ile aynı tarayıcıda **veri karışmıyor**
-- [ ] Ayarlar → sürüm ve senkron satırı
+- [ ] Greenleaf: mağaza kodu boş, `kutluhan08`
+- [ ] Lima: `lima-market` + `limaadmin` / kasiyer PIN
+- [ ] `/app?tenant=lima-market` → girişte kod korunur
+- [ ] Aynı tarayıcıda mağaza değiştir → sepet/oturum karışmaz
+- [ ] Ayarlar → sürüm / senkron
 
 ## İlgili
 

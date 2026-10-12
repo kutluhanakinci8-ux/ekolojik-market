@@ -1,4 +1,12 @@
 import type { BillEmailIngestionSettings } from '../types/billEmailIngestion';
+import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posApiFetch } from './posApiAuth';
+
+function tenantQuery(): string {
+  const tenant = loadTenantId();
+  if (!tenant || tenant === DEFAULT_TENANT_ID) return '';
+  return `?tenant=${encodeURIComponent(tenant)}`;
+}
 
 export interface BillEmailTestResult {
   ok: boolean;
@@ -36,7 +44,7 @@ export interface BillEmailInboxMessage {
 export async function testBillEmailConnection(
   settings: Pick<BillEmailIngestionSettings, 'imapHost' | 'imapPort' | 'imapUser' | 'imapPassword' | 'inboxAddress'>,
 ): Promise<BillEmailTestResult> {
-  const response = await fetch('/api/bill-email/test', {
+  const response = await posApiFetch(`/api/bill-email/test${tenantQuery()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings),
@@ -52,7 +60,7 @@ export async function testBillEmailConnection(
 export async function pollBillEmails(
   settings: BillEmailIngestionSettings,
 ): Promise<BillEmailPollResult> {
-  const response = await fetch('/api/bill-email/poll', {
+  const response = await posApiFetch(`/api/bill-email/poll${tenantQuery()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings),
@@ -72,7 +80,9 @@ export async function fetchBillEmailInbox(limit = 20): Promise<{
   ok: boolean;
   messages?: BillEmailInboxMessage[];
 }> {
-  const response = await fetch(`/api/bill-email/inbox?limit=${limit}`);
+  const q = tenantQuery();
+  const sep = q ? '&' : '?';
+  const response = await posApiFetch(`/api/bill-email/inbox${q}${sep}limit=${limit}`);
   const data = await response.json().catch(() => ({}));
   return {
     ok: Boolean(data.ok),

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
+import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId, normalizeStoreCodeInput } from './storage/tenantSession';
 import { setCurrencyDisplaySettings } from './utils/format';
 import { AppShell } from './components/AppShell';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
@@ -76,10 +77,17 @@ function renderPage(
 export function PosApp() {
   useAppReleaseRefresh();
   const store = useStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('tenant')?.trim();
+    if (fromUrl) {
+      saveTenantId(normalizeStoreCodeInput(fromUrl));
+    }
+  }, [searchParams]);
   const allowedTabs = store.authSession
     ? filterTabsForProductProfile(store.authSession.allowedTabs, store.settings)
     : [];
-  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState<AppPage>('sales');
   const [postaUnread, setPostaUnread] = useState(0);
   const [postaOnboardingOpen, setPostaOnboardingOpen] = useState(false);
@@ -195,7 +203,10 @@ export function PosApp() {
   }, [store.authSession, allowedTabs]);
 
   if (!store.authSession) {
-    return <Navigate to="/giris" replace />;
+    const tenant = loadTenantId();
+    const tenantQuery =
+      tenant && tenant !== DEFAULT_TENANT_ID ? `?tenant=${encodeURIComponent(tenant)}` : '';
+    return <Navigate to={`/giris${tenantQuery}`} replace />;
   }
 
   if (!store.catalogDisplayReady) {

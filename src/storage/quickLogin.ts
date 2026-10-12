@@ -1,17 +1,21 @@
-const LAST_QUICK_USER_KEY = 'market-pos-last-quick-user';
+import { tenantLocalStorageSuffix } from './posLocalStorageKeys';
+
+function lastQuickUserKey(): string {
+  return `market-pos-last-quick-user${tenantLocalStorageSuffix()}`;
+}
 
 export function saveLastQuickUser(username: string): void {
-  sessionStorage.setItem(LAST_QUICK_USER_KEY, username.trim().toLowerCase());
+  sessionStorage.setItem(lastQuickUserKey(), username.trim().toLowerCase());
 }
 
 export function loadLastQuickUser(): string | null {
   try {
-    return sessionStorage.getItem(LAST_QUICK_USER_KEY);
+    return sessionStorage.getItem(lastQuickUserKey());
   } catch {
     return null;
   }
 }
 
 export function clearLastQuickUser(): void {
-  sessionStorage.removeItem(LAST_QUICK_USER_KEY);
+  sessionStorage.removeItem(lastQuickUserKey());
 }

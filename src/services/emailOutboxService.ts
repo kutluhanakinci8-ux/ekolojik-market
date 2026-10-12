@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { posApiFetch } from './posApiAuth';
 
 function tenantQuery(): string {
   const tenant = loadTenantId();
@@ -50,7 +51,7 @@ export async function sendEmailTest(payload: {
 }
 
 export async function processEmailOutbox(): Promise<{ ok: boolean; processed?: number; sent?: number; failed?: number }> {
-  const res = await fetch('/api/email/outbox/process', { method: 'POST' });
+  const res = await posApiFetch(`/api/email/outbox/process${tenantQuery()}`, { method: 'POST' });
   return res.json();
 }
 
@@ -59,7 +60,8 @@ export async function fetchRecentOutbox(limit = 20): Promise<{
   items?: Array<Record<string, unknown>>;
   counts?: { pending: number; sent: number; failed: number };
 }> {
-  const res = await fetch(`/api/email/outbox/recent?limit=${limit}`);
+  const q = tenantQuery();
+  const res = await posApiFetch(`/api/email/outbox/recent${q ? `${q}&` : '?'}limit=${limit}`);
   return res.json();
 }
 
@@ -69,7 +71,7 @@ export async function fetchOutboxMessage(id: string): Promise<{
   message?: Record<string, unknown>;
   error?: string;
 }> {
-  const res = await fetch(`/api/email/outbox/${encodeURIComponent(id)}`);
+  const res = await posApiFetch(`/api/email/outbox/${encodeURIComponent(id)}${tenantQuery()}`);
   return res.json();
 }
 
@@ -78,7 +80,7 @@ export async function retryOutboxMessage(id: string): Promise<{
   error?: string;
   processed?: { sent?: number; failed?: number };
 }> {
-  const res = await fetch('/api/email/outbox/retry', {
+  const res = await posApiFetch(`/api/email/outbox/retry${tenantQuery()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id }),
