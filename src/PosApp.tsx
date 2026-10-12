@@ -240,6 +240,9 @@ export function PosApp() {
       store={store}
       page={shellPage}
       allowedTabs={allowedTabs}
+      onForceServerSync={() => {
+        void store.refreshTenantData();
+      }}
       onPageChange={setPage}
       onLogout={store.logout}
       onBrandSecretClick={showCostProfitToggle ? store.toggleCostProfitReveal : undefined}

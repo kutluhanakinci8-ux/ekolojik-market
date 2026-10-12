@@ -31,6 +31,7 @@ import { mergeSalesById } from '../utils/mergeStoreSnapshots';
 import {
   applySalesHistoryClearToSnapshot,
   localSnapshotHasStaleSales,
+  shouldForceServerSalesSnapshot,
 } from '../utils/salesHistoryClear';
 import {
   clearPosApiToken,
@@ -1124,6 +1125,15 @@ export function usePosStoreState() {
       const remote = await fetchStoreSnapshot();
 
       if (cancelled) return;
+
+      if (remote && shouldForceServerSalesSnapshot(localSnapshot, remote)) {
+        applySnapshot(
+          applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
+        );
+        setSyncStatus('synced');
+        setSyncReady(true);
+        return;
+      }
       if (loadTenantId() !== tenantAtStart) {
         setSyncReady(true);
         return;
@@ -1357,6 +1367,14 @@ export function usePosStoreState() {
 
     const pullRemoteSales = async () => {
       const local = buildCurrentSnapshot();
+      const remote = await fetchStoreSnapshot();
+      if (remote && shouldForceServerSalesSnapshot(local, remote)) {
+        applySnapshot(
+          applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
+        );
+        setSyncStatus('synced');
+        return;
+      }
       const merged = await fetchMergedWithLocal(local);
       if (!merged) return;
       if (saleIdsSignature(merged.sales) === saleIdsSignature(local.sales)) return;
@@ -5120,6 +5138,11 @@ export function usePosStoreState() {
   const todayRefundTotal = todayReturns.reduce((sum, entry) => sum + entry.refundTotal, 0);
   const todayTotal = todayGrossTotal - todayRefundTotal;
 
+  const hasStaleLocalSalesData = useMemo(
+    () => localSnapshotHasStaleSales(sales, settings.salesHistoryClearedAt),
+    [sales, settings.salesHistoryClearedAt],
+  );
+
   const totalStockUnits = products.reduce((sum, p) => sum + p.stock, 0);
   const lowStockThreshold = settings.lowStockThreshold;
   const lowStockCount = products.filter((p) => p.stock > 0 && p.stock <= lowStockThreshold).length;
@@ -5298,6 +5321,7 @@ export function usePosStoreState() {
     persistStoreNow,
     syncStatus,
     syncReady,
+    hasStaleLocalSalesData,
     catalogDisplayReady,
     cartTotal,
     cartSampleCount,

@@ -69,3 +69,15 @@ export function localSnapshotHasStaleSales(
   if (!t0 || !sales.length) return false;
   return sales.some((s) => clearTs(s.createdAt) <= t0);
 }
+
+/** Sunucu satışları sildi / sıfırladı — yerel kopya hâlâ eski satış taşıyor */
+export function shouldForceServerSalesSnapshot(
+  local: PersistedStoreSnapshot,
+  remote: PersistedStoreSnapshot,
+): boolean {
+  const clearedAt = resolveSalesHistoryClearedAt(local, remote);
+  if (!clearedAt) return false;
+  if (localSnapshotHasStaleSales(local.sales ?? [], clearedAt)) return true;
+  if ((remote.sales?.length ?? 0) === 0 && (local.sales?.length ?? 0) > 0) return true;
+  return false;
+}

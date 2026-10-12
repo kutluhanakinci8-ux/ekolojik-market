@@ -16,6 +16,7 @@ export type AppPage =
 
 interface AppShellProps {
   store: Store;
+  onForceServerSync?: () => void;
   page: AppPage;
   allowedTabs: AppPage[];
   onPageChange: (page: AppPage) => void;
@@ -27,6 +28,7 @@ interface AppShellProps {
 
 export function AppShell({
   store,
+  onForceServerSync,
   page,
   allowedTabs,
   onPageChange,
@@ -37,8 +39,43 @@ export function AppShell({
 }: AppShellProps) {
   const visibleNavItems = buildVisibleNavItems(allowedTabs);
 
+  const showSalesSyncAlert =
+    store.hasStaleLocalSalesData || store.syncStatus === 'local-only';
+
   return (
     <div className="app-shell">
+      {showSalesSyncAlert ? (
+        <div
+          className="app-sync-alert"
+          role="status"
+          style={{
+            background: '#7f1d1d',
+            color: '#fff',
+            padding: '10px 16px',
+            fontSize: 14,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 12,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>
+            Bu ekranda <strong>eski satış verisi</strong> var — Günlük Kasa ({formatCurrency(store.todayTotal)})
+            ve raporlar yanlış görünebilir. Sunucudaki sıfır kayıtla eşitleyin.
+          </span>
+          {onForceServerSync ? (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ color: '#fff', borderColor: '#fff' }}
+              onClick={() => onForceServerSync()}
+            >
+              Sunucudan temizle
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <header className="app-topbar app-topbar--premium">
         <div className="app-topbar-left">
           <div
