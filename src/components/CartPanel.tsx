@@ -62,6 +62,8 @@ interface CartPanelProps {
   onBarcodeScanFeedback?: (result: BarcodeScanApplyResult) => void;
   /** POS Lite: kupon/puan kapalı, ödeme alanı kompakt */
   compactCheckout?: boolean;
+  hasHeldSales?: boolean;
+  onRecallHeldSale?: () => void;
 }
 
 type CustomerStatus = 'registered' | 'new-registration' | 'gl-linked' | 'partner-only' | 'name-only' | 'none';
@@ -109,11 +111,14 @@ export function CartPanel({
   onBarcodeScan,
   onBarcodeScanFeedback,
   compactCheckout = false,
+  hasHeldSales = false,
+  onRecallHeldSale,
 }: CartPanelProps) {
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerQuery, setCustomerQuery] = useState('');
   /** Sepet doluysa ürün listesine yer açmak için müşteri alanını daralt */
   const [customerExtraOpen, setCustomerExtraOpen] = useState(true);
+  const [crmOpen, setCrmOpen] = useState(false);
   const getProduct = (id: number) => products.find((p) => p.id === id);
   const getSet = (id: string) => productSets.find((set) => set.id === id);
 
@@ -495,26 +500,44 @@ export function CartPanel({
       {cart.length > 0 && (
         <div className={`cart-panel-footer ${sampleCount > 0 ? 'cart-panel-footer--has-sample' : ''}`}>
           {showCrmCheckout && (
-            <div className="cart-crm-row">
-              <input
-                className="cart-crm-input"
-                placeholder="Kupon kodu"
-                value={crmCouponCode}
-                onChange={(e) => onCrmCouponChange!(e.target.value.toUpperCase())}
-              />
-              {onCrmPointsChange && (
-                <input
-                  className="cart-crm-input cart-crm-input--points"
-                  type="number"
-                  min={0}
-                  placeholder="Puan kullan"
-                  value={crmPointsToRedeem || ''}
-                  onChange={(e) => onCrmPointsChange(parseInt(e.target.value, 10) || 0)}
-                />
+            <div className="cart-crm-collapsible">
+              <button
+                type="button"
+                className="cart-crm-toggle"
+                aria-expanded={crmOpen}
+                onClick={() => setCrmOpen((open) => !open)}
+              >
+                <span>Kupon / puan</span>
+                <span className="cart-crm-toggle-meta">
+                  {(crmCouponCode?.trim() || (crmPointsToRedeem ?? 0) > 0) ? ' · girildi' : ''}
+                  {crmOpen ? ' ▴' : ' ▾'}
+                </span>
+              </button>
+              {crmOpen && (
+                <>
+                  <div className="cart-crm-row">
+                    <input
+                      className="cart-crm-input"
+                      placeholder="Kupon kodu"
+                      value={crmCouponCode}
+                      onChange={(e) => onCrmCouponChange!(e.target.value.toUpperCase())}
+                    />
+                    {onCrmPointsChange && (
+                      <input
+                        className="cart-crm-input cart-crm-input--points"
+                        type="number"
+                        min={0}
+                        placeholder="Puan kullan"
+                        value={crmPointsToRedeem || ''}
+                        onChange={(e) => onCrmPointsChange(parseInt(e.target.value, 10) || 0)}
+                      />
+                    )}
+                  </div>
+                  {crmHint && <p className="cart-crm-hint">{crmHint}</p>}
+                </>
               )}
             </div>
           )}
-          {crmHint && <p className="cart-crm-hint">{crmHint}</p>}
           <div className="cart-total">
             <span>Toplam</span>
             <strong>{samplesOnly ? 'Ücretsiz' : formatCurrency(total)}</strong>
@@ -565,12 +588,29 @@ export function CartPanel({
               </>
             )}
           </div>
-          {onParkSale && cart.length > 0 && (
-            <button type="button" className="btn btn-outline btn-block cart-park-btn" onClick={onParkSale} disabled={checkoutBusy}>
-              Beklet (F7)
-            </button>
-          )}
-          <p className="cart-shortcut-hint">F8 — son bekleyen satışı geri çağır</p>
+          <div className="cart-footer-actions">
+            {onParkSale && (
+              <button
+                type="button"
+                className="btn btn-outline cart-park-btn"
+                onClick={onParkSale}
+                disabled={checkoutBusy}
+              >
+                Beklet F7
+              </button>
+            )}
+            {onRecallHeldSale && (
+              <button
+                type="button"
+                className="btn btn-outline cart-recall-btn"
+                onClick={onRecallHeldSale}
+                disabled={checkoutBusy || !hasHeldSales}
+                title={hasHeldSales ? 'Son bekleyen satışı sepete yükle' : 'Bekleyen satış yok'}
+              >
+                ↩ Bekleyen F8
+              </button>
+            )}
+          </div>
         </div>
       )}
     </aside>

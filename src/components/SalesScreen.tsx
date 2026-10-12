@@ -547,6 +547,11 @@ export function SalesScreen({ store }: SalesScreenProps) {
             onClear={store.clearCart}
             onCheckout={handleCheckout}
             onParkSale={() => store.parkCurrentSale()}
+            hasHeldSales={store.heldPosSales.length > 0}
+            onRecallHeldSale={() => {
+              const latest = store.heldPosSales[0];
+              if (latest) store.recallHeldSale(latest.id);
+            }}
             checkoutBusy={checkoutBusy}
             cashDayClosed={store.isCashDayClosed && (posCheckout.blockSalesWhenDayClosed ?? true)}
             crmCouponCode={posLiteCheckout ? '' : store.saleCouponCode}

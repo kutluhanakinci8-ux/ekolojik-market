@@ -1999,6 +1999,51 @@ input {
   font-size: 20px;
 }
 
+.cart-panel--has-items .cart-sample-summary {
+  font-size: 11px;
+  margin: 0 0 6px;
+  line-height: 1.3;
+}
+
+.cart-panel--has-items .cart-panel-footer {
+  display: flex;
+  flex-direction: column;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cart-footer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cart-panel--has-items .cart-park-btn,
+.cart-panel--has-items .cart-recall-btn {
+  margin-top: 0;
+  padding: 8px 6px;
+  font-size: 11px;
+  min-height: 0;
+}
+
+.cart-recall-btn:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.45);
+  color: #1d4ed8;
+}
+
+.cart-panel--has-items .payment-buttons--pos {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.cart-panel--has-items .btn-payment {
+  padding: 8px 4px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
 .cart-panel-top--compact + .cart-panel-items {
   padding-top: 8px;
 }
@@ -16987,7 +17032,36 @@ input {
 .posta-hub-calendar-row { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .posta-hub-calendar-row strong { display: block; }
 .posta-hub-draft-detail { padding: 16px; }
-.cart-crm-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.cart-crm-collapsible {
+  margin-bottom: 6px;
+}
+
+.cart-crm-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cart-crm-toggle:hover {
+  border-color: rgba(45, 90, 39, 0.35);
+  background: rgba(240, 249, 238, 0.9);
+}
+
+.cart-crm-toggle-meta {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.cart-crm-row { display: flex; gap: 8px; margin: 8px 0 6px; }
 .cart-crm-input {
   flex: 1;
   padding: 8px 10px;
