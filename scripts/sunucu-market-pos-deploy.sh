@@ -120,6 +120,9 @@ bash "${REPO_ROOT}/scripts/backup-market-pos-data.sh" "${INSTALL_DIR}/data"
 
 bash "${INSTALL_DIR}/kur.sh"
 
+echo "==> Mağaza sahibi tam yetki (kutluhan*)..."
+MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/ensure-owner-admin-on-server.mjs" || true
+
 if [[ "${EKOLOJIK_DEPLOY_DATA_MIGRATIONS:-0}" == "1" ]]; then
   echo "==> Veri migrasyonları (EKOLOJIK_DEPLOY_DATA_MIGRATIONS=1)..."
   node "${APP_SRC}/scripts/apply-irsaliye-stock.mjs" "${INSTALL_DIR}/data" || echo "    (irsaliye atlandı)"

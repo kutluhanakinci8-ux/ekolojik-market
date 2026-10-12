@@ -12,6 +12,7 @@ import {
   isDemoSupplierPurchaseInvoice,
 } from '../data/demoSupplierPurchases';
 import { DEFAULT_USERS } from '../data/defaultUsers';
+import { elevateOwnerAdmins } from '../utils/elevateOwnerAdmins';
 import { splitGrossAmount } from '../utils/vatAnalytics';
 import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS } from '../data/navigation';
 import { PRICE_BATCH_1_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
@@ -607,15 +608,19 @@ function resolveUsersFromSnapshot(
   mergedSettings: AppSettings,
 ): PosUser[] {
   if (!snapshot.users?.length) {
-    return isIsolatedStoreContext(mergedSettings) ? [] : DEFAULT_USERS.map((user) => ({ ...user }));
+    const base = isIsolatedStoreContext(mergedSettings) ? [] : DEFAULT_USERS.map((user) => ({ ...user }));
+    return mapUsersWithTabPolicy(elevateOwnerAdmins(base), mergedSettings);
   }
   const remoteUsers = snapshot.users.map((user) =>
     normalizeUser(user as unknown as Record<string, unknown>),
   );
   if (isIsolatedStoreContext(mergedSettings)) {
-    return mapUsersWithTabPolicy(remoteUsers, mergedSettings);
+    return mapUsersWithTabPolicy(elevateOwnerAdmins(remoteUsers), mergedSettings);
   }
-  return mapUsersWithTabPolicy(mergeUserLists(remoteUsers, loadUsers()), mergedSettings);
+  return mapUsersWithTabPolicy(
+    elevateOwnerAdmins(mergeUserLists(remoteUsers, loadUsers())),
+    mergedSettings,
+  );
 }
 
 function loadUsers(): PosUser[] {
@@ -624,13 +629,13 @@ function loadUsers(): PosUser[] {
     try {
       const parsed = JSON.parse(stored) as Record<string, unknown>[];
       if (parsed.length > 0) {
-        return parsed.map(normalizeUser);
+        return elevateOwnerAdmins(parsed.map(normalizeUser));
       }
     } catch {
       /* fall through */
     }
   }
-  return DEFAULT_USERS.map((user) => ({ ...user }));
+  return elevateOwnerAdmins(DEFAULT_USERS.map((user) => ({ ...user })));
 }
 
 function mergeUserLists(remoteUsers: PosUser[], localUsers: PosUser[]): PosUser[] {

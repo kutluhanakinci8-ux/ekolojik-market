@@ -351,6 +351,13 @@ async function readStoreData(tenantId = 'main') {
     if (stockChanged) persist = true;
   }
 
+  const { elevateOwnerAdminsInStore } = await import('./server/ownerAdminElevate.mjs');
+  const elevated = elevateOwnerAdminsInStore(data);
+  if (elevated.changed) {
+    data = elevated.store;
+    persist = true;
+  }
+
   if (persist) {
     await writeStoreData(data, tenantId);
   }
@@ -3069,6 +3076,8 @@ const server = createServer(async (req, res) => {
         const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);
         toSave = changed ? stockFixed : withSecrets;
       }
+      const { elevateOwnerAdminsInStore } = await import('./server/ownerAdminElevate.mjs');
+      toSave = elevateOwnerAdminsInStore(toSave).store;
       await writeStoreData(toSave, tenantId);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, updatedAt: toSave.updatedAt }));
