@@ -1,0 +1,50 @@
+d93b177 feat(lima): ham ESC/POS Mac köprüsü — c0 üreticisi CUPS rastertopos atlanır (v15)
+7b6b21a fix: duplicate sacrifice constants removed
+c10ca5e fix(receipt): c0 atıl satırlar — marka 4. satırdan (v14)
+d01fa7f fix(mac): rastertopos koyuluk yamasi varsayilan kapali — c0/LIMA bozulmasi
+b44e7f9 fix(receipt): c0/bozuk başlık — üst boşluk, izole popup, rastertopos notu (v13)
+c9abdf4 fix(receipt): Lima başlık bozulması — boş title, letter-spacing kaldır (v12)
+5294652 feat(receipt): Lima premium termal fiş — hizalı tipografi (v11)
+f78fa9b fix(build): APP_FEATURE_TAG string tipi — sunucu tsc build kırılması
+5f770bc fix(receipt): Lima düz metin fiş (plain-v10) — Firefox kısa kesik raster
+a23f357 fix(receipt): Firefox kısa kesik — iframe opacity, rulo 3276mm, print filter kaldır
+81fd8ad fix(receipt): termal erken kesim — dinamik sayfa, kesim payı, yazdır öncesi ölçüm
+0251916 fix(receipt): ayrı fiş penceresi kaldırıldı — gizli 80mm iframe
+b615ce1 fix(pos): yazdırma beklerken ödeme butonları kilitlenmesin
+85dcd49 fix(receipt): Lima yazdırma — dar popup, 0×0 iframe kaldırıldı (erken kesim)
+a5df65b fix(receipt): dinamik @page yüksekliği — termal erken kesim
+6e8d4ed fix(receipt): tüm satırlar total-row; deploy notu 80mm-v6
+155e5e3 fix(receipt): 80mm Arial kalın fiş — silik Courier/sığdır kaldırıldı
+502146a fix(receipt): tek 16px kalın fiş + Chrome ölçek %100 uyarısı
+4fd8553 fix(receipt): tüm fiş satırları TOPLAM kalınlığında (receipt-thermal)
+405fcc7 chore(mac): install script applies rastertopos darkness patch
+a98c48d fix(receipt): termal koyuluk — CSS + Mac rastertopos ESC 7
+345a4c9 fix(receipt): termal fişte daha koyu yazdırma (Lima/main)
+ce7c354 scripts: macOS POS-80C CUPS kurulum (rastertopos derleme)
+d43b360 docs(diag): sunucuda lpstat olmaz uyarısı
+e27319d chore: diag-fis-yazici.sh sunucu fiş log ve ayar teşhis
+c485fcf fix(fis): greenleaf fiş 58mm + 2.125in @page Mac POS-80C
+94a79db fix(fis): Mac POS-80C kağıt 2.125in CSS uyumu + kağıt boyutu yönergesi
+bf6a6b1 docs(fis): Chrome hedef PDF — POS-80C seçim yönergesi
+6c2d261 fix(fis): Chrome üstbilgi çakışması — boş title, 0 kenar, yazdır hatırlatması
+6d2f0e6 fix(ui): Lima fiş paneli metni + sürüm damgası (eski önbellek tespiti)
+5a41442 feat(fis): konsol + sunucu receipt-print.log teşhis, classic print yedek
+7562214 fix(deploy): deploy echo satirlari bash uyumlu
+e2958f5 fix(deploy): restore script satırında tırnak hatası
+3343d24 fix(main): Greenleaf kasa fiş ayarını geri yükle — Lima deploy main'i bozmasın
+e909bd0 fix(lima): fiş — main ile aynı printThermalReceipt, ayar temizliği
+aec5d99 fix(receipt): Lima fişi main/yonetici yolu — iframe + onload print
+e6c63f2 fix(receipt): termal çöp çıktı — Greenleaf düz metin, yazdırma penceresi
+e024dea fix(receipt): termal fiş — mali simulated belirsizliği ve yazdırma sırası
+0e25d29 fix(receipt): Greenleaf kasa yolu geri — sunucu Zywell profili kapatıldı
+f581dd8 fix(receipt): Ayarlardan POS-80C 58mm, kenar 0, Chrome üst bilgi azaltma
+47f044a fix: sync script printMode plain varsayılanı
+d7f045a fix(receipt): Zywell düz metin fiş — HTML çöp karakter düzeltmesi
+ec7c870 feat: Zywell fiş yazıcı ayarları tenant bazlı — Lima ile main senkron
+c31bf66 fix(pos-lite): sepet doluysa Temizle — başlık ve ödeme üstü
+1f0d661 feat(pos-lite): sepette kampanya kaldır, kompakt ödeme ve daha fazla satır
+36cfe77 fix: POS Lite görsel haritası src manifest olmadan sunucuda
+0f715d9 types: posLiteCatalogImageByProductId settings alanı
+5ae285b fix(pos-lite): ürün görselleri kalıcı — sunucu zenginleştirme ve istemci yedek
+8b44c57 feat(pos-lite): Greenleaf ürün görselleri catalogImageId ile
+30b9eae fix(pos-lite): Greenleaf ürün stoku — irsaliye sıfırlama ve stok ekranı

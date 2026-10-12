@@ -1,0 +1,5 @@
+36cfe77 fix: POS Lite görsel haritası src manifest olmadan sunucuda
+0f715d9 types: posLiteCatalogImageByProductId settings alanı
+5ae285b fix(pos-lite): ürün görselleri kalıcı — sunucu zenginleştirme ve istemci yedek
+8b44c57 feat(pos-lite): Greenleaf ürün görselleri catalogImageId ile
+30b9eae fix(pos-lite): Greenleaf ürün stoku — irsaliye sıfırlama ve stok ekranı

@@ -6,7 +6,9 @@ Ekolojik ve doğal ürün mağazaları için satış, stok, raporlama ve günlü
 
 | | |
 |---|---|
-| **GitHub** | `harikaotoservisinfo-spec/ekolojik-market-pos` |
+| **GitHub** | `kutluhanakinci8-ux/ekolojik-market` |
+| **Canlı POS** | https://www.ekolojikmarket.com.tr/app (Mac = Windows, tek sürüm) |
+| **Geliştirme** | Yalnızca `main` — bkz. `docs/MAIN-GELISTIRME.md` |
 | **VPS kaynak** | `/var/www/ekolojik-market-pos` |
 | **VPS çalışma** | `/var/www/market-pos` (PM2, port **5180**) |
 

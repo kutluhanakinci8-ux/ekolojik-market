@@ -1,0 +1,3300 @@
+diff --git a/scripts/clear-receipt-printer-settings.mjs b/scripts/clear-receipt-printer-settings.mjs
+new file mode 100644
+index 0000000..ece8356
+--- /dev/null
++++ b/scripts/clear-receipt-printer-settings.mjs
+@@ -0,0 +1,37 @@
++#!/usr/bin/env node
++/**
++ * Sunucudaki receiptPrinter kaydını kaldır — Greenleaf kasa (HTML/Chrome) yolu geri gelir.
++ *   node scripts/clear-receipt-printer-settings.mjs --data-dir /var/www/market-pos/data
++ *   node scripts/clear-receipt-printer-settings.mjs --data-dir ./data --tenant lima-market
++ */
++import { readFile, writeFile } from 'node:fs/promises';
++import { join } from 'node:path';
++
++function arg(name) {
++  const i = process.argv.indexOf(`--${name}`);
++  return i >= 0 ? process.argv[i + 1] : '';
++}
++
++const dataDir = arg('data-dir') || join(process.cwd(), 'data');
++const tenant = arg('tenant') || 'all';
++
++function storePath(id) {
++  return id === 'main' ? join(dataDir, 'store.json') : join(dataDir, 'tenants', id, 'store.json');
++}
++
++/** main silinmez — Greenleaf kasa ayarı restore script ile yönetilir */
++const tenants =
++  tenant === 'all' ? ['lima-market'] : [tenant];
++
++for (const id of tenants) {
++  const path = storePath(id);
++  const store = JSON.parse(await readFile(path, 'utf8'));
++  if (store.settings?.receiptPrinter) {
++    delete store.settings.receiptPrinter;
++    store.updatedAt = new Date().toISOString();
++    await writeFile(path, JSON.stringify(store, null, 2));
++    console.log(`OK   ${id}: receiptPrinter kaldırıldı (Greenleaf kasa yolu)`);
++  } else {
++    console.log(`—    ${id}: zaten yok`);
++  }
++}
+diff --git a/scripts/diag-fis-yazici.sh b/scripts/diag-fis-yazici.sh
+new file mode 100755
+index 0000000..37bbd75
+--- /dev/null
++++ b/scripts/diag-fis-yazici.sh
+@@ -0,0 +1,85 @@
++#!/usr/bin/env bash
++# Fiş yazdırma teşhis — VPS (sunucu) + istemci notları
++# Kullanım: bash scripts/diag-fis-yazici.sh
++#           DATA_DIR=/var/www/market-pos/data bash scripts/diag-fis-yazici.sh
++set -euo pipefail
++
++DATA_DIR="${DATA_DIR:-/var/www/market-pos/data}"
++REPO="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
++
++echo "=============================================="
++echo "  FIS YAZICI TESHIS — $(date -Iseconds)"
++echo "  DATA_DIR=$DATA_DIR"
++echo "=============================================="
++echo ""
++echo "NOT: Termal yazici (POS-80C) kasa Mac/PC USB baglidir."
++echo "     Sunucu fisi BASMAZ; tarayici loglari ve store ayari burada."
++echo ""
++echo "!!! SUNUCUDA (root@srv...) lpstat / cups YOKTUR — 'command not found' NORMAL."
++echo "    Yazici logu icin Mac'te YENI Terminal: prompt 'macbook@macbook-air ~' (ssh YOK)."
++echo ""
++
++section() { echo ""; echo "── $1 ──"; }
++
++section "1) Sunucu fis olay logu (tarayicidan POST)"
++for f in \
++  "$DATA_DIR/receipt-print.log" \
++  "$DATA_DIR/tenants/lima-market/receipt-print.log"; do
++  if [[ -f "$f" ]]; then
++    echo "# $f (son 25 satir)"
++    tail -n 25 "$f" || true
++  else
++    echo "# (yok) $f"
++  fi
++done
++
++section "2) store.json — receiptPrinter (main)"
++if [[ -f "$DATA_DIR/store.json" ]]; then
++  node -e "
++    const s=JSON.parse(require('fs').readFileSync('$DATA_DIR/store.json','utf8'));
++    console.log(JSON.stringify(s.settings?.receiptPrinter ?? '(kayit yok)', null, 2));
++  "
++else
++  echo "store.json bulunamadi"
++fi
++
++section "3) lima-market — receiptPrinter"
++L="$DATA_DIR/tenants/lima-market/store.json"
++if [[ -f "$L" ]]; then
++  node -e "
++    const s=JSON.parse(require('fs').readFileSync('$L','utf8'));
++    console.log('productProfile:', s.settings?.productProfile);
++    console.log('receiptPrinter:', JSON.stringify(s.settings?.receiptPrinter ?? null, null, 2));
++  "
++else
++  echo "lima store yok"
++fi
++
++section "4) PM2 market-pos (son 40 satir)"
++if command -v pm2 >/dev/null 2>&1; then
++  pm2 logs market-pos --nostream --lines 40 2>/dev/null || pm2 status
++else
++  echo "pm2 yok"
++fi
++
++section "5) API canli mi"
++PORT="${PORT:-5180}"
++curl -fsS -o /dev/null -w "HTTP %{http_code} http://127.0.0.1:${PORT}/\n" "http://127.0.0.1:${PORT}/" 2>/dev/null || echo "curl basarisiz"
++
++section "6) Kasa Mac — yerelde calistirin"
++cat <<'MAC'
++
++  lpstat -p -d
++  lpoptions -p Printer_POS_80C 2>/dev/null || lpoptions -p POS-80C 2>/dev/null || lpoptions -d
++  # Erken kesim: Cutting=1 sayfa sonu (yanlis uzunlukta keser). Belge sonu icin:
++  # sudo lpoptions -p Printer_POS_80C -o Cutting=2Cutattheendofdocument
++  # c0/Ç0 + LIMA bozuk: Mac'te temiz surucu (VPS'te pm2 yok):
++  #   bash scripts/mac-pos80c-rebuild-clean.sh
++  #   bash scripts/mac-pos80c-smoke-test.sh
++  sudo tail -f /var/log/cups/error_log
++  lpstat -o
++
++MAC
++
++echo ""
++echo "Teshis bitti."
+diff --git a/scripts/lima-mac-raw-print.mjs b/scripts/lima-mac-raw-print.mjs
+new file mode 100755
+index 0000000..b277c22
+--- /dev/null
++++ b/scripts/lima-mac-raw-print.mjs
+@@ -0,0 +1,91 @@
++#!/usr/bin/env node
++/**
++ * Lima Mac — POS-80C ham ESC/POS (CUPS rastertopos / c0 çöpü YOK)
++ * Kullanım: node scripts/lima-mac-raw-print.mjs
++ * Lima fişi önce http://127.0.0.1:18765/print dener.
++ */
++import { createServer } from 'node:http';
++import { spawn } from 'node:child_process';
++import { writeFileSync, unlinkSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++
++const PORT = Number(process.env.LIMA_RAW_PRINT_PORT || 18765);
++const QUEUE = process.env.POS80_QUEUE_NAME || 'Printer_POS_80C';
++
++function escposPayload(text) {
++  const init = Buffer.from([0x1b, 0x40]);
++  const body = Buffer.from(String(text).replace(/\r\n/g, '\n') + '\n\n', 'utf8');
++  const cut = Buffer.from([0x1d, 0x56, 0x00]);
++  return Buffer.concat([init, body, cut]);
++}
++
++function lpRaw(buffer) {
++  return new Promise((resolve, reject) => {
++    const file = join(tmpdir(), `lima-raw-${Date.now()}.bin`);
++    writeFileSync(file, buffer);
++    const child = spawn('lp', ['-d', QUEUE, '-o', 'raw', file], { stdio: ['ignore', 'pipe', 'pipe'] });
++    let err = '';
++    child.stderr.on('data', (c) => {
++      err += c;
++    });
++    child.on('close', (code) => {
++      try {
++        unlinkSync(file);
++      } catch {
++        /* ignore */
++      }
++      if (code === 0) resolve();
++      else reject(new Error(err || `lp exit ${code}`));
++    });
++  });
++}
++
++const server = createServer(async (req, res) => {
++  res.setHeader('Access-Control-Allow-Origin', '*');
++  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
++  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
++
++  if (req.method === 'OPTIONS') {
++    res.writeHead(204);
++    res.end();
++    return;
++  }
++
++  if (req.method === 'GET' && req.url === '/health') {
++    res.writeHead(200, { 'Content-Type': 'application/json' });
++    res.end(JSON.stringify({ ok: true, queue: QUEUE }));
++    return;
++  }
++
++  if (req.method !== 'POST' || req.url !== '/print') {
++    res.writeHead(404);
++    res.end('not found');
++    return;
++  }
++
++  const chunks = [];
++  for await (const chunk of req) chunks.push(chunk);
++  let body;
++  try {
++    body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
++  } catch {
++    res.writeHead(400);
++    res.end('invalid json');
++    return;
++  }
++
++  try {
++    await lpRaw(escposPayload(body.text ?? ''));
++    res.writeHead(200, { 'Content-Type': 'application/json' });
++    res.end(JSON.stringify({ ok: true }));
++  } catch (e) {
++    res.writeHead(500, { 'Content-Type': 'application/json' });
++    res.end(JSON.stringify({ ok: false, error: String(e) }));
++  }
++});
++
++server.listen(PORT, '127.0.0.1', () => {
++  console.log(`Lima ham fiş: http://127.0.0.1:${PORT}/print  kuyruk=${QUEUE}`);
++  console.log('Test: curl -s -X POST http://127.0.0.1:18765/print -d \'{"text":"LIMA TEST"}\'');
++});
+diff --git a/scripts/mac-pos80c-cups-install.sh b/scripts/mac-pos80c-cups-install.sh
+new file mode 100755
+index 0000000..c4f059a
+--- /dev/null
++++ b/scripts/mac-pos80c-cups-install.sh
+@@ -0,0 +1,81 @@
++#!/usr/bin/env bash
++# POS-80C termal fiş — macOS CUPS (pos80.ppd + rastertopos derleme)
++# Intel Mac: GitHub filter/64 LINUX ARM'dır — kullanmayın; bu script kaynaktan derler.
++# Kullanım: bash mac-pos80c-cups-install.sh
++set -euo pipefail
++
++WORKDIR="${HOME}/Downloads/pos80-mac"
++ZIP="${WORKDIR}/pos80-cups.zip"
++URI="${POS80_USB_URI:-usb://Printer/POS-80C?serial=012345678AB}"
++QUEUE="${POS80_QUEUE_NAME:-Printer_POS_80C}"
++
++mkdir -p "$WORKDIR"
++if [[ ! -f "$ZIP" ]]; then
++  curl -fL -o "$ZIP" \
++    'https://github.com/IntegersOfK/Hoin-POS-58-80/archive/refs/heads/master.zip'
++fi
++
++cd "$WORKDIR"
++unzip -qo "$ZIP"
++SRC="$WORKDIR/Hoin-POS-58-80-master"
++
++# Varsayılan KAPALI: ESC 7 yamasi baslikta Ç0/c0 ve LIMA bozulmasi yapar (printf | lp testi).
++APPLY_POS80_DARKNESS="${APPLY_POS80_DARKNESS:-0}"
++if [[ "$APPLY_POS80_DARKNESS" == "1" ]]; then
++  echo "→ Baski yogunlugu (ESC/POS) yamasi — APPLY_POS80_DARKNESS=1"
++  DARK_PATCH="${DARK_PATCH:-$(dirname "$0")/mac-rastertopos-darkness.patch}"
++  if [[ -f "$DARK_PATCH" ]]; then
++    (cd "$SRC" && patch -p1 -N -r - < "$DARK_PATCH") || true
++  fi
++else
++  echo "→ Koyuluk yamasi atlandi (temiz rastertopos). Koyu icin: APPLY_POS80_DARKNESS=1"
++fi
++
++# Yamadan kalan ESC 7 satirlarini temizle (c0/Ç0 uretir)
++if grep -q "putchar('7')" "$SRC/rastertopos/rastertopos.c" 2>/dev/null; then
++  echo "→ rastertopos.c icindeki koyuluk ESC blogu kaldiriliyor..."
++  perl -i.bak -0pe 's/\n\t\/\* POS-80C: koyu baski.*?\n\tputchar\(2\);\n//s' \
++    "$SRC/rastertopos/rastertopos.c" || true
++fi
++
++cd "$SRC/rastertopos"
++
++echo "→ rastertopos derleniyor (Mach-O olmalı)..."
++make clean 2>/dev/null || true
++make CC="${CC:-clang}" CFLAGS="-O2" LIBS="-lcups -lcupsimage -lm"
++
++file ./rastertopos | grep -q 'Mach-O' || {
++  echo "HATA: rastertopos macOS ikilisi değil. Xcode Command Line Tools: xcode-select --install"
++  file ./rastertopos
++  exit 1
++}
++
++FILTER=/usr/libexec/cups/filter/rastertopos
++if [[ -f "$FILTER" ]]; then
++  sudo cp "$FILTER" "${FILTER}.bak" 2>/dev/null || true
++fi
++sudo cp ./rastertopos "$FILTER"
++sudo chmod 755 "$FILTER"
++
++sudo mkdir -p /Library/Printers/PPDs/Contents/Resources
++sudo cp "$SRC/ppd/pos80.ppd" /Library/Printers/PPDs/Contents/Resources/pos80.ppd
++
++echo "→ Eski kuyruk siliniyor: $QUEUE"
++sudo lpadmin -x "$QUEUE" 2>/dev/null || true
++
++echo "→ POS-80 PPD ile kuyruk oluşturuluyor..."
++sudo lpadmin -p "$QUEUE" -E \
++  -v "$URI" \
++  -P /Library/Printers/PPDs/Contents/Resources/pos80.ppd \
++  -D 'Printer POS-80C' \
++  -L "$(scutil --get ComputerName 2>/dev/null || echo Mac)"
++
++sudo lpoptions -p "$QUEUE" -o PageSize=X80mmY3276mm
++sudo lpadmin -d "$QUEUE"
++sudo launchctl kickstart -k system/org.cups.cupsd 2>/dev/null || true
++
++echo ""
++lpoptions -p "$QUEUE" | grep -o "printer-make-and-model='[^']*'" || true
++echo ""
++echo "Test: printf 'LIMA TEST\\n' | lp -d $QUEUE"
++echo "file /usr/libexec/cups/filter/rastertopos"
+diff --git a/scripts/mac-pos80c-disable-darkness.sh b/scripts/mac-pos80c-disable-darkness.sh
+new file mode 100755
+index 0000000..ae50ce8
+--- /dev/null
++++ b/scripts/mac-pos80c-disable-darkness.sh
+@@ -0,0 +1,21 @@
++#!/usr/bin/env bash
++# POS-80C — rastertopos koyuluk yamasını geri al (başta c0/çöp basıyorsa)
++# Kullanım: bash scripts/mac-pos80c-disable-darkness.sh
++set -euo pipefail
++
++FILTER=/usr/libexec/cups/filter/rastertopos
++BAK="${FILTER}.bak"
++
++if [[ -f "$BAK" ]]; then
++  echo "→ Yedek rastertopos geri yükleniyor..."
++  sudo cp "$BAK" "$FILTER"
++  sudo chmod 755 "$FILTER"
++else
++  echo "Yedek yok — temiz rastertopos yeniden derleniyor..."
++  DIR="$(cd "$(dirname "$0")" && pwd)"
++  exec bash "$DIR/mac-pos80c-rebuild-clean.sh"
++fi
++
++sudo launchctl kickstart -k system/org.cups.cupsd 2>/dev/null || true
++echo "Test: printf 'LIMA TEST\\n' | lp -d Printer_POS_80C"
++echo "Başta garip karakter yoksa fiş başlığı düzelmiş olmalı."
+diff --git a/scripts/mac-pos80c-rebuild-clean.sh b/scripts/mac-pos80c-rebuild-clean.sh
+new file mode 100755
+index 0000000..0aa84b8
+--- /dev/null
++++ b/scripts/mac-pos80c-rebuild-clean.sh
+@@ -0,0 +1,13 @@
++#!/usr/bin/env bash
++# POS-80C — temiz sürücü (koyuluk yok). Mac'te c0/Ç0 ve LIMA üst üste binmesi için.
++# Kullanım: bash scripts/mac-pos80c-rebuild-clean.sh
++set -euo pipefail
++DIR="$(cd "$(dirname "$0")" && pwd)"
++export APPLY_POS80_DARKNESS=0
++bash "$DIR/mac-pos80c-cups-install.sh"
++echo ""
++echo "=== Dogrulama (Mac) ==="
++echo "  printf 'LIMA TEST\\n' | lp -d Printer_POS_80C"
++echo "  Beklenen: LIMA TEST (basinda Ç0/c0 OLMAMALI)"
++echo ""
++echo "pm2 sadece VPS sunucusunda; Mac'te gerekmez."
+diff --git a/scripts/mac-pos80c-smoke-test.sh b/scripts/mac-pos80c-smoke-test.sh
+new file mode 100755
+index 0000000..97b8cad
+--- /dev/null
++++ b/scripts/mac-pos80c-smoke-test.sh
+@@ -0,0 +1,6 @@
++#!/usr/bin/env bash
++# Mac POS-80C — tek satir metin testi
++set -euo pipefail
++QUEUE="${POS80_QUEUE_NAME:-Printer_POS_80C}"
++printf 'LIMA TEST\n' | lp -d "$QUEUE"
++echo "Kuyruk: $QUEUE — fis basinda sadece «LIMA TEST» olmali."
+diff --git a/scripts/mac-rastertopos-darkness.patch.DISABLED b/scripts/mac-rastertopos-darkness.patch.DISABLED
+new file mode 100644
+index 0000000..e2e8ba9
+--- /dev/null
++++ b/scripts/mac-rastertopos-darkness.patch.DISABLED
+@@ -0,0 +1,2 @@
++# DEVRE DISI — bu yama Mac POS-80C'de baslikta c0/Ç0 ve LIMA bozulmasi yapar.
++# Koyuluk icin yazici menusu veya lima-mac-raw-print.mjs kullanin.
+diff --git a/scripts/restore-greenleaf-receipt-settings.mjs b/scripts/restore-greenleaf-receipt-settings.mjs
+new file mode 100644
+index 0000000..9c32bb1
+--- /dev/null
++++ b/scripts/restore-greenleaf-receipt-settings.mjs
+@@ -0,0 +1,45 @@
++#!/usr/bin/env node
++/**
++ * Greenleaf (main) kasa — çalışan fiş ayarını store.json'a yaz.
++ * Gelişmiş profil KAPALI → satışta klasik HTML 80mm + iframe (yonetici yolu).
++ *
++ *   node scripts/restore-greenleaf-receipt-settings.mjs --data-dir /var/www/market-pos/data
++ */
++import { readFile, writeFile } from 'node:fs/promises';
++import { join } from 'node:path';
++
++/** Ayarlar panelinde görünen referans; enabled:false = fiş kodu main dalı ile aynı */
++export const GREENLEAF_KASA_RECEIPT_PRESET = {
++  enabled: false,
++  brand: 'zywell',
++  windowsPrinterName: 'POS-80C',
++  paperWidthMm: 80,
++  pageMarginMm: 0,
++  autoPrintOnSale: true,
++  copies: 1,
++  printMode: 'html',
++};
++
++function arg(name) {
++  const i = process.argv.indexOf(`--${name}`);
++  return i >= 0 ? process.argv[i + 1] : '';
++}
++
++const dataDir = arg('data-dir') || join(process.cwd(), 'data');
++const tenant = arg('tenant') || 'main';
++
++const path =
++  tenant === 'main'
++    ? join(dataDir, 'store.json')
++    : join(dataDir, 'tenants', tenant, 'store.json');
++
++const store = JSON.parse(await readFile(path, 'utf8'));
++store.settings = {
++  ...(store.settings ?? {}),
++  receiptPrinter: { ...GREENLEAF_KASA_RECEIPT_PRESET },
++};
++store.updatedAt = new Date().toISOString();
++await writeFile(path, JSON.stringify(store, null, 2));
++
++console.log(`OK   ${tenant}: Greenleaf kasa fiş ayarı yazıldı`);
++console.log(JSON.stringify(store.settings.receiptPrinter, null, 2));
+diff --git a/scripts/seed-lima-demo-products.mjs b/scripts/seed-lima-demo-products.mjs
+index 167489a..19f3cbf 100644
+--- a/scripts/seed-lima-demo-products.mjs
++++ b/scripts/seed-lima-demo-products.mjs
+@@ -1,10 +1,15 @@
+ #!/usr/bin/env node
+ /**
+- * Lima Market (POS Lite) — 4 deneme ürünü
++ * Lima Market (POS Lite) — Greenleaf (main) mağazadan ürün kopyala + stok
++ *
+  *   node scripts/seed-lima-demo-products.mjs --data-dir /var/www/market-pos/data
++ *   node scripts/seed-lima-demo-products.mjs --data-dir ./data --source-ids 1,4,5,6
+  */
+ import { readFile, writeFile } from 'node:fs/promises';
+-import { join } from 'node:path';
++import { join, dirname } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+ 
+ function arg(name) {
+   const i = process.argv.indexOf(`--${name}`);
+@@ -13,117 +18,93 @@ function arg(name) {
+ 
+ const dataDir = arg('data-dir') || join(process.cwd(), 'data');
+ const tenant = arg('tenant') || 'lima-market';
+-const path =
+-  tenant === 'main' ? join(dataDir, 'store.json') : join(dataDir, 'tenants', tenant, 'store.json');
++const sourceIdsRaw = arg('source-ids') || '1,4,5,6';
++const sourceIds = sourceIdsRaw
++  .split(',')
++  .map((s) => Number(s.trim()))
++  .filter((n) => Number.isFinite(n) && n > 0);
++
++const mainPath = join(dataDir, 'store.json');
++const targetPath =
++  tenant === 'main' ? mainPath : join(dataDir, 'tenants', tenant, 'store.json');
++
++const manifestPath = join(repoRoot, 'src/data/productImageManifest.json');
++const imageManifest = JSON.parse(await readFile(manifestPath, 'utf8'));
++
++const mainStore = JSON.parse(await readFile(mainPath, 'utf8'));
++const mainById = new Map((mainStore.products ?? []).map((p) => [p.id, p]));
++
++function catalogImageForSourceId(sourceId) {
++  const path = imageManifest[String(sourceId)];
++  if (!path) return {};
++  return { catalogImageId: sourceId, imageUrl: path };
++}
+ 
+-/** Lima deneme seti — barkodları satış ekranında manuel girilebilir */
+-const DEMO_PRODUCTS = [
+-  {
+-    id: 1001,
+-    productCode: 'LIMA-001',
+-    barcode: '8690631000001',
+-    name: 'Organik Zeytinyağı 500 ml',
+-    category: 'temizlik',
+-    pv: 1,
+-    purchasePrice: 85,
+-    partnerPrice: 120,
+-    fullSalePrice: 149.9,
+-    ourPercent: 0,
+-    ourPriceWithVat: 149.9,
+-    partnerPriceWithVat: 120,
+-    boxDimensions: '-',
+-    weightKg: 0.5,
+-    desi: 1,
+-    cargoPerUnit: 0,
+-    suratTotal: 0,
+-    arasTotal: 0,
+-    yurticiTotal: 0,
+-    stock: 40,
+-    isSample: false,
+-    sampleStock: 0,
+-  },
+-  {
+-    id: 1002,
+-    productCode: 'LIMA-002',
+-    barcode: '8690631000002',
+-    name: 'Tam Buğday Ekmeği',
+-    category: 'temizlik',
+-    pv: 0.5,
+-    purchasePrice: 12,
+-    partnerPrice: 18,
+-    fullSalePrice: 24.9,
+-    ourPercent: 0,
+-    ourPriceWithVat: 24.9,
+-    partnerPriceWithVat: 18,
+-    boxDimensions: '-',
+-    weightKg: 0.4,
+-    desi: 1,
+-    cargoPerUnit: 0,
+-    suratTotal: 0,
+-    arasTotal: 0,
+-    yurticiTotal: 0,
+-    stock: 60,
+-    isSample: false,
+-    sampleStock: 0,
+-  },
+-  {
+-    id: 1003,
+-    productCode: 'LIMA-003',
+-    barcode: '8690631000003',
+-    name: 'Süt 1 L (tam yağlı)',
+-    category: 'temizlik',
+-    pv: 0.5,
+-    purchasePrice: 28,
+-    partnerPrice: 35,
+-    fullSalePrice: 42.5,
+-    ourPercent: 0,
+-    ourPriceWithVat: 42.5,
+-    partnerPriceWithVat: 35,
+-    boxDimensions: '-',
+-    weightKg: 1,
+-    desi: 1,
+-    cargoPerUnit: 0,
+-    suratTotal: 0,
+-    arasTotal: 0,
+-    yurticiTotal: 0,
+-    stock: 48,
+-    isSample: false,
+-    sampleStock: 0,
+-  },
+-  {
+-    id: 1004,
+-    productCode: 'LIMA-004',
+-    barcode: '8690631000004',
+-    name: 'Çiçek Balı 250 g',
+-    category: 'temizlik',
+-    pv: 1.2,
+-    purchasePrice: 95,
+-    partnerPrice: 130,
+-    fullSalePrice: 165,
+-    ourPercent: 0,
+-    ourPriceWithVat: 165,
+-    partnerPriceWithVat: 130,
+-    boxDimensions: '-',
+-    weightKg: 0.25,
+-    desi: 1,
+-    cargoPerUnit: 0,
+-    suratTotal: 0,
+-    arasTotal: 0,
+-    yurticiTotal: 0,
+-    stock: 25,
+-    isSample: false,
+-    sampleStock: 0,
+-  },
+-];
++const missing = sourceIds.filter((id) => !mainById.has(id));
++if (missing.length) {
++  console.error(`HATA  main store.json içinde bulunamayan id: ${missing.join(', ')}`);
++  process.exit(1);
++}
+ 
+-const raw = await readFile(path, 'utf8');
+-const store = JSON.parse(raw);
+ const now = new Date().toISOString();
+-store.products = DEMO_PRODUCTS;
+-store.updatedAt = now;
+-await writeFile(path, JSON.stringify(store, null, 2));
++const cloned = sourceIds.map((sourceId, index) => {
++  const src = mainById.get(sourceId);
++  const stock = Math.max(0, Math.floor(Number(src.stock) || 0));
++  const targetId = 1001 + index;
++  return {
++    ...src,
++    id: targetId,
++    stock,
++    isSample: src.isSample ?? false,
++    sampleStock: src.sampleStock ?? 0,
++    ...catalogImageForSourceId(sourceId),
++  };
++});
++
++const targetStore = JSON.parse(await readFile(targetPath, 'utf8'));
++targetStore.products = cloned;
++targetStore.settings = {
++  ...(targetStore.settings ?? {}),
++  productProfile: targetStore.settings?.productProfile ?? 'pos-lite',
++  posLiteCatalogImageByProductId: Object.fromEntries(
++    cloned.map((p, i) => [String(p.id), sourceIds[i]]),
++  ),
++  posLiteImageUrlByProductId: Object.fromEntries(
++    cloned.map((p, i) => {
++      const path = imageManifest[String(sourceIds[i])];
++      return path ? [String(p.id), path] : null;
++    }).filter(Boolean),
++  ),
++};
++targetStore.updatedAt = now;
++
++const movements = cloned
++  .filter((p) => p.stock > 0)
++  .map((p, i) => ({
++    id: `M-seed-${p.id}-${Date.now()}-${i}`,
++    productId: p.id,
++    productName: p.name,
++    type: 'in',
++    quantity: p.stock,
++    previousStock: 0,
++    newStock: p.stock,
++    note: `Greenleaf #${sourceIds[i]} stok aktarımı (Lima POS Lite)`,
++    createdAt: now,
++  }));
++
++if (movements.length) {
++  const prev = Array.isArray(targetStore.stockMovements) ? targetStore.stockMovements : [];
++  targetStore.stockMovements = [...movements, ...prev];
++}
++
++await writeFile(targetPath, JSON.stringify(targetStore, null, 2));
+ 
+-console.log(`OK   ${tenant}: ${DEMO_PRODUCTS.length} deneme ürünü yazıldı`);
+-for (const p of DEMO_PRODUCTS) {
+-  console.log(`     ${p.barcode}  ${p.name}  stok=${p.stock}  satış=${p.fullSalePrice} ₺`);
++console.log(`OK   ${tenant}: ${cloned.length} ürün main mağazadan kopyalandı`);
++for (let i = 0; i < cloned.length; i++) {
++  const p = cloned[i];
++  const srcId = sourceIds[i];
++  const img = imageManifest[String(srcId)] ?? '(yok)';
++  console.log(
++    `     main#${srcId} → #${p.id}  ${p.barcode ?? p.productCode ?? '-'}  ${p.name?.slice(0, 50)}  stok=${p.stock}  resim=${img}`,
++  );
+ }
+diff --git a/scripts/sunucu-market-pos-deploy.sh b/scripts/sunucu-market-pos-deploy.sh
+index eb345a9..0759024 100755
+--- a/scripts/sunucu-market-pos-deploy.sh
++++ b/scripts/sunucu-market-pos-deploy.sh
+@@ -111,6 +111,12 @@ echo "==> Sunucu verisi: irsaliye stokları..."
+ node "${APP_SRC}/scripts/apply-irsaliye-stock.mjs" "${INSTALL_DIR}/data" || echo "    (veri migrasyonu atlandı — data/ henüz yok olabilir)"
+ echo "==> Sunucu verisi: Posta onboarding (Faz 3)..."
+ node "${APP_SRC}/scripts/migrate-posta-onboarding.mjs" "${INSTALL_DIR}/data" || echo "    (posta onboarding migrasyonu atlandı)"
++echo "==> Greenleaf main: kasa fis ayari geri yukleme..."
++node "${APP_SRC}/scripts/restore-greenleaf-receipt-settings.mjs" --data-dir "${INSTALL_DIR}/data" --tenant main \
++  || echo "    main fis ayari atlandi"
++echo "==> Lima Market: receiptPrinter temizligi..."
++node "${APP_SRC}/scripts/clear-receipt-printer-settings.mjs" --data-dir "${INSTALL_DIR}/data" --tenant lima-market \
++  || echo "    lima receiptPrinter temizligi atlandi"
+ 
+ echo "==> Build doğrulama..."
+ VERIFY_TMP="$(mktemp)"
+diff --git a/scripts/sync-receipt-printer-tenants.mjs b/scripts/sync-receipt-printer-tenants.mjs
+new file mode 100644
+index 0000000..1d1fc06
+--- /dev/null
++++ b/scripts/sync-receipt-printer-tenants.mjs
+@@ -0,0 +1,56 @@
++#!/usr/bin/env node
++/**
++ * Fiş yazıcı ayarını main → POS Lite tenant kopyala (Zywell varsayılanı)
++ *
++ *   node scripts/sync-receipt-printer-tenants.mjs --data-dir /var/www/market-pos/data
++ *   node scripts/sync-receipt-printer-tenants.mjs --data-dir ./data --source main --target lima-market
++ */
++import { readFile, writeFile } from 'node:fs/promises';
++import { join } from 'node:path';
++
++import { GREENLEAF_KASA_RECEIPT_PRESET } from './restore-greenleaf-receipt-settings.mjs';
++
++const ZYWELL_PRESET = { ...GREENLEAF_KASA_RECEIPT_PRESET };
++
++function arg(name) {
++  const i = process.argv.indexOf(`--${name}`);
++  return i >= 0 ? process.argv[i + 1] : '';
++}
++
++const dataDir = arg('data-dir') || join(process.cwd(), 'data');
++const sourceTenant = arg('source') || 'main';
++const targetTenant = arg('target') || 'lima-market';
++
++function storePath(tenant) {
++  return tenant === 'main'
++    ? join(dataDir, 'store.json')
++    : join(dataDir, 'tenants', tenant, 'store.json');
++}
++
++const sourcePath = storePath(sourceTenant);
++const targetPath = storePath(targetTenant);
++
++const sourceStore = JSON.parse(await readFile(sourcePath, 'utf8'));
++const targetStore = JSON.parse(await readFile(targetPath, 'utf8'));
++
++const sourcePrinter =
++  sourceStore.settings?.receiptPrinter
++  ?? (sourceTenant === 'main' ? ZYWELL_PRESET : null)
++  ?? ZYWELL_PRESET;
++
++/** main store'a otomatik yazma — Lima düzeltmeleri Greenleaf'i bozmasın */
++const mergedPrinter = {
++  ...ZYWELL_PRESET,
++  ...sourcePrinter,
++  enabled: false,
++  printMode: sourcePrinter.printMode === 'plain' ? 'plain' : 'html',
++};
++targetStore.settings = {
++  ...(targetStore.settings ?? {}),
++  receiptPrinter: mergedPrinter,
++};
++targetStore.updatedAt = new Date().toISOString();
++await writeFile(targetPath, JSON.stringify(targetStore, null, 2));
++
++console.log(`OK   ${targetTenant}: fiş yazıcı ayarı kopyalandı (gelişmiş profil kapalı)`);
++console.log(JSON.stringify(targetStore.settings.receiptPrinter, null, 2));
+diff --git a/server.mjs b/server.mjs
+index 7549738..495dbe5 100644
+--- a/server.mjs
++++ b/server.mjs
+@@ -16,6 +16,7 @@ import {
+ } from './server/tenantAuth.mjs';
+ import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
+ import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
++import { shouldSkipIrsaliyeStockMigration } from './server/tenantStoreGuard.mjs';
+ import { sendCrmEmail } from './server/crmOutreach.mjs';
+ import {
+   getEkolojikMailConfig,
+@@ -321,12 +322,17 @@ async function readStoreData(tenantId = 'main') {
+ 
+   let persist = false;
+ 
+-  if (data?.products?.length) {
++  if (data?.products?.length && !shouldSkipIrsaliyeStockMigration(tenantId, data)) {
+     const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
+     data = snapshot;
+     if (stockChanged) persist = true;
+   }
+ 
++  const { enrichPosLiteProductMedia } = await import('./server/posLiteProductMedia.mjs');
++  const { store: mediaEnriched, changed: mediaChanged } = enrichPosLiteProductMedia(data);
++  data = mediaEnriched;
++  if (mediaChanged) persist = true;
++
+   if (persist) {
+     await writeStoreData(data, tenantId);
+   }
+@@ -2944,6 +2950,21 @@ const server = createServer(async (req, res) => {
+       return;
+     }
+ 
++    if (pathname === '/api/pos/receipt-print-log' && req.method === 'POST') {
++      const tenantId = resolveTenantId(url);
++      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
++      const body = await readRequestBody(req);
++      const { appendReceiptPrintLog } = await import('./server/receiptPrintLog.mjs');
++      await appendReceiptPrintLog(DATA_DIR, tenantId, {
++        phase: body?.phase ?? 'unknown',
++        detail: body?.detail ?? null,
++        userAgent: body?.userAgent ?? null,
++      });
++      res.writeHead(204);
++      res.end();
++      return;
++    }
++
+     if (pathname === '/api/data' && req.method === 'GET') {
+       const tenantId = resolveTenantId(url);
+       if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+diff --git a/server/posLiteProductMedia.mjs b/server/posLiteProductMedia.mjs
+new file mode 100644
+index 0000000..c3acad2
+--- /dev/null
++++ b/server/posLiteProductMedia.mjs
+@@ -0,0 +1,74 @@
++function isPosLiteStore(store) {
++  return store?.settings?.productProfile === 'pos-lite';
++}
++
++function imageMapFromSettings(settings) {
++  const raw = settings?.posLiteCatalogImageByProductId;
++  if (!raw || typeof raw !== 'object') return null;
++  return raw;
++}
++
++function urlMapFromSettings(settings) {
++  const raw = settings?.posLiteImageUrlByProductId;
++  if (!raw || typeof raw !== 'object') return null;
++  return raw;
++}
++
++/**
++ * GET / kayıt: eksik görsel alanlarını settings haritasından tamamla.
++ */
++export function enrichPosLiteProductMedia(store) {
++  if (!isPosLiteStore(store)) return { store, changed: false };
++  const catalogMap = imageMapFromSettings(store.settings);
++  const urlMap = urlMapFromSettings(store.settings);
++  if (!catalogMap && !urlMap) return { store, changed: false };
++
++  let changed = false;
++  const products = (store.products ?? []).map((p) => {
++    const mappedCatalog = catalogMap?.[String(p.id)];
++    const mappedUrl = urlMap?.[String(p.id)];
++    const catalogImageId = p.catalogImageId ?? mappedCatalog;
++    const imageUrl =
++      (p.imageUrl?.startsWith('/product-images/') ? p.imageUrl : undefined)
++      ?? (mappedUrl?.startsWith('/product-images/') ? mappedUrl : undefined);
++    if (catalogImageId === p.catalogImageId && imageUrl === p.imageUrl) return p;
++    changed = true;
++    return {
++      ...p,
++      ...(catalogImageId != null ? { catalogImageId } : {}),
++      ...(imageUrl ? { imageUrl } : {}),
++    };
++  });
++
++  if (!changed) return { store, changed: false };
++  return {
++    store: { ...store, products, updatedAt: new Date().toISOString() },
++    changed: true,
++  };
++}
++
++/** PUT: istemci eski bundle ile yazsa bile görsel alanlarını koru */
++export function mergePosLiteProductMediaOnWrite(existing, incoming) {
++  if (!isPosLiteStore(incoming ?? existing)) return incoming;
++  if (!Array.isArray(incoming?.products)) return incoming;
++
++  const prevById = new Map((existing?.products ?? []).map((p) => [p.id, p]));
++  const catalogMap = imageMapFromSettings(incoming.settings ?? existing?.settings);
++  const urlMap = urlMapFromSettings(incoming.settings ?? existing?.settings);
++
++  const products = incoming.products.map((p) => {
++    const prev = prevById.get(p.id);
++    const catalogImageId = p.catalogImageId ?? prev?.catalogImageId ?? catalogMap?.[String(p.id)];
++    const imageUrl =
++      (p.imageUrl?.startsWith('/product-images/') ? p.imageUrl : undefined)
++      ?? (prev?.imageUrl?.startsWith('/product-images/') ? prev.imageUrl : undefined)
++      ?? (urlMap?.[String(p.id)]?.startsWith('/product-images/') ? urlMap[String(p.id)] : undefined);
++    return {
++      ...p,
++      ...(catalogImageId != null ? { catalogImageId } : {}),
++      ...(imageUrl ? { imageUrl } : {}),
++    };
++  });
++
++  return { ...incoming, products };
++}
+diff --git a/server/receiptPrintLog.mjs b/server/receiptPrintLog.mjs
+new file mode 100644
+index 0000000..cf0cd48
+--- /dev/null
++++ b/server/receiptPrintLog.mjs
+@@ -0,0 +1,20 @@
++import { appendFile, mkdir } from 'node:fs/promises';
++import { dirname, join } from 'node:path';
++
++export function receiptPrintLogPath(dataDir, tenantId) {
++  if (tenantId && tenantId !== 'main') {
++    return join(dataDir, 'tenants', tenantId, 'receipt-print.log');
++  }
++  return join(dataDir, 'receipt-print.log');
++}
++
++export async function appendReceiptPrintLog(dataDir, tenantId, payload) {
++  const path = receiptPrintLogPath(dataDir, tenantId);
++  await mkdir(dirname(path), { recursive: true });
++  const line = `${JSON.stringify({
++    at: new Date().toISOString(),
++    tenantId: tenantId || 'main',
++    ...payload,
++  })}\n`;
++  await appendFile(path, line, 'utf8');
++}
+diff --git a/server/tenantStoreGuard.mjs b/server/tenantStoreGuard.mjs
+index 5f729fc..964a6ce 100644
+--- a/server/tenantStoreGuard.mjs
++++ b/server/tenantStoreGuard.mjs
+@@ -1,7 +1,9 @@
++import { mergePosLiteProductMediaOnWrite } from './posLiteProductMedia.mjs';
++
+ /** POS Lite / ayrı tenant — main (Greenleaf) seed verisinin yazılmasını engelle */
+ const MAIN_DEMO_USERNAMES = new Set(['yonetici', 'kasiyer']);
+ 
+-function isPosLiteStore(store) {
++export function isPosLiteStore(store) {
+   return store?.settings?.productProfile === 'pos-lite';
+ }
+ 
+@@ -33,7 +35,18 @@ export function guardIsolatedTenantStoreWrite(tenantId, existing, incoming) {
+     out.products = [];
+   }
+ 
+-  return out;
++  const merged = mergePosLiteProductMediaOnWrite(existing, out);
++  return mergeReceiptPrinterSettingsOnWrite(existing, merged);
++}
++
++function mergeReceiptPrinterSettingsOnWrite(existing, incoming) {
++  if (!incoming?.settings) return incoming;
++  if (isPosLiteStore(existing) || isPosLiteStore(incoming)) {
++    const settings = { ...incoming.settings };
++    delete settings.receiptPrinter;
++    return { ...incoming, settings };
++  }
++  return incoming;
+ }
+ 
+ export function shouldSkipIrsaliyeStockMigration(tenantId, store) {
+diff --git a/src/components/CartPanel.tsx b/src/components/CartPanel.tsx
+index e35d9f1..225bbcb 100644
+--- a/src/components/CartPanel.tsx
++++ b/src/components/CartPanel.tsx
+@@ -60,6 +60,8 @@ interface CartPanelProps {
+   scanSearchRef?: RefObject<PremiumProductSearchHandle>;
+   onBarcodeScan?: (normalized: string) => BarcodeScanApplyResult;
+   onBarcodeScanFeedback?: (result: BarcodeScanApplyResult) => void;
++  /** POS Lite: kupon/puan kapalı, ödeme alanı kompakt */
++  compactCheckout?: boolean;
+ }
+ 
+ type CustomerStatus = 'registered' | 'new-registration' | 'gl-linked' | 'partner-only' | 'name-only' | 'none';
+@@ -106,6 +108,7 @@ export function CartPanel({
+   scanSearchRef,
+   onBarcodeScan,
+   onBarcodeScanFeedback,
++  compactCheckout = false,
+ }: CartPanelProps) {
+   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+   const [customerQuery, setCustomerQuery] = useState('');
+@@ -180,8 +183,14 @@ export function CartPanel({
+   const hasCartItems = cart.length > 0;
+   const samplesOnly = hasCartItems && total === 0 && sampleCount > 0;
+ 
++  const showCrmCheckout =
++    !compactCheckout && onCrmCouponChange && !samplesOnly;
++  const crmHint = compactCheckout ? '' : crmDiscountLabel;
++
+   return (
+-    <aside className="cart-panel">
++    <aside
++      className={`cart-panel${compactCheckout ? ' cart-panel--compact-checkout' : ''}${hasCartItems ? ' cart-panel--has-items' : ''}`}
++    >
+       <div className={`cart-panel-top ${hasCartItems ? 'cart-panel-top--compact' : ''}`}>
+         <div className="cart-panel-search">
+           <PremiumProductSearch
+@@ -198,7 +207,19 @@ export function CartPanel({
+         </div>
+ 
+         <div className="cart-panel-header-row">
+-          <h2>Sepet</h2>
++          <div className="cart-panel-header-title">
++            <h2>Sepet</h2>
++            {hasCartItems && (
++              <button
++                type="button"
++                className="cart-panel-header-clear"
++                onClick={onClear}
++                disabled={checkoutBusy}
++              >
++                Temizle
++              </button>
++            )}
++          </div>
+           <div className="cart-panel-header-actions">
+             {partnerLocked && (
+               <span className="cart-panel-partner-chip">Partner</span>
+@@ -253,11 +274,6 @@ export function CartPanel({
+             >
+               {customerSearchOpen ? 'Müşteri aramasını kapat' : 'Kayıtlı müşteri ara'}
+             </button>
+-            {hasCartItems && (
+-              <button type="button" className="cart-panel-toolbar__clear" onClick={onClear}>
+-                Temizle
+-              </button>
+-            )}
+           </div>
+ 
+           {customerSearchOpen && (
+@@ -437,13 +453,13 @@ export function CartPanel({
+ 
+       {cart.length > 0 && (
+         <div className={`cart-panel-footer ${sampleCount > 0 ? 'cart-panel-footer--has-sample' : ''}`}>
+-          {onCrmCouponChange && !samplesOnly && (
++          {showCrmCheckout && (
+             <div className="cart-crm-row">
+               <input
+                 className="cart-crm-input"
+                 placeholder="Kupon kodu"
+                 value={crmCouponCode}
+-                onChange={(e) => onCrmCouponChange(e.target.value.toUpperCase())}
++                onChange={(e) => onCrmCouponChange!(e.target.value.toUpperCase())}
+               />
+               {onCrmPointsChange && (
+                 <input
+@@ -457,7 +473,7 @@ export function CartPanel({
+               )}
+             </div>
+           )}
+-          {crmDiscountLabel && <p className="cart-crm-hint">{crmDiscountLabel}</p>}
++          {crmHint && <p className="cart-crm-hint">{crmHint}</p>}
+           <div className="cart-total">
+             <span>Toplam</span>
+             <strong>{samplesOnly ? 'Ücretsiz' : formatCurrency(total)}</strong>
+@@ -475,6 +491,18 @@ export function CartPanel({
+           {cashDayClosed && (
+             <p className="cart-day-closed-warn" role="alert">Kasa günü kapalı — satış kapalı (Ayarlar’dan kuralı değiştirebilirsiniz).</p>
+           )}
++          {compactCheckout && (
++            <div className="cart-payment-toolbar">
++              <button
++                type="button"
++                className="cart-footer-clear"
++                onClick={onClear}
++                disabled={checkoutBusy}
++              >
++                Temizle
++              </button>
++            </div>
++          )}
+           <div className="payment-buttons payment-buttons--pos">
+             <button type="button" className="btn btn-payment cash" onClick={() => onCheckout('cash')} disabled={checkoutBusy || cashDayClosed}>
+               {checkoutBusy ? '⏳...' : samplesOnly ? '🎁 Numune' : '💵 Nakit F1'}
+diff --git a/src/components/SalesScreen.tsx b/src/components/SalesScreen.tsx
+index 758a274..a8c7228 100644
+--- a/src/components/SalesScreen.tsx
++++ b/src/components/SalesScreen.tsx
+@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ import { CATEGORIES } from '../data/categories';
+ import type { Store } from '../store/useStore';
+ import { buildReceiptFromCart, printThermalReceipt } from '../utils/receiptPrint';
++import { logReceiptPrint } from '../utils/receiptPrintLog';
+ import { DEFAULT_POS_CHECKOUT_SETTINGS, type CompleteSaleOptions } from '../types/pos';
+ import { tryFiscalReceipt } from '../utils/posFiscalCheckout';
+ import { PosPaymentModal } from './pos/PosPaymentModal';
+@@ -22,12 +23,16 @@ import type { PremiumProductSearchHandle } from './PremiumProductSearch';
+ import { usePosBarcodeWedge } from '../hooks/usePosBarcodeWedge';
+ import type { BarcodeScanApplyResult } from '../utils/barcodeScan';
+ import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
++import { isPosLiteProfile } from '../utils/tenantProductProfile';
++import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
++import { shouldUseGreenleafReceiptPath } from '../utils/greenleafReceipt';
+ 
+ interface SalesScreenProps {
+   store: Store;
+ }
+ 
+ export function SalesScreen({ store }: SalesScreenProps) {
++  const posLiteCheckout = isPosLiteProfile(store.settings);
+   const posCheckout = useMemo(
+     () => ({ ...DEFAULT_POS_CHECKOUT_SETTINGS, ...store.settings.posCheckout }),
+     [store.settings.posCheckout],
+@@ -168,94 +173,109 @@ export function SalesScreen({ store }: SalesScreenProps) {
+     setCheckoutBusy(true);
+     setPaymentModal(null);
+ 
+-    const cartSnapshot = [...store.cart];
+-    const paidItems = cartSnapshot.filter((item) => item.priceType !== 'sample');
+-    const sampleCount = store.cartSampleCount;
+-    const total = store.cartTotal;
+-    const samplesOnly = paidItems.length === 0 && sampleCount > 0;
+-
+-    let receiptNo: string | undefined;
+-    let fiscalPrinted = false;
+-    const fiscalMethod = method === 'split' ? 'split' : method;
+-
+-    const runFiscal = !samplesOnly && method !== 'credit';
+-    if (runFiscal && posCheckout.fiscalTiming === 'before_sale') {
+-      const fiscal = await tryFiscalReceipt(
+-        paidItems,
+-        store.products,
+-        store.productSets,
+-        fiscalMethod,
+-        total,
+-        posCheckout,
+-      );
+-      if (fiscal.cancelled) {
+-        setCheckoutBusy(false);
++    try {
++      const cartSnapshot = [...store.cart];
++      const paidItems = cartSnapshot.filter((item) => item.priceType !== 'sample');
++      const sampleCount = store.cartSampleCount;
++      const total = store.cartTotal;
++      const samplesOnly = paidItems.length === 0 && sampleCount > 0;
++
++      let receiptNo: string | undefined;
++      let fiscalPrinted = false;
++      const fiscalMethod = method === 'split' ? 'split' : method;
++
++      const runFiscal = !samplesOnly && method !== 'credit';
++      if (runFiscal && posCheckout.fiscalTiming === 'before_sale') {
++        const fiscal = await tryFiscalReceipt(
++          paidItems,
++          store.products,
++          store.productSets,
++          fiscalMethod,
++          total,
++          posCheckout,
++        );
++        if (fiscal.cancelled) {
++          return;
++        }
++        receiptNo = fiscal.receiptNo;
++        fiscalPrinted = fiscal.fiscalPrinted;
++      }
++
++      const sale = store.completeSale(method, options);
++      if (!sale) {
++        setLastSale(
++          store.checkoutError
++            ?? (method === 'credit'
++              ? 'Veresiye kaydedilemedi — müşteri seçin veya Greenleaf no girin'
++              : 'Satış kaydedilemedi — müşteri bilgisini kontrol edin'),
++        );
++        setTimeout(() => setLastSale(null), 5000);
+         return;
+       }
+-      receiptNo = fiscal.receiptNo;
+-      fiscalPrinted = fiscal.fiscalPrinted;
+-    }
+ 
+-    const sale = store.completeSale(method, options);
+-    if (!sale) {
+-      setLastSale(
+-        store.checkoutError
+-          ?? (method === 'credit'
+-            ? 'Veresiye kaydedilemedi — müşteri seçin veya Greenleaf no girin'
+-            : 'Satış kaydedilemedi — müşteri bilgisini kontrol edin'),
+-      );
+-      setTimeout(() => setLastSale(null), 5000);
+-      setCheckoutBusy(false);
+-      return;
+-    }
++      if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
++        const fiscal = await tryFiscalReceipt(
++          paidItems,
++          store.products,
++          store.productSets,
++          fiscalMethod,
++          sale.total,
++          posCheckout,
++        );
++        if (!fiscal.cancelled) {
++          receiptNo = fiscal.receiptNo ?? receiptNo;
++          fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
++        }
++      }
+ 
+-    if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
+-      const fiscal = await tryFiscalReceipt(
+-        paidItems,
+-        store.products,
+-        store.productSets,
+-        fiscalMethod,
+-        sale.total,
+-        posCheckout,
+-      );
+-      if (!fiscal.cancelled) {
+-        receiptNo = fiscal.receiptNo ?? receiptNo;
+-        fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
++      const receiptPayment = method === 'split' ? 'card' : method;
++      const useClassicReceipt = shouldUseGreenleafReceiptPath(store.settings);
++      const receiptPrinter = normalizeReceiptPrinterSettings(store.settings.receiptPrinter);
++      if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
++        const receiptData = buildReceiptFromCart(
++          paidItems,
++          store.products,
++          receiptPayment,
++          sale.total,
++          store.settings.businessName,
++          { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
++          store.productSets,
++        );
++        const runPrint = () => {
++          if (useClassicReceipt) {
++            return printThermalReceipt(receiptData);
++          }
++          if (receiptPrinter.autoPrintOnSale && receiptPrinter.brand !== 'none') {
++            return printThermalReceipt(receiptData, receiptPrinter);
++          }
++          logReceiptPrint('skipped', { reason: 'advanced-disabled' });
++          return Promise.resolve();
++        };
++        // Yazdır penceresi açık kalınca kasa kilitlemesin (⏳ butonlar)
++        void runPrint().catch((err) => {
++          logReceiptPrint('error-sale-print', { message: String(err) });
++        });
+       }
+-    }
+ 
+-    const receiptPayment = method === 'split' ? 'card' : method;
+-    if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
+-      const receiptData = buildReceiptFromCart(
+-        paidItems,
+-        store.products,
+-        receiptPayment,
+-        sale.total,
+-        store.settings.businessName,
+-        { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
+-        store.productSets,
+-      );
+-      await printThermalReceipt(receiptData);
++      const methodLabel = samplesOnly
++        ? 'Numune'
++        : method === 'cash' ? 'Nakit'
++          : method === 'card' ? 'Kart'
++            : method === 'credit' ? 'Veresiye'
++              : method === 'split' ? 'Bölünmüş'
++                : 'Havale';
++      const changeMsg = sale.changeGiven != null && sale.changeGiven > 0
++        ? ` · Para üstü ${formatCurrency(sale.changeGiven)}`
++        : '';
++      const fiscalMsg = receiptNo ? ` · Fiş: ${receiptNo}` : fiscalPrinted ? '' : samplesOnly ? '' : ' · Fiş yazdırıldı';
++      const sampleMsg = sampleCount > 0 ? ` · ${sampleCount} numune` : '';
++      const amountMsg = samplesOnly ? `${sampleCount} adet numune verildi` : `${formatCurrency(sale.total)} satış`;
++      setLastSale(`${methodLabel} ile ${amountMsg}${sampleMsg}${changeMsg}${fiscalMsg}`);
++      setTimeout(() => setLastSale(null), 5000);
++    } finally {
++      setCheckoutBusy(false);
++      focusBarcodeInput();
+     }
+-
+-    const methodLabel = samplesOnly
+-      ? 'Numune'
+-      : method === 'cash' ? 'Nakit'
+-        : method === 'card' ? 'Kart'
+-          : method === 'credit' ? 'Veresiye'
+-            : method === 'split' ? 'Bölünmüş'
+-              : 'Havale';
+-    const changeMsg = sale.changeGiven != null && sale.changeGiven > 0
+-      ? ` · Para üstü ${formatCurrency(sale.changeGiven)}`
+-      : '';
+-    const fiscalMsg = receiptNo ? ` · Fiş: ${receiptNo}` : fiscalPrinted ? '' : samplesOnly ? '' : ' · Fiş yazdırıldı';
+-    const sampleMsg = sampleCount > 0 ? ` · ${sampleCount} numune` : '';
+-    const amountMsg = samplesOnly ? `${sampleCount} adet numune verildi` : `${formatCurrency(sale.total)} satış`;
+-    setLastSale(`${methodLabel} ile ${amountMsg}${sampleMsg}${changeMsg}${fiscalMsg}`);
+-    setTimeout(() => setLastSale(null), 5000);
+-
+-    setCheckoutBusy(false);
+-    focusBarcodeInput();
+   }, [checkoutBusy, focusBarcodeInput, posCheckout, store]);
+ 
+   const handleCheckout = useCallback((method: 'cash' | 'card' | 'transfer' | 'credit' | 'split') => {
+@@ -522,12 +542,13 @@ export function SalesScreen({ store }: SalesScreenProps) {
+             onParkSale={() => store.parkCurrentSale()}
+             checkoutBusy={checkoutBusy}
+             cashDayClosed={store.isCashDayClosed && (posCheckout.blockSalesWhenDayClosed ?? true)}
+-            crmCouponCode={store.saleCouponCode}
+-            onCrmCouponChange={store.setSaleCouponCode}
+-            crmPointsToRedeem={store.saleLoyaltyPointsToRedeem}
+-            onCrmPointsChange={store.setSaleLoyaltyPointsToRedeem}
+-            cartSubtotal={store.cartSubtotal}
+-            crmDiscountLabel={crmDiscountLabel}
++            crmCouponCode={posLiteCheckout ? '' : store.saleCouponCode}
++            onCrmCouponChange={posLiteCheckout ? undefined : store.setSaleCouponCode}
++            crmPointsToRedeem={posLiteCheckout ? 0 : store.saleLoyaltyPointsToRedeem}
++            onCrmPointsChange={posLiteCheckout ? undefined : store.setSaleLoyaltyPointsToRedeem}
++            cartSubtotal={posLiteCheckout ? undefined : store.cartSubtotal}
++            crmDiscountLabel={posLiteCheckout ? '' : crmDiscountLabel}
++            compactCheckout={posLiteCheckout}
+             businessName={formatBusinessBrand(store.settings.businessName)}
+             posNotes={store.settings.posNotes.items}
+             posNotesDurationSec={store.settings.posNotes.displayDurationSec}
+diff --git a/src/components/SettingsScreen.tsx b/src/components/SettingsScreen.tsx
+index ac4e101..af6688b 100644
+--- a/src/components/SettingsScreen.tsx
++++ b/src/components/SettingsScreen.tsx
+@@ -11,6 +11,8 @@ import { UsersManagement } from './UsersManagement';
+ import { CurrencyRatesSettings } from './CurrencyRatesSettings';
+ import { CrmSettingsPanel } from './crm/CrmSettingsPanel';
+ import { PosCheckoutSettingsPanel } from './pos/PosCheckoutSettingsPanel';
++import { PosReceiptPrinterSettingsPanel } from './pos/PosReceiptPrinterSettingsPanel';
++import { isPosLiteProfile } from '../utils/tenantProductProfile';
+ import { EmailOutboxSettingsPanel } from './settings/EmailOutboxSettingsPanel';
+ 
+ interface SettingsScreenProps {
+@@ -264,6 +266,10 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
+                 Değişiklikleri Kaydet
+               </button>
+             </div>
++
++            {isAdmin && (
++              <PosReceiptPrinterSettingsPanel store={store} />
++            )}
+           </section>
+         )}
+ 
+@@ -271,13 +277,17 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
+           <CurrencyRatesSettings store={store} />
+         )}
+ 
+-        {activeTab === 'crm' && isAdmin && (
++        {activeTab === 'crm' && isAdmin && !isPosLiteProfile(store.settings) && (
+           <>
+             <CrmSettingsPanel store={store} />
+             <PosCheckoutSettingsPanel store={store} />
+           </>
+         )}
+ 
++        {activeTab === 'crm' && isAdmin && isPosLiteProfile(store.settings) && (
++          <PosCheckoutSettingsPanel store={store} />
++        )}
++
+         {activeTab === 'notes' && (
+           <PosNotesSettings store={store} />
+         )}
+diff --git a/src/components/StockScreen.tsx b/src/components/StockScreen.tsx
+index 1098ca0..10f3474 100644
+--- a/src/components/StockScreen.tsx
++++ b/src/components/StockScreen.tsx
+@@ -7,13 +7,14 @@ import type { Product, WholesalePrices } from '../types/product';
+ import { formatCurrency, formatDateTime } from '../utils/format';
+ import { exportStockCsv, getStockInventoryValue } from '../utils/stockExport';
+ import {
+-  getIrsaliyeWarehouseStockMetrics,
++  getStockScreenMetrics,
+   IRSALIYE_CODES_WITHOUT_PRODUCT,
+   IRSALIYE_LUY2026000000002_ID,
+   IRSALIYE_PDF_LINE_COUNT,
+   IRSALIYE_WAREHOUSE_CODE_COUNT,
+   IRSALIYE_WAREHOUSE_UNIT_TOTAL,
+ } from '../utils/irsaliyeWarehouse';
++import { isPosLiteProfile } from '../utils/tenantProductProfile';
+ import {
+   WHOLESALE_BASE_LABELS,
+   WHOLESALE_QUANTITIES,
+@@ -108,9 +109,12 @@ export function StockScreen({ store }: StockScreenProps) {
+   const [bulkWholesaleDiscounts, setBulkWholesaleDiscounts] = useState(DEFAULT_WHOLESALE_DISCOUNTS);
+   const [wholesaleDisplayTier, setWholesaleDisplayTier] = useState<WholesaleDisplayTier>(10);
+ 
++  const posLiteCatalog = isPosLiteProfile(store.settings);
++  const stockListMode = posLiteCatalog ? 'tenant-catalog' : 'irsaliye-warehouse';
++
+   const warehouse = useMemo(
+-    () => getIrsaliyeWarehouseStockMetrics(store.products, store.lowStockThreshold),
+-    [store.products, store.lowStockThreshold],
++    () => getStockScreenMetrics(store.products, store.lowStockThreshold, stockListMode),
++    [store.products, store.lowStockThreshold, stockListMode],
+   );
+ 
+   const warehouseProducts = warehouse.products;
+@@ -336,16 +340,22 @@ export function StockScreen({ store }: StockScreenProps) {
+         </div>
+       </div>
+ 
+-      <div className="stock-summary-strip" role="region" aria-label="İrsaliye depo özeti">
++      <div
++        className="stock-summary-strip"
++        role="region"
++        aria-label={posLiteCatalog ? 'Stok özeti' : 'İrsaliye depo özeti'}
++      >
+         <div className="stock-summary-strip-main">
+           <button type="button" className="stock-summary-chip active" onClick={() => applyFilter('all')}>
+             <span className="stock-summary-chip-label">Ürün</span>
+             <strong>{warehouseProducts.length}</strong>
+           </button>
+-          <span className="stock-summary-chip stock-summary-chip--static">
+-            <span className="stock-summary-chip-label">Stok kodu</span>
+-            <strong>{IRSALIYE_WAREHOUSE_CODE_COUNT}</strong>
+-          </span>
++          {!posLiteCatalog && (
++            <span className="stock-summary-chip stock-summary-chip--static">
++              <span className="stock-summary-chip-label">Stok kodu</span>
++              <strong>{IRSALIYE_WAREHOUSE_CODE_COUNT}</strong>
++            </span>
++          )}
+           <button type="button" className="stock-summary-chip stock-summary-chip--green" onClick={() => applyFilter('all')}>
+             <span className="stock-summary-chip-label">Toplam stok</span>
+             <strong>{totalStockUnits.toLocaleString('tr-TR')}</strong>
+@@ -387,7 +397,7 @@ export function StockScreen({ store }: StockScreenProps) {
+             {summaryOpen ? 'Özet gizle ▴' : 'Detaylı özet ▾'}
+           </button>
+         </div>
+-        {summaryOpen && (
++        {summaryOpen && !posLiteCatalog && (
+           <div className="stock-summary-strip-detail">
+             <span className="stock-summary-meta">
+               e-İrsaliye <strong>{IRSALIYE_LUY2026000000002_ID}</strong> · {IRSALIYE_PDF_LINE_COUNT} satır ·{' '}
+@@ -405,14 +415,22 @@ export function StockScreen({ store }: StockScreenProps) {
+             <span className="stock-version">Depo {APP_CATALOG_VERSION}</span>
+           </div>
+         )}
++        {summaryOpen && posLiteCatalog && (
++          <div className="stock-summary-strip-detail">
++            <span className="stock-summary-meta">
++              Mağaza kataloğu · {warehouseProducts.length} ürün · toplam stok{' '}
++              {totalStockUnits.toLocaleString('tr-TR')} · envanter {formatCurrency(inventoryValue)}
++            </span>
++          </div>
++        )}
+       </div>
+ 
+       <div className="stock-body">
+         <div className="stock-table-panel">
+           <div className="stock-table-bar">
+             <span>
+-              <strong>{filtered.length}</strong> / {warehouseProducts.length} irsaliye ürünü · PDF{' '}
+-              {IRSALIYE_PDF_LINE_COUNT} satır
++              <strong>{filtered.length}</strong> / {warehouseProducts.length}{' '}
++              {posLiteCatalog ? 'ürün' : `irsaliye ürünü · PDF ${IRSALIYE_PDF_LINE_COUNT} satır`}
+             </span>
+             {totalPages > 1 && (
+               <div className="pagination">
+diff --git a/src/components/pos/PosReceiptPrinterSettingsPanel.tsx b/src/components/pos/PosReceiptPrinterSettingsPanel.tsx
+new file mode 100644
+index 0000000..7712bde
+--- /dev/null
++++ b/src/components/pos/PosReceiptPrinterSettingsPanel.tsx
+@@ -0,0 +1,180 @@
++import { useState } from 'react';
++import type { Store } from '../../store/useStore';
++import {
++  DEFAULT_ZYWELL_RECEIPT_PRINTER,
++  normalizeReceiptPrinterSettings,
++  type ReceiptPrinterBrand,
++  type ReceiptPrintMode,
++} from '../../types/receiptPrinter';
++import { isPosLiteProfile } from '../../utils/tenantProductProfile';
++import { printTestSaleReceipt } from '../../utils/receiptPrint';
++import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
++import { loadTenantId } from '../../storage/tenantSession';
++import { APP_BUILD_ID, APP_FEATURE_TAG } from '../../version';
++
++function ReceiptPrintDebugBlock({ businessName }: { businessName: string }) {
++  const [status, setStatus] = useState('');
++  const tenant = loadTenantId();
++  const logPath =
++    tenant === 'main' || !tenant
++      ? '/var/www/market-pos/data/receipt-print.log'
++      : `/var/www/market-pos/data/tenants/${tenant}/receipt-print.log`;
++
++  const runTest = async () => {
++    setStatus('Test fiş gönderiliyor…');
++    try {
++      await printTestSaleReceipt(businessName);
++      const err = getLastReceiptPrintError();
++      const tail = getReceiptPrintLog().slice(-5).map((e) => e.phase).join(' → ');
++      setStatus(err ? `Hata: ${err}` : `Adımlar: ${tail}`);
++    } catch (e) {
++      setStatus(`Hata: ${String(e)}`);
++    }
++  };
++
++  return (
++    <div className="settings-subpanel" style={{ marginTop: 12 }}>
++      <h3>Fiş teşhis</h3>
++      <button type="button" className="btn btn-outline" onClick={() => void runTest()}>
++        Test fiş yazdır
++      </button>
++      {status ? <p className="module-hint">{status}</p> : null}
++      <p className="module-hint">
++        <strong>Tarayıcı:</strong> F12 → Konsol → <code>market-pos-fis</code> satırları.
++        <br />
++        <strong>Sunucu (SSH):</strong> <code>tail -f {logPath}</code>
++        <br />
++        <strong>Mac yazıcı:</strong> Terminal → <code>lpstat -p</code> ve{' '}
++        <code>tail -f /var/log/cups/error_log</code>
++        <br />
++        <strong>Önizleme bozuksa:</strong> üst/alt bilgi <strong>kapalı</strong>, ölçek <strong>%100</strong>.
++        <br />
++        <strong>Chrome:</strong> Hedef <strong>POS-80C</strong>. Kağıt boyutu küçük kare (2,125 inç) ise
++        Mac’te yazıcıya <strong>80mm termal rulo</strong> tanımlayın; Chrome’da en geniş rulo seçin.
++        <code>lpstat -p -d</code>
++      </p>
++    </div>
++  );
++}
++
++interface PosReceiptPrinterSettingsPanelProps {
++  store: Store;
++}
++
++export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSettingsPanelProps) {
++  if (isPosLiteProfile(store.settings)) {
++    return (
++      <section className="settings-panel settings-panel--receipt-printer">
++        <h2>Fiş yazıcısı</h2>
++        <p className="module-hint">
++          <strong>Lima Market</strong> — ayrı mağaza, <strong>limaadmin</strong> ile giriş. Satış sonrası
++          otomatik premium fiş. Mac’te <strong>c0/Ç0</strong> için: Terminal’de sürekli çalışan ham yazdır
++          köprüsü (CUPS rastertopos atlanır):{' '}
++          <code>node scripts/lima-mac-raw-print.mjs</code> — sonra test satışı.
++        </p>
++        <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
++        <p className="module-hint muted" style={{ marginTop: 8, fontSize: 11 }}>
++          Yüklü sürüm: {APP_FEATURE_TAG} · {APP_BUILD_ID}
++          {APP_FEATURE_TAG !== 'receipt-print-debug' ? ' — sayfayı Cmd+Shift+R ile yenileyin' : null}
++        </p>
++      </section>
++    );
++  }
++
++  const printer = normalizeReceiptPrinterSettings(store.settings.receiptPrinter);
++
++  const set = (patch: Partial<typeof printer>) => {
++    store.updateReceiptPrinterSettings(patch);
++  };
++
++  const applyZywellPreset = () => {
++    store.updateReceiptPrinterSettings({ ...DEFAULT_ZYWELL_RECEIPT_PRINTER });
++  };
++
++  return (
++    <section className="settings-panel settings-panel--receipt-printer">
++      <div className="settings-panel-head">
++        <div>
++          <h2>Fiş yazıcısı</h2>
++          <p>Termal fiş (Zywell 80mm) — Windows’ta yazıcı adı Chrome ile eşleşmeli</p>
++        </div>
++        <button type="button" className="btn btn-outline" onClick={applyZywellPreset}>
++          POS-80C / Zywell varsayılanı
++        </button>
++      </div>
++
++      <div className="settings-form-grid settings-form-grid--checks">
++        <label className="settings-check">
++          <input
++            type="checkbox"
++            checked={printer.enabled}
++            onChange={(e) => set({ enabled: e.target.checked })}
++          />
++          <span>Gelişmiş fiş profili (kapalı = Greenleaf kasa yolu, önerilen)</span>
++        </label>
++        <label className="settings-check">
++          <input
++            type="checkbox"
++            checked={printer.autoPrintOnSale}
++            onChange={(e) => set({ autoPrintOnSale: e.target.checked })}
++          />
++          <span>Satış sonrası otomatik fiş</span>
++        </label>
++        <label className="settings-field">
++          <span>Marka</span>
++          <select
++            value={printer.brand}
++            onChange={(e) => set({ brand: e.target.value as ReceiptPrinterBrand })}
++          >
++            <option value="none">Kapalı / tarayıcı varsayılanı</option>
++            <option value="zywell">Zywell</option>
++            <option value="generic">Diğer termal</option>
++          </select>
++        </label>
++        <label className="settings-field">
++          <span>Windows yazıcı adı</span>
++          <input
++            value={printer.windowsPrinterName}
++            onChange={(e) => set({ windowsPrinterName: e.target.value })}
++            placeholder="Örn. POS-80C, Zywell"
++          />
++        </label>
++        <label className="settings-field">
++          <span>Fiş formatı</span>
++          <select
++            value={printer.printMode}
++            onChange={(e) => set({ printMode: e.target.value as ReceiptPrintMode })}
++          >
++            <option value="plain">Düz metin (Zywell — önerilen)</option>
++            <option value="html">HTML tablo</option>
++          </select>
++        </label>
++        <label className="settings-field">
++          <span>Kağıt genişliği</span>
++          <select
++            value={String(printer.paperWidthMm)}
++            onChange={(e) => set({ paperWidthMm: e.target.value === '58' ? 58 : 80 })}
++          >
++            <option value="80">80 mm</option>
++            <option value="58">58 mm</option>
++          </select>
++        </label>
++        <label className="settings-field">
++          <span>Kopya sayısı</span>
++          <input
++            type="number"
++            min={1}
++            max={3}
++            value={printer.copies}
++            onChange={(e) => set({ copies: parseInt(e.target.value, 10) || 1 })}
++          />
++        </label>
++      </div>
++      <p className="module-hint">
++        <strong>Kapalı</strong> bırakın: diğer kullanıcıdaki (yonetici) gibi HTML fiş + Chrome + POS-80C.
++        Sadece özel ihtiyaçta açın. Chrome: hedef POS-80C, üst/alt bilgiler kapalı, kenar yok, sayfa genişliğine sığdır.
++      </p>
++      <ReceiptPrintDebugBlock businessName={store.settings.businessName} />
++    </section>
++  );
++}
+diff --git a/src/services/fiscalBridge.ts b/src/services/fiscalBridge.ts
+index 17e32c9..352adbd 100644
+--- a/src/services/fiscalBridge.ts
++++ b/src/services/fiscalBridge.ts
+@@ -25,6 +25,18 @@ export interface FiscalReceiptResponse {
+   simulated?: boolean;
+ }
+ 
++/** Termal fiş atlanır yalnızca gerçek mali cihazda fiş kesildiğinde (belirsiz yanıtlarda termal devam). */
++export function isRealFiscalDevicePrint(
++  fiscal: Pick<FiscalReceiptResponse, 'success' | 'simulated' | 'receiptNo'>,
++): boolean {
++  if (!fiscal.success) return false;
++  if (fiscal.simulated === true) return false;
++  if (fiscal.simulated === false) return true;
++  const receiptNo = String(fiscal.receiptNo ?? '');
++  if (receiptNo.startsWith('SIM-')) return false;
++  return false;
++}
++
+ export interface FiscalReturnReceiptItem extends FiscalReceiptItem {
+   priceType?: PriceType;
+ }
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index eb768b5..629807a 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -52,6 +52,7 @@ import {
+ import {
+   DEFAULT_POS_NOTES,
+   DEFAULT_SETTINGS,
++  normalizeReceiptPrinterSettings,
+   normalizeUtilityBillSubscriptions,
+   type PosNote,
+ } from '../types/business';
+@@ -196,6 +197,7 @@ import {
+ import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
+ import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+ import { isPosLiteProfile } from '../utils/tenantProductProfile';
++import { sanitizeReceiptPrinterSettings } from '../utils/greenleafReceipt';
+ 
+ function storageKeys() {
+   return posLocalStorageKeys();
+@@ -512,6 +514,10 @@ function loadSettings(): AppSettings {
+         customExpenseCategories: normalizeCustomExpenseCategories(parsed.customExpenseCategories),
+         crm: { ...DEFAULT_CRM_SETTINGS, ...(parsed.crm ?? {}), automationEnabled: parsed.crm?.automationEnabled ?? DEFAULT_CRM_SETTINGS.automationEnabled },
+         posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(parsed.posCheckout ?? {}) },
++        receiptPrinter: sanitizeReceiptPrinterSettings({
++          ...DEFAULT_SETTINGS,
++          ...parsed,
++        } as AppSettings),
+       };
+     } catch {
+       return DEFAULT_SETTINGS;
+@@ -741,9 +747,16 @@ function buildLocalSnapshot(
+   capitalContributions: CapitalContribution[],
+   crm: CrmPersistedData,
+ ): PersistedStoreSnapshot {
++  const posLite = isPosLiteProfile(settings);
+   return {
+     updatedAt: new Date().toISOString(),
+-    products: products.map(({ imageUrl: _, ...rest }) => rest),
++    products: products.map((p) => {
++      const { imageUrl, catalogImageId, ...rest } = p;
++      const next: Product = { ...rest };
++      if (catalogImageId != null) next.catalogImageId = catalogImageId;
++      if (posLite && imageUrl?.startsWith('/product-images/')) next.imageUrl = imageUrl;
++      return next;
++    }),
+     productSets,
+     sales,
+     saleReturns,
+@@ -850,9 +863,11 @@ export function useStore() {
+     users?: PosUser[];
+     cashSessions?: DailyCashSession[];
+   }): PersistedStoreSnapshot => {
+-    const { products: irsaliyeProducts } = applyIrsaliyeStockToProducts(products);
++    const snapshotProducts = isIsolatedStoreContext(settings)
++      ? products
++      : applyIrsaliyeStockToProducts(products).products;
+     return buildLocalSnapshot(
+-      irsaliyeProducts,
++      snapshotProducts,
+       productSets,
+       sales,
+       saleReturns,
+@@ -948,6 +963,7 @@ export function useStore() {
+       ),
+       crm: { ...DEFAULT_CRM_SETTINGS, ...(snapshot.settings?.crm ?? {}) },
+       posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS, ...(snapshot.settings?.posCheckout ?? {}) },
++      receiptPrinter: sanitizeReceiptPrinterSettings(mergedSettings),
+     });
+     if (snapshot.priceType) setPriceType(snapshot.priceType);
+     setUsers(resolveUsersFromSnapshot(snapshot, mergedSettings));
+@@ -2088,6 +2104,10 @@ export function useStore() {
+ 
+   useEffect(() => {
+     if (!syncReady || irsaliyeStockMigrationRef.current) return;
++    if (isIsolatedStoreContext(settings)) {
++      irsaliyeStockMigrationRef.current = true;
++      return;
++    }
+     if (localStorage.getItem(IRSALIYE_STOCK_MIGRATION_KEY)) {
+       irsaliyeStockMigrationRef.current = true;
+       return;
+@@ -2111,7 +2131,7 @@ export function useStore() {
+         { irsaliye: 'LUY2026000000002' },
+       );
+     }
+-  }, [syncReady, products, authSession, logActivity]);
++  }, [syncReady, products, authSession, logActivity, settings]);
+ 
+   const refreshExchangeRatesFromTcmb = useCallback(async () => {
+     const tcmb = await fetchTcmbRates();
+@@ -4003,6 +4023,19 @@ export function useStore() {
+     });
+   }, [settings.posCheckout, updateSettings]);
+ 
++  const updateReceiptPrinterSettings = useCallback(
++    (patch: Partial<AppSettings['receiptPrinter']>) => {
++      if (isPosLiteProfile(settings)) return;
++      updateSettings({
++        receiptPrinter: normalizeReceiptPrinterSettings({
++          ...settings.receiptPrinter,
++          ...patch,
++        }),
++      });
++    },
++    [settings, updateSettings],
++  );
++
+   const processSaleReturn = useCallback((
+     saleId: string,
+     requestedLines: Array<{ lineKey: string; quantity: number }>,
+@@ -4633,6 +4666,7 @@ export function useStore() {
+     heldPosSales,
+     recordCashDrawerCount,
+     updatePosCheckoutSettings,
++    updateReceiptPrinterSettings,
+     processSaleReturn,
+     setProductStock,
+     updateProductBarcode,
+diff --git a/src/styles/global.css b/src/styles/global.css
+index 4aa8b0c..3727349 100644
+--- a/src/styles/global.css
++++ b/src/styles/global.css
+@@ -1555,10 +1555,69 @@ input {
+   padding: 0 4px 8px;
+ }
+ 
++.cart-panel-header-title {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  min-width: 0;
++}
++
+ .cart-panel-header-row h2 {
+   font-size: 18px;
+   font-weight: 600;
+   flex-shrink: 0;
++  margin: 0;
++}
++
++.cart-panel-header-clear {
++  border: 1px solid rgba(220, 38, 38, 0.35);
++  background: rgba(254, 226, 226, 0.9);
++  color: #b91c1c;
++  font-size: 11px;
++  font-weight: 700;
++  padding: 4px 10px;
++  border-radius: 999px;
++  cursor: pointer;
++  white-space: nowrap;
++}
++
++.cart-panel-header-clear:hover:not(:disabled) {
++  background: #dc2626;
++  color: #fff;
++  border-color: #dc2626;
++}
++
++.cart-panel-header-clear:disabled {
++  opacity: 0.5;
++  cursor: not-allowed;
++}
++
++.cart-payment-toolbar {
++  display: flex;
++  justify-content: flex-end;
++  margin-bottom: 6px;
++}
++
++.cart-footer-clear {
++  border: 1px solid var(--border);
++  background: var(--bg-card);
++  color: var(--text-muted);
++  font-size: 11px;
++  font-weight: 600;
++  padding: 5px 12px;
++  border-radius: 6px;
++  cursor: pointer;
++}
++
++.cart-footer-clear:hover:not(:disabled) {
++  border-color: rgba(220, 38, 38, 0.4);
++  color: #b91c1c;
++  background: rgba(254, 226, 226, 0.5);
++}
++
++.cart-footer-clear:disabled {
++  opacity: 0.5;
++  cursor: not-allowed;
+ }
+ 
+ .cart-panel-header-actions {
+@@ -2639,11 +2698,107 @@ input {
+ }
+ 
+ .cart-panel-footer {
++  flex-shrink: 0;
+   padding: 20px;
+   border-top: 1px solid var(--border);
+   background: var(--bg);
+ }
+ 
++/* POS Lite — daha fazla sepet satırı, kompakt ödeme */
++.cart-panel--compact-checkout .cart-panel-footer {
++  padding: 10px 12px 8px;
++}
++
++.cart-panel--compact-checkout.cart-panel--has-items .sale-customer-bar {
++  display: none;
++}
++
++.cart-panel--compact-checkout .cart-item {
++  padding: 8px 10px;
++  gap: 6px;
++  margin-bottom: 6px;
++}
++
++.cart-panel--compact-checkout .cart-item-info {
++  gap: 8px;
++}
++
++.cart-panel--compact-checkout .cart-item-info .product-image-sm {
++  width: 40px;
++  height: 40px;
++}
++
++.cart-panel--compact-checkout .cart-item-name {
++  font-size: 12px;
++  -webkit-line-clamp: 2;
++}
++
++.cart-panel--compact-checkout .cart-item-controls {
++  gap: 8px;
++}
++
++.cart-panel--compact-checkout .qty-control {
++  padding: 2px;
++}
++
++.cart-panel--compact-checkout .qty-control button {
++  width: 24px;
++  height: 24px;
++  font-size: 14px;
++}
++
++.cart-panel--compact-checkout .qty-control span {
++  min-width: 20px;
++  font-size: 13px;
++}
++
++.cart-panel--compact-checkout .cart-item-total {
++  font-size: 13px;
++}
++
++.cart-panel--compact-checkout .cart-total {
++  margin-bottom: 8px;
++  font-size: 14px;
++}
++
++.cart-panel--compact-checkout .cart-total strong {
++  font-size: 20px;
++}
++
++.cart-panel--compact-checkout .payment-buttons--pos {
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 4px;
++}
++
++.cart-panel--compact-checkout .btn-payment {
++  padding: 7px 4px;
++  font-size: 10px;
++  line-height: 1.2;
++  border-radius: 6px;
++}
++
++.cart-panel--compact-checkout .cart-park-btn {
++  margin-top: 4px;
++  padding: 6px 10px;
++  font-size: 11px;
++  min-height: 0;
++}
++
++.cart-panel--compact-checkout .cart-shortcut-hint {
++  margin: 3px 0 0;
++  font-size: 9px;
++  line-height: 1.2;
++}
++
++.cart-panel--compact-checkout .cart-panel-top--compact {
++  padding-bottom: 6px;
++}
++
++.cart-panel--compact-checkout .cart-panel-top--compact + .cart-panel-items {
++  padding-top: 6px;
++  padding-bottom: 6px;
++}
++
+ .cart-total {
+   display: flex;
+   justify-content: space-between;
+diff --git a/src/types/business.ts b/src/types/business.ts
+index e8e2ff9..71cd44a 100644
+--- a/src/types/business.ts
++++ b/src/types/business.ts
+@@ -2,6 +2,10 @@ import type { PaymentStatus, PurchaseInvoiceLine } from './accounting';
+ import type { CurrencySettings } from './currency';
+ import type { CashDrawerCount, PosCheckoutSettings } from './pos';
+ import { DEFAULT_POS_CHECKOUT_SETTINGS } from './pos';
++import type { ReceiptPrinterSettings } from './receiptPrinter';
++import { DEFAULT_RECEIPT_PRINTER, normalizeReceiptPrinterSettings } from './receiptPrinter';
++
++export { normalizeReceiptPrinterSettings };
+ import { DEFAULT_CRM_SETTINGS, type CrmSettings } from './crm';
+ import { DEFAULT_CURRENCY_SETTINGS } from './currency';
+ import type { DashboardWidgetsConfig } from './dashboard';
+@@ -250,6 +254,9 @@ export interface AppSettings {
+   businessName: string;
+   /** `pos-lite`: stok + satış + sınırlı raporlar; Posta/müşteri modülleri kapalı profil */
+   productProfile?: TenantProductProfile;
++  /** POS Lite ürün id → Greenleaf katalog görsel id (örn. "1001": 1) */
++  posLiteCatalogImageByProductId?: Record<string, number>;
++  posLiteImageUrlByProductId?: Record<string, string>;
+   lowStockThreshold: number;
+   defaultPriceType: PriceType;
+   posNotes: PosNotesConfig;
+@@ -263,6 +270,7 @@ export interface AppSettings {
+   customExpenseCategories?: CustomExpenseCategory[];
+   crm?: CrmSettings;
+   posCheckout?: PosCheckoutSettings;
++  receiptPrinter?: ReceiptPrinterSettings;
+ }
+ 
+ export const DEFAULT_POS_NOTES: PosNotesConfig = {
+@@ -288,6 +296,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
+   customExpenseCategories: [],
+   crm: { ...DEFAULT_CRM_SETTINGS },
+   posCheckout: { ...DEFAULT_POS_CHECKOUT_SETTINGS },
++  receiptPrinter: { ...DEFAULT_RECEIPT_PRINTER },
+ };
+ 
+ export { normalizeUtilityBillSubscriptions };
+diff --git a/src/types/product.ts b/src/types/product.ts
+index 4350fbe..486243d 100644
+--- a/src/types/product.ts
++++ b/src/types/product.ts
+@@ -27,6 +27,8 @@ export interface Product {
+   /** Numune stok adedi (satılabilir stoktan bağımsız) */
+   sampleStock?: number;
+   imageUrl?: string;
++  /** Greenleaf katalog görseli (farklı tenant ürün id’si için kaynak id, örn. Lima #1001 → main #1) */
++  catalogImageId?: number;
+   sourceUrl?: string;
+   /** Adet kademeli toptan birim fiyatları (KDV dahil) */
+   wholesalePrices?: WholesalePrices;
+diff --git a/src/types/receiptPrinter.ts b/src/types/receiptPrinter.ts
+new file mode 100644
+index 0000000..ae5a2b7
+--- /dev/null
++++ b/src/types/receiptPrinter.ts
+@@ -0,0 +1,73 @@
++export type ReceiptPrinterBrand = 'none' | 'zywell' | 'generic';
++/** `plain`: sade metin (Zywell/ESC-POS sürücüde güvenli); `html`: tablo fiş */
++export type ReceiptPrintMode = 'plain' | 'html';
++
++export interface ReceiptPrinterSettings {
++  /** Fiş yazdırma aktif */
++  enabled: boolean;
++  brand: ReceiptPrinterBrand;
++  /** Windows’ta görünen yazıcı adı (Chrome yazdır → hedef) */
++  windowsPrinterName: string;
++  paperWidthMm: 58 | 80;
++  /** Her satış sonrası termal fiş */
++  autoPrintOnSale: boolean;
++  copies: number;
++  printMode: ReceiptPrintMode;
++  /** @page kenar boşluğu (mm) — termalde 0 */
++  pageMarginMm: number;
++}
++
++/** Greenleaf kasa — POS-80C; «gelişmiş profil» kapalı (çalışan yönetici yolu) */
++export const GREENLEAF_KASA_RECEIPT_PRESET: ReceiptPrinterSettings = {
++  enabled: false,
++  brand: 'zywell',
++  windowsPrinterName: 'POS-80C',
++  paperWidthMm: 80,
++  autoPrintOnSale: true,
++  copies: 1,
++  printMode: 'html',
++  pageMarginMm: 0,
++};
++
++/** Ayarlar → «POS-80C varsayılanı» butonu */
++export const DEFAULT_ZYWELL_RECEIPT_PRINTER: ReceiptPrinterSettings = {
++  ...GREENLEAF_KASA_RECEIPT_PRESET,
++};
++
++export const DEFAULT_RECEIPT_PRINTER: ReceiptPrinterSettings = {
++  enabled: false,
++  brand: 'none',
++  windowsPrinterName: '',
++  paperWidthMm: 80,
++  autoPrintOnSale: true,
++  copies: 1,
++  printMode: 'html',
++  pageMarginMm: 0,
++};
++
++export function normalizeReceiptPrinterSettings(
++  raw?: Partial<ReceiptPrinterSettings> | null,
++): ReceiptPrinterSettings {
++  const base = { ...DEFAULT_RECEIPT_PRINTER, ...(raw ?? {}) };
++  const paper = base.paperWidthMm === 58 ? 58 : 80;
++  const copies = Math.min(3, Math.max(1, Math.floor(Number(base.copies) || 1)));
++  const brand =
++    base.brand === 'zywell' || base.brand === 'generic' || base.brand === 'none'
++      ? base.brand
++      : 'none';
++  return {
++    enabled: Boolean(base.enabled),
++    brand,
++    windowsPrinterName: String(base.windowsPrinterName ?? '').trim(),
++    paperWidthMm: paper,
++    autoPrintOnSale: base.autoPrintOnSale !== false,
++    copies,
++    printMode: base.printMode === 'html' ? 'html' : 'plain',
++    pageMarginMm: Math.min(8, Math.max(0, Number(base.pageMarginMm) || 0)),
++  };
++}
++
++export type ThermalReceiptPrintOptions = Pick<
++  ReceiptPrinterSettings,
++  'paperWidthMm' | 'copies' | 'printMode' | 'pageMarginMm' | 'brand'
++>;
+diff --git a/src/utils/cashRegisterReceiptPrint.ts b/src/utils/cashRegisterReceiptPrint.ts
+index 71d89c0..bfc2643 100644
+--- a/src/utils/cashRegisterReceiptPrint.ts
++++ b/src/utils/cashRegisterReceiptPrint.ts
+@@ -1,4 +1,4 @@
+-import { printFiscalCashReport } from '../services/fiscalBridge';
++import { isRealFiscalDevicePrint, printFiscalCashReport } from '../services/fiscalBridge';
+ import {
+   CASH_ACTIVITY_KIND_LABELS,
+   type CashActivityRow,
+@@ -254,7 +254,7 @@ export async function printCashRegisterReceipt(
+   try {
+     const fiscal = await printFiscalCashReport(buildFiscalPayload(data));
+     if (fiscal.success) {
+-      fiscalPrinted = !fiscal.simulated;
++      fiscalPrinted = isRealFiscalDevicePrint(fiscal);
+       if (fiscalPrinted) {
+         return {
+           printed: true,
+diff --git a/src/utils/greenleafReceipt.ts b/src/utils/greenleafReceipt.ts
+new file mode 100644
+index 0000000..d54630c
+--- /dev/null
++++ b/src/utils/greenleafReceipt.ts
+@@ -0,0 +1,33 @@
++import type { AppSettings } from '../types/business';
++import {
++  DEFAULT_RECEIPT_PRINTER,
++  normalizeReceiptPrinterSettings,
++  type ReceiptPrinterSettings,
++} from '../types/receiptPrinter';
++import { loadTenantId } from '../storage/tenantSession';
++import { isPosLiteProfile } from './tenantProductProfile';
++
++export const LIMA_MARKET_TENANT_ID = 'lima-market';
++
++export function isLimaMarketTenant(tenantId = loadTenantId()): boolean {
++  return tenantId === LIMA_MARKET_TENANT_ID;
++}
++
++/** Lima / POS Lite — tarayıcıdaki eski «gelişmiş yazıcı» ayarını sıfırla */
++export function sanitizeReceiptPrinterSettings(
++  settings: AppSettings,
++  tenantId = loadTenantId(),
++): ReceiptPrinterSettings {
++  if (isLimaMarketTenant(tenantId) || isPosLiteProfile(settings)) {
++    return { ...DEFAULT_RECEIPT_PRINTER, enabled: false };
++  }
++  return normalizeReceiptPrinterSettings(settings.receiptPrinter);
++}
++
++/** Yönetici / Greenleaf kasa: sunucu profili kapalı veya POS Lite tenant */
++export function shouldUseGreenleafReceiptPath(settings: AppSettings): boolean {
++  if (isLimaMarketTenant() || isPosLiteProfile(settings)) return true;
++  const raw = settings.receiptPrinter;
++  if (raw == null) return true;
++  return !normalizeReceiptPrinterSettings(raw).enabled;
++}
+diff --git a/src/utils/irsaliyeWarehouse.ts b/src/utils/irsaliyeWarehouse.ts
+index 45c0d49..1fe040c 100644
+--- a/src/utils/irsaliyeWarehouse.ts
++++ b/src/utils/irsaliyeWarehouse.ts
+@@ -41,8 +41,8 @@ export function getIrsaliyeWarehouseProducts(products: Product[]): Product[] {
+   return products.filter(isIrsaliyeWarehouseProduct);
+ }
+ 
+-export function getIrsaliyeWarehouseStockMetrics(
+-  products: Product[],
++function stockMetricsForProductList(
++  warehouseProducts: Product[],
+   lowStockThreshold: number,
+ ): {
+   products: Product[];
+@@ -52,7 +52,6 @@ export function getIrsaliyeWarehouseStockMetrics(
+   inStockCount: number;
+   healthPercent: number;
+ } {
+-  const warehouseProducts = getIrsaliyeWarehouseProducts(products);
+   const totalStockUnits = warehouseProducts.reduce((sum, p) => sum + p.stock, 0);
+   const lowStockCount = warehouseProducts.filter(
+     (p) => p.stock > 0 && p.stock <= lowStockThreshold,
+@@ -74,4 +73,22 @@ export function getIrsaliyeWarehouseStockMetrics(
+   };
+ }
+ 
++/** Greenleaf: yalnızca irsaliye depo kartları; POS Lite: tüm katalog */
++export function getStockScreenMetrics(
++  products: Product[],
++  lowStockThreshold: number,
++  mode: 'irsaliye-warehouse' | 'tenant-catalog',
++) {
++  const list =
++    mode === 'tenant-catalog' ? products : getIrsaliyeWarehouseProducts(products);
++  return stockMetricsForProductList(list, lowStockThreshold);
++}
++
++export function getIrsaliyeWarehouseStockMetrics(
++  products: Product[],
++  lowStockThreshold: number,
++) {
++  return getStockScreenMetrics(products, lowStockThreshold, 'irsaliye-warehouse');
++}
++
+ export { IRSALIYE_LUY2026000000002_ID };
+diff --git a/src/utils/limaMacRawPrint.ts b/src/utils/limaMacRawPrint.ts
+new file mode 100644
+index 0000000..d307b8c
+--- /dev/null
++++ b/src/utils/limaMacRawPrint.ts
+@@ -0,0 +1,34 @@
++const LIMA_RAW_PRINT_URL =
++  typeof import.meta.env?.VITE_LIMA_RAW_PRINT_URL === 'string' &&
++  import.meta.env.VITE_LIMA_RAW_PRINT_URL
++    ? import.meta.env.VITE_LIMA_RAW_PRINT_URL
++    : 'http://127.0.0.1:18765/print';
++
++const RAW_PRINT_TIMEOUT_MS = 2500;
++
++/** Mac’te lima-mac-raw-print.mjs — CUPS rastertopos (c0) atlanır */
++export async function tryLimaMacRawReceiptPrint(text: string): Promise<boolean> {
++  try {
++    const res = await fetch(LIMA_RAW_PRINT_URL, {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ text }),
++      signal: AbortSignal.timeout(RAW_PRINT_TIMEOUT_MS),
++    });
++    if (!res.ok) return false;
++    const data = (await res.json()) as { ok?: boolean };
++    return data.ok === true;
++  } catch {
++    return false;
++  }
++}
++
++export async function isLimaMacRawPrintAvailable(): Promise<boolean> {
++  try {
++    const base = LIMA_RAW_PRINT_URL.replace(/\/print\/?$/, '');
++    const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(800) });
++    return res.ok;
++  } catch {
++    return false;
++  }
++}
+diff --git a/src/utils/posFiscalCheckout.ts b/src/utils/posFiscalCheckout.ts
+index fe299d0..04562f3 100644
+--- a/src/utils/posFiscalCheckout.ts
++++ b/src/utils/posFiscalCheckout.ts
+@@ -1,7 +1,7 @@
+ import type { CartItem, Product } from '../types/product';
+ import type { ProductSet } from '../types/productSet';
+ import type { PosCheckoutSettings } from '../types/pos';
+-import { printFiscalReceipt } from '../services/fiscalBridge';
++import { isRealFiscalDevicePrint, printFiscalReceipt } from '../services/fiscalBridge';
+ 
+ export async function tryFiscalReceipt(
+   paidItems: CartItem[],
+@@ -35,7 +35,11 @@ export async function tryFiscalReceipt(
+   try {
+     const fiscal = await printFiscalReceipt({ items: fiscalItems, paymentMethod: fiscalMethod, total });
+     if (fiscal.success) {
+-      return { receiptNo: fiscal.receiptNo, fiscalPrinted: !fiscal.simulated, cancelled: false };
++      return {
++        receiptNo: fiscal.receiptNo,
++        fiscalPrinted: isRealFiscalDevicePrint(fiscal),
++        cancelled: false,
++      };
+     }
+     if (settings.fiscalFailMode === 'continue') {
+       return { fiscalPrinted: false, cancelled: false };
+diff --git a/src/utils/productImage.ts b/src/utils/productImage.ts
+index d9e1723..01b91a1 100644
+--- a/src/utils/productImage.ts
++++ b/src/utils/productImage.ts
+@@ -64,9 +64,24 @@ export function getPlaceholderImage(product: Product): string {
+   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+ }
+ 
++/** Lima demo kopyası (main 1,4,5,6 → 1001–1004) — settings haritası yüklenmeden önce yedek */
++const LIMA_DEMO_CATALOG_IMAGE_ID: Record<number, number> = {
++  1001: 1,
++  1002: 4,
++  1003: 5,
++  1004: 6,
++};
++
++function resolveCatalogImageId(product: Product): number {
++  return product.catalogImageId ?? LIMA_DEMO_CATALOG_IMAGE_ID[product.id] ?? product.id;
++}
++
+ export function getProductImageUrl(product: Product): string {
+-  const catalogPath = getCatalogImagePath(product.id);
+-  return product.imageUrl || catalogPath || getPlaceholderImage(product);
++  if (product.imageUrl?.startsWith('/product-images/')) {
++    return product.imageUrl;
++  }
++  const catalogPath = getCatalogImagePath(resolveCatalogImageId(product));
++  return catalogPath || getPlaceholderImage(product);
+ }
+ 
+ export function isCustomImage(product: Product): boolean {
+diff --git a/src/utils/receiptPrint.ts b/src/utils/receiptPrint.ts
+index b68559d..bd11006 100644
+--- a/src/utils/receiptPrint.ts
++++ b/src/utils/receiptPrint.ts
+@@ -1,6 +1,14 @@
+ import type { CartItem, PriceType, Product, Sale } from '../types/product';
+ import type { ProductSet } from '../types/productSet';
+ import type { SaleReturn } from '../types/saleReturn';
++import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
++import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
++import { logReceiptPrint } from './receiptPrintLog';
++import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
++import { tryLimaMacRawReceiptPrint } from './limaMacRawPrint';
++
++/** Termal sürücüde \u200b başlık kenarda «c0» / bozuk karakter basabiliyor */
++const BLANK_PRINT_TITLE = '';
+ 
+ export interface ReceiptLineItem {
+   name: string;
+@@ -44,6 +52,10 @@ const PAYMENT_LABELS: Record<SaleReceiptData['paymentMethod'], string> = {
+   credit: 'Veresiye',
+ };
+ 
++/** Mac rastertopos: c0 ilk satırlara basılır — markadan önce atıl satırlar */
++const RECEIPT_DRIVER_SACRIFICE_LINES = 4;
++const RECEIPT_SACRIFICE_FILL = '-';
++
+ function formatReceiptMoney(amount: number): string {
+   return new Intl.NumberFormat('tr-TR', {
+     style: 'currency',
+@@ -52,6 +64,14 @@ function formatReceiptMoney(amount: number): string {
+   }).format(amount);
+ }
+ 
++/** Termal düz metin — ₺ yerine TL (bazı ESC/POS sürücülerde sembol bozulmasın) */
++function formatReceiptMoneyPlain(amount: number): string {
++  return `${new Intl.NumberFormat('tr-TR', {
++    minimumFractionDigits: 2,
++    maximumFractionDigits: 2,
++  }).format(amount)} TL`;
++}
++
+ function formatReceiptDateTime(date: Date): string {
+   return new Intl.DateTimeFormat('tr-TR', {
+     day: '2-digit',
+@@ -149,58 +169,287 @@ export function buildReturnReceipt(
+   };
+ }
+ 
+-function receiptBaseStyles(): string {
++function receiptPageCss(paperWidthMm: 58 | 80, pageMarginMm = 0): string {
++  const m = Math.min(8, Math.max(0, pageMarginMm));
++  return `@page { size: ${paperWidthMm}mm auto; margin: ${m}mm; }`;
++}
++
++/** Termal: sans-serif + tek punto (Courier küçük raster’da silik; TOPLAM büyük punto koyu kalıyordu) */
++const RECEIPT_THERMAL_FONT =
++  'Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif';
++
++const RECEIPT_THERMAL_BOLD_CSS = `
++    body.receipt-thermal,
++    body.receipt-thermal * {
++      font-family: ${RECEIPT_THERMAL_FONT} !important;
++      font-size: 18px !important;
++      font-weight: 900 !important;
++      color: #000 !important;
++      -webkit-font-smoothing: none;
++      font-synthesis: weight;
++    }
++    body.receipt-thermal .title {
++      font-size: 19px !important;
++    }
++    body.receipt-thermal .total-row td,
++    body.receipt-thermal .total-row .line-price,
++    body.receipt-thermal .meta-row,
++    body.receipt-thermal .meta-row strong {
++      font-size: 18px !important;
++      font-weight: 900 !important;
++    }`;
++
++/** filter/text-shadow CUPS rastertopos’ta bbox’ı bozup 1–2 cm’lik boş kesik fiş yapabiliyor */
++const THERMAL_PRINT_DARK_CSS = `
++    @media print {
++      html, body {
++        margin: 0 !important;
++        padding: 0 !important;
++        -webkit-print-color-adjust: exact;
++        print-color-adjust: exact;
++      }
++      body.receipt-thermal,
++      body.receipt-thermal * {
++        font-weight: 900 !important;
++        color: #000 !important;
++      }
++      .divider { border-top-width: 2px; border-top-style: solid; }
++    }`;
++
++function receiptBaseStyles(paperWidthMm: 58 | 80 = 80, pageMarginMm = 0): string {
++  const bodyWidth = paperWidthMm === 58 ? 50 : 72;
+   return `
+-    @page { size: 80mm auto; margin: 4mm; }
++    ${receiptPageCss(paperWidthMm, pageMarginMm)}
++    ${RECEIPT_THERMAL_BOLD_CSS}
++    ${THERMAL_PRINT_DARK_CSS}
++    @media screen {
++      html, body { margin: 0 !important; padding: 0 !important; }
++    }
+     * { box-sizing: border-box; }
+     body {
+       margin: 0;
+       padding: 0;
+-      width: 72mm;
+-      font-family: "Courier New", Courier, monospace;
+-      font-size: 11px;
++      width: ${bodyWidth}mm;
++      font-family: ${RECEIPT_THERMAL_FONT};
++      font-size: 18px;
++      font-weight: 900;
+       line-height: 1.35;
+       color: #000;
+       background: #fff;
+     }
+     .center { text-align: center; }
+-    .bold { font-weight: 700; }
+-    .title { font-size: 14px; font-weight: 800; margin-bottom: 2px; }
+-    .muted { color: #333; font-size: 10px; }
++    .bold { font-weight: 900; }
++    .title { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
++    .muted { color: #000; font-size: 14px; font-weight: 900; }
+     .divider {
+       border: none;
+-      border-top: 1px dashed #000;
++      border-top: 2px solid #000;
+       margin: 8px 0;
+     }
+     table { width: 100%; border-collapse: collapse; }
+-    .line td { padding: 2px 0; vertical-align: top; }
++    .line td { padding: 2px 0; vertical-align: top; font-weight: 900; }
+     .line-name { width: 68%; word-break: break-word; }
+     .line-price { width: 32%; text-align: right; white-space: nowrap; }
+     .line-sub td {
+       padding: 0 0 4px;
+-      font-size: 9px;
+-      color: #444;
++      font-size: 13px;
++      font-weight: 900;
++      color: #000;
+     }
+     .total-row td {
+       padding-top: 6px;
+-      font-size: 13px;
+-      font-weight: 800;
++      font-size: 15px;
++      font-weight: 900;
+     }
+-    .total-row .line-price { font-size: 14px; }
+-    .footer { margin-top: 10px; font-size: 10px; }
++    .total-row .line-price { font-size: 15px; font-weight: 900; }
++    .footer { margin-top: 10px; font-size: 18px; font-weight: 900; }
++    .meta-row { font-size: 18px; font-weight: 900; }
++    ${receiptTailSpacerCss()}
+   `;
+ }
+ 
+-function buildReceiptPrintScript(): string {
++/** Termal: sabit @page yüksekliği veya kısa ölçüm → Mac POS-80C erken keser */
++function buildReceiptPrintScript(
++  paperWidthMm: 58 | 80 = 80,
++  fixedRollHeightMm?: number,
++): string {
++  const blankTitle = BLANK_PRINT_TITLE;
++  const rollMm = fixedRollHeightMm ?? 0;
+   return `
+   <script>
+-    window.onload = function () {
+-      setTimeout(function () { window.print(); }, 120);
+-    };
++    (function () {
++      var t = ${JSON.stringify(blankTitle)};
++      var paperW = ${paperWidthMm};
++      var fixedRoll = ${rollMm};
++      var CUT_MARGIN_MM = 36;
++      function measureReceiptHeightPx() {
++        var b = document.body;
++        var r = document.documentElement;
++        var marker = document.getElementById('receipt-end-marker');
++        if (marker && b) {
++          var top = b.getBoundingClientRect().top;
++          var bottom = marker.getBoundingClientRect().bottom;
++          if (bottom > top) return Math.ceil(bottom - top);
++        }
++        return Math.max(
++          b ? b.scrollHeight : 0,
++          r ? r.scrollHeight : 0,
++          b ? b.offsetHeight : 0,
++          b ? b.getBoundingClientRect().height : 0
++        );
++      }
++      function applyReceiptPageHeight() {
++        var mm = fixedRoll > 0 ? fixedRoll : 0;
++        if (!mm) {
++          var px = measureReceiptHeightPx();
++          mm = Math.ceil(px * 25.4 / 96) + CUT_MARGIN_MM;
++          if (mm < 140) mm = 140;
++          if (mm > 2400) mm = 2400;
++        }
++        var el = document.getElementById('receipt-page-dynamic');
++        if (!el) {
++          el = document.createElement('style');
++          el.id = 'receipt-page-dynamic';
++          document.head.appendChild(el);
++        }
++        el.textContent =
++          '@page { size: ' + paperW + 'mm ' + mm + 'mm !important; margin: 0 !important; }';
++      }
++      function before() {
++        document.title = t;
++        applyReceiptPageHeight();
++      }
++      window.applyReceiptPageHeight = applyReceiptPageHeight;
++      window.onbeforeprint = before;
++    })();
+   </script>`;
+ }
+ 
+-export function buildReturnReceiptHtml(data: ReturnReceiptData): string {
++const RECEIPT_TAIL_SPACER =
++  '<div id="receipt-end-marker" class="receipt-tail-spacer" aria-hidden="true"></div>';
++
++function receiptTailSpacerCss(): string {
++  return `.receipt-tail-spacer { height: 12mm; width: 100%; flex-shrink: 0; }`;
++}
++
++type ReceiptPrintWindow = Window & { applyReceiptPageHeight?: () => void };
++
++function applyReceiptPageHeightInWindow(win: ReceiptPrintWindow): void {
++  try {
++    win.applyReceiptPageHeight?.();
++  } catch {
++    /* ignore */
++  }
++}
++
++/** Layout + fontlar otursun, sonra ölçüm ve yazdır (beforeprint tek başına yetmeyebilir) */
++function scheduleThermalPrintInWindow(win: ReceiptPrintWindow, onError?: () => void): void {
++  const doc = win.document;
++  let printInvoked = false;
++  const trigger = () => {
++    if (printInvoked) return;
++    applyReceiptPageHeightInWindow(win);
++    window.setTimeout(() => {
++      if (printInvoked) return;
++      printInvoked = true;
++      applyReceiptPageHeightInWindow(win);
++      try {
++        doc.title = BLANK_PRINT_TITLE;
++        win.focus();
++        win.print();
++      } catch {
++        printInvoked = false;
++        onError?.();
++      }
++    }, 60);
++  };
++  const afterLayout = () => {
++    window.requestAnimationFrame(() => {
++      window.requestAnimationFrame(trigger);
++    });
++  };
++  if (doc.readyState === 'complete') {
++    window.setTimeout(afterLayout, 120);
++  } else {
++    win.addEventListener('load', () => window.setTimeout(afterLayout, 120), { once: true });
++  }
++}
++
++function escapeHtml(text: string): string {
++  return text
++    .replace(/&/g, '&amp;')
++    .replace(/</g, '&lt;')
++    .replace(/>/g, '&gt;');
++}
++
++function wrapPlainReceiptBody(
++  body: string,
++  paperWidthMm: 58 | 80,
++  pageMarginMm = 0,
++): string {
++  const width = paperWidthMm === 58 ? 50 : 72;
++  return `<!DOCTYPE html>
++<html lang="tr">
++<head>
++  <meta charset="utf-8" />
++  <title>${BLANK_PRINT_TITLE}</title>
++  <style>
++    ${receiptPageCss(paperWidthMm, pageMarginMm)}
++    @media print {
++      html, body { margin: 0 !important; padding: 0 !important; }
++    }
++    body {
++      margin: 0;
++      padding: 0;
++      width: ${width}mm;
++      font-family: "Courier New", Courier, monospace;
++      font-size: 11px;
++      line-height: 1.35;
++      white-space: pre-wrap;
++      color: #000;
++      background: #fff;
++    }
++  </style>
++</head>
++<body>${escapeHtml(body)}</body>
++</html>`;
++}
++
++export function buildPlainTextSaleReceipt(
++  data: SaleReceiptData,
++  opts?: { sacrificeLines?: boolean },
++): string {
++  const receiptRef = data.receiptNo || data.saleId || '—';
++  const useSacrifice = opts?.sacrificeLines !== false;
++  const sacrifice = useSacrifice
++    ? Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
++        RECEIPT_SACRIFICE_FILL.repeat(30),
++      )
++    : [];
++  const lines: string[] = [
++    ...sacrifice,
++    ...(useSacrifice ? [''] : []),
++    formatReceiptBrandName(data.businessName),
++    'SATIŞ FİŞİ',
++    '--------------------------------',
++    `Tarih: ${formatReceiptDateTime(data.createdAt)}`,
++    `Fiş No: ${receiptRef}`,
++    `Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}`,
++    '--------------------------------',
++  ];
++  for (const item of data.items) {
++    lines.push(truncateName(item.name, 28));
++    lines.push(`  ${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}`);
++    lines.push(`  ${formatReceiptMoneyPlain(item.lineTotal)}`);
++  }
++  lines.push('--------------------------------');
++  lines.push(`TOPLAM  ${formatReceiptMoneyPlain(data.total)}`);
++  lines.push('');
++  lines.push('Teşekkürler.');
++  return lines.join('\n');
++}
++
++export function buildReturnReceiptHtml(data: ReturnReceiptData, paperWidthMm: 58 | 80 = 80): string {
+   const lines = data.items
+     .map((item) => {
+       const sample = item.priceType === 'sample';
+@@ -226,9 +475,9 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData): string {
+ <html lang="tr">
+ <head>
+   <meta charset="utf-8" />
+-  <title>İade Fişi ${data.returnId}</title>
++  <title>${BLANK_PRINT_TITLE}</title>
+   <style>
+-    ${receiptBaseStyles()}
++    ${receiptBaseStyles(paperWidthMm)}
+     .return-banner {
+       margin: 8px 0;
+       padding: 8px 4px;
+@@ -258,7 +507,7 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData): string {
+     }
+   </style>
+ </head>
+-<body>
++<body class="receipt-thermal">
+   <div class="center title">${data.businessName}</div>
+   <div class="return-banner">
+     İADE FİŞİ
+@@ -289,22 +538,26 @@ export function buildReturnReceiptHtml(data: ReturnReceiptData): string {
+     <div>İade işleminiz kaydedilmiştir.</div>
+     <div>İyi günler dileriz.</div>
+   </div>
+-  ${buildReceiptPrintScript()}
++  ${RECEIPT_TAIL_SPACER}
+ </body>
+ </html>`;
+ }
+ 
+-export function buildReceiptHtml(data: SaleReceiptData): string {
++export function buildReceiptHtml(
++  data: SaleReceiptData,
++  paperWidthMm: 58 | 80 = 80,
++  pageMarginMm = 0,
++): string {
+   const lines = data.items
+     .map((item) => {
+       const left = `${truncateName(item.name)} x${item.quantity}`;
+       const right = formatReceiptMoney(item.lineTotal);
+       return `
+-        <tr class="line">
+-          <td class="line-name">${left}</td>
++        <tr class="line total-row">
++          <td class="line-name bold">${left}</td>
+           <td class="line-price">${right}</td>
+         </tr>
+-        <tr class="line-sub">
++        <tr class="line-sub total-row">
+           <td colspan="2">${item.quantity} x ${formatReceiptMoney(item.unitPrice)}</td>
+         </tr>
+       `;
+@@ -317,18 +570,19 @@ export function buildReceiptHtml(data: SaleReceiptData): string {
+ <html lang="tr">
+ <head>
+   <meta charset="utf-8" />
+-  <title>Fiş ${receiptRef}</title>
++  <meta name="viewport" content="width=302" />
++  <title>${BLANK_PRINT_TITLE}</title>
+   <style>
+-    ${receiptBaseStyles()}
++    ${receiptBaseStyles(paperWidthMm, pageMarginMm)}
+   </style>
+ </head>
+-<body>
+-  <div class="center title">${data.businessName}</div>
+-  <div class="center muted">SATIŞ FİŞİ</div>
++<body class="receipt-thermal" data-receipt-layout="80mm-v9">
++  <div class="center title total-row"><strong>${data.businessName}</strong></div>
++  <div class="center muted"><strong>SATIŞ FİŞİ</strong></div>
+   <hr class="divider" />
+-  <div>Tarih: ${formatReceiptDateTime(data.createdAt)}</div>
+-  <div>Fiş No: ${receiptRef}</div>
+-  <div>Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}</div>
++  <div class="meta-row"><strong>Tarih: ${formatReceiptDateTime(data.createdAt)}</strong></div>
++  <div class="meta-row"><strong>Fiş No: ${receiptRef}</strong></div>
++  <div class="meta-row"><strong>Ödeme: ${PAYMENT_LABELS[data.paymentMethod]}</strong></div>
+   <hr class="divider" />
+   <table>
+     <tbody>
+@@ -341,24 +595,313 @@ export function buildReceiptHtml(data: SaleReceiptData): string {
+   </table>
+   <hr class="divider" />
+   <div class="center footer">
+-    <div>Bizi tercih ettiğiniz için teşekkürler.</div>
+-    <div>İyi günler dileriz.</div>
++    <div><strong>Bizi tercih ettiğiniz için teşekkürler.</strong></div>
++    <div><strong>İyi günler dileriz.</strong></div>
+   </div>
+-  ${buildReceiptPrintScript()}
++  ${RECEIPT_TAIL_SPACER}
+ </body>
+ </html>`;
+ }
+ 
+-export function printHtmlReceipt(html: string): Promise<void> {
++const CLASSIC_RECEIPT_80MM_FIX = `
++  <style>
++    @media print {
++      html, body {
++        width: 72mm !important;
++        max-width: 80mm !important;
++        margin: 0 !important;
++        padding: 0 !important;
++        zoom: 1 !important;
++        -webkit-print-color-adjust: exact;
++        print-color-adjust: exact;
++      }
++      body.receipt-plain-thermal {
++        font-family: ${RECEIPT_THERMAL_FONT} !important;
++        font-size: 15px !important;
++        font-weight: 700 !important;
++        line-height: 1.4 !important;
++        color: #000 !important;
++      }
++    }
++  </style>`;
++
++function receiptPremiumStyles(): string {
++  return `
++    @page { size: 80mm auto; margin: 0; }
++    * { box-sizing: border-box; }
++    body.receipt-premium {
++      margin: 0;
++      padding: 0 4px 8px;
++      width: 72mm;
++      font-family: Arial, sans-serif;
++      font-size: 13px;
++      font-weight: 500;
++      line-height: 1.35;
++      color: #000;
++      background: #fff;
++      -webkit-font-smoothing: none;
++      font-synthesis: none;
++    }
++    /* Mac rastertopos: ilk 1–3 metin satırı bozulur (c0) — marka aşağıda başlar */
++    .rp-driver-skip {
++      display: block;
++      height: 10mm;
++      min-height: 10mm;
++      width: 100%;
++    }
++    .rp-sacrifice {
++      display: block;
++      margin: 0;
++      padding: 2px 0;
++      font-size: 9px;
++      line-height: 1.05;
++      font-weight: 400;
++      text-align: center;
++      letter-spacing: 0;
++      color: #000;
++      white-space: nowrap;
++      overflow: hidden;
++    }
++    .rp-brand {
++      text-align: center;
++      font-size: 20px;
++      font-weight: 400;
++      letter-spacing: normal;
++      margin: 0 0 6px;
++      line-height: 1.15;
++      word-break: break-word;
++    }
++    .rp-kind {
++      text-align: center;
++      font-size: 11px;
++      font-weight: 700;
++      letter-spacing: 0.12em;
++      margin: 0 0 10px;
++    }
++    .rp-rule {
++      border: none;
++      border-top: 1px solid #000;
++      margin: 10px 0;
++    }
++    .rp-rule--thick { border-top-width: 2px; }
++    .rp-meta {
++      width: 100%;
++      border-collapse: collapse;
++      font-size: 12px;
++    }
++    .rp-meta td { padding: 3px 0; vertical-align: top; }
++    .rp-meta .rp-label { width: 38%; font-weight: 700; }
++    .rp-meta .rp-value { text-align: right; font-weight: 600; }
++    .rp-items { width: 100%; border-collapse: collapse; margin-top: 2px; }
++    .rp-item-name td {
++      padding: 8px 0 2px;
++      font-weight: 700;
++      font-size: 13px;
++      line-height: 1.25;
++      word-break: break-word;
++    }
++    .rp-item-detail td {
++      padding: 0 0 6px;
++      font-size: 11px;
++      font-weight: 600;
++    }
++    .rp-item-detail .rp-sub { text-align: left; }
++    .rp-item-detail .rp-amt {
++      text-align: right;
++      white-space: nowrap;
++      font-weight: 700;
++      font-size: 13px;
++    }
++    .rp-total { width: 100%; border-collapse: collapse; margin-top: 2px; }
++    .rp-total td { padding: 8px 0 4px; font-size: 16px; font-weight: 800; }
++    .rp-total .rp-total-label { text-align: left; letter-spacing: 0.05em; }
++    .rp-total .rp-total-amt { text-align: right; white-space: nowrap; }
++    .rp-footer {
++      text-align: center;
++      font-size: 12px;
++      font-weight: 600;
++      margin-top: 12px;
++      line-height: 1.45;
++    }
++    .rp-footer strong {
++      display: block;
++      font-weight: 700;
++      font-size: 13px;
++      margin-bottom: 2px;
++    }
++    ${receiptTailSpacerCss()}
++    @media print {
++      html, body { margin: 0 !important; padding: 0 !important; }
++      body.receipt-premium { width: 72mm !important; color: #000 !important; }
++      body.receipt-premium::before,
++      body.receipt-premium::after { content: none !important; display: none !important; }
++    }
++  `;
++}
++
++function sanitizeReceiptVisibleText(text: string): string {
++  return text
++    .normalize('NFKC')
++    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\ufeff]/g, '')
++    .replace(/\s+/g, ' ')
++    .trim();
++}
++
++function formatReceiptBrandName(name: string): string {
++  return sanitizeReceiptVisibleText(name).toLocaleUpperCase('tr-TR');
++}
++
++function buildDriverSacrificeLinesHtml(): string {
++  const line = RECEIPT_SACRIFICE_FILL.repeat(30);
++  return Array.from({ length: RECEIPT_DRIVER_SACRIFICE_LINES }, () =>
++    `<div class="rp-sacrifice">${line}</div>`,
++  ).join('\n');
++}
++
++/** Lima premium termal — hizalı tablo, tek ağırlık (ghost/çift basım yok) */
++export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string {
++  const receiptRef = data.receiptNo || data.saleId || '—';
++  const itemRows = data.items
++    .map(
++      (item) => `
++    <tr class="rp-item-name"><td colspan="2">${escapeHtml(item.name)}</td></tr>
++    <tr class="rp-item-detail">
++      <td class="rp-sub">${item.quantity} x ${formatReceiptMoneyPlain(item.unitPrice)}</td>
++      <td class="rp-amt">${formatReceiptMoneyPlain(item.lineTotal)}</td>
++    </tr>`,
++    )
++    .join('');
++
++  return `<!DOCTYPE html>
++<html lang="tr">
++<head>
++  <meta charset="utf-8" />
++  <meta name="viewport" content="width=302" />
++  <title>${BLANK_PRINT_TITLE}</title>
++  <style>${receiptPremiumStyles()}</style>
++</head>
++<body class="receipt-premium">
++  <div class="rp-driver-skip" aria-hidden="true"></div>
++  ${buildDriverSacrificeLinesHtml()}
++  <div class="rp-brand">${escapeHtml(formatReceiptBrandName(data.businessName))}</div>
++  <div class="rp-kind">SATIŞ FİŞİ</div>
++  <hr class="rp-rule" />
++  <table class="rp-meta" role="presentation">
++    <tr><td class="rp-label">Tarih</td><td class="rp-value">${formatReceiptDateTime(data.createdAt)}</td></tr>
++    <tr><td class="rp-label">Fiş No</td><td class="rp-value">${escapeHtml(receiptRef)}</td></tr>
++    <tr><td class="rp-label">Ödeme</td><td class="rp-value">${PAYMENT_LABELS[data.paymentMethod]}</td></tr>
++  </table>
++  <hr class="rp-rule" />
++  <table class="rp-items" role="presentation">${itemRows}</table>
++  <hr class="rp-rule rp-rule--thick" />
++  <table class="rp-total" role="presentation">
++    <tr>
++      <td class="rp-total-label">TOPLAM</td>
++      <td class="rp-total-amt">${formatReceiptMoneyPlain(data.total)}</td>
++    </tr>
++  </table>
++  <hr class="rp-rule" />
++  <div class="rp-footer">
++    <strong>Teşekkür ederiz</strong>
++    İyi günler dileriz.
++  </div>
++  ${RECEIPT_TAIL_SPACER}
++  ${buildReceiptPrintScript(80)}
++</body>
++</html>`;
++}
++
++/** Lima klasik: düz metin yedek */
++export function buildGreenleafPlainReceiptHtml(data: SaleReceiptData): string {
++  const plain = buildPlainTextSaleReceipt(data);
++  return wrapPlainReceiptBody(plain, 80, 0)
++    .replace(
++      'font-size: 11px;',
++      `font-size: 15px;\n      font-weight: 700;\n      font-family: ${RECEIPT_THERMAL_FONT};`,
++    )
++    .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
++    .replace(
++      '</body>',
++      `${RECEIPT_TAIL_SPACER}\n${buildReceiptPrintScript(80)}\n</body>`,
++    )
++    .replace('<body>', '<body class="receipt-plain-thermal" data-receipt-layout="plain-v10">');
++}
++
++/** HTML tablo fiş (yedek / test) */
++export function buildGreenleafSaleReceiptHtml(data: SaleReceiptData): string {
++  const body = buildReceiptHtml(data, 80, 0).replace(
++    /@page\s*\{\s*size:\s*80mm\s+auto[^}]*\}/,
++    '',
++  );
++  return body
++    .replace(
++      '<meta charset="utf-8" />',
++      '<meta charset="utf-8" />\n  <meta name="viewport" content="width=302" />',
++    )
++    .replace('</head>', `${CLASSIC_RECEIPT_80MM_FIX}</head>`)
++    .replace('</body>', `${buildReceiptPrintScript(80)}\n</body>`);
++}
++
++const RECEIPT_PRINT_WINDOW_NAME = 'lima-market-receipt-print';
++
++/** 80 mm ≈ 302px — gizli iframe yedek (ana sayfa ile bindirme riski) */
++const THERMAL_PRINT_IFRAME_STYLE =
++  'position:fixed;left:0;top:0;width:302px;min-height:400px;height:auto;border:0;margin:0;padding:0;z-index:2147483646;background:#fff;pointer-events:none;overflow:visible;';
++
++/** Sadece fiş HTML — küçük popup (POS arka planı basılmaz) */
++function printHtmlReceiptIsolatedWindow(html: string): Promise<void> {
+   return new Promise((resolve) => {
++    logReceiptPrint('classic-premium-window-start', { htmlBytes: html.length });
++    const features =
++      'popup=yes,width=340,height=720,left=60,top=40,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
++    const win = window.open('', RECEIPT_PRINT_WINDOW_NAME, features) as ReceiptPrintWindow | null;
++    if (!win) {
++      logReceiptPrint('popup-blocked', { fallback: 'iframe' });
++      void printHtmlReceiptClassicIframe(html).then(resolve);
++      return;
++    }
++
++    let finished = false;
++    const cleanup = () => {
++      if (finished) return;
++      finished = true;
++      logReceiptPrint('classic-done');
++      try {
++        win.close();
++      } catch {
++        /* ignore */
++      }
++      resolve();
++    };
++
++    win.document.open();
++    win.document.write(html);
++    win.document.close();
++    win.document.title = BLANK_PRINT_TITLE;
++
++    win.addEventListener('beforeprint', () => {
++      applyReceiptPageHeightInWindow(win);
++      logReceiptPrint('beforeprint');
++    });
++    win.addEventListener('afterprint', cleanup, { once: true });
++    setTimeout(cleanup, 60_000);
++    scheduleThermalPrintInWindow(win, cleanup);
++  });
++}
++
++/** Görünmez iframe yedek */
++function printHtmlReceiptClassicIframe(html: string): Promise<void> {
++  return new Promise((resolve) => {
++    logReceiptPrint('classic-premium-iframe-start', { htmlBytes: html.length });
+     const iframe = document.createElement('iframe');
+     iframe.setAttribute('aria-hidden', 'true');
+-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
++    iframe.style.cssText = THERMAL_PRINT_IFRAME_STYLE;
+     document.body.appendChild(iframe);
+ 
+     const win = iframe.contentWindow;
+     const doc = win?.document;
+     if (!doc || !win) {
++      logReceiptPrint('error-no-iframe-window');
+       document.body.removeChild(iframe);
+       resolve();
+       return;
+@@ -369,19 +912,148 @@ export function printHtmlReceipt(html: string): Promise<void> {
+     doc.close();
+ 
+     const cleanup = () => {
++      logReceiptPrint('classic-done');
+       if (iframe.parentNode) document.body.removeChild(iframe);
+       resolve();
+     };
+ 
++    win.addEventListener('beforeprint', () => {
++      applyReceiptPageHeightInWindow(win);
++      logReceiptPrint('beforeprint');
++    });
+     win.addEventListener('afterprint', cleanup, { once: true });
+-    setTimeout(cleanup, 8000);
++
++    scheduleThermalPrintInWindow(win, () => {
++      logReceiptPrint('error-parent-print');
++      cleanup();
++    });
++
++    setTimeout(cleanup, 60_000);
++  });
++}
++
++function printHtmlReceiptClassic(html: string): Promise<void> {
++  return printHtmlReceiptClassicIframe(html);
++}
++
++function printHtmlReceiptInWindow(win: Window, html: string, onDone: () => void): void {
++  const doc = win.document;
++  doc.open();
++  doc.write(html);
++  doc.close();
++  doc.title = BLANK_PRINT_TITLE;
++
++  const cleanup = () => {
++    onDone();
++  };
++
++  win.addEventListener('beforeprint', () => {
++    doc.title = BLANK_PRINT_TITLE;
++    applyReceiptPageHeightInWindow(win);
+   });
++  win.addEventListener('afterprint', cleanup, { once: true });
++  setTimeout(cleanup, 60_000);
++
++  scheduleThermalPrintInWindow(win, cleanup);
+ }
+ 
+-export function printThermalReceipt(data: SaleReceiptData): Promise<void> {
+-  return printHtmlReceipt(buildReceiptHtml(data));
++function printHtmlReceiptViaIframe(html: string): Promise<void> {
++  return new Promise((resolve) => {
++    const iframe = document.createElement('iframe');
++    iframe.setAttribute('aria-hidden', 'true');
++    iframe.style.cssText = THERMAL_PRINT_IFRAME_STYLE;
++    document.body.appendChild(iframe);
++    const win = iframe.contentWindow;
++    if (!win) {
++      document.body.removeChild(iframe);
++      resolve();
++      return;
++    }
++    printHtmlReceiptInWindow(win, html, () => {
++      if (iframe.parentNode) document.body.removeChild(iframe);
++      resolve();
++    });
++  });
++}
++
++/** Termal fiş: görünür yazdırma penceresi (gizli iframe Mac/termalde PDF ham veri basıyordu) */
++export function printHtmlReceipt(html: string): Promise<void> {
++  return new Promise((resolve) => {
++    logReceiptPrint('advanced-start', { htmlBytes: html.length });
++    const features =
++      'popup,width=360,height=720,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes';
++    const printWin = window.open('', 'market-pos-receipt-print', features);
++    if (!printWin) {
++      logReceiptPrint('popup-blocked', { fallback: 'iframe' });
++      void printHtmlReceiptViaIframe(html).then(resolve);
++      return;
++    }
++    printHtmlReceiptInWindow(printWin, html, () => {
++      try {
++        printWin.close();
++      } catch {
++        /* ignore */
++      }
++      resolve();
++    });
++  });
++}
++
++export async function printTestSaleReceipt(businessName: string): Promise<void> {
++  const sample: SaleReceiptData = {
++    businessName,
++    createdAt: new Date(),
++    paymentMethod: 'cash',
++    total: 1,
++    items: [{ name: 'TEST FIS', quantity: 1, unitPrice: 1, lineTotal: 1 }],
++    saleId: 'TEST',
++  };
++  logReceiptPrint('test-print');
++  await printThermalReceipt(sample);
++}
++
++export async function printThermalReceipt(
++  data: SaleReceiptData,
++  options?: ThermalReceiptPrintOptions,
++): Promise<void> {
++  if (options === undefined) {
++    logReceiptPrint('thermal-classic-path', { saleId: data.saleId, items: data.items.length });
++    const plainNoSacrifice = buildPlainTextSaleReceipt(data, { sacrificeLines: false });
++    const rawOk = await tryLimaMacRawReceiptPrint(plainNoSacrifice);
++    if (rawOk) {
++      logReceiptPrint('thermal-raw-escpos-ok', { saleId: data.saleId });
++      return;
++    }
++    logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed' });
++    remindChromeReceiptPrintSettings();
++    await printHtmlReceiptIsolatedWindow(buildGreenleafPremiumReceiptHtml(data));
++    return;
++  }
++  const normalized = normalizeReceiptPrinterSettings(options);
++  logReceiptPrint('thermal-advanced-path', {
++    saleId: data.saleId,
++    printMode: normalized.printMode,
++    paperWidthMm: normalized.paperWidthMm,
++  });
++  const paper = normalized.paperWidthMm;
++  const copies = normalized.copies;
++  const margin = normalized.pageMarginMm;
++  const mode = normalized.printMode === 'plain' ? 'plain' : 'html';
++  const html =
++    mode === 'plain'
++      ? wrapPlainReceiptBody(buildPlainTextSaleReceipt(data), paper, margin)
++      : buildReceiptHtml(data, paper, margin);
++  for (let i = 0; i < copies; i += 1) {
++    await printHtmlReceipt(html);
++  }
+ }
+ 
+-export function printReturnReceipt(data: ReturnReceiptData): Promise<void> {
+-  return printHtmlReceipt(buildReturnReceiptHtml(data));
++export function printReturnReceipt(
++  data: ReturnReceiptData,
++  paperWidthMm: 58 | 80 = 80,
++): Promise<void> {
++  const html = buildReturnReceiptHtml(data, paperWidthMm)
++    .replace('</body>', `${RECEIPT_TAIL_SPACER}\n</body>`)
++    .replace('</body>', `${buildReceiptPrintScript(paperWidthMm)}\n</body>`);
++  return printHtmlReceiptClassic(html);
+ }
+diff --git a/src/utils/receiptPrintLog.ts b/src/utils/receiptPrintLog.ts
+new file mode 100644
+index 0000000..6d1ef99
+--- /dev/null
++++ b/src/utils/receiptPrintLog.ts
+@@ -0,0 +1,53 @@
++import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
++import { posApiAuthHeaders, posApiFetch } from '../services/posApiAuth';
++
++export interface ReceiptPrintLogEntry {
++  t: number;
++  phase: string;
++  detail?: Record<string, unknown>;
++}
++
++const MAX_ENTRIES = 80;
++const buffer: ReceiptPrintLogEntry[] = [];
++
++function logUrl(): string {
++  const tenant = loadTenantId();
++  const base = '/api/pos/receipt-print-log';
++  if (!tenant || tenant === DEFAULT_TENANT_ID) return base;
++  return `${base}?tenant=${encodeURIComponent(tenant)}`;
++}
++
++export function logReceiptPrint(phase: string, detail?: Record<string, unknown>): void {
++  const entry: ReceiptPrintLogEntry = { t: Date.now(), phase, detail };
++  buffer.push(entry);
++  if (buffer.length > MAX_ENTRIES) buffer.shift();
++  console.info('[market-pos-fis]', phase, detail ?? '');
++  void postReceiptPrintLog(phase, detail);
++}
++
++export function getReceiptPrintLog(): ReceiptPrintLogEntry[] {
++  return [...buffer];
++}
++
++export function getLastReceiptPrintError(): string | null {
++  for (let i = buffer.length - 1; i >= 0; i -= 1) {
++    const e = buffer[i];
++    if (e.phase.includes('error') || e.phase.includes('blocked')) {
++      return `${e.phase}${e.detail ? ` ${JSON.stringify(e.detail)}` : ''}`;
++    }
++  }
++  return null;
++}
++
++async function postReceiptPrintLog(phase: string, detail?: Record<string, unknown>): Promise<void> {
++  try {
++    await posApiFetch(logUrl(), {
++      method: 'POST',
++      headers: posApiAuthHeaders({ 'Content-Type': 'application/json' }),
++      body: JSON.stringify({ phase, detail, userAgent: navigator.userAgent }),
++      signal: AbortSignal.timeout(4000),
++    });
++  } catch {
++    /* sunucu logu isteğe bağlı */
++  }
++}
+diff --git a/src/utils/receiptPrintReminder.ts b/src/utils/receiptPrintReminder.ts
+new file mode 100644
+index 0000000..1888aac
+--- /dev/null
++++ b/src/utils/receiptPrintReminder.ts
+@@ -0,0 +1,25 @@
++const REMINDER_KEY = 'market-pos-receipt-print-reminder-v6';
++
++/** Chrome önizlemedeki URL/tarih şeridi — kullanıcı bir kez uyarılır */
++export function remindChromeReceiptPrintSettings(): void {
++  try {
++    if (sessionStorage.getItem(REMINDER_KEY)) return;
++    sessionStorage.setItem(REMINDER_KEY, '1');
++  } catch {
++    return;
++  }
++  window.alert(
++    'Termal fiş — tarayıcı yazdır penceresi (Firefox / Chrome):\n\n'
++      + '1. Hedef: «PDF olarak kaydet» DEĞİL → USB yazıcı (POS-80C / Zywell)\n'
++      + '   (Liste boşsa: Mac Ayarlar → Yazıcılar, USB takılı mı; Chrome’u kapat-aç)\n'
++      + '2. «Üst bilgi ve alt bilgileri yazdır» KAPALI — açıksa kenarda URL/c0 benzeri çöp + başlık bozulur\n'
++      + '   (Mac: hâlâ c0 varsa rastertopos koyuluk yaması — scripts/diag-fis-yazici.sh notu)\n'
++      + '3. ÖLÇEK (zorunlu): tam %100 — 89 veya «sayfa genişliğine sığdır» OLMAZ\n'
++      + '   (Silik basım + erken kesik fiş genelde buradan.)\n'
++      + '4. Kenar boşluk: Yok\n'
++      + '5. Kağıt boyutu: 80×3276 mm rulo (X80mmY3276mm) — ~210 mm «custom» seçiliyse '
++      + 'fiş önizlemede tam görünür ama yazıcı birkaç mm kesik basabilir.\n'
++      + '   Mac: lpoptions -p Printer_POS_80C -o PageSize=X80mmY3276mm\n\n'
++      + 'Önizleme ortada küçük kare görünüyorsa kağıt boyutu yanlıştır; fiş metni doğru olsa bile basım bozulur.',
++  );
++}
+diff --git a/src/utils/returnReceiptPrint.ts b/src/utils/returnReceiptPrint.ts
+index cc22d93..13fd312 100644
+--- a/src/utils/returnReceiptPrint.ts
++++ b/src/utils/returnReceiptPrint.ts
+@@ -1,4 +1,4 @@
+-import { printFiscalReturnReceipt } from '../services/fiscalBridge';
++import { isRealFiscalDevicePrint, printFiscalReturnReceipt } from '../services/fiscalBridge';
+ import type { Product, Sale } from '../types/product';
+ import type { ProductSet } from '../types/productSet';
+ import type { SaleReturn } from '../types/saleReturn';
+@@ -83,7 +83,7 @@ export async function printSaleReturnReceipt(
+       });
+ 
+       if (fiscal.success) {
+-        fiscalPrinted = !fiscal.simulated;
++        fiscalPrinted = isRealFiscalDevicePrint(fiscal);
+         fiscalReceiptNo = fiscal.receiptNo;
+       } else if (!options?.skipFiscalConfirm && !confirm(
+         `Yazar kasa iade fişi hatası: ${fiscal.message ?? 'Bilinmeyen hata'}\nTermal iade fişi yazdırılsın mı?`,
+diff --git a/src/version.ts b/src/version.ts
+index 4ab826c..9fb32d8 100644
+--- a/src/version.ts
++++ b/src/version.ts
+@@ -3,5 +3,5 @@ declare const __APP_BUILD_ID__: string;
+ export const APP_BUILD_ID: string =
+   typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
+ 
+-/** Ayarlar ekranında deploy doğrulaması için */
+-export const APP_FEATURE_TAG = 'idle-notes-broadcast';
++/** Ayarlar ekranında deploy doğrulaması için (string — sürüm etiketi sık değişir) */
++export const APP_FEATURE_TAG: string = 'receipt-raw-v15';
