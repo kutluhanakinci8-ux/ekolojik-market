@@ -3346,19 +3346,23 @@ export function usePosStoreState() {
       syncPosLocalStorageKeys();
       const normalized = username.trim().toLowerCase();
       const lockCheck = checkLoginAllowed(normalized);
-      if (!lockCheck.allowed) {
-        return {
-          status: 'locked',
-          message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
-          retryAfterMs: lockCheck.retryAfterMs,
-        };
-      }
 
       saveTenantId(resolveLoginTenantId(normalized, loadTenantId()));
       syncPosLocalStorageKeys();
 
+      let remoteAuth = await exchangePosApiToken({ username: normalized, password });
+      if (!lockCheck.allowed) {
+        if (!remoteAuth.ok) {
+          return {
+            status: 'locked',
+            message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
+            retryAfterMs: lockCheck.retryAfterMs,
+          };
+        }
+        clearLoginLockout(normalized);
+      }
+
       let user: PosUser | undefined;
-      const remoteAuth = await exchangePosApiToken({ username: normalized, password });
       if (remoteAuth.ok) {
         const claims = decodePosApiTokenClaims(loadPosApiToken());
         if (claims?.tenantId?.trim()) {
@@ -3455,19 +3459,23 @@ export function usePosStoreState() {
       }
 
       const lockCheck = checkLoginAllowed(normalized);
-      if (!lockCheck.allowed) {
-        return {
-          status: 'locked',
-          message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
-          retryAfterMs: lockCheck.retryAfterMs,
-        };
-      }
 
       saveTenantId(resolveLoginTenantId(normalized, loadTenantId()));
       syncPosLocalStorageKeys();
 
+      let remoteAuth = await exchangePosApiToken({ username: normalized, pin });
+      if (!lockCheck.allowed) {
+        if (!remoteAuth.ok) {
+          return {
+            status: 'locked',
+            message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
+            retryAfterMs: lockCheck.retryAfterMs,
+          };
+        }
+        clearLoginLockout(normalized);
+      }
+
       let user: PosUser | undefined;
-      const remoteAuth = await exchangePosApiToken({ username: normalized, pin });
       if (remoteAuth.ok) {
         const claims = decodePosApiTokenClaims(loadPosApiToken());
         if (claims?.tenantId?.trim()) {
