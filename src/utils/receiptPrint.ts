@@ -5,7 +5,7 @@ import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
 import { remindSilentReceiptBridgeMissing } from './receiptPrintBridgeReminder';
-import { tryLimaRawReceiptPrint } from './limaRawReceiptPrint';
+import { getLastLimaRawPrintError, tryLimaRawReceiptPrint } from './limaRawReceiptPrint';
 import { toThermalReceiptAscii } from './thermalReceiptAscii';
 import { applyRetailVat } from './productPricing';
 import { DEFAULT_VAT_RATE, roundMoney, splitGrossAmount } from './vatAnalytics';
@@ -1108,7 +1108,16 @@ export async function printThermalReceipt(
       logReceiptPrint('thermal-raw-escpos-ok', { saleId: receipt.saleId });
       return;
     }
-    logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed' });
+    const rawErr = getLastLimaRawPrintError();
+    logReceiptPrint('thermal-raw-escpos-error', {
+      saleId: receipt.saleId,
+      printerName,
+      error: rawErr ?? 'bridge-off-or-failed',
+    });
+    if (rawErr && typeof window !== 'undefined') {
+      window.alert(`Fiş yazılamadı:\n\n${rawErr}`);
+      return;
+    }
     remindSilentReceiptBridgeMissing();
     return;
   }

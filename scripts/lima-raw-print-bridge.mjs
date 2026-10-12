@@ -80,10 +80,36 @@ function resolveWin32Queue(requested) {
   const norm = (s) => s.toLowerCase().replace(/[\s_-]/g, '');
   const hit = printers.find((p) => norm(p) === norm(want));
   if (hit) return hit;
-  const pos80 = printers.filter((p) => /pos.?80/i.test(p));
+  const pos80 = printers.filter((p) => /pos.?80|printer[\s_-]?80/i.test(p));
   if (pos80.length === 1) return pos80[0];
-  if (want && /pos.?80/i.test(want) && pos80.length) return pos80[0];
+  if (want && /pos.?80|printer[\s_-]?80/i.test(want) && pos80.length) return pos80[0];
   return want || QUEUE;
+}
+
+function win32PrinterStatus(requested) {
+  const printers = listWin32Printers();
+  const want = String(requested || QUEUE).trim();
+  const resolved = resolveWin32Queue(want);
+  if (!printers.length) {
+    return {
+      ready: false,
+      requested: want,
+      resolvedQueue: resolved,
+      error:
+        'Windows yazici listesi bos. Bluetoothta sadece "printer-80" gorunuyorsa bu yetmez: '
+        + 'Ayarlar → Yazicilar ve tarayicilar → Yazici ekle (POS-80 / Generic) veya USB kullanin.',
+    };
+  }
+  if (!printers.includes(resolved)) {
+    return {
+      ready: false,
+      requested: want,
+      resolvedQueue: resolved,
+      error: `Yazici kuyrugu bulunamadi: "${resolved}". Ayarlardaki ad Windows yazici listesiyle ayni olmali.`,
+      printers,
+    };
+  }
+  return { ready: true, requested: want, resolvedQueue: resolved, printers };
 }
 
 function lpRaw(buffer, queueName) {
@@ -167,9 +193,11 @@ const server = createServer(async (req, res) => {
       escpos: 'ascii-safe',
     };
     if (os === 'win32') {
-      const printers = listWin32Printers();
-      payload.printerCount = printers.length;
-      if (printers.length) payload.printers = printers;
+      const st = win32PrinterStatus(QUEUE);
+      payload.printerReady = st.ready;
+      payload.printerCount = st.printers?.length ?? 0;
+      if (st.printers?.length) payload.printers = st.printers;
+      if (!st.ready) payload.printerError = st.error;
     }
     res.end(JSON.stringify(payload));
     return;
@@ -201,6 +229,22 @@ const server = createServer(async (req, res) => {
         : os === 'win32'
           ? resolveWin32Queue(printer || QUEUE)
           : printer || QUEUE;
+    if (os === 'win32') {
+      const st = win32PrinterStatus(printer || QUEUE);
+      if (!st.ready) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: false,
+            error: st.error,
+            requested: st.requested,
+            resolvedQueue: st.resolvedQueue,
+            printers: st.printers ?? [],
+          }),
+        );
+        return;
+      }
+    }
     await sendRaw(buildEscPosReceiptBuffer(body.text ?? ''), queue);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, queue }));

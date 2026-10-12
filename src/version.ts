@@ -4,4 +4,4 @@ export const APP_BUILD_ID: string =
   typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
 
 /** Ayarlar ekranında deploy doğrulaması için (string — sürüm etiketi sık değişir) */
-export const APP_FEATURE_TAG: string = 'fis-win-bridge-v46';
+export const APP_FEATURE_TAG: string = 'fis-win-printer-v47';

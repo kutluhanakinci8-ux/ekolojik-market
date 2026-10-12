@@ -7,7 +7,27 @@ const LOCAL_PRINT_URL =
     ? import.meta.env.VITE_LIMA_RAW_PRINT_URL
     : 'http://127.0.0.1:18765/print';
 
+const LOCAL_HEALTH_URL = LOCAL_PRINT_URL.replace(/\/print\/?$/, '/health');
+
 const RAW_PRINT_TIMEOUT_MS = 6000;
+
+export interface LimaBridgeHealth {
+  ok?: boolean;
+  queue?: string;
+  resolvedQueue?: string;
+  platform?: string;
+  charset?: string;
+  printerReady?: boolean;
+  printerCount?: number;
+  printers?: string[];
+  printerError?: string;
+}
+
+let lastRawPrintError: string | null = null;
+
+export function getLastLimaRawPrintError(): string | null {
+  return lastRawPrintError;
+}
 
 function serverThermalPrintPath(): string {
   const tenant = loadTenantId();
@@ -16,12 +36,14 @@ function serverThermalPrintPath(): string {
   return `${base}?tenant=${encodeURIComponent(tenant)}`;
 }
 
+type PostRawResult = { ok: true } | { ok: false; error: string };
+
 async function postRawReceipt(
   url: string,
   text: string,
   printerName?: string,
   usePosAuth = false,
-): Promise<boolean> {
+): Promise<PostRawResult> {
   try {
     const body = JSON.stringify({
       text,
@@ -44,19 +66,33 @@ async function postRawReceipt(
           body,
           signal: AbortSignal.timeout(RAW_PRINT_TIMEOUT_MS),
         });
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+      resolvedQueue?: string;
+      printers?: string[];
+    };
     if (!res.ok || data.ok !== true) {
-      if (typeof console !== 'undefined' && data.error) {
-        console.warn('[market-pos-fis] raw print:', data.error);
+      const printers =
+        Array.isArray(data.printers) && data.printers.length
+          ? ` Mevcut: ${data.printers.join(', ')}`
+          : '';
+      const msg =
+        data.error?.trim() ||
+        (res.status === 500 ? 'Yazici gonderimi basarisiz (500)' : `HTTP ${res.status}`);
+      const full = `${msg}${printers}`;
+      if (typeof console !== 'undefined') {
+        console.warn('[market-pos-fis] raw print:', full);
       }
-      return false;
+      return { ok: false, error: full };
     }
-    return true;
+    return { ok: true };
   } catch (err) {
+    const msg = String(err);
     if (typeof console !== 'undefined') {
       console.warn('[market-pos-fis] raw print failed:', err);
     }
-    return false;
+    return { ok: false, error: msg };
   }
 }
 
@@ -68,6 +104,7 @@ export async function tryLimaRawReceiptPrint(
   text: string,
   printerName?: string,
 ): Promise<boolean> {
+  lastRawPrintError = null;
   const attempts: { url: string; auth: boolean }[] = [
     { url: LOCAL_PRINT_URL, auth: false },
   ];
@@ -78,20 +115,28 @@ export async function tryLimaRawReceiptPrint(
     });
   }
   for (const { url, auth } of attempts) {
-    if (await postRawReceipt(url, text, printerName, auth)) return true;
+    const result = await postRawReceipt(url, text, printerName, auth);
+    if (result.ok) return true;
+    lastRawPrintError = result.error;
   }
   return false;
 }
 
-export async function isLimaRawPrintAvailable(): Promise<boolean> {
+export async function fetchLimaBridgeHealth(): Promise<LimaBridgeHealth | null> {
   try {
-    const res = await fetch(LOCAL_PRINT_URL.replace(/\/print\/?$/, '/health'), {
-      signal: AbortSignal.timeout(1200),
+    const res = await fetch(LOCAL_HEALTH_URL, {
+      signal: AbortSignal.timeout(2500),
     });
-    if (res.ok) return true;
+    if (!res.ok) return null;
+    return (await res.json()) as LimaBridgeHealth;
   } catch {
-    /* local bridge off */
+    return null;
   }
+}
+
+export async function isLimaRawPrintAvailable(): Promise<boolean> {
+  const health = await fetchLimaBridgeHealth();
+  if (health?.ok === true) return true;
   if (typeof window === 'undefined') return false;
   try {
     const res = await posApiFetch(`${serverThermalPrintPath()}/health`, {
@@ -103,6 +148,38 @@ export async function isLimaRawPrintAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Köprü ayakta ve (Windows’ta) yazıcı kuyruğu tanımlı */
+export async function isLimaRawPrintReadyForReceipt(): Promise<{
+  bridgeUp: boolean;
+  printerReady: boolean;
+  health: LimaBridgeHealth | null;
+  message: string;
+}> {
+  const health = await fetchLimaBridgeHealth();
+  if (!health?.ok) {
+    return {
+      bridgeUp: false,
+      printerReady: false,
+      health,
+      message: 'Fiş servisi kapalı (127.0.0.1:18765)',
+    };
+  }
+  if (health.platform === 'win32' && health.printerReady === false) {
+    return {
+      bridgeUp: true,
+      printerReady: false,
+      health,
+      message: health.printerError ?? 'Windows yazıcı kuyruğu hazır değil',
+    };
+  }
+  return {
+    bridgeUp: true,
+    printerReady: true,
+    health,
+    message: `Köprü hazır → ${health.resolvedQueue ?? health.queue ?? 'yazıcı'}`,
+  };
 }
 
 /** @deprecated use tryLimaRawReceiptPrint */

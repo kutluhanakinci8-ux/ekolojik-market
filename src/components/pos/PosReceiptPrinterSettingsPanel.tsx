@@ -8,7 +8,7 @@ import {
 } from '../../types/receiptPrinter';
 import { isPosLiteProfile } from '../../utils/tenantProductProfile';
 import { printTestSaleReceipt } from '../../utils/receiptPrint';
-import { isLimaMacRawPrintAvailable } from '../../utils/limaMacRawPrint';
+import { isLimaRawPrintReadyForReceipt } from '../../utils/limaRawReceiptPrint';
 import { getLastReceiptPrintError, getReceiptPrintLog } from '../../utils/receiptPrintLog';
 import { loadTenantId } from '../../storage/tenantSession';
 import { APP_BUILD_ID, APP_FEATURE_TAG } from '../../version';
@@ -30,13 +30,15 @@ function ReceiptPrintDebugBlock({
       : `/var/www/market-pos/data/tenants/${tenant}/receipt-print.log`;
 
   const checkBridge = async () => {
-    const ok = await isLimaMacRawPrintAvailable();
-    setBridgeOk(ok);
-    setStatus(
-      ok
-        ? 'Köprü hazır (sessiz yazdırma)'
-        : 'Köprü kapalı — bu kasa PC’de install-windows-receipt-bridge.ps1 (Win) veya Mac kurulum betiği',
-    );
+    const ready = await isLimaRawPrintReadyForReceipt();
+    setBridgeOk(ready.bridgeUp);
+    setStatus(ready.message);
+    if (ready.bridgeUp && !ready.printerReady) {
+      setStatus(
+        `${ready.message}\n\nBluetoothta yalnizca "printer-80" varsa Windows’a yazici olarak ekleyin `
+          + '(Ayarlar → Yazicilar) veya USB kullanin; sonra Ayarlar’daki yazici adini listedeki tam adla eslestirin.',
+      );
+    }
   };
 
   const runTest = async () => {
@@ -70,6 +72,9 @@ function ReceiptPrintDebugBlock({
         <strong>Tarayıcı:</strong> F12 → Konsol → <code>market-pos-fis</code> satırları.
         <br />
         <strong>Sunucu (SSH):</strong> <code>tail -f {logPath}</code>
+        <br />
+        <strong>Windows yazıcı:</strong> PowerShell → <code>Get-Printer</code> (liste bos ise Bluetooth
+        eslestirme yetmez; yazici sürücüsü ekleyin). <code>diag-windows-receipt-bridge.ps1</code>
         <br />
         <strong>Mac yazıcı:</strong> Terminal → <code>lpstat -p</code> ve{' '}
         <code>tail -f /var/log/cups/error_log</code>
