@@ -20,18 +20,10 @@ export interface ReceiptPrinterSettings {
 /** Standart Windows kuyruk adı — Zywell POS-80 */
 export const STANDARD_WINDOWS_ZYWELL_PRINTER_NAME = 'Ekolojik POS-80 (Zywell)';
 
-const LEGACY_WINDOWS_PRINTER_ALIASES = new Set(
-  ['pos-80c', 'printer pos-80c', 'printer_pos_80c', 'pos80c'].map((s) => s.replace(/\s/g, '')),
-);
-
-/** Eski ayarlardaki POS-80C → kurulum betiğinin oluşturduğu kuyruk adı */
+/** Eski ayarlardaki boş ad → standart kurulum adı (POS-80C Windows’ta geçerli kuyruk adıdır) */
 export function normalizeWindowsPrinterName(raw: string): string {
   const t = raw.trim();
   if (!t) return '';
-  const key = t.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (LEGACY_WINDOWS_PRINTER_ALIASES.has(key)) {
-    return STANDARD_WINDOWS_ZYWELL_PRINTER_NAME;
-  }
   return t;
 }
 

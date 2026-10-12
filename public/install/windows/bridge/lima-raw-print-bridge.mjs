@@ -57,11 +57,19 @@ function resolveDarwinQueue(requested) {
 
 function listWin32Printers() {
   if (platform() !== 'win32') return [];
+  const ps = [
+    '$names = @()',
+    'try { $names += @(Get-Printer -ErrorAction Stop | Select-Object -ExpandProperty Name) } catch {}',
+    'try {',
+    '  $names += @(Get-CimInstance Win32_Printer -ErrorAction Stop | Select-Object -ExpandProperty Name)',
+    '} catch {}',
+    '$names | Where-Object { $_ } | Sort-Object -Unique',
+  ].join('; ');
   try {
-    const out = execSync(
-      'powershell.exe -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"',
-      { encoding: 'utf8', timeout: 12000 },
-    );
+    const out = execSync(`powershell.exe -NoProfile -Command "${ps}"`, {
+      encoding: 'utf8',
+      timeout: 15000,
+    });
     return out
       .split(/\r?\n/)
       .map((s) => s.trim())
