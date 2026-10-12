@@ -57,14 +57,24 @@ public class LimaRawPrinter {
 "@
 }
 
+$script:LimaCachedPrinter = $null
+
 function Resolve-LimaPrinterName([string]$PrinterName) {
+  if ($script:LimaCachedPrinter) {
+    return $script:LimaCachedPrinter
+  }
   if (Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue) {
+    $script:LimaCachedPrinter = $PrinterName
     return $PrinterName
   }
   $alt = Get-Printer -ErrorAction SilentlyContinue | Where-Object {
     $_.Name -match 'Ekolojik POS-80|POS-80|Zywell'
   } | Select-Object -First 1
-  if ($alt) { return $alt.Name }
+  if ($alt) {
+    $script:LimaCachedPrinter = $alt.Name
+    return $alt.Name
+  }
+  $script:LimaCachedPrinter = $PrinterName
   return $PrinterName
 }
 

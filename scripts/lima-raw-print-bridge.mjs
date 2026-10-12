@@ -14,6 +14,9 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildEscPosReceiptBuffer } from './escposTurkish.mjs';
 
+/** Kasada /health → bridgeVersion ile eski köprü tespiti */
+const BRIDGE_VERSION = '2026-10-12-fast-worker';
+
 const PORT = Number(process.env.LIMA_RAW_PRINT_PORT || 18765);
 const QUEUE =
   process.env.POS80_QUEUE_NAME ||
@@ -185,6 +188,24 @@ function ensureWinPrintWorker() {
   });
 }
 
+function warmWinPrintWorker() {
+  if (platform() !== 'win32') return;
+  ensureWinPrintWorker();
+  void (async () => {
+    try {
+      const ready = await takeWorkerLine(90_000);
+      if (ready === 'READY') {
+        winWorkerReady = true;
+        console.log('Windows print worker READY (hizli fiş).');
+      } else {
+        console.warn('Windows print worker beklenmeyen:', ready);
+      }
+    } catch (e) {
+      console.warn('Windows print worker hazirlanamadi:', e);
+    }
+  })();
+}
+
 function takeWorkerLine(timeoutMs = 45_000) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
@@ -297,6 +318,9 @@ const server = createServer(async (req, res) => {
       platform: os,
       charset,
       escpos: 'ascii-safe',
+      bridgeVersion: BRIDGE_VERSION,
+      fastPrintWorker: os === 'win32',
+      workerReady: os === 'win32' ? winWorkerReady : undefined,
     };
     if (os === 'win32') {
       if (fullCheck) {
@@ -355,8 +379,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Lima sessiz fiş: http://127.0.0.1:${PORT}/print  yazıcı="${QUEUE}"  os=${platform()}`);
   if (platform() === 'win32') {
-    ensureWinPrintWorker();
+    warmWinPrintWorker();
     void listWin32Printers();
-    console.log('Windows: hizli yazdirma worker hazirlaniyor (ilk READY bir kez).');
   }
 });
