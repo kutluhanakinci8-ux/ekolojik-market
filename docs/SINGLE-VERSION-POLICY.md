@@ -1,5 +1,7 @@
 # Tek program sürümü (Mac = Windows = web)
 
+Üst politika: **`docs/TEK-DAL-TEK-SURUM-KURALLARI.md`** (tek dal `main`, deploy, kod vs veri).
+
 ## Kural
 
 1. **Tek uygulama:** Tüm kasalar `https://www.ekolojikmarket.com.tr/app` adresindeki **aynı** Vite/React build’ini kullanır. Mac veya Windows için **ayrı POS sürümü yok**.
