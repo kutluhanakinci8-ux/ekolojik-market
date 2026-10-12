@@ -190,7 +190,10 @@ export function CartPanel({
   const hasCartItems = cart.length > 0;
   const samplesOnly = hasCartItems && total === 0 && sampleCount > 0;
   const cartFocusLayout = hasCartItems && !compactCheckout;
+  const searchActive = search.trim().length > 0;
   const showCustomerExtra = compactCheckout || customerExtraOpen || !hasCartItems;
+  /** Barkod/ürün araması yazılırken Greenleaf alanı gizlenir — liste için yer açılır */
+  const showCustomerBar = compactCheckout || !searchActive;
 
   useEffect(() => {
     if (cart.length === 0) {
@@ -211,7 +214,7 @@ export function CartPanel({
 
   return (
     <aside
-      className={`cart-panel${compactCheckout ? ' cart-panel--compact-checkout' : ''}${hasCartItems ? ' cart-panel--has-items' : ''}${cartFocusLayout ? ' cart-panel--cart-focus' : ''}`}
+      className={`cart-panel${compactCheckout ? ' cart-panel--compact-checkout' : ''}${hasCartItems ? ' cart-panel--has-items' : ''}${cartFocusLayout ? ' cart-panel--cart-focus' : ''}${searchActive ? ' cart-panel--search-active' : ''}`}
     >
       <div className={`cart-panel-top ${hasCartItems ? 'cart-panel-top--compact' : ''}`}>
         <div className="cart-panel-search">
@@ -272,6 +275,14 @@ export function CartPanel({
           </div>
         </div>
 
+        {searchActive && saleGreenleafNumber.trim() && (
+          <p className="cart-gl-active-pill" title="Greenleaf numarası kayıtlı — aramayı temizleyince alan geri gelir">
+            GL {saleGreenleafNumber.trim()}
+            {partnerLocked ? ' · Partner fiyat' : ''}
+          </p>
+        )}
+
+        {showCustomerBar && (
         <div className={`sale-customer-bar ${cartFocusLayout && !showCustomerExtra ? 'sale-customer-bar--slim' : ''}`}>
           <input
             type="text"
@@ -365,6 +376,7 @@ export function CartPanel({
             </div>
           )}
         </div>
+        )}
       </div>
 
       <div

@@ -1950,6 +1950,25 @@ input {
   margin-bottom: 8px;
 }
 
+.cart-panel--search-active .cart-panel-top {
+  padding-bottom: 6px;
+}
+
+.cart-gl-active-pill {
+  margin: 0 4px 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--greenleaf-dark);
+  background: rgba(240, 249, 238, 0.95);
+  border: 1px solid rgba(45, 90, 39, 0.2);
+  border-radius: 999px;
+}
+
+.cart-panel--search-active.cart-panel--cart-focus .cart-panel-items {
+  min-height: min(48vh, 400px);
+}
+
 .cart-panel--cart-focus .cart-panel-header-row h2 {
   font-size: 16px;
 }
