@@ -6,6 +6,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if (-not (Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue)) {
+  $alt = Get-Printer | Where-Object { $_.Name -match 'Ekolojik POS-80|POS-80|Zywell' } | Select-Object -First 1
+  if ($alt) {
+    $PrinterName = $alt.Name
+  }
+}
+
 if (-not (Test-Path -LiteralPath $FilePath)) {
   Write-Error "Dosya bulunamadı: $FilePath"
   exit 2

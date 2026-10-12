@@ -77,19 +77,25 @@ function resolveWin32Queue(requested) {
   const printers = listWin32Printers();
   if (!printers.length) return want || QUEUE;
   if (printers.includes(want)) return want;
-  const norm = (s) => s.toLowerCase().replace(/[\s_-]/g, '');
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const hit = printers.find((p) => norm(p) === norm(want));
   if (hit) return hit;
-  const pos80 = printers.filter((p) => /pos.?80|printer[\s_-]?80/i.test(p));
-  if (pos80.length === 1) return pos80[0];
-  if (want && /pos.?80|printer[\s_-]?80/i.test(want) && pos80.length) return pos80[0];
+  const standard = printers.find((p) => /ekolojik\s+pos-80\s*\(zywell\)/i.test(p));
+  if (standard) return standard;
+  const pos80 = printers.filter((p) => /pos.?80|zywell|ekolojik/i.test(p));
+  if (pos80.length >= 1) return pos80[0];
+  if (want && /pos|80|zywell|ekolojik|printer/i.test(want) && printers.length) return printers[0];
   return want || QUEUE;
 }
 
 function win32PrinterStatus(requested) {
   const printers = listWin32Printers();
   const want = String(requested || QUEUE).trim();
-  const resolved = resolveWin32Queue(want);
+  let resolved = resolveWin32Queue(want);
+  if (!printers.includes(resolved)) {
+    const fallback = printers.find((p) => /pos.?80|zywell|ekolojik/i.test(p));
+    if (fallback) resolved = fallback;
+  }
   if (!printers.length) {
     return {
       ready: false,
@@ -223,7 +229,7 @@ const server = createServer(async (req, res) => {
   try {
     const printer = body.printer ? String(body.printer).trim() : '';
     const os = platform();
-    const queue =
+    let queue =
       os === 'darwin'
         ? resolveDarwinQueue(printer || QUEUE)
         : os === 'win32'
@@ -244,6 +250,7 @@ const server = createServer(async (req, res) => {
         );
         return;
       }
+      queue = st.resolvedQueue;
     }
     await sendRaw(buildEscPosReceiptBuffer(body.text ?? ''), queue);
     res.writeHead(200, { 'Content-Type': 'application/json' });

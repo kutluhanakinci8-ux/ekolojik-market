@@ -20,6 +20,21 @@ export interface ReceiptPrinterSettings {
 /** Standart Windows kuyruk adı — Zywell POS-80 */
 export const STANDARD_WINDOWS_ZYWELL_PRINTER_NAME = 'Ekolojik POS-80 (Zywell)';
 
+const LEGACY_WINDOWS_PRINTER_ALIASES = new Set(
+  ['pos-80c', 'printer pos-80c', 'printer_pos_80c', 'pos80c'].map((s) => s.replace(/\s/g, '')),
+);
+
+/** Eski ayarlardaki POS-80C → kurulum betiğinin oluşturduğu kuyruk adı */
+export function normalizeWindowsPrinterName(raw: string): string {
+  const t = raw.trim();
+  if (!t) return '';
+  const key = t.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (LEGACY_WINDOWS_PRINTER_ALIASES.has(key)) {
+    return STANDARD_WINDOWS_ZYWELL_PRINTER_NAME;
+  }
+  return t;
+}
+
 /** Greenleaf kasa — Zywell; «gelişmiş profil» kapalı (çalışan yönetici yolu) */
 export const GREENLEAF_KASA_RECEIPT_PRESET: ReceiptPrinterSettings = {
   enabled: false,
@@ -61,7 +76,7 @@ export function normalizeReceiptPrinterSettings(
   return {
     enabled: Boolean(base.enabled),
     brand,
-    windowsPrinterName: String(base.windowsPrinterName ?? '').trim(),
+    windowsPrinterName: normalizeWindowsPrinterName(String(base.windowsPrinterName ?? '').trim()),
     paperWidthMm: paper,
     autoPrintOnSale: base.autoPrintOnSale !== false,
     copies,

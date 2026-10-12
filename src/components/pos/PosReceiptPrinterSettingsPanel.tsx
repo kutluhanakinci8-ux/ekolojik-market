@@ -148,7 +148,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           <p>Termal fiş (POS-80C) — sessiz yazdırma; kasada otomatik fiş servisi kurulumu yukarıda</p>
         </div>
         <button type="button" className="btn btn-outline" onClick={applyZywellPreset}>
-          POS-80C / Zywell varsayılanı
+          Zywell varsayılan adı
         </button>
       </div>
 
@@ -185,7 +185,7 @@ export function PosReceiptPrinterSettingsPanel({ store }: PosReceiptPrinterSetti
           <input
             value={printer.windowsPrinterName}
             onChange={(e) => set({ windowsPrinterName: e.target.value })}
-            placeholder="Örn. POS-80C, Zywell"
+            placeholder={STANDARD_WINDOWS_ZYWELL_PRINTER_NAME}
           />
         </label>
         <label className="settings-field">
