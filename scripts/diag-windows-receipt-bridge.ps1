@@ -15,8 +15,9 @@ Write-Host "`nKurulum klasoru: $dest"
   Write-Host "  $(if (Test-Path $p) { 'OK' } else { '--' }) $_"
 }
 
-Write-Host "`nGorev: LimaMarketReceiptBridge"
-Get-ScheduledTask -TaskName 'LimaMarketReceiptBridge' -ErrorAction SilentlyContinue | Format-List TaskName, State
+Write-Host "`nGorev: EkolojikMarketReceiptBridge"
+Get-ScheduledTask -TaskName 'EkolojikMarketReceiptBridge' -ErrorAction SilentlyContinue | Format-List TaskName, State
+Write-Host "POS80_QUEUE_NAME (kullanici): $([Environment]::GetEnvironmentVariable('POS80_QUEUE_NAME','User'))"
 
 Write-Host "Health:"
 try {
