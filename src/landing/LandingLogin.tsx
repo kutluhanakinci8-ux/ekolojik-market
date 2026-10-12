@@ -5,7 +5,7 @@ import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
 import { clearPosApiToken, decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
-import { TenantStoreCodeField } from '../components/TenantStoreCodeField';
+import { LoginTenantStoreSection } from '../components/LoginTenantStoreSection';
 import { resolveLoginTenantId } from '../config/loginTenant';
 import {
   DEFAULT_TENANT_ID,
@@ -29,6 +29,9 @@ export function LandingLogin() {
   const [pendingTotpUserId, setPendingTotpUserId] = useState<string | null>(null);
   const [pendingUsername, setPendingUsername] = useState('');
   const [tenantId, setTenantId] = useState(() => resolveTenantIdForLoginPage());
+  const loginPageTenantFromUrl = Boolean(
+    new URLSearchParams(window.location.search).get('tenant')?.trim(),
+  );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(registerState?.message ?? null);
   const [busy, setBusy] = useState(false);
@@ -127,6 +130,7 @@ export function LandingLogin() {
             store={store}
             tenantId={tenantId}
             onTenantIdChange={setTenantId}
+            initialExpandedTenant={loginPageTenantFromUrl}
             defaultUsername={lastQuickUser ?? undefined}
             onSwitchToPassword={() => setMode('password')}
             onSuccess={goToApp}
@@ -135,7 +139,11 @@ export function LandingLogin() {
           <form className="landing-form-grid" onSubmit={handlePasswordSubmit}>
             {!pendingTotpUserId && (
               <>
-                <TenantStoreCodeField tenantId={tenantId} onTenantIdChange={setTenantId} />
+                <LoginTenantStoreSection
+                  tenantId={tenantId}
+                  onTenantIdChange={setTenantId}
+                  initialExpanded={loginPageTenantFromUrl}
+                />
                 <label>
                   Kullanıcı Adı
                   <input

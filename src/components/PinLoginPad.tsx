@@ -4,12 +4,13 @@ import { loadLastQuickUser } from '../storage/quickLogin';
 import { resolveLoginTenantId } from '../config/loginTenant';
 import { saveTenantId } from '../storage/tenantSession';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
-import { TenantStoreCodeField } from './TenantStoreCodeField';
+import { LoginTenantStoreSection } from './LoginTenantStoreSection';
 
 interface PinLoginPadProps {
   store: Store;
   tenantId: string;
   onTenantIdChange: (tenantId: string) => void;
+  initialExpandedTenant?: boolean;
   defaultUsername?: string;
   onSwitchToPassword: () => void;
   onSuccess?: () => void;
@@ -19,6 +20,7 @@ export function PinLoginPad({
   store,
   tenantId,
   onTenantIdChange,
+  initialExpandedTenant = false,
   defaultUsername,
   onSwitchToPassword,
   onSuccess,
@@ -65,7 +67,11 @@ export function PinLoginPad({
 
   return (
     <div className="pin-login">
-      <TenantStoreCodeField tenantId={tenantId} onTenantIdChange={onTenantIdChange} />
+      <LoginTenantStoreSection
+        tenantId={tenantId}
+        onTenantIdChange={onTenantIdChange}
+        initialExpanded={initialExpandedTenant}
+      />
 
       <label className="pin-login-username">
         Kullanıcı Adı

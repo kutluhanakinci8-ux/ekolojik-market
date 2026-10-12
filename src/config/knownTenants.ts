@@ -16,7 +16,7 @@ export function normalizeStoreCodeInput(raw: string): string {
 }
 
 export function storeCodePlaceholder(): string {
-  return 'Greenleaf: boş · Lima: lima-market';
+  return 'Kayıt e-postanızdaki mağaza kodu';
 }
 
 /**
@@ -32,7 +32,7 @@ export function validateStoreCodeForLogin(tenantId: string): string | null {
     return null;
   }
   if (!/^[a-z0-9][a-z0-9._-]{1,38}[a-z0-9]$/.test(id) && id.length < 40) {
-    return 'Mağaza kodu geçersiz. Greenleaf için boş bırakın; Lima için lima-market yazın.';
+    return 'Mağaza kodu geçersiz. Varsayılan mağaza için boş bırakın.';
   }
   return 'Bu mağaza kodu tanınmıyor. Kayıt e-postanızdaki mağaza kodunu kullanın veya destek ile iletişime geçin.';
 }

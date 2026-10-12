@@ -6,7 +6,7 @@ import { loadLastQuickUser } from '../storage/quickLogin';
 import { resolveLoginTenantId } from '../config/loginTenant';
 import { normalizeStoreCodeInput, resolveTenantIdForLoginPage, saveTenantId } from '../storage/tenantSession';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
-import { TenantStoreCodeField } from './TenantStoreCodeField';
+import { LoginTenantStoreSection } from './LoginTenantStoreSection';
 import { PinLoginPad } from './PinLoginPad';
 
 interface LoginScreenProps {
@@ -30,7 +30,7 @@ export function LoginScreen({ store }: LoginScreenProps) {
   const [totpCode, setTotpCode] = useState('');
   const [pendingTotpUserId, setPendingTotpUserId] = useState<string | null>(null);
   const [pendingUsername, setPendingUsername] = useState('');
-  const [tenantId, setTenantId] = useState(() => loadTenantId());
+  const [tenantId, setTenantId] = useState(() => resolveTenantIdForLoginPage());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -39,7 +39,8 @@ export function LoginScreen({ store }: LoginScreenProps) {
     setBusy(true);
     setError(null);
 
-    const resolvedTenant = normalizeStoreCodeInput(tenantId);
+    const loginUser = (pendingTotpUserId ? pendingUsername : username).trim();
+    const resolvedTenant = resolveLoginTenantId(loginUser, normalizeStoreCodeInput(tenantId));
     const tenantError = validateStoreCodeForLogin(resolvedTenant);
     if (tenantError) {
       setError(tenantError);
@@ -115,7 +116,7 @@ export function LoginScreen({ store }: LoginScreenProps) {
           <form className="login-form" onSubmit={handlePasswordSubmit}>
             {!pendingTotpUserId && (
               <>
-                <TenantStoreCodeField tenantId={tenantId} onTenantIdChange={setTenantId} />
+                <LoginTenantStoreSection tenantId={tenantId} onTenantIdChange={setTenantId} />
               <label>
                 Kullanıcı Adı
                 <input

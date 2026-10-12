@@ -17615,3 +17615,11 @@ input {
   gap: 8px;
   margin-top: 8px;
 }
+
+.login-tenant-advanced-toggle {
+  margin: 0 0 0.5rem;
+  text-align: center;
+}
+.login-tenant-advanced-panel {
+  margin-bottom: 0.5rem;
+}
