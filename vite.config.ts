@@ -30,6 +30,20 @@ export default defineConfig({
           'dist/app-release.json',
           JSON.stringify({ version: appVersion, buildId }, null, 0),
         );
+        const indexPath = 'dist/index.html';
+        let html = readFileSync(indexPath, 'utf8');
+        if (html.includes('name="ek-pos-build"')) {
+          html = html.replace(
+            /name="ek-pos-build" content="[^"]*"/,
+            `name="ek-pos-build" content="${buildId}"`,
+          );
+        } else {
+          html = html.replace(
+            '<meta charset="UTF-8" />',
+            `<meta name="ek-pos-build" content="${buildId}" />\n    <meta charset="UTF-8" />`,
+          );
+        }
+        writeFileSync(indexPath, html);
       },
     },
   ],
