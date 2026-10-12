@@ -4,11 +4,10 @@ import type { SaleReturn } from '../types/saleReturn';
 import type { ThermalReceiptPrintOptions } from '../types/receiptPrinter';
 import { normalizeReceiptPrinterSettings } from '../types/receiptPrinter';
 import { logReceiptPrint } from './receiptPrintLog';
-import { remindChromeReceiptPrintSettings } from './receiptPrintReminder';
 import { remindSilentReceiptBridgeMissing } from './receiptPrintBridgeReminder';
 import { tryLimaRawReceiptPrint } from './limaRawReceiptPrint';
 import { applyRetailVat } from './productPricing';
-import { DEFAULT_VAT_RATE, roundMoney } from './vatAnalytics';
+import { DEFAULT_VAT_RATE, roundMoney, splitGrossAmount } from './vatAnalytics';
 
 /** Termal sürücüde \u200b başlık kenarda «c0» / bozuk karakter basabiliyor */
 const BLANK_PRINT_TITLE = '';
@@ -85,17 +84,32 @@ export function buildSaleReceiptVatBreakdown(
 }
 
 export function resolveSaleReceiptVat(data: SaleReceiptData): SaleReceiptVatBreakdown | undefined {
-  if (!isLimaBrandedReceipt(data.businessName)) return undefined;
-  const netFromItems = roundMoney(data.items.reduce((sum, item) => sum + item.lineTotal, 0));
-  const netTotal = netFromItems > 0 ? netFromItems : roundMoney(data.total);
-  if (netTotal <= 0) return undefined;
-  return buildSaleReceiptVatBreakdown(netTotal);
+  const itemsSum = roundMoney(data.items.reduce((sum, item) => sum + item.lineTotal, 0));
+  const grossFromTotal = roundMoney(data.total);
+  const grossTotal = grossFromTotal > 0 ? grossFromTotal : itemsSum;
+  if (grossTotal <= 0) return undefined;
+
+  if (isLimaBrandedReceipt(data.businessName)) {
+    const netFromItems = itemsSum > 0 ? itemsSum : grossFromTotal;
+    return buildSaleReceiptVatBreakdown(netFromItems);
+  }
+
+  const split = splitGrossAmount(grossTotal, DEFAULT_VAT_RATE);
+  return {
+    vatRate: DEFAULT_VAT_RATE,
+    netTotal: split.netAmount,
+    vatAmount: split.vatAmount,
+    grossTotal: split.grossAmount,
+  };
 }
 
 export function withSaleReceiptVatBreakdown(data: SaleReceiptData): SaleReceiptData {
   const vat = data.vat ?? resolveSaleReceiptVat(data);
   if (!vat) return data;
-  return { ...data, vat, total: vat.grossTotal };
+  const total = isLimaBrandedReceipt(data.businessName)
+    ? vat.grossTotal
+    : (roundMoney(data.total) > 0 ? roundMoney(data.total) : vat.grossTotal);
+  return { ...data, vat, total };
 }
 
 function receiptVatFor(data: SaleReceiptData): SaleReceiptVatBreakdown | undefined {
@@ -891,7 +905,7 @@ export function buildGreenleafPremiumReceiptHtml(data: SaleReceiptData): string 
   </table>
   <hr class="rp-rule" />
   <table class="rp-items" role="presentation">${itemRows}</table>
-  ${receiptVatFor(data) ? '<div class="rp-vat-note">Satır fiyatları KDV hariçtir.</div>' : ''}
+  ${receiptVatFor(data) ? '<div class="rp-vat-note">Satır tutarları KDV dahil; alt kısımda KDV dökümü.</div>' : ''}
   <hr class="rp-rule rp-rule--thick" />
   <table class="rp-total" role="presentation">
     ${buildReceiptVatPremiumRows(data)}
@@ -1074,19 +1088,13 @@ export async function printThermalReceipt(
   if (options === undefined) {
     logReceiptPrint('thermal-classic-path', { saleId: receipt.saleId, items: receipt.items.length });
     const plainNoSacrifice = buildPlainTextSaleReceipt(receipt);
-    const limaSilent = isLimaBrandedReceipt(receipt.businessName);
     const rawOk = await tryLimaRawReceiptPrint(plainNoSacrifice, printerName);
     if (rawOk) {
       logReceiptPrint('thermal-raw-escpos-ok', { saleId: receipt.saleId });
       return;
     }
-    logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed', limaSilent });
-    if (limaSilent) {
-      remindSilentReceiptBridgeMissing();
-      return;
-    }
-    remindChromeReceiptPrintSettings();
-    await printHtmlReceiptClassicIframe(buildGreenleafPremiumReceiptHtml(receipt));
+    logReceiptPrint('thermal-raw-escpos-skip', { reason: 'bridge-off-or-failed' });
+    remindSilentReceiptBridgeMissing();
     return;
   }
   const normalized = normalizeReceiptPrinterSettings(options);

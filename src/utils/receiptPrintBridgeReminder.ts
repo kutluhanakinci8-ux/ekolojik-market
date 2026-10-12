@@ -15,6 +15,6 @@ export function remindSilentReceiptBridgeMissing(): void {
       + '• Mac + USB: Terminal → node scripts/lima-raw-print-bridge.mjs\n'
       + '• Linux VPS (yazıcı sunucuda): cd repo && bash scripts/start-lima-receipt-bridge.sh\n'
       + '   veya: pm2 start lima-receipt-bridge (deploy sonrası)\n\n'
-      + 'SSH sunucuda .bat / .ps1 ÇALIŞMAZ. Tarayıcı yazdır penceresi Lima’da açılmaz.',
+      + 'SSH sunucuda .bat / .ps1 ÇALIŞMAZ. Tarayıcı «Yazdır» penceresi açılmaz — köprü şart.',
   );
 }
