@@ -29,6 +29,10 @@ import {
 } from '../services/storeApi';
 import { mergeSalesById } from '../utils/mergeStoreSnapshots';
 import {
+  applySalesHistoryClearToSnapshot,
+  localSnapshotHasStaleSales,
+} from '../utils/salesHistoryClear';
+import {
   clearPosApiToken,
   clearPosApiTokensForAllKnownTenants,
   decodePosApiTokenClaims,
@@ -1128,11 +1132,17 @@ export function usePosStoreState() {
 
       if (tenant !== DEFAULT_TENANT_ID) {
         if (remote) {
-          if (deviceHasLocalStoreData()) {
-            setSyncStatus('local-only');
-          } else {
-            applySnapshot(remote);
+          const staleSales = localSnapshotHasStaleSales(
+            localSnapshot.sales ?? [],
+            remote.settings?.salesHistoryClearedAt,
+          );
+          if (staleSales || !deviceHasLocalStoreData()) {
+            applySnapshot(
+              applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
+            );
             setSyncStatus('synced');
+          } else {
+            setSyncStatus('local-only');
           }
         } else {
           setProducts([]);
@@ -1144,7 +1154,16 @@ export function usePosStoreState() {
       }
 
       if (loadPosApiToken() && remote && hasPersistedStoreData(remote)) {
-        if (deviceHasLocalStoreData()) {
+        const staleSales = localSnapshotHasStaleSales(
+          localSnapshot.sales ?? [],
+          remote.settings?.salesHistoryClearedAt,
+        );
+        if (staleSales) {
+          applySnapshot(
+            applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
+          );
+          setSyncStatus('synced');
+        } else if (deviceHasLocalStoreData()) {
           setSyncStatus('local-only');
         } else {
           const remoteUsers = (remote.users ?? []).map((user) =>
@@ -3335,8 +3354,14 @@ export function usePosStoreState() {
       let sessionSettings = settings;
       try {
         const remote = await fetchStoreSnapshot();
-        if (remote && !deviceHasLocalStoreData()) {
-          applySnapshot(remote);
+        const localSales = loadSales();
+        const staleSales = remote
+          ? localSnapshotHasStaleSales(localSales, remote.settings?.salesHistoryClearedAt)
+          : false;
+        if (remote && (staleSales || !deviceHasLocalStoreData())) {
+          applySnapshot(
+            applySalesHistoryClearToSnapshot(remote, remote.settings?.salesHistoryClearedAt),
+          );
           sessionSettings = snapshotMergedSettings(remote);
           setSyncStatus('synced');
         } else if (remote) {

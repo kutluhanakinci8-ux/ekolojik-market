@@ -280,6 +280,8 @@ export interface AppSettings {
   crm?: CrmSettings;
   posCheckout?: PosCheckoutSettings;
   receiptPrinter?: ReceiptPrinterSettings;
+  /** Sunucu/yönetici satış geçmişi sıfırlaması — bu saatten önceki satışlar senkrona alınmaz */
+  salesHistoryClearedAt?: string;
 }
 
 export const DEFAULT_POS_NOTES: PosNotesConfig = {

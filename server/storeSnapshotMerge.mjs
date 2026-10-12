@@ -38,17 +38,36 @@ function mergeStockMovements(local, remote) {
   return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+function filterAfterClear(items, clearedAt) {
+  const t0 = ts(clearedAt);
+  if (!t0 || !Array.isArray(items)) return items ?? [];
+  return items.filter((row) => ts(row.createdAt) > t0);
+}
+
 export function mergeIncomingStoreWithExisting(incoming, existing) {
   if (!existing || typeof existing !== 'object') return incoming;
+  const clearedAt = existing.settings?.salesHistoryClearedAt ?? incoming.settings?.salesHistoryClearedAt;
   const out = { ...incoming };
-  if (Array.isArray(incoming.sales) && Array.isArray(existing.sales)) {
-    out.sales = mergeSalesById(incoming.sales, existing.sales);
+  if (clearedAt) {
+    out.sales = filterAfterClear(incoming.sales, clearedAt);
+    out.saleReturns = filterAfterClear(incoming.saleReturns, clearedAt);
+    out.stockMovements = filterAfterClear(incoming.stockMovements, clearedAt);
+    if (ts(clearedAt)) out.customerLedger = [];
   }
-  if (Array.isArray(incoming.saleReturns) && Array.isArray(existing.saleReturns)) {
-    out.saleReturns = mergeByCreatedAtId(incoming.saleReturns, existing.saleReturns);
+  if (Array.isArray(out.sales) && Array.isArray(existing.sales)) {
+    out.sales = mergeSalesById(out.sales, filterAfterClear(existing.sales, clearedAt));
   }
-  if (Array.isArray(incoming.stockMovements) && Array.isArray(existing.stockMovements)) {
-    out.stockMovements = mergeStockMovements(incoming.stockMovements, existing.stockMovements);
+  if (Array.isArray(out.saleReturns) && Array.isArray(existing.saleReturns)) {
+    out.saleReturns = mergeByCreatedAtId(
+      out.saleReturns,
+      filterAfterClear(existing.saleReturns, clearedAt),
+    );
+  }
+  if (Array.isArray(out.stockMovements) && Array.isArray(existing.stockMovements)) {
+    out.stockMovements = mergeStockMovements(
+      out.stockMovements,
+      filterAfterClear(existing.stockMovements, clearedAt),
+    );
   }
   out.updatedAt = new Date(Math.max(ts(incoming.updatedAt), ts(existing.updatedAt), Date.now())).toISOString();
   return out;

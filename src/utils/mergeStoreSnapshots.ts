@@ -2,6 +2,10 @@ import type { Customer } from '../types/business';
 import type { Product, Sale, StockMovement } from '../types/product';
 import type { SaleReturn } from '../types/saleReturn';
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
+import {
+  applySalesHistoryClearToSnapshot,
+  resolveSalesHistoryClearedAt,
+} from './salesHistoryClear';
 
 function ts(iso: string | undefined): number {
   if (!iso) return 0;
@@ -70,21 +74,28 @@ export function mergeStoreSnapshots(
   local: PersistedStoreSnapshot,
   remote: PersistedStoreSnapshot,
 ): PersistedStoreSnapshot {
+  const clearedAt = resolveSalesHistoryClearedAt(local, remote);
+  const localClean = applySalesHistoryClearToSnapshot(local, clearedAt);
+  const remoteClean = applySalesHistoryClearToSnapshot(remote, clearedAt);
   const updatedAt = new Date(
     Math.max(ts(local.updatedAt), ts(remote.updatedAt), Date.now()),
   ).toISOString();
 
   return {
-    ...remote,
-    ...local,
+    ...remoteClean,
+    ...localClean,
     updatedAt,
-    sales: mergeSalesById(local.sales ?? [], remote.sales ?? []),
-    saleReturns: mergeSaleReturnsById(local.saleReturns ?? [], remote.saleReturns ?? []),
-    stockMovements: mergeStockMovementsById(local.stockMovements ?? [], remote.stockMovements ?? []),
-    customers: mergeCustomersById(local.customers ?? [], remote.customers ?? []),
-    products: mergeProductsById(local.products ?? [], remote.products ?? []),
-    productSets: remote.productSets?.length ? remote.productSets : local.productSets,
-    settings: local.settings ?? remote.settings,
+    settings: {
+      ...remoteClean.settings,
+      ...localClean.settings,
+      salesHistoryClearedAt: clearedAt ?? localClean.settings?.salesHistoryClearedAt,
+    },
+    sales: mergeSalesById(localClean.sales ?? [], remoteClean.sales ?? []),
+    saleReturns: mergeSaleReturnsById(localClean.saleReturns ?? [], remoteClean.saleReturns ?? []),
+    stockMovements: mergeStockMovementsById(localClean.stockMovements ?? [], remoteClean.stockMovements ?? []),
+    customers: mergeCustomersById(localClean.customers ?? [], remoteClean.customers ?? []),
+    products: mergeProductsById(localClean.products ?? [], remoteClean.products ?? []),
+    productSets: remoteClean.productSets?.length ? remoteClean.productSets : localClean.productSets,
     priceType: local.priceType ?? remote.priceType,
     users: local.users?.length ? local.users : remote.users,
   };
