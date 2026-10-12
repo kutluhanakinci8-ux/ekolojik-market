@@ -339,8 +339,11 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
               <p className="module-hint" style={{ marginBottom: 12 }}>
                 <strong>Uygulama</strong> satırı tarayıcıdaki güncel programı gösterir.{' '}
                 <strong>Katalog</strong> ürün/fiyat paketinin kod içi kimliğidir (tarih eski sürüm anlamına
-                gelmez). Mac ve Windows aynı <code>www.ekolojikmarket.com.tr</code> + senkron ile aynı veriyi
-                görür.
+                gelmez).                 Tek program sürümü: <code>www.ekolojikmarket.com.tr</code> (deploy). Mağaza verisi (stok,
+                fiyat, özel ürün fotoğrafları, fiş ayarları) <strong>sunucuda</strong> tutulur — Greenleaf
+                (<code>kutluhan08</code>) yalnızca Greenleaf; Lima ayrı tenant. Platform yöneticisi (
+                <code>yonetici</code>) tüm mağazaları güncelleyebilir. Yönetici fotoğraf değiştirirse ~2 sn
+                içinde sunucuya yazılır; diğer kasalar giriş/yenilemede aynı veriyi alır.
               </p>
               <div className="settings-stat-grid">
                 <article className="settings-stat-card">

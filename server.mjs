@@ -3043,7 +3043,17 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/data' && req.method === 'PUT') {
       const tenantId = resolveTenantId(url);
-      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, tenantId);
+      if (!authPayload) return;
+      const existingForAuth = await readTenantStore(DATA_DIR, tenantId);
+      const writer = existingForAuth?.users?.find((u) => u.id === authPayload.userId);
+      const { assertTenantStoreWriteAllowed } = await import('./server/tenantWritePolicy.mjs');
+      const writePolicy = assertTenantStoreWriteAllowed(writer?.username, tenantId);
+      if (!writePolicy.ok) {
+        res.writeHead(writePolicy.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: writePolicy.error }));
+        return;
+      }
       const data = await readRequestBody(req);
       if (!data || typeof data !== 'object') {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
