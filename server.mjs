@@ -274,7 +274,9 @@ if (envBootstrap.loaded) {
   console.log(`Ekolojik env: ${envBootstrap.count} değişken yüklendi (${envBootstrap.path})`);
 }
 const DIST = join(__dirname, 'dist');
-const DATA_DIR = join(__dirname, 'data');
+const DATA_DIR = process.env.MARKET_POS_DATA_DIR?.trim()
+  ? join(process.env.MARKET_POS_DATA_DIR.trim())
+  : join(__dirname, 'data');
 const deliverMessage = createDeliverMessage(DATA_DIR);
 const PORT = Number(process.env.PORT || 5180);
 const HOST = process.env.HOST || '0.0.0.0';
