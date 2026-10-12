@@ -2,7 +2,7 @@
   "name": "Ekolojik Market POS",
   "short_name": "Ekolojik POS",
   "description": "Posta hub ve mağaza yönetimi",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2d5a27",

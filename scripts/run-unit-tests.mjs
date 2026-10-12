@@ -16,3 +16,4 @@ function run(script) {
 
 await run(join(REPO, 'scripts/unit/outbox-auth.mjs'));
 await run(join(REPO, 'scripts/verify-staging-server-shim.mjs'));
+await run(join(REPO, 'scripts/single-version-smoke.mjs'));

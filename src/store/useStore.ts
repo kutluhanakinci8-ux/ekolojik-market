@@ -208,7 +208,9 @@ import {
   usesNetRetailWithVatBreakdown,
 } from '../utils/tenantCatalogIsolation';
 import { applyRetailVat, mergeProductPricing, type ProductPricingInput } from '../utils/productPricing';
+import { isGreenleafPersistedImageUrl } from '../utils/greenleafProductImages';
 import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
+import { canPushTenantDataToServer } from '../config/tenantDataPolicy';
 import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
 function storageKeys() {
@@ -741,8 +743,13 @@ function createSetMovement(
 
 function serializeProductsForSnapshot(products: Product[], settings: AppSettings): Product[] {
   const isolated = isTenantCatalogIsolated(undefined, settings);
+  const localImages = isolated ? {} : loadAllImages();
   return products.map((p) => {
     if (!isolated) {
+      const url = localImages[p.id] ?? p.imageUrl;
+      if (isGreenleafPersistedImageUrl(url)) {
+        return { ...p, imageUrl: url };
+      }
       const { imageUrl: _, ...rest } = p;
       return rest as Product;
     }
@@ -882,6 +889,10 @@ export function usePosStoreState() {
   const [costProfitRevealed, setCostProfitRevealed] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'loading' | 'synced' | 'local-only'>('loading');
+  const persistStoreNowRef = useRef<
+    (overrides?: { users?: PosUser[]; cashSessions?: DailyCashSession[] }) => Promise<boolean>
+  >(async () => false);
+  const serverSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [crmData, setCrmData] = useState<CrmPersistedData>(loadCrmData);
   const [saleCouponCode, setSaleCouponCode] = useState('');
   const [saleLoyaltyPointsToRedeem, setSaleLoyaltyPointsToRedeem] = useState(0);
@@ -1014,6 +1025,9 @@ export function usePosStoreState() {
     }
     if (snapshot.activityAuditLog?.length) {
       setActivityAuditLog(snapshot.activityAuditLog);
+    }
+    if (!isolated && snapshot.products?.length) {
+      migrateImagesFromProducts(snapshot.products);
     }
   }, []);
 
@@ -2950,6 +2964,9 @@ export function usePosStoreState() {
   }, [applySnapshot, buildCurrentSnapshot, authSession, logActivity]);
 
   const pushStoreToServer = useCallback(async () => {
+    if (authSession && !canPushTenantDataToServer(authSession.username, loadTenantId())) {
+      return false;
+    }
     const snapshot = buildCurrentSnapshot();
     const saved = await saveStoreSnapshot(snapshot);
     setSyncStatus(saved ? 'synced' : 'local-only');
@@ -2967,6 +2984,20 @@ export function usePosStoreState() {
     setSyncStatus(saved ? 'synced' : 'local-only');
     return saved;
   }, [buildCurrentSnapshot]);
+
+  persistStoreNowRef.current = persistStoreNow;
+
+  const scheduleAdminServerSync = useCallback(() => {
+    if (!syncReady) return;
+    if (!authSession || authSession.role !== 'admin') return;
+    if (!loadPosApiToken()) return;
+    if (!canPushTenantDataToServer(authSession.username, loadTenantId())) return;
+    if (serverSyncTimerRef.current) clearTimeout(serverSyncTimerRef.current);
+    serverSyncTimerRef.current = setTimeout(() => {
+      serverSyncTimerRef.current = null;
+      void persistStoreNowRef.current();
+    }, 2000);
+  }, [authSession, syncReady]);
 
   const closeCashDay = useCallback((): {
     ok: boolean;
@@ -3746,10 +3777,11 @@ export function usePosStoreState() {
           urun: product.name,
         });
       }
+      scheduleAdminServerSync();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Resim kaydedilemedi');
     }
-  }, [products, authSession, logActivity]);
+  }, [products, authSession, logActivity, scheduleAdminServerSync]);
 
   const removeProductImage = useCallback((productId: number) => {
     const product = products.find((p) => p.id === productId);
@@ -3766,7 +3798,8 @@ export function usePosStoreState() {
         urun: product.name,
       });
     }
-  }, [products, authSession, logActivity]);
+    scheduleAdminServerSync();
+  }, [products, authSession, logActivity, scheduleAdminServerSync]);
 
   const resolveCheckoutCustomer = useCallback((): Customer | undefined => {
     if (saleCustomerId) {
@@ -4226,8 +4259,9 @@ export function usePosStoreState() {
           ...patch,
         }),
       });
+      scheduleAdminServerSync();
     },
-    [settings.receiptPrinter, updateSettings],
+    [settings.receiptPrinter, updateSettings, scheduleAdminServerSync],
   );
 
   const processSaleReturn = useCallback((
