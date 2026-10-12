@@ -71,6 +71,8 @@ export function PosCheckoutSettingsPanel({ store }: PosCheckoutSettingsPanelProp
       </div>
       <p className="module-hint">
         Satış ekranı kısayolları: F1 nakit (para üstü), F2 kart, F3 havale, F4 veresiye, F6 bölünmüş, F7 beklet, F8 son bekleyeni geri çağır.
+        <br />
+        <strong>İki ekran / iki sekme:</strong> aynı kullanıcıyla satış girerseniz veriler sunucuda birleşir; diğer ekranda en geç ~12 sn içinde güncellenir veya sekmeyi öne getirin (Ctrl+F5).
       </p>
     </section>
   );

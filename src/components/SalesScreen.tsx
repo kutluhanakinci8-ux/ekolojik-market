@@ -333,7 +333,7 @@ export function SalesScreen({ store }: SalesScreenProps) {
 
     setCheckoutBusy(false);
     focusBarcodeInput();
-  }, [checkoutBusy, focusBarcodeInput, posCheckout, store]);
+  }, [checkoutBusy, focusBarcodeInput, posCheckout, posLiteCheckout, store]);
 
   const handleCheckout = useCallback((method: 'cash' | 'card' | 'transfer' | 'credit' | 'split') => {
     if (method === 'cash') {

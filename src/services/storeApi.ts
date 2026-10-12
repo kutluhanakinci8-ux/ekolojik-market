@@ -1,5 +1,6 @@
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { mergeStoreSnapshots } from '../utils/mergeStoreSnapshots';
 import { posApiAuthHeaders, posApiFetch } from './posApiAuth';
 
 function apiUrl(): string {
@@ -24,7 +25,7 @@ export async function fetchStoreSnapshot(): Promise<PersistedStoreSnapshot | nul
   }
 }
 
-export async function saveStoreSnapshot(snapshot: PersistedStoreSnapshot): Promise<boolean> {
+export async function putStoreSnapshot(snapshot: PersistedStoreSnapshot): Promise<boolean> {
   try {
     const res = await posApiFetch(apiUrl(), {
       method: 'PUT',
@@ -36,4 +37,25 @@ export async function saveStoreSnapshot(snapshot: PersistedStoreSnapshot): Promi
   } catch {
     return false;
   }
+}
+
+export async function buildMergedSnapshotForSave(
+  local: PersistedStoreSnapshot,
+): Promise<PersistedStoreSnapshot> {
+  const remote = await fetchStoreSnapshot();
+  return remote ? mergeStoreSnapshots(local, remote) : local;
+}
+
+export async function saveStoreSnapshot(snapshot: PersistedStoreSnapshot): Promise<boolean> {
+  const payload = await buildMergedSnapshotForSave(snapshot);
+  return putStoreSnapshot(payload);
+}
+
+/** Uzak veriyi yerel ile birleştir (çekme / sekme senkronu). */
+export async function fetchMergedWithLocal(
+  local: PersistedStoreSnapshot,
+): Promise<PersistedStoreSnapshot | null> {
+  const remote = await fetchStoreSnapshot();
+  if (!remote) return null;
+  return mergeStoreSnapshots(local, remote);
 }

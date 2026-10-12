@@ -3163,6 +3163,8 @@ const server = createServer(async (req, res) => {
         if (data.settings == null && existing.settings) {
           data.settings = existing.settings;
         }
+        const { mergeIncomingStoreWithExisting } = await import('./server/storeSnapshotMerge.mjs');
+        Object.assign(data, mergeIncomingStoreWithExisting(data, existing));
       }
       data.updatedAt = data.updatedAt || new Date().toISOString();
       const {

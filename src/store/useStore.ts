@@ -20,7 +20,14 @@ import { IRSALIYE_STOCK_MIGRATION_KEY, irsaliyeEanForCode } from '../data/irsali
 import { applyCatalogPricing } from '../utils/productPricing';
 import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
 import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
-import { fetchStoreSnapshot, saveStoreSnapshot } from '../services/storeApi';
+import {
+  buildMergedSnapshotForSave,
+  fetchMergedWithLocal,
+  fetchStoreSnapshot,
+  putStoreSnapshot,
+  saveStoreSnapshot,
+} from '../services/storeApi';
+import { mergeSalesById } from '../utils/mergeStoreSnapshots';
 import {
   clearPosApiToken,
   clearPosApiTokensForAllKnownTenants,
@@ -222,6 +229,10 @@ import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
 function storageKeys() {
   return posLocalStorageKeys();
+}
+
+function saleIdsSignature(list: { id: string }[]): string {
+  return list.map((s) => s.id).sort().join('\0');
 }
 
 const CATALOG_PRODUCTS: Array<Omit<Product, 'stock'>> = [
@@ -952,6 +963,24 @@ export function usePosStoreState() {
 
   const crmSettings = getCrmSettings(settings);
 
+  const applyMergedOperationalSlices = useCallback((merged: PersistedStoreSnapshot) => {
+    const mergedSettings = snapshotMergedSettings(merged);
+    const isolated = isIsolatedStoreContext(mergedSettings);
+    const mergedCustomers = merged.customers ?? [];
+    setSales(repairSaleCustomerLinks(merged.sales ?? [], mergedCustomers));
+    setSaleReturns(merged.saleReturns ?? []);
+    setStockMovements(merged.stockMovements ?? []);
+    setCustomers(mergedCustomers);
+    setProducts(
+      isolated
+        ? coerceTenantCatalogProducts(merged.products ?? [], true)
+        : mergeWithSeed(merged.products),
+    );
+    if (merged.cashSessions?.length) {
+      setCashSessions(merged.cashSessions);
+    }
+  }, []);
+
   const buildCurrentSnapshot = useCallback((overrides?: {
     users?: PosUser[];
     cashSessions?: DailyCashSession[];
@@ -1290,14 +1319,101 @@ export function usePosStoreState() {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(async () => {
       const snapshot = buildCurrentSnapshot();
-      const saved = await saveStoreSnapshot(snapshot);
+      const payload = await buildMergedSnapshotForSave(snapshot);
+      if (saleIdsSignature(payload.sales) !== saleIdsSignature(snapshot.sales)) {
+        applyMergedOperationalSlices(payload);
+      }
+      const saved = await putStoreSnapshot(payload);
       if (saved) setSyncStatus('synced');
     }, 700);
 
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [buildCurrentSnapshot, syncReady, authSession]);
+  }, [applyMergedOperationalSlices, buildCurrentSnapshot, syncReady, authSession]);
+
+  /** Diğer sekme / kasa satışları — periyodik ve sekme öne gelince sunucudan birleştir. */
+  useEffect(() => {
+    if (!syncReady || !authSession) return;
+
+    const pullRemoteSales = async () => {
+      const local = buildCurrentSnapshot();
+      const merged = await fetchMergedWithLocal(local);
+      if (!merged) return;
+      if (saleIdsSignature(merged.sales) === saleIdsSignature(local.sales)) return;
+      applyMergedOperationalSlices(merged);
+      setSyncStatus('synced');
+    };
+
+    const intervalId = window.setInterval(() => {
+      void pullRemoteSales();
+    }, 12_000);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void pullRemoteSales();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    void pullRemoteSales();
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [applyMergedOperationalSlices, authSession, buildCurrentSnapshot, syncReady]);
+
+  /** Aynı tarayıcıda iki sekme: localStorage değişince satış listesini birleştir. */
+  useEffect(() => {
+    if (!syncReady) return;
+    const watched = new Set([
+      storageKeys().sales,
+      storageKeys().saleReturns,
+      storageKeys().stockMovements,
+      storageKeys().products,
+    ]);
+
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || !watched.has(event.key) || !event.newValue) return;
+      try {
+        if (event.key === storageKeys().sales) {
+          const diskSales = JSON.parse(event.newValue) as Sale[];
+          setSales((prev) => repairSaleCustomerLinks(mergeSalesById(prev, diskSales), customers));
+        } else if (event.key === storageKeys().saleReturns) {
+          const disk = JSON.parse(event.newValue) as SaleReturn[];
+          setSaleReturns((prev) => {
+            const map = new Map(prev.map((r) => [r.id, r]));
+            for (const r of disk) map.set(r.id, r);
+            return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          });
+        } else if (event.key === storageKeys().stockMovements) {
+          const disk = JSON.parse(event.newValue) as StockMovement[];
+          setStockMovements((prev) => {
+            const map = new Map(prev.map((m) => [m.id, m]));
+            for (const m of disk) map.set(m.id, m);
+            return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          });
+        } else if (event.key === storageKeys().products) {
+          const disk = JSON.parse(event.newValue) as Product[];
+          setProducts((prev) => {
+            const map = new Map(prev.map((p) => [p.id, p]));
+            for (const p of disk) {
+              const old = map.get(p.id);
+              if (!old) {
+                map.set(p.id, p);
+                continue;
+              }
+              map.set(p.id, p.stock < old.stock ? p : old);
+            }
+            return mergeWithSeed([...map.values()]);
+          });
+        }
+      } catch {
+        /* ignore corrupt storage */
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [customers, syncReady]);
 
   useEffect(() => {
     if (authSession && loadPosApiToken()) {
