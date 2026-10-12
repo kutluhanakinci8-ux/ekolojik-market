@@ -15,7 +15,6 @@ import { formatCurrency } from '../utils/format';
 import { SALE_PRICE_LABELS } from '../utils/salePricing';
 import { getWholesaleTierLabel } from '../utils/wholesalePricing';
 import type { PosNote } from '../types/business';
-import { ProductImage } from './ProductImage';
 import { CartIdleStage } from './CartIdleStage';
 
 interface CartPanelProps {
@@ -404,11 +403,10 @@ export function CartPanel({
             if (item.setId) {
               const set = getSet(item.setId);
               if (!set) return null;
-              const coverProduct = products.find((p) => p.id === set.items[0]?.productId);
               return (
                 <div key={`set-${item.setId}-${item.priceType}`} className="cart-item cart-item--set">
-                  <div className="cart-item-info">
-                    {coverProduct ? <ProductImage product={coverProduct} size="sm" /> : <div className="set-cart-thumb">🎁</div>}
+                  <div className="cart-item-info cart-item-info--no-thumb">
+                    <div className="set-cart-thumb" aria-hidden>🎁</div>
                     <div>
                       <div className="cart-item-name">{set.name}</div>
                       <div className="cart-item-price">
@@ -458,8 +456,7 @@ export function CartPanel({
 
             return (
               <div key={`${item.productId}-${item.priceType}`} className={`cart-item ${isSampleLine ? 'cart-item--sample' : ''}`}>
-                <div className="cart-item-info">
-                  <ProductImage product={product} size="sm" />
+                <div className="cart-item-info cart-item-info--no-thumb">
                   <div>
                     <div className="cart-item-name">{product.name}</div>
                     <div className="cart-item-price">

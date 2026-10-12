@@ -23,6 +23,7 @@ import { normalizeBarcodeScanInput, type BarcodeScanApplyResult } from '../utils
 import { isLikelyBarcodeInput } from '../utils/productBarcode';
 import { playBarcodeErrorTone, playBarcodeSuccessTone } from '../utils/barcodeFeedback';
 import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import { getSampleStock, isSampleProduct } from '../utils/sampleProduct';
 import {
   categoriesForTenantSales,
   filterTenantProductSets,
@@ -150,6 +151,12 @@ export function SalesScreen({ store }: SalesScreenProps) {
     ? stockFilter
     : parsedSearch.stockFilter;
 
+  /** Satış ön ekranda tükenen ürün gösterilmez */
+  const salesGridStockFilter: StockSearchFilter =
+    effectiveStockFilter === 'low' || effectiveStockFilter === 'sample'
+      ? effectiveStockFilter
+      : 'in_stock';
+
   const showingSets = effectiveCategory === 'setler' || parsedSearch.showSets;
 
   const filteredProducts = useMemo(() => {
@@ -157,15 +164,17 @@ export function SalesScreen({ store }: SalesScreenProps) {
     return searchProducts(store.products, search, {
       lowStockThreshold: store.lowStockThreshold,
       categoryId: effectiveCategory,
-      stockFilter: effectiveStockFilter,
+      stockFilter: salesGridStockFilter,
     }).map((result) => result.product);
-  }, [store.products, search, effectiveCategory, effectiveStockFilter, store.lowStockThreshold, showingSets]);
+  }, [store.products, search, effectiveCategory, salesGridStockFilter, store.lowStockThreshold, showingSets]);
 
   const filteredSets = useMemo(() => {
     if (!showingSets && !parsedSearch.showSets && effectiveCategory !== 'setler') {
       if (!search.trim().toLowerCase().includes('set')) return [];
     }
-    return searchProductSets(activeSets, search, { onlyWhenRequested: effectiveCategory !== 'setler' });
+    return searchProductSets(activeSets, search, { onlyWhenRequested: effectiveCategory !== 'setler' }).filter(
+      (set) => set.stock > 0,
+    );
   }, [activeSets, search, showingSets, parsedSearch.showSets, effectiveCategory]);
 
   const displaySets = showingSets || (effectiveCategory === 'all' && parsedSearch.showSets);
@@ -191,13 +200,16 @@ export function SalesScreen({ store }: SalesScreenProps) {
   }, [store.cartCheckoutPreview, store.cart, store.saleCouponCode, store.saleLoyaltyPointsToRedeem]);
 
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: store.products.length };
+    const counts: Record<string, number> = { all: 0 };
     for (const p of store.products) {
+      const sellable = isSampleProduct(p) ? getSampleStock(p) > 0 : p.stock > 0;
+      if (!sellable) continue;
+      counts.all += 1;
       counts[p.category] = (counts[p.category] ?? 0) + 1;
     }
-    counts.setler = activeSets.length;
+    counts.setler = activeSets.filter((set) => set.stock > 0).length;
     return counts;
-  }, [store.products, activeSets.length]);
+  }, [store.products, activeSets]);
 
   const salesCategories = useMemo(
     () => categoriesForTenantSales(
@@ -479,13 +491,6 @@ export function SalesScreen({ store }: SalesScreenProps) {
                 onClick={() => changeStockFilter('low')}
               >
                 Az Stok
-              </button>
-              <button
-                type="button"
-                className={`sales-stock-filter ${effectiveStockFilter === 'out' ? 'active' : ''}`}
-                onClick={() => changeStockFilter('out')}
-              >
-                Tükenen
               </button>
             </div>
 
