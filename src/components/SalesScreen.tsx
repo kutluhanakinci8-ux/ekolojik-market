@@ -246,7 +246,8 @@ export function SalesScreen({ store }: SalesScreenProps) {
     let fiscalPrinted = false;
     const fiscalMethod = method === 'split' ? 'split' : method;
 
-    const runFiscal = !samplesOnly && method !== 'credit';
+    /** Lima / Zywell: mali InPOS yok — her satışta 127.0.0.1:9191 beklemesi fişi geciktirmesin */
+    const runFiscal = !posLiteCheckout && !samplesOnly && method !== 'credit';
     if (runFiscal && posCheckout.fiscalTiming === 'before_sale') {
       const fiscal = await tryFiscalReceipt(
         paidItems,
@@ -277,8 +278,24 @@ export function SalesScreen({ store }: SalesScreenProps) {
       return;
     }
 
+    const receiptPayment = method === 'split' ? 'card' : method;
+    const shouldPrintThermal = !samplesOnly && method !== 'credit' && !fiscalPrinted;
+    const receiptData = shouldPrintThermal
+      ? buildReceiptFromCart(
+          paidItems,
+          store.products,
+          receiptPayment,
+          sale.total,
+          store.settings.businessName,
+          { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
+          store.productSets,
+        )
+      : null;
+    const printerName =
+      store.settings.receiptPrinter?.windowsPrinterName?.trim() || 'Ekolojik POS-80 (Zywell)';
+
     if (runFiscal && posCheckout.fiscalTiming === 'after_sale') {
-      const fiscal = await tryFiscalReceipt(
+      const fiscalPromise = tryFiscalReceipt(
         paidItems,
         store.products,
         store.productSets,
@@ -286,25 +303,15 @@ export function SalesScreen({ store }: SalesScreenProps) {
         sale.total,
         posCheckout,
       );
+      if (shouldPrintThermal && receiptData) {
+        await printThermalReceipt(receiptData, undefined, printerName);
+      }
+      const fiscal = await fiscalPromise;
       if (!fiscal.cancelled) {
         receiptNo = fiscal.receiptNo ?? receiptNo;
         fiscalPrinted = fiscal.fiscalPrinted || fiscalPrinted;
       }
-    }
-
-    const receiptPayment = method === 'split' ? 'card' : method;
-    if (!samplesOnly && method !== 'credit' && !fiscalPrinted) {
-      const receiptData = buildReceiptFromCart(
-        paidItems,
-        store.products,
-        receiptPayment,
-        sale.total,
-        store.settings.businessName,
-        { receiptNo, saleId: sale.id, createdAt: new Date(sale.createdAt) },
-        store.productSets,
-      );
-      const printerName =
-        store.settings.receiptPrinter?.windowsPrinterName?.trim() || 'Ekolojik POS-80 (Zywell)';
+    } else if (shouldPrintThermal && receiptData) {
       await printThermalReceipt(receiptData, undefined, printerName);
     }
 

@@ -68,13 +68,20 @@ export async function checkFiscalBridge(): Promise<{ online: boolean; device?: s
   }
 }
 
+const FISCAL_BRIDGE_TIMEOUT_MS = 1200;
+
 export async function printFiscalReceipt(req: FiscalReceiptRequest): Promise<FiscalReceiptResponse> {
-  const res = await fetch(`${BRIDGE_URL}/api/fiscal/receipt`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  });
-  return res.json() as Promise<FiscalReceiptResponse>;
+  try {
+    const res = await fetch(`${BRIDGE_URL}/api/fiscal/receipt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: AbortSignal.timeout(FISCAL_BRIDGE_TIMEOUT_MS),
+    });
+    return res.json() as Promise<FiscalReceiptResponse>;
+  } catch {
+    return { success: false, message: 'Yazar kasa köprüsü yanıt vermedi (kapalı veya zaman aşımı)' };
+  }
 }
 
 /** İade / iptal fişi — InPOS köprüsü üzerinden mali iade belgesi */

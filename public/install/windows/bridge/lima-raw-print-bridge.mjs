@@ -365,7 +365,13 @@ const server = createServer(async (req, res) => {
           ? resolveWin32Queue(printer || QUEUE)
           : printer || QUEUE;
     if (os === 'win32') {
-      queue = resolveWin32Queue(printer || QUEUE);
+      const want = String(printer || QUEUE).trim();
+      const cached = win32PrinterCache.names;
+      if (want && cached.length && cached.includes(want)) {
+        queue = want;
+      } else {
+        queue = resolveWin32Queue(want || QUEUE);
+      }
     }
     await sendRaw(buildEscPosReceiptBuffer(body.text ?? ''), queue);
     res.writeHead(200, { 'Content-Type': 'application/json' });
