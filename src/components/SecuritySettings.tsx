@@ -205,7 +205,7 @@ export function SecuritySettings({ store }: SecuritySettingsProps) {
           <div className="security-feature-head">
             <div>
               <h3>Kilitli Hesaplar</h3>
-              <p>5 hatalı giriş sonrası yönetici onayı</p>
+              <p>5 hatalı giriş sonrası bu tarayıcıda geçici bekleme (sunucu kilidi değil)</p>
             </div>
             <span className={`security-status-pill ${lockouts.length > 0 ? 'is-warn' : 'is-on'}`}>
               {lockouts.length > 0 ? `${lockouts.length} kilitli` : 'Temiz'}
@@ -222,7 +222,6 @@ export function SecuritySettings({ store }: SecuritySettingsProps) {
                     <div>
                       <strong>@{item.username}</strong>
                       <span>{item.failedAttempts} hatalı deneme</span>
-                      {item.requiresAdminUnlock && <span className="security-lockout-badge">Onay gerekli</span>}
                     </div>
                     <button type="button" className="btn btn-sm btn-outline" onClick={() => unlockAccount(item.username)}>
                       Kilidi Aç

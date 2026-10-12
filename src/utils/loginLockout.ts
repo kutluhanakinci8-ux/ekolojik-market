@@ -8,7 +8,8 @@ function loadLockouts(): LoginLockoutRecord[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as LoginLockoutRecord[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
   } catch {
     return [];
   }
@@ -16,6 +17,15 @@ function loadLockouts(): LoginLockoutRecord[] {
 
 function saveLockouts(records: LoginLockoutRecord[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+/** Eski sürümlerdeki "yönetici onayı" bayrağı — sunucu kilidi değil, tarayıcı sayacı */
+export function purgeLegacyLoginLockouts(): void {
+  const records = loadLockouts();
+  const next = records.filter((item) => !item.requiresAdminUnlock);
+  if (next.length !== records.length) {
+    saveLockouts(next);
+  }
 }
 
 export function getLoginLockout(username: string): LoginLockoutRecord | null {
@@ -31,25 +41,6 @@ export function checkLoginAllowed(username: string): { allowed: boolean; message
   const record = getLoginLockout(username);
   if (!record) return { allowed: true };
 
-  if (record.requiresAdminUnlock) {
-    if (record.lockedUntil) {
-      const lockedUntilMs = new Date(record.lockedUntil).getTime();
-      const remaining = lockedUntilMs - Date.now();
-      if (remaining > 0) {
-        const minutes = Math.ceil(remaining / 60000);
-        return {
-          allowed: false,
-          message: `Çok fazla hatalı deneme. ${minutes} dakika bekleyin ve yönetici onayı gerekir.`,
-          retryAfterMs: remaining,
-        };
-      }
-    }
-    return {
-      allowed: false,
-      message: 'Hesap kilitli. Yönetici onayı bekleniyor.',
-    };
-  }
-
   if (record.lockedUntil) {
     const lockedUntilMs = new Date(record.lockedUntil).getTime();
     const remaining = lockedUntilMs - Date.now();
@@ -57,7 +48,7 @@ export function checkLoginAllowed(username: string): { allowed: boolean; message
       const minutes = Math.ceil(remaining / 60000);
       return {
         allowed: false,
-        message: `Çok fazla hatalı deneme. ${minutes} dakika sonra tekrar deneyin.`,
+        message: `Bu tarayıcıda çok fazla hatalı deneme yapıldı. ${minutes} dakika bekleyin veya doğru şifreyle tekrar deneyin.`,
         retryAfterMs: remaining,
       };
     }
@@ -78,7 +69,7 @@ export function recordFailedLogin(username: string): LoginLockoutRecord {
     username: normalized,
     failedAttempts: shouldLock ? LOGIN_MAX_ATTEMPTS : failedAttempts,
     lockedUntil: shouldLock ? new Date(Date.now() + LOGIN_LOCKOUT_MS).toISOString() : existing?.lockedUntil ?? null,
-    requiresAdminUnlock: shouldLock ? true : (existing?.requiresAdminUnlock ?? false),
+    requiresAdminUnlock: false,
     lastAttemptAt: now,
   };
 
@@ -94,18 +85,5 @@ export function clearLoginLockout(username: string): void {
 }
 
 export function adminUnlockLogin(username: string): void {
-  const normalized = username.trim().toLowerCase();
-  const records = loadLockouts();
-  const existing = records.find((item) => item.username === normalized);
-  if (!existing) return;
-
-  const updated: LoginLockoutRecord = {
-    ...existing,
-    failedAttempts: 0,
-    lockedUntil: null,
-    requiresAdminUnlock: false,
-    lastAttemptAt: new Date().toISOString(),
-  };
-
-  saveLockouts(records.map((item) => (item.username === normalized ? updated : item)));
+  clearLoginLockout(username);
 }

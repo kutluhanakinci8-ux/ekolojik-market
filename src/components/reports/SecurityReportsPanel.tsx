@@ -28,7 +28,7 @@ export function SecurityReportsPanel({ store, period }: SecurityReportsPanelProp
   const stats = useMemo(() => {
     const success = loginRows.filter((row) => row.success).length;
     const failed = loginRows.filter((row) => !row.success).length;
-    const lockouts = store.getLoginLockouts().filter((row) => row.lockedUntil || row.requiresAdminUnlock);
+    const lockouts = store.getLoginLockouts().filter((row) => row.lockedUntil && new Date(row.lockedUntil) > new Date());
     return { success, failed, lockouts: lockouts.length };
   }, [loginRows, store]);
 

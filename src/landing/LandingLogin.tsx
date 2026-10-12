@@ -13,6 +13,7 @@ import {
   resolveTenantIdForLoginPage,
   saveTenantId,
 } from '../storage/tenantSession';
+import { purgeLegacyLoginLockouts } from '../utils/loginLockout';
 
 type LoginMode = 'password' | 'pin';
 
@@ -44,6 +45,7 @@ export function LandingLogin() {
   }, [registerState?.message, navigate]);
 
   useEffect(() => {
+    purgeLegacyLoginLockouts();
     const fromUrl = new URLSearchParams(window.location.search).get('tenant')?.trim();
     const resolved = resolveTenantIdForLoginPage();
     if (fromUrl) {

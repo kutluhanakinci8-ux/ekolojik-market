@@ -3353,11 +3353,14 @@ export function usePosStoreState() {
       let remoteAuth = await exchangePosApiToken({ username: normalized, password });
       if (!lockCheck.allowed) {
         if (!remoteAuth.ok) {
-          return {
-            status: 'locked',
-            message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
-            retryAfterMs: lockCheck.retryAfterMs,
-          };
+          if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
+            return {
+              status: 'locked',
+              message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
+              retryAfterMs: lockCheck.retryAfterMs,
+            };
+          }
+          return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
         }
         clearLoginLockout(normalized);
       }
@@ -3466,11 +3469,14 @@ export function usePosStoreState() {
       let remoteAuth = await exchangePosApiToken({ username: normalized, pin });
       if (!lockCheck.allowed) {
         if (!remoteAuth.ok) {
-          return {
-            status: 'locked',
-            message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
-            retryAfterMs: lockCheck.retryAfterMs,
-          };
+          if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
+            return {
+              status: 'locked',
+              message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
+              retryAfterMs: lockCheck.retryAfterMs,
+            };
+          }
+          return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
         }
         clearLoginLockout(normalized);
       }
@@ -3591,7 +3597,7 @@ export function usePosStoreState() {
   }, [authSession, logActivity]);
 
   const getLoginLockouts = useCallback((): LoginLockoutRecord[] => {
-    return getAllLoginLockouts().filter((item) => item.requiresAdminUnlock || (item.lockedUntil && new Date(item.lockedUntil) > new Date()));
+    return getAllLoginLockouts().filter((item) => item.lockedUntil && new Date(item.lockedUntil) > new Date());
   }, []);
 
   const beginTotpSetup = useCallback((): { secret: string; uri: string } | null => {
