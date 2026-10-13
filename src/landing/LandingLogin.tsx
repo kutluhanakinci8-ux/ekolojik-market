@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/StoreProvider';
 import { loadLastQuickUser } from '../storage/quickLogin';
 import { PinLoginPad } from '../components/PinLoginPad';
+import { PasswordField } from '../components/PasswordField';
 import {
   clearPosApiToken,
   decodePosApiTokenClaims,
@@ -194,17 +195,14 @@ export function LandingLogin() {
                 </label>
               </>
             ) : (
-              <label>
-                Şifre
-                <input
-                  type="password"
-                  autoComplete="off"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                />
-              </label>
+              <PasswordField
+                label="Şifre"
+                autoComplete="off"
+                value={password}
+                onChange={setPassword}
+                placeholder="••••••••"
+                required
+              />
             )}
 
             {store.syncStatus === 'loading' && (

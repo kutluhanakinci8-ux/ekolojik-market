@@ -11110,6 +11110,51 @@ input {
   }
 }
 
+/* Password field — göster / gizle */
+.password-field {
+  display: grid;
+  gap: 6px;
+}
+
+.password-field-wrap {
+  position: relative;
+  display: block;
+}
+
+.password-field-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 44px !important;
+}
+
+.password-field-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.password-field-toggle:hover {
+  color: var(--primary);
+  background: rgba(45, 106, 79, 0.08);
+}
+
+.password-field-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Login */
 .login-screen {
   min-height: 100vh;

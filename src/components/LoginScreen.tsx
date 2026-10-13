@@ -8,6 +8,7 @@ import { normalizeStoreCodeInput, resolveTenantIdForLoginPage, saveTenantId } fr
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { LoginTenantStoreSection } from './LoginTenantStoreSection';
 import { PinLoginPad } from './PinLoginPad';
+import { PasswordField } from './PasswordField';
 
 interface LoginScreenProps {
   store: Store;
@@ -152,17 +153,14 @@ export function LoginScreen({ store }: LoginScreenProps) {
                 <input type="hidden" value={password} readOnly />
               </>
             ) : (
-              <label>
-                Şifre
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                />
-              </label>
+              <PasswordField
+                label="Şifre"
+                autoComplete="current-password"
+                value={password}
+                onChange={setPassword}
+                placeholder="••••••••"
+                required
+              />
             )}
 
             {store.syncStatus === 'loading' && (
