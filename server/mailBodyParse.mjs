@@ -1,5 +1,12 @@
 /** Basit RFC822 gövde çıkarımı (Posta hub okuma paneli) — UTF-8 / charset destekli */
 
+/** IMAP ham RFC822 — baytları bozmadan latin1 string (charset decode için) */
+export function rawMailSourceFromBuffer(source) {
+  if (source == null) return '';
+  const buf = Buffer.isBuffer(source) ? source : Buffer.from(source);
+  return buf.toString('latin1');
+}
+
 function parseCharset(contentType) {
   const m = String(contentType ?? '').match(/charset=["']?([^"'\s;]+)/i);
   if (!m) return 'utf-8';
@@ -62,18 +69,27 @@ function decodeTransferBody(body, encoding, charset) {
   return decodeBuffer(Buffer.from(raw, 'latin1'), charset);
 }
 
+function tryLatin1Utf8Repair(str) {
+  try {
+    const repaired = Buffer.from(str, 'latin1').toString('utf8');
+    if (repaired.includes('\uFFFD')) return null;
+    return repaired;
+  } catch {
+    return null;
+  }
+}
+
 /** UTF-8 baytları Latin-1 sanılarak kaydedilmiş metin (mÃ¼ÅŸteri → müşteri) */
 export function repairUtf8Mojibake(str) {
   if (!str || typeof str !== 'string') return str;
-  if (!/Ã|Ä|Å|â€™|â€œ|â€/.test(str)) return str;
-  try {
-    const repaired = Buffer.from(str, 'latin1').toString('utf8');
-    if (repaired.includes('\uFFFD')) return str;
-    if (/[ğüşöçıİĞÜŞÖÇ]/.test(repaired)) return repaired;
-    if (repaired.length < str.length && /[a-zA-Z0-9]/.test(repaired)) return repaired;
-  } catch {
-    /* ignore */
-  }
+  const hasReplacement = str.includes('\uFFFD');
+  const hasClassicMojibake = /Ã|Ä|Å|â€™|â€œ|â€/.test(str);
+  if (!hasReplacement && !hasClassicMojibake) return str;
+  const repaired = tryLatin1Utf8Repair(str);
+  if (!repaired) return str;
+  if (/[ğüşöçıİĞÜŞÖÇ]/.test(repaired)) return repaired;
+  if (hasClassicMojibake && /[a-zA-Z0-9]/.test(repaired)) return repaired;
+  if (hasReplacement && repaired.length <= str.length + 4) return repaired;
   return str;
 }
 

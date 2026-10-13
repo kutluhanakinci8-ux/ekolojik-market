@@ -237,6 +237,7 @@ export async function importSupportInboxFromImap(
   const existing = await readMessages(dataDir);
   const byKey = new Map(existing.map((r) => [r.dedupeKey, r]));
   let added = 0;
+  let refreshed = 0;
   const autoreplies = [];
 
   for (const msg of fetched) {
@@ -244,7 +245,22 @@ export async function importSupportInboxFromImap(
     const parsed = parseMailBody(raw);
     const threadHdr = parseThreadHeadersFromRaw(raw);
     const dedupe = dedupeKey(msg);
-    if (byKey.has(dedupe)) continue;
+    const prior = byKey.get(dedupe);
+    if (prior) {
+      const corrupt =
+        prior.bodyText?.includes('\uFFFD')
+        || prior.snippet?.includes('\uFFFD')
+        || prior.bodyHtml?.includes('\uFFFD');
+      const fixedText = repairUtf8Mojibake(parsed.text ?? '');
+      if (corrupt && fixedText && !fixedText.includes('\uFFFD')) {
+        prior.bodyText = fixedText;
+        prior.bodyHtml = repairUtf8Mojibake(parsed.html ?? '');
+        prior.snippet = repairUtf8Mojibake(parsed.snippet || prior.snippet || '');
+        prior.subject = repairUtf8Mojibake(msg.subject ?? prior.subject);
+        refreshed += 1;
+      }
+      continue;
+    }
 
     const row = {
       id: `ps-${randomUUID()}`,
@@ -280,14 +296,14 @@ export async function importSupportInboxFromImap(
     }
   }
 
-  if (added > 0) {
+  if (added > 0 || refreshed > 0) {
     const merged = [...byKey.values()].sort(
       (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
     );
     await writeMessages(dataDir, merged);
   }
 
-  return { ok: true, scanned: fetched.length, added, autoreplies };
+  return { ok: true, scanned: fetched.length, added, refreshed, autoreplies };
 }
 
 export async function syncPlatformSupportInbox(dataDir, { maxMessages = 40 } = {}) {
