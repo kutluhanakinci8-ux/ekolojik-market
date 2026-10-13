@@ -3518,6 +3518,52 @@
   border-radius: 8px;
 }
 
+.platform-support-mail-meta {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: #f1f5f3;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.platform-support-mail-meta dt {
+  font-weight: 600;
+  color: #3d5245;
+  margin: 0;
+}
+
+.platform-support-mail-meta dd {
+  margin: 0.15rem 0 0;
+  color: #1a2e1a;
+}
+
+.platform-support-mail-meta code {
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.platform-support-mono-truncate {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-support-inline-link {
+  margin-left: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--pu-accent, #2d6a4f);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .platform-support-reply-label {
   display: flex;
   flex-direction: column;

@@ -25,12 +25,21 @@ function renderMailFooterHtml() {
   const brand = getPlatformSupportMailBrand();
   const year = new Date().getFullYear();
   const socialCells = brand.social
-    .map(
-      (s) => `
+    .map((s) => {
+      const label = escapeHtml(s.label);
+      const letter = escapeHtml(socialIconLetter(s.key));
+      const baseStyle = `display:inline-block;min-width:40px;height:40px;line-height:40px;text-align:center;border-radius:10px;border:1px solid #d0ddd4;font-size:13px;font-weight:700;`;
+      if (s.url) {
+        return `
     <td style="padding:0 6px 0 0;">
-      <a href="${escapeHtml(s.url)}" title="${escapeHtml(s.label)}" style="display:inline-block;min-width:40px;height:40px;line-height:40px;text-align:center;border-radius:10px;border:1px solid #d0ddd4;background:#ffffff;color:${BRAND_GREEN};font-size:13px;font-weight:700;text-decoration:none;">${escapeHtml(socialIconLetter(s.key))}</a>
-    </td>`,
-    )
+      <a href="${escapeHtml(s.url)}" title="${label}" style="${baseStyle}background:#ffffff;color:${BRAND_GREEN};text-decoration:none;">${letter}</a>
+    </td>`;
+      }
+      return `
+    <td style="padding:0 6px 0 0;">
+      <span title="${label} (yakında)" style="${baseStyle}background:#f7faf8;color:#9aa89d;">${letter}</span>
+    </td>`;
+    })
     .join('');
 
   const socialRow = brand.social.length
@@ -97,7 +106,7 @@ export function formatPlatformSupportAutoreplyText({ brandName, messageId, suppo
   if (siteBrand.social.length) {
     lines.push('', 'Sosyal medya:');
     for (const s of siteBrand.social) {
-      lines.push(`- ${s.label}: ${s.url}`);
+      lines.push(s.url ? `- ${s.label}: ${s.url}` : `- ${s.label}`);
     }
   }
   return lines.join('\n');
@@ -201,7 +210,7 @@ function appendSupportMailPlainFooter(lines) {
   if (siteBrand.social.length) {
     lines.push('', 'Sosyal medya:');
     for (const s of siteBrand.social) {
-      lines.push(`- ${s.label}: ${s.url}`);
+      lines.push(s.url ? `- ${s.label}: ${s.url}` : `- ${s.label}`);
     }
   }
   return lines;

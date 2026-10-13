@@ -28,12 +28,10 @@ export function getPlatformSupportMailBrand() {
     { key: 'x', label: 'X', env: 'EKOLOJIK_SOCIAL_X' },
   ];
 
-  const social = socialDefs
-    .map(({ key, label, env }) => {
-      const url = trimUrl(process.env[env]);
-      return url ? { key, label, url } : null;
-    })
-    .filter(Boolean);
+  const social = socialDefs.map(({ key, label, env }) => {
+    const url = trimUrl(process.env[env]);
+    return { key, label, url: url || null };
+  });
 
   return {
     site,

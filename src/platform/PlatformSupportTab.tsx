@@ -182,6 +182,8 @@ export function PlatformSupportTab() {
   };
 
   const selectedMail = inboxMessages.find((m) => m.id === selectedMailId) ?? null;
+  const selectedMailCase =
+    selectedMail ? caseRows.find((c) => c.links?.inboxMessageId === selectedMail.id) ?? null : null;
 
   const onInboxSync = async () => {
     setInboxSyncing(true);
@@ -653,6 +655,45 @@ export function PlatformSupportTab() {
               <>
                 <h3>{selectedMail.subject}</h3>
                 <p className="platform-table-muted">{selectedMail.from}</p>
+                <dl className="platform-support-mail-meta">
+                  <div>
+                    <dt>Talep referansı</dt>
+                    <dd>
+                      <code>{selectedMail.id}</code>
+                      <span className="platform-support-hint"> Müşteriye otomatik yanıtta gösterilen kod.</span>
+                    </dd>
+                  </div>
+                  {selectedMailCase ? (
+                    <div>
+                      <dt>Destek kaydı</dt>
+                      <dd>
+                        #{selectedMailCase.number}
+                        <button
+                          type="button"
+                          className="platform-support-inline-link"
+                          onClick={() => {
+                            setSection('cases');
+                            setSelectedCaseId(selectedMailCase.id);
+                          }}
+                        >
+                          Kaydı aç
+                        </button>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {selectedMail.messageId ? (
+                    <div>
+                      <dt>E-posta Message-ID</dt>
+                      <dd><code className="platform-support-mono-truncate">{selectedMail.messageId}</code></dd>
+                    </div>
+                  ) : null}
+                  {selectedMail.inReplyTo ? (
+                    <div>
+                      <dt>In-Reply-To</dt>
+                      <dd><code className="platform-support-mono-truncate">{selectedMail.inReplyTo}</code></dd>
+                    </div>
+                  ) : null}
+                </dl>
                 {selectedMail.autoreplySentAt ? (
                   <p className="platform-inline-msg">Otomatik alındı maili gönderildi ({formatDateTime(selectedMail.autoreplySentAt)})</p>
                 ) : null}

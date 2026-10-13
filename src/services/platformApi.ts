@@ -998,6 +998,8 @@ export async function savePlatformSupportSlaPolicy(
 
 export type PlatformSupportInboxMessage = {
   id: string;
+  messageId?: string | null;
+  inReplyTo?: string | null;
   from: string;
   to: string;
   subject: string;
@@ -1006,6 +1008,7 @@ export type PlatformSupportInboxMessage = {
   bodyText: string;
   readAt: string | null;
   autoreplySentAt: string | null;
+  repliedAt?: string | null;
   externalTicketRef: string | null;
   outboxStatus?: string;
   source?: string;
