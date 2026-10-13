@@ -1,4 +1,5 @@
 import { ImapFlow } from 'imapflow';
+import { rawMailSourceFromBuffer } from './mailBodyParse.mjs';
 
 export function buildImapClient(config) {
   const host = String(config.imapHost || '').trim();
@@ -82,7 +83,7 @@ export async function fetchRecentMailboxMessages(
       const receivedAt = (msg.internalDate ?? new Date()).toISOString();
       let rawSource = '';
       if (msg.source) {
-        rawSource = msg.source.toString('utf8');
+        rawSource = rawMailSourceFromBuffer(msg.source);
       }
       const text = rawSource.slice(0, 12000);
       const deliveredMatch = text.match(/^Delivered-To:\s*(.+)$/im);
