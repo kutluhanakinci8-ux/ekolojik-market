@@ -724,7 +724,7 @@ export function PlatformSupportTab() {
         </section>
 
         <section className="platform-panel platform-panel--premium">
-          <div className="platform-panel platform-panel--premium-head">
+          <div className="platform-panel-head">
             <h3>Öncelikli kuyruk</h3>
             <PlatformFilterSelect
               label="Tür"
