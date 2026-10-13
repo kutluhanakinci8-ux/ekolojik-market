@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   fetchPlatformUserOperations,
   type PlatformRecentLoginRow,
   type PlatformUserRosterRow,
   type PlatformUserTotals,
 } from '../services/platformApi';
+import { avatarHue, KpiIcon, RingProgress, userInitials } from './platformUserUi';
 
 const ENGAGEMENT_LABELS: Record<string, string> = {
   active: 'Aktif',
@@ -14,6 +15,8 @@ const ENGAGEMENT_LABELS: Record<string, string> = {
   never_logged_in: 'Hiç giriş yok',
   churned: 'Pasif / terk',
 };
+
+const ENGAGEMENT_ORDER = ['active', 'new', 'dormant_30', 'dormant_60', 'never_logged_in', 'churned'] as const;
 
 type FilterEngagement = 'all' | PlatformUserRosterRow['engagement'];
 
@@ -28,6 +31,27 @@ function formatDateTime(iso: string | null): string {
   } catch {
     return iso;
   }
+}
+
+function relativeLogin(iso: string | null): string {
+  if (!iso) return 'Giriş kaydı yok';
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '—';
+  const days = Math.floor((Date.now() - t) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return 'Bugün';
+  if (days === 1) return 'Dün';
+  if (days < 30) return `${days} gün önce`;
+  return formatDateTime(iso);
+}
+
+function UsersTabSkeleton() {
+  return (
+    <div className="platform-users platform-users--loading" aria-busy="true">
+      <div className="platform-users-skeleton-hero" />
+      <div className="platform-users-skeleton-kpis" />
+      <div className="platform-users-skeleton-block" />
+    </div>
+  );
 }
 
 export function PlatformUsersTab() {
@@ -46,6 +70,7 @@ export function PlatformUsersTab() {
   const [tenantFilter, setTenantFilter] = useState('all');
   const [engagementFilter, setEngagementFilter] = useState<FilterEngagement>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'cashier'>('all');
+  const [loginFilter, setLoginFilter] = useState<'all' | 'success' | 'fail'>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,146 +110,258 @@ export function PlatformUsersTab() {
     });
   }, [roster, search, tenantFilter, engagementFilter, roleFilter]);
 
-  if (loading) {
-    return <p className="platform-muted">Kullanıcı işlemleri yükleniyor…</p>;
-  }
+  const filteredLogins = useMemo(() => {
+    if (loginFilter === 'all') return recentLogins;
+    return recentLogins.filter((e) => (loginFilter === 'success' ? e.success : !e.success));
+  }, [recentLogins, loginFilter]);
+
+  const loginSuccessRate = useMemo(() => {
+    if (!totals) return 0;
+    const total = totals.loginSuccess30d + totals.loginFailed30d;
+    if (!total) return 100;
+    return Math.round((totals.loginSuccess30d / total) * 100);
+  }, [totals]);
+
+  const engagementSegments = useMemo(() => {
+    if (!totals?.totalUsers) return [];
+    return ENGAGEMENT_ORDER
+      .filter((key) => (engagementBreakdown[key] ?? 0) > 0)
+      .map((key) => ({
+        key,
+        count: engagementBreakdown[key] ?? 0,
+        pct: Math.round(((engagementBreakdown[key] ?? 0) / totals.totalUsers) * 100),
+      }));
+  }, [engagementBreakdown, totals]);
+
+  if (loading) return <UsersTabSkeleton />;
   if (error) {
     return (
-      <p className="landing-flash landing-flash--error" role="alert">
-        {error}
-        <button type="button" className="btn btn-text" onClick={() => void load()}>Tekrar dene</button>
-      </p>
+      <div className="platform-users-error">
+        <p className="landing-flash landing-flash--error" role="alert">{error}</p>
+        <button type="button" className="btn btn-primary" onClick={() => void load()}>Tekrar dene</button>
+      </div>
     );
   }
   if (!totals) return null;
 
   return (
-    <div className="platform-users">
-      <div className="platform-users-hero">
-        <div>
+    <div className="platform-users platform-users--premium">
+      <header className="platform-users-hero platform-users-hero--premium">
+        <div className="platform-users-hero-copy">
+          <span className="platform-users-hero-badge">Platform Intelligence</span>
           <h2>Kullanıcı işlemleri</h2>
-          <p className="platform-muted">
-            Tüm kiracılar — kayıtlı hesaplar, aktivite, güvenlik ve terk sinyalleri
-            {generatedAt ? ` · ${formatDateTime(generatedAt)}` : ''}
+          <p>
+            Kayıtlı hesaplar, aktivite, güvenlik ve terk sinyalleri — tüm kiracılar tek ekranda.
           </p>
+          {generatedAt && (
+            <time className="platform-users-hero-time" dateTime={generatedAt}>
+              Son güncelleme: {formatDateTime(generatedAt)}
+            </time>
+          )}
         </div>
-        <button type="button" className="btn btn-secondary" onClick={() => void load()}>
-          Yenile
-        </button>
-      </div>
+        <div className="platform-users-hero-actions">
+          <div className="platform-users-hero-stat">
+            <RingProgress pct={totals.engagementRate30d} label="30g giriş oranı" />
+            <span className="platform-users-hero-stat-label">30g giriş oranı</span>
+          </div>
+          <button type="button" className="btn btn-primary platform-users-refresh" onClick={() => void load()}>
+            Yenile
+          </button>
+        </div>
+      </header>
 
-      <div className="platform-users-kpi-grid">
+      <div className="platform-users-kpi-grid platform-users-kpi-grid--premium">
         <article className="platform-users-kpi platform-users-kpi--primary">
-          <span className="platform-users-kpi-label">Toplam kullanıcı</span>
-          <strong className="platform-users-kpi-value">{totals.totalUsers}</strong>
-          <span className="platform-users-kpi-sub">+{totals.newUsers30d} son 30 gün</span>
+          <KpiIcon name="users" />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">Toplam kullanıcı</span>
+            <strong className="platform-users-kpi-value">{totals.totalUsers}</strong>
+            <span className="platform-users-kpi-trend platform-users-kpi-trend--up">+{totals.newUsers30d} / 30g</span>
+          </div>
         </article>
         <article className="platform-users-kpi">
-          <span className="platform-users-kpi-label">Aktif</span>
-          <strong className="platform-users-kpi-value">{totals.activeCount}</strong>
-          <span className="platform-users-kpi-sub">{formatPct(totals.engagementRate30d)} 30g giriş</span>
+          <KpiIcon name="active" />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">Aktif hesap</span>
+            <strong className="platform-users-kpi-value">{totals.activeCount}</strong>
+            <span className="platform-users-kpi-sub">{totals.loggedInLast7d} son 7 gün giriş</span>
+          </div>
+        </article>
+        <article className="platform-users-kpi platform-users-kpi--danger">
+          <KpiIcon name="churn" />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">Pasif / terk</span>
+            <strong className="platform-users-kpi-value">{totals.churnedCount}</strong>
+            <span className="platform-users-kpi-sub">kapatılmış hesap</span>
+          </div>
         </article>
         <article className="platform-users-kpi platform-users-kpi--warn">
-          <span className="platform-users-kpi-label">Pasif / terk</span>
-          <strong className="platform-users-kpi-value">{totals.churnedCount}</strong>
-          <span className="platform-users-kpi-sub">hesap kapatılmış</span>
-        </article>
-        <article className="platform-users-kpi platform-users-kpi--warn">
-          <span className="platform-users-kpi-label">Uyuyan (30g)</span>
-          <strong className="platform-users-kpi-value">{totals.dormant30dCount}</strong>
-          <span className="platform-users-kpi-sub">{totals.dormant60dCount} adet 60g+</span>
+          <KpiIcon name="sleep" />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">Uyuyan (30g)</span>
+            <strong className="platform-users-kpi-value">{totals.dormant30dCount}</strong>
+            <span className="platform-users-kpi-sub">{totals.dormant60dCount} adet 60g+</span>
+          </div>
         </article>
         <article className="platform-users-kpi">
-          <span className="platform-users-kpi-label">Yönetici / kasiyer</span>
-          <strong className="platform-users-kpi-value">{totals.adminCount} / {totals.cashierCount}</strong>
-          <span className="platform-users-kpi-sub">rol dağılımı</span>
+          <KpiIcon name="roles" />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">Yönetici / kasiyer</span>
+            <strong className="platform-users-kpi-value">{totals.adminCount}<span className="platform-users-kpi-sep">/</span>{totals.cashierCount}</strong>
+            <div className="platform-users-role-bar" aria-hidden>
+              <span style={{ width: `${totals.totalUsers ? (totals.adminCount / totals.totalUsers) * 100 : 0}%` }} />
+            </div>
+          </div>
+        </article>
+        <article className="platform-users-kpi platform-users-kpi--ring">
+          <RingProgress pct={totals.totpCoveragePct} variant={totals.totpCoveragePct >= 50 ? 'brand' : 'warn'} />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">2FA kapsamı</span>
+            <strong className="platform-users-kpi-value">{formatPct(totals.totpCoveragePct)}</strong>
+            <span className="platform-users-kpi-sub">{totals.totpEnabledCount} hesap</span>
+          </div>
+        </article>
+        <article className="platform-users-kpi platform-users-kpi--ring">
+          <RingProgress
+            pct={totals.recoveryEmailCoveragePct}
+            variant={totals.recoveryEmailCoveragePct >= 80 ? 'brand' : 'warn'}
+          />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">Sıfırlama e-postası</span>
+            <strong className="platform-users-kpi-value">{formatPct(totals.recoveryEmailCoveragePct)}</strong>
+            <span className="platform-users-kpi-sub platform-users-kpi-sub--warn">{totals.missingRecoveryEmailCount} eksik</span>
+          </div>
         </article>
         <article className="platform-users-kpi">
-          <span className="platform-users-kpi-label">2FA kapsamı</span>
-          <strong className="platform-users-kpi-value">{formatPct(totals.totpCoveragePct)}</strong>
-          <span className="platform-users-kpi-sub">{totals.totpEnabledCount} hesap</span>
-        </article>
-        <article className="platform-users-kpi">
-          <span className="platform-users-kpi-label">Sıfırlama e-postası</span>
-          <strong className="platform-users-kpi-value">{formatPct(totals.recoveryEmailCoveragePct)}</strong>
-          <span className="platform-users-kpi-sub">{totals.missingRecoveryEmailCount} eksik</span>
-        </article>
-        <article className="platform-users-kpi">
-          <span className="platform-users-kpi-label">Giriş (30g)</span>
-          <strong className="platform-users-kpi-value">{totals.loginSuccess30d}</strong>
-          <span className="platform-users-kpi-sub">{totals.loginFailed30d} başarısız</span>
+          <KpiIcon name="login" />
+          <div className="platform-users-kpi-body">
+            <span className="platform-users-kpi-label">Giriş (30g)</span>
+            <strong className="platform-users-kpi-value">{totals.loginSuccess30d}</strong>
+            <div className="platform-users-login-rate">
+              <div className="platform-users-login-rate-bar">
+                <span style={{ width: `${loginSuccessRate}%` }} />
+              </div>
+              <span className="platform-users-kpi-sub">{loginSuccessRate}% başarı · {totals.loginFailed30d} hata</span>
+            </div>
+          </div>
         </article>
       </div>
 
-      <section className="platform-users-engagement" aria-label="Etkileşim dağılımı">
-        <h3>Etkileşim durumu</h3>
-        <div className="platform-users-engagement-bars">
-          {Object.entries(engagementBreakdown).map(([key, count]) => {
+      <section className="platform-users-panel platform-users-engagement" aria-label="Etkileşim dağılımı">
+        <div className="platform-users-panel-head">
+          <h3>Etkileşim durumu</h3>
+          <span className="platform-muted">{totals.totalUsers} kullanıcı</span>
+        </div>
+        <div className="platform-users-stacked-bar" role="img" aria-label="Etkileşim dağılımı">
+          {engagementSegments.map((seg) => (
+            <span
+              key={seg.key}
+              className={`platform-users-stacked-segment platform-users-stacked-segment--${seg.key}`}
+              style={{ width: `${seg.pct}%` }}
+              title={`${ENGAGEMENT_LABELS[seg.key]}: ${seg.count}`}
+            />
+          ))}
+        </div>
+        <ul className="platform-users-engagement-legend">
+          {ENGAGEMENT_ORDER.map((key) => {
+            const count = engagementBreakdown[key] ?? 0;
             const pct = totals.totalUsers ? Math.round((count / totals.totalUsers) * 100) : 0;
             return (
-              <div key={key} className="platform-users-engagement-row">
-                <span className="platform-users-engagement-label">{ENGAGEMENT_LABELS[key] ?? key}</span>
-                <div className="platform-users-engagement-track">
-                  <div className="platform-users-engagement-fill" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="platform-users-engagement-count">{count}</span>
-              </div>
+              <li key={key} className={count === 0 ? 'platform-users-legend-item--empty' : ''}>
+                <span className={`platform-users-legend-dot platform-users-legend-dot--${key}`} />
+                <span>{ENGAGEMENT_LABELS[key]}</span>
+                <strong>{count}</strong>
+                <span className="platform-muted">{pct}%</span>
+              </li>
             );
           })}
+        </ul>
+      </section>
+
+      <section className="platform-users-panel" aria-label="Kiracı bazlı özet">
+        <div className="platform-users-panel-head">
+          <h3>Mağaza bazlı kullanıcı özeti</h3>
+        </div>
+        <div className="platform-users-table-scroll">
+          <table className="platform-table platform-users-tenant-table platform-table--premium">
+            <thead>
+              <tr>
+                <th>Mağaza</th>
+                <th>Toplam</th>
+                <th>Aktif</th>
+                <th>Terk</th>
+                <th>Uyuyan</th>
+                <th>30g giriş</th>
+                <th>2FA</th>
+                <th>E-posta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tenantStats.map((t) => {
+                const loginPct = t.activeCount
+                  ? Math.round((t.loggedInLast30d / t.activeCount) * 100)
+                  : 0;
+                return (
+                  <tr key={t.tenantId}>
+                    <td>
+                      <div className="platform-users-store-cell">
+                        <span className="platform-users-store-avatar">{t.businessName.slice(0, 1)}</span>
+                        <div>
+                          <strong>{t.businessName}</strong>
+                          <div className="platform-muted">{t.tenantId}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span className="platform-users-num">{t.totalUsers}</span></td>
+                    <td><span className="platform-users-num platform-users-num--ok">{t.activeCount}</span></td>
+                    <td>
+                      <span className={t.churnedCount > 0 ? 'platform-users-num platform-users-num--bad' : 'platform-users-num'}>
+                        {t.churnedCount}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={t.dormant30dCount > 0 ? 'platform-users-num platform-users-num--warn' : 'platform-users-num'}>
+                        {t.dormant30dCount}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="platform-users-inline-metric">
+                        <div className="platform-users-mini-bar"><span style={{ width: `${loginPct}%` }} /></div>
+                        <span>{t.activeCount ? formatPct(loginPct) : '—'}</span>
+                      </div>
+                    </td>
+                    <td><span className="platform-users-pct">{formatPct(t.totpCoveragePct)}</span></td>
+                    <td>
+                      <span className={t.recoveryEmailCoveragePct < 100 ? 'platform-users-pct platform-users-pct--warn' : 'platform-users-pct'}>
+                        {formatPct(t.recoveryEmailCoveragePct)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section className="platform-users-section" aria-label="Kiracı bazlı özet">
-        <h3>Mağaza bazlı kullanıcı özeti</h3>
-        <table className="platform-table platform-users-tenant-table">
-          <thead>
-            <tr>
-              <th>Mağaza</th>
-              <th>Toplam</th>
-              <th>Aktif</th>
-              <th>Terk</th>
-              <th>Uyuyan</th>
-              <th>30g giriş %</th>
-              <th>2FA</th>
-              <th>E-posta</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tenantStats.map((t) => (
-              <tr key={t.tenantId}>
-                <td>
-                  <strong>{t.businessName}</strong>
-                  <div className="platform-muted">{t.tenantId}</div>
-                </td>
-                <td>{t.totalUsers}</td>
-                <td>{t.activeCount}</td>
-                <td className={t.churnedCount > 0 ? 'platform-warn' : ''}>{t.churnedCount}</td>
-                <td className={t.dormant30dCount > 0 ? 'platform-warn' : ''}>{t.dormant30dCount}</td>
-                <td>
-                  {t.activeCount
-                    ? formatPct(Math.round((t.loggedInLast30d / t.activeCount) * 100))
-                    : '—'}
-                </td>
-                <td>{formatPct(t.totpCoveragePct)}</td>
-                <td>{formatPct(t.recoveryEmailCoveragePct)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="platform-users-section" aria-label="Kullanıcı listesi">
-        <div className="platform-users-toolbar">
-          <h3>Kullanıcı dizini</h3>
-          <div className="platform-users-filters">
-            <input
-              type="search"
-              placeholder="Ad, kullanıcı adı, mağaza…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="platform-users-search"
-            />
-            <select value={tenantFilter} onChange={(e) => setTenantFilter(e.target.value)}>
+      <section className="platform-users-panel platform-users-panel--directory" aria-label="Kullanıcı listesi">
+        <div className="platform-users-panel-head platform-users-panel-head--stack">
+          <div>
+            <h3>Kullanıcı dizini</h3>
+            <p className="platform-muted">{filteredRoster.length} / {roster.length} kayıt</p>
+          </div>
+          <div className="platform-users-filters platform-users-filters--premium">
+            <label className="platform-users-search-wrap">
+              <span className="platform-users-search-icon" aria-hidden />
+              <input
+                type="search"
+                placeholder="Ad, kullanıcı adı, mağaza…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="platform-users-search"
+              />
+            </label>
+            <select value={tenantFilter} onChange={(e) => setTenantFilter(e.target.value)} aria-label="Mağaza">
               <option value="all">Tüm mağazalar</option>
               {tenantStats.map((t) => (
                 <option key={t.tenantId} value={t.tenantId}>{t.businessName}</option>
@@ -233,22 +370,42 @@ export function PlatformUsersTab() {
             <select
               value={engagementFilter}
               onChange={(e) => setEngagementFilter(e.target.value as FilterEngagement)}
+              aria-label="Durum"
             >
               <option value="all">Tüm durumlar</option>
               {Object.entries(ENGAGEMENT_LABELS).map(([k, label]) => (
                 <option key={k} value={k}>{label}</option>
               ))}
             </select>
-            <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as 'all' | 'admin' | 'cashier')}>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as 'all' | 'admin' | 'cashier')}
+              aria-label="Rol"
+            >
               <option value="all">Tüm roller</option>
               <option value="admin">Yönetici</option>
               <option value="cashier">Kasiyer</option>
             </select>
           </div>
         </div>
-        <p className="platform-muted">{filteredRoster.length} kayıt gösteriliyor</p>
+        <div className="platform-users-chip-row">
+          {ENGAGEMENT_ORDER.map((key) => {
+            const count = engagementBreakdown[key] ?? 0;
+            if (!count) return null;
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`platform-users-chip ${engagementFilter === key ? 'platform-users-chip--on' : ''}`}
+                onClick={() => setEngagementFilter(engagementFilter === key ? 'all' : key)}
+              >
+                {ENGAGEMENT_LABELS[key]} ({count})
+              </button>
+            );
+          })}
+        </div>
         <div className="platform-users-roster-wrap">
-          <table className="platform-table platform-users-roster">
+          <table className="platform-table platform-users-roster platform-table--premium">
             <thead>
               <tr>
                 <th>Kullanıcı</th>
@@ -260,24 +417,55 @@ export function PlatformUsersTab() {
               </tr>
             </thead>
             <tbody>
+              {filteredRoster.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="platform-users-empty">
+                    Filtrelere uyan kullanıcı bulunamadı. Aramayı veya filtreleri değiştirin.
+                  </td>
+                </tr>
+              )}
               {filteredRoster.map((row) => (
                 <tr key={`${row.tenantId}-${row.id}`} className={!row.isActive ? 'platform-users-row--inactive' : ''}>
                   <td>
-                    <strong>{row.displayName}</strong>
-                    <div className="platform-muted">@{row.username}</div>
+                    <div className="platform-users-person">
+                      <span
+                        className="platform-users-avatar"
+                        style={{ '--avatar-hue': avatarHue(row.username) } as CSSProperties}
+                      >
+                        {userInitials(row.displayName, row.username)}
+                      </span>
+                      <div>
+                        <strong>{row.displayName}</strong>
+                        <div className="platform-muted">@{row.username}</div>
+                      </div>
+                    </div>
                   </td>
-                  <td>{row.businessName}</td>
-                  <td>{row.role === 'admin' ? 'Yönetici' : 'Kasiyer'}</td>
+                  <td><span className="platform-users-store-tag">{row.businessName}</span></td>
+                  <td>
+                    <span className={`platform-users-role platform-users-role--${row.role}`}>
+                      {row.role === 'admin' ? 'Yönetici' : 'Kasiyer'}
+                    </span>
+                  </td>
                   <td>
                     <span className={`platform-users-pill platform-users-pill--${row.engagement}`}>
                       {ENGAGEMENT_LABELS[row.engagement] ?? row.engagement}
                     </span>
                   </td>
-                  <td>{formatDateTime(row.lastLoginAt)}</td>
-                  <td className="platform-users-security">
-                    {row.totpEnabled ? <span title="2FA">2FA</span> : null}
-                    {!row.hasRecoveryEmail && row.isActive ? <span className="platform-warn">E-posta</span> : null}
-                    {row.mustChangePassword ? <span>Şifre</span> : null}
+                  <td>
+                    <span className="platform-users-last-login">{formatDateTime(row.lastLoginAt)}</span>
+                    <span className="platform-muted platform-users-last-login-sub">{relativeLogin(row.lastLoginAt)}</span>
+                  </td>
+                  <td>
+                    <div className="platform-users-security-chips">
+                      {row.totpEnabled && <span className="platform-users-chip-sec platform-users-chip-sec--ok">2FA</span>}
+                      {row.hasRecoveryEmail
+                        ? <span className="platform-users-chip-sec platform-users-chip-sec--ok">E-posta</span>
+                        : row.isActive && <span className="platform-users-chip-sec platform-users-chip-sec--bad">E-posta</span>}
+                      {row.mustChangePassword && <span className="platform-users-chip-sec">Şifre</span>}
+                      {!row.totpEnabled && row.hasRecoveryEmail && !row.mustChangePassword && (
+                        <span className="platform-muted">—</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -286,23 +474,59 @@ export function PlatformUsersTab() {
         </div>
       </section>
 
-      <section className="platform-users-section" aria-label="Son girişler">
-        <h3>Son giriş denemeleri</h3>
-        <ul className="platform-users-login-feed">
-          {recentLogins.map((entry) => (
+      <section className="platform-users-panel" aria-label="Son girişler">
+        <div className="platform-users-panel-head">
+          <h3>Son giriş denemeleri</h3>
+          <div className="platform-users-login-filters">
+            <button
+              type="button"
+              className={`platform-users-chip ${loginFilter === 'all' ? 'platform-users-chip--on' : ''}`}
+              onClick={() => setLoginFilter('all')}
+            >
+              Tümü
+            </button>
+            <button
+              type="button"
+              className={`platform-users-chip ${loginFilter === 'success' ? 'platform-users-chip--on' : ''}`}
+              onClick={() => setLoginFilter('success')}
+            >
+              Başarılı
+            </button>
+            <button
+              type="button"
+              className={`platform-users-chip ${loginFilter === 'fail' ? 'platform-users-chip--on' : ''}`}
+              onClick={() => setLoginFilter('fail')}
+            >
+              Başarısız
+            </button>
+          </div>
+        </div>
+        <ul className="platform-users-timeline">
+          {filteredLogins.length === 0 && (
+            <li className="platform-users-timeline-empty">Bu filtre için giriş kaydı yok.</li>
+          )}
+          {filteredLogins.map((entry) => (
             <li
               key={`${entry.tenantId}-${entry.id}`}
-              className={entry.success ? 'platform-users-login--ok' : 'platform-users-login--fail'}
+              className={`platform-users-timeline-item ${entry.success ? 'is-success' : 'is-fail'}`}
             >
-              <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
-              <span className="platform-users-login-who">
-                {entry.displayName ?? entry.username} · {entry.businessName}
-              </span>
-              <span className="platform-muted">
-                {entry.success ? 'Başarılı' : 'Başarısız'}
-                {entry.method ? ` · ${entry.method}` : ''}
-                {entry.failureReason ? ` — ${entry.failureReason}` : ''}
-              </span>
+              <span className="platform-users-timeline-dot" aria-hidden />
+              <div className="platform-users-timeline-body">
+                <div className="platform-users-timeline-top">
+                  <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
+                  <span className={`platform-users-timeline-badge ${entry.success ? 'is-ok' : 'is-bad'}`}>
+                    {entry.success ? 'Başarılı' : 'Başarısız'}
+                  </span>
+                </div>
+                <p className="platform-users-timeline-who">
+                  {entry.displayName ?? entry.username}
+                  <span className="platform-muted"> · {entry.businessName}</span>
+                </p>
+                {!entry.success && entry.failureReason && (
+                  <p className="platform-users-timeline-detail">{entry.failureReason}</p>
+                )}
+                {entry.method && <p className="platform-muted platform-users-timeline-meta">{entry.method}{entry.clientIp ? ` · ${entry.clientIp}` : ''}</p>}
+              </div>
             </li>
           ))}
         </ul>
