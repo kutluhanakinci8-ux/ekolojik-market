@@ -22,6 +22,11 @@ import {
 import { PLATFORM_TENANT_ID } from './platformOperators.mjs';
 import { listMergedRecentOutbox } from './emailOutbox.mjs';
 import { readTenantStore } from './tenantAuth.mjs';
+import {
+  appendOutboundMessageId,
+  mergeReferencesChain,
+  resolveInboxThreadRoot,
+} from './platformSupportEmailThread.mjs';
 
 const INBOX_DIR = (dataDir) => join(dataDir, 'platform', 'support-inbox');
 const SUPPORT_LOCAL = () => getPlatformSupportMailAddress().toLowerCase();
@@ -180,14 +185,19 @@ async function maybeSendAutoreply(dataDir, row) {
     messageId: row.id,
     brandName: pres.fromName,
   });
+  const references = mergeReferencesChain(row.references, row.messageId);
   const result = await sendSupportMail(dataDir, {
     to: from,
     subject,
     text,
     html,
     inReplyTo: row.messageId,
-    references: row.references || row.messageId,
+    references,
   });
+  if (result?.messageId) {
+    appendOutboundMessageId(row, result.messageId);
+    row.references = mergeReferencesChain(references, result.messageId);
+  }
   return { ok: Boolean(result?.messageId), ...result };
 }
 
@@ -209,6 +219,7 @@ function extractSenderEmail(fromLabel) {
 /** Dış müşteri IMAP maili — otomatik alındı (iç outbox / bounce hariç) */
 function shouldAutoreplyForInboxRow(row) {
   if (row.autoreplySentAt) return false;
+  if (row.threadRootId && row.threadRootId !== row.id) return false;
   if (row.source === 'outbox-bridge') return false;
   const from = extractSenderEmail(row.from);
   if (!from.includes('@')) return false;
@@ -293,6 +304,8 @@ export async function importSupportInboxFromImap(
       messageId: msg.messageId ?? null,
       inReplyTo: threadHdr.inReplyTo ?? null,
       references: threadHdr.references ?? null,
+      threadRootId: null,
+      outboundMessageIds: [],
       from: repairUtf8Mojibake(msg.from ?? ''),
       to: repairUtf8Mojibake(msg.to ?? ''),
       subject: repairUtf8Mojibake(msg.subject ?? ''),
@@ -306,11 +319,18 @@ export async function importSupportInboxFromImap(
       source: 'imap',
       ingestedAt: new Date().toISOString(),
     };
+    const threadHit = resolveInboxThreadRoot([...byKey.values()], {
+      inReplyTo: row.inReplyTo,
+      references: row.references,
+    });
+    if (threadHit) {
+      row.threadRootId = threadHit.root.id;
+    }
     byKey.set(dedupe, row);
     added += 1;
 
-    const { autoCreateCaseForInboxRow } = await import('./platformSupportCases.mjs');
-    await autoCreateCaseForInboxRow(dataDir, row);
+    const { processInboxRowForCase } = await import('./platformSupportCases.mjs');
+    await processInboxRowForCase(dataDir, row);
 
     await applyAutoreplyIfNeeded(dataDir, row, autoreplies);
   }
@@ -437,14 +457,19 @@ export async function replyPlatformSupportInbox(dataDir, { messageId, body, oper
     body: text,
     operatorUsername,
   });
+  const references = mergeReferencesChain(row.references, row.messageId);
   const result = await sendSupportMail(dataDir, {
     to,
     subject,
     text: replyText,
     html: replyHtml,
     inReplyTo: row.messageId,
-    references: row.references || row.messageId,
+    references,
   });
+  if (result?.messageId) {
+    appendOutboundMessageId(row, result.messageId);
+    row.references = mergeReferencesChain(references, result.messageId);
+  }
   if (!result?.messageId) {
     return { ok: false, error: 'SMTP gönderimi başarısız' };
   }
