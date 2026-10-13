@@ -368,6 +368,25 @@ export async function getPlatformBillingExportCsv(dataDir, days = 30) {
   return { csv, filename: `platform-gelir-${stamp}.csv` };
 }
 
+export async function getPlatformSupportOverview(dataDir, { days } = {}) {
+  const { buildPlatformSupportOverview } = await import('./platformSupportMetrics.mjs');
+  return buildPlatformSupportOverview(dataDir, { days });
+}
+
+export async function updatePlatformSupportSlaPolicy(dataDir, patch) {
+  const { writeSupportSlaPolicy } = await import('./platformSupportPolicy.mjs');
+  const policy = await writeSupportSlaPolicy(dataDir, patch);
+  return { ok: true, policy };
+}
+
+export async function getPlatformSupportExportCsv(dataDir, days) {
+  const overview = await getPlatformSupportOverview(dataDir, { days });
+  const { buildPlatformSupportCsv } = await import('./platformSupportMetrics.mjs');
+  const csv = buildPlatformSupportCsv(overview);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { csv, filename: `platform-destek-${stamp}.csv` };
+}
+
 export async function getPlatformInfrastructureOverview(dataDir) {
   const { buildPlatformInfrastructureOverview } = await import('./platformInfrastructureMetrics.mjs');
   return buildPlatformInfrastructureOverview(dataDir);

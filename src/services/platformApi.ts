@@ -640,6 +640,66 @@ export type PlatformBillingPayload = {
   tenants: PlatformBillingTenantRow[];
 };
 
+export type PlatformSupportSlaPolicy = {
+  firstResponseTargetMinutes: number;
+  staleWaitingHours: number;
+  windowDaysDefault?: number;
+  updatedAt?: string;
+};
+
+export type PlatformSupportQueueItem = {
+  id: string;
+  tenantId: string;
+  businessName: string;
+  threadId: string;
+  kind: 'first_response' | 'stale_waiting';
+  severity: string;
+  status: string;
+  subject: string;
+  customerName: string;
+  waitMs: number;
+  targetMs: number;
+  updatedAt: string;
+  assignedUserId: string | null;
+  channel: string;
+};
+
+export type PlatformSupportTenantRow = {
+  tenantId: string;
+  businessName: string;
+  messaging: PlatformCommsTenantRow['messaging'];
+  firstResponse: PlatformCommsTenantRow['firstResponse'];
+  onboardingStatus: string;
+  messagingEmbedReady: boolean;
+  postaOnboardingComplete: boolean;
+  queueItems: number;
+  slaBreaches: number;
+};
+
+export type PlatformSupportPayload = {
+  generatedAt: string;
+  windowDays: number;
+  policy: Pick<PlatformSupportSlaPolicy, 'firstResponseTargetMinutes' | 'staleWaitingHours'>;
+  capabilities: { messagingPublicConfigured: boolean };
+  totals: {
+    openThreads: number;
+    waitingThreads: number;
+    pendingFirstResponse: number;
+    queueSize: number;
+    slaBreaches: number;
+    slaMet: number;
+    compliancePercent: number | null;
+    firstResponse: {
+      avgMs: number | null;
+      medianMs: number | null;
+      p90Ms: number | null;
+      samples: number;
+    };
+  };
+  queue: PlatformSupportQueueItem[];
+  tenants: PlatformSupportTenantRow[];
+};
+
 export type PlatformInfrastructureCheck = {
   id: string;
   label: string;
@@ -768,6 +828,68 @@ export async function downloadPlatformBillingCsv(days = 30): Promise<{ ok: boole
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `platform-gelir-${stamp}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function fetchPlatformSupportOverview(days?: number): Promise<{
+  ok: boolean;
+  data?: PlatformSupportPayload;
+  error?: string;
+}> {
+  try {
+    const q = days != null && days > 0 ? `?days=${days}` : '';
+    const res = await fetch(`/api/platform/support${q}`, { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSupportPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Destek özeti yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformSupportPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function savePlatformSupportSlaPolicy(
+  patch: Partial<PlatformSupportSlaPolicy>,
+): Promise<{ ok: boolean; policy?: PlatformSupportSlaPolicy; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/support/policy', {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = (await res.json()) as { ok?: boolean; policy?: PlatformSupportSlaPolicy; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Politika kaydedilemedi' };
+    }
+    return { ok: true, policy: data.policy };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function downloadPlatformSupportCsv(days?: number): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const q = days != null && days > 0 ? `?days=${days}` : '';
+    const res = await fetch(`/api/platform/support/export.csv${q}`, {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `platform-destek-${stamp}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
     return { ok: true };

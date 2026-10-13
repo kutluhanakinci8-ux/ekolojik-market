@@ -1003,6 +1003,70 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformSupportOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportOverview(DATA_DIR, {
+          days: Number.isFinite(daysParam) && daysParam > 0 ? daysParam : undefined,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Destek verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/policy' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { readSupportSlaPolicy } = await import('./server/platformSupportPolicy.mjs');
+          const policy = await readSupportSlaPolicy(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, policy }));
+          return;
+        }
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { updatePlatformSupportSlaPolicy } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSupportSlaPolicy(DATA_DIR, body ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Politika kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformSupportExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformSupportExportCsv(
+          DATA_DIR,
+          Number.isFinite(daysParam) && daysParam > 0 ? daysParam : undefined,
+        );
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/infrastructure' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
