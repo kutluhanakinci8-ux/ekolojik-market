@@ -74,11 +74,14 @@ export async function issuePlatformApiTokenFromCredentials(dataDir, { username, 
   }
   const meta = (await readPlatformOperatorsMeta(dataDir)).operators.find((o) => o.username === canonical);
   const userId = `platform:${canonical}`;
+  const { readPlatformSessionEpoch } = await import('./platformSessionRevoke.mjs');
+  const platformEpoch = await readPlatformSessionEpoch(dataDir);
   const token = await createPosApiToken(dataDir, {
     tenantId: PLATFORM_TENANT_ID,
     userId,
     role: 'platform',
     username: canonical,
+    platformEpoch,
   });
   const exp = Date.now() + 24 * 60 * 60 * 1000;
   return {

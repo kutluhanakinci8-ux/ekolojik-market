@@ -853,6 +853,86 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/security/policy' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { readSecurityAlertPolicy } = await import('./server/platformSecurityPolicy.mjs');
+          const policy = await readSecurityAlertPolicy(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, policy }));
+          return;
+        }
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { updatePlatformSecurityAlertPolicy } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSecurityAlertPolicy(DATA_DIR, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Politika kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/notify-check' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { platformSecurityNotifyCheck } = await import('./server/platformApi.mjs');
+        const result = await platformSecurityNotifyCheck(DATA_DIR, { force: body.force === true });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...result }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bildirim kontrolü başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/revoke-platform-sessions' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { platformRevokeAllSessions } = await import('./server/platformApi.mjs');
+        const result = await platformRevokeAllSessions(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Oturum sonlandırılamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/revoke-user' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const tenantId = String(body.tenantId ?? '').trim();
+        const userId = String(body.userId ?? '').trim();
+        if (!tenantId || !userId) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'tenantId ve userId gerekli' }));
+          return;
+        }
+        const { platformRevokeTenantUserSession } = await import('./server/platformApi.mjs');
+        const result = await platformRevokeTenantUserSession(DATA_DIR, tenantId, userId);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kullanıcı oturumu sonlandırılamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/calendar' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;

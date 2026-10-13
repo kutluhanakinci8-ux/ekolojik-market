@@ -282,7 +282,105 @@ export type PlatformSecurityPayload = {
       createdAt: string;
     }>;
   };
+  failedLogins24h?: number;
+  thresholdAlerts?: Array<{
+    id: string;
+    severity: string;
+    title: string;
+    detail: string;
+    metric: number;
+    threshold: number;
+  }>;
+  alertPolicy?: PlatformSecurityAlertPolicy;
+  platformSessionEpoch?: number;
+  revokeCandidates?: Array<{
+    tenantId: string;
+    userId: string;
+    username: string;
+    displayName: string;
+    businessName: string;
+    role: string;
+  }>;
 };
+
+export type PlatformSecurityAlertPolicy = {
+  enabled: boolean;
+  emailOps: boolean;
+  webhookUrl: string;
+  cooldownMinutes: number;
+  thresholds: {
+    failedLogins24h: number;
+    securityScoreBelow: number;
+    highRecommendations: number;
+  };
+  lastFired?: Record<string, string>;
+};
+
+async function platformSecurityPost<T>(path: string, body?: unknown): Promise<{ ok: boolean; data?: T; error?: string }> {
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: body !== undefined ? JSON.stringify(body) : '{}',
+    });
+    const data = (await res.json()) as T & { ok?: boolean; error?: string };
+    if (!res.ok) {
+      return { ok: false, error: data.error ?? 'İşlem başarısız' };
+    }
+    if (data.ok === false) {
+      return { ok: false, error: data.error ?? 'İşlem başarısız' };
+    }
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function savePlatformSecurityPolicy(
+  policy: Partial<PlatformSecurityAlertPolicy>,
+): Promise<{ ok: boolean; policy?: PlatformSecurityAlertPolicy; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/security/policy', {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(policy),
+    });
+    const data = (await res.json()) as { ok?: boolean; policy?: PlatformSecurityAlertPolicy; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Politika kaydedilemedi' };
+    }
+    return { ok: true, policy: data.policy };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function runPlatformSecurityNotifyCheck(force = false): Promise<{
+  ok: boolean;
+  sent?: boolean;
+  message?: string;
+  error?: string;
+}> {
+  const result = await platformSecurityPost<{ sent?: boolean; message?: string }>(
+    '/api/platform/security/notify-check',
+    { force },
+  );
+  if (!result.ok) return result;
+  return { ok: true, sent: result.data?.sent, message: result.data?.message };
+}
+
+export async function revokePlatformOperatorSessions(): Promise<{ ok: boolean; error?: string }> {
+  const result = await platformSecurityPost('/api/platform/security/revoke-platform-sessions');
+  return { ok: result.ok, error: result.error };
+}
+
+export async function revokeTenantUserPlatformSession(
+  tenantId: string,
+  userId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await platformSecurityPost('/api/platform/security/revoke-user', { tenantId, userId });
+  return { ok: result.ok, error: result.error };
+}
 
 export async function downloadPlatformSecurityCsv(days = 90): Promise<{ ok: boolean; error?: string }> {
   try {

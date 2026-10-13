@@ -1616,6 +1616,73 @@
   line-height: 1.4;
 }
 
+.platform-security-policy-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.platform-security-policy-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.platform-security-policy-field span,
+.platform-security-policy-grid label span {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pu-muted);
+  margin-bottom: 0.25rem;
+}
+
+.platform-security-policy-field input,
+.platform-security-policy-grid input {
+  width: 100%;
+  font: inherit;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--pu-border);
+  border-radius: 10px;
+}
+
+.platform-security-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.65rem;
+}
+
+.platform-security-policy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.platform-security-danger-btn {
+  color: #b91c1c !important;
+  font-weight: 600;
+}
+
+.platform-security-session-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.platform-security-revoke-scroll {
+  max-height: 260px;
+  margin-top: 0.75rem;
+}
+
+.platform-security-threshold-panel {
+  border-color: #fecaca;
+}
+
 @media (max-width: 720px) {
   .platform-users-hero--premium {
     padding: 1rem;

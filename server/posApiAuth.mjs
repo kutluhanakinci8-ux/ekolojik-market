@@ -48,11 +48,24 @@ function signPayload(secret, payloadB64) {
   return createHmac('sha256', secret).update(`${TOKEN_VERSION}.${payloadB64}`).digest('base64url');
 }
 
-export async function createPosApiToken(dataDir, { tenantId, userId, role, username }) {
+export async function createPosApiToken(dataDir, {
+  tenantId,
+  userId,
+  role,
+  username,
+  authEpoch,
+  platformEpoch,
+}) {
   const secret = await getPosApiSecret(dataDir);
   const exp = Date.now() + TOKEN_TTL_MS;
   const payload = { tenantId, userId, role, exp };
   if (username) payload.username = String(username).trim().toLowerCase();
+  if (authEpoch != null && Number.isFinite(Number(authEpoch))) {
+    payload.ae = Number(authEpoch);
+  }
+  if (platformEpoch != null && Number.isFinite(Number(platformEpoch))) {
+    payload.pe = Number(platformEpoch);
+  }
   const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
   const sig = signPayload(secret, payloadB64);
   return `${TOKEN_VERSION}.${payloadB64}.${sig}`;
@@ -112,6 +125,21 @@ export async function verifyPosApiToken(
   }
   if (requireAdmin && payload.role !== 'admin' && !isPlatform) {
     return { ok: false, status: 403, error: 'Yönetici yetkisi gerekli' };
+  }
+
+  if (isPlatform) {
+    const { readPlatformSessionEpoch } = await import('./platformSessionRevoke.mjs');
+    const pe = await readPlatformSessionEpoch(dataDir);
+    if ((payload.pe ?? 0) !== pe) {
+      return { ok: false, status: 401, error: 'Platform oturumu sonlandırıldı — tekrar giriş yapın' };
+    }
+  } else if (payload.userId && payload.tenantId) {
+    const store = await readTenantStore(dataDir, payload.tenantId);
+    const user = store?.users?.find((u) => u.id === payload.userId);
+    const ae = Number(user?.authEpoch) || 0;
+    if ((payload.ae ?? 0) !== ae) {
+      return { ok: false, status: 401, error: 'Oturum sonlandırıldı — tekrar giriş yapın' };
+    }
   }
 
   return { ok: true, payload };
@@ -217,6 +245,8 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
     tenantId,
     userId: user.id,
     role: user.role,
+    username: user.username,
+    authEpoch: user.authEpoch ?? 0,
   });
   const exp = Date.now() + TOKEN_TTL_MS;
   const { passwordHash, pinHash, totpSecret, ...publicUser } = user;
@@ -246,11 +276,14 @@ export async function refreshPosApiTokenFromBearer(dataDir, token, tenantId) {
   }
 
   if (verified.payload.role === 'platform') {
+    const { readPlatformSessionEpoch } = await import('./platformSessionRevoke.mjs');
+    const pe = await readPlatformSessionEpoch(dataDir);
     const newToken = await createPosApiToken(dataDir, {
       tenantId: PLATFORM_TENANT_ID,
       userId: verified.payload.userId,
       role: 'platform',
       username: verified.payload.username,
+      platformEpoch: pe,
     });
     return { ok: true, token: newToken, role: 'platform', userId: verified.payload.userId };
   }
@@ -265,6 +298,8 @@ export async function refreshPosApiTokenFromBearer(dataDir, token, tenantId) {
     tenantId,
     userId: user.id,
     role: user.role,
+    username: user.username,
+    authEpoch: user.authEpoch ?? 0,
   });
   const exp = Date.now() + TOKEN_TTL_MS;
   return {
