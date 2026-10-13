@@ -83,17 +83,25 @@ function renderMailFooterHtml() {
           </tr>`;
 }
 
-export function formatPlatformSupportAutoreplyText({ brandName, messageId, supportEmail }) {
+function formatCaseRefLabel(caseNumber) {
+  const n = Number(caseNumber);
+  return Number.isFinite(n) && n > 0 ? `#${n}` : null;
+}
+
+export function formatPlatformSupportAutoreplyText({ brandName, messageId, supportEmail, caseNumber }) {
   const brand = brandName || 'Ekolojik Destek';
   const mail = supportEmail || getPlatformSupportMailAddress();
   const siteBrand = getPlatformSupportMailBrand();
+  const caseRef = formatCaseRefLabel(caseNumber);
   const lines = [
     'Merhaba,',
     '',
     `${brand} destek ekibine yazdığınız için teşekkür ederiz.`,
     'Talebiniz kayıt altına alındı; iş saatlerinde en kısa sürede size dönüş yapacağız.',
     '',
+    ...(caseRef ? [`Destek kaydı: ${caseRef}`, ''] : []),
     `Talep referansı: ${messageId}`,
+    ...(caseRef ? [`[EKO-DESTEK-${caseNumber}]`] : []),
     '',
     'Bu mesaja yanıt vererek yazışmaya devam edebilirsiniz.',
     '',
@@ -112,12 +120,19 @@ export function formatPlatformSupportAutoreplyText({ brandName, messageId, suppo
   return lines.join('\n');
 }
 
-export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, supportEmail }) {
+export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, supportEmail, caseNumber }) {
   const pres = getPlatformSupportMailPresentation();
   const brand = brandName || pres.fromName || 'Ekolojik Destek';
   const mail = supportEmail || pres.from || getPlatformSupportMailAddress();
   const siteBrand = getPlatformSupportMailBrand();
   const ref = escapeHtml(messageId);
+  const caseRef = formatCaseRefLabel(caseNumber);
+  const caseRefHtml = caseRef
+    ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#2d3b2f;">Destek kaydı: <strong>${escapeHtml(caseRef)}</strong></p>`
+    : '';
+  const caseTokenHtml = caseRef
+    ? `<div style="font-size:11px;color:#6b7c6f;margin-top:8px;">[EKO-DESTEK-${escapeHtml(String(caseNumber))}]</div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="tr">
@@ -155,11 +170,13 @@ export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, suppo
                 <strong>${escapeHtml(brand)}</strong> destek ekibine yazdığınız için teşekkür ederiz.
                 Talebiniz kayıt altına alındı; iş saatlerinde en kısa sürede size dönüş yapacağız.
               </p>
+              ${caseRefHtml}
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;background:${BRAND_GREEN_LIGHT};border-radius:12px;border:1px solid #b7e4c7;">
                 <tr>
                   <td style="padding:16px 20px;">
                     <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND_GREEN};margin-bottom:6px;">Talep referansı</div>
                     <div style="font-family:ui-monospace,'SF Mono',Consolas,monospace;font-size:14px;color:#1b4332;word-break:break-all;">${ref}</div>
+                    ${caseTokenHtml}
                   </td>
                 </tr>
               </table>
@@ -191,11 +208,11 @@ export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, suppo
 </html>`.trim();
 }
 
-export function buildPlatformSupportAutoreplyContent({ messageId, brandName } = {}) {
+export function buildPlatformSupportAutoreplyContent({ messageId, brandName, caseNumber } = {}) {
   const pres = getPlatformSupportMailPresentation();
   const brand = brandName || pres.fromName;
   const supportEmail = pres.from;
-  const payload = { brandName: brand, messageId, supportEmail };
+  const payload = { brandName: brand, messageId, supportEmail, caseNumber };
   return {
     text: formatPlatformSupportAutoreplyText(payload),
     html: formatPlatformSupportAutoreplyHtml(payload),

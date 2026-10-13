@@ -24,6 +24,7 @@ import { listMergedRecentOutbox } from './emailOutbox.mjs';
 import { readTenantStore } from './tenantAuth.mjs';
 import {
   appendOutboundMessageId,
+  buildCaseOutboundToInboxRootIndex,
   mergeReferencesChain,
   resolveInboxThreadRoot,
 } from './platformSupportEmailThread.mjs';
@@ -173,17 +174,28 @@ async function sendSupportMail(dataDir, { to, subject, text, html, inReplyTo, re
   });
 }
 
+async function resolveCaseForInboxRow(dataDir, row) {
+  const { findCaseByInboxRootId } = await import('./platformCaseStore.mjs');
+  const rootId = row.threadRootId || row.id;
+  return findCaseByInboxRootId(dataDir, rootId);
+}
+
 async function maybeSendAutoreply(dataDir, row) {
   if (row.autoreplySentAt) return { skipped: true };
   const from = String(row.from ?? '').match(/[\w.+-]+@[\w.-]+/)?.[0];
   if (!from?.includes('@')) return { skipped: true, reason: 'no_from' };
   const pres = getPlatformSupportMailPresentation();
+  const linkedCase = await resolveCaseForInboxRow(dataDir, row);
+  const caseNumber = linkedCase?.number ?? null;
+  const baseSubject = row.subject || 'Destek talebiniz';
+  const taggedSubject = caseNumber ? `[Destek #${caseNumber}] ${baseSubject}` : baseSubject;
   const subject = row.subject?.toLowerCase().startsWith('re:')
     ? row.subject
-    : `Re: ${row.subject || 'Destek talebiniz'}`;
+    : `Re: ${taggedSubject}`;
   const { text, html } = buildPlatformSupportAutoreplyContent({
     messageId: row.id,
     brandName: pres.fromName,
+    caseNumber,
   });
   const references = mergeReferencesChain(row.references, row.messageId);
   const result = await sendSupportMail(dataDir, {
@@ -197,6 +209,15 @@ async function maybeSendAutoreply(dataDir, row) {
   if (result?.messageId) {
     appendOutboundMessageId(row, result.messageId);
     row.references = mergeReferencesChain(references, result.messageId);
+    if (linkedCase?.id) {
+      const { recordCaseEmailOutbound } = await import('./platformCaseStore.mjs');
+      await recordCaseEmailOutbound(dataDir, linkedCase.id, {
+        messageId: result.messageId,
+        references: row.references,
+        kind: 'autoreply',
+        inboxMessageId: row.id,
+      });
+    }
   }
   return { ok: Boolean(result?.messageId), ...result };
 }
@@ -264,6 +285,8 @@ export async function importSupportInboxFromImap(
   }
 
   const existing = await readMessages(dataDir);
+  const { readPlatformCases } = await import('./platformCaseStore.mjs');
+  const caseOutboundIndex = buildCaseOutboundToInboxRootIndex(await readPlatformCases(dataDir));
   const byKey = new Map(existing.map((r) => [r.dedupeKey, r]));
   let added = 0;
   let refreshed = 0;
@@ -319,10 +342,14 @@ export async function importSupportInboxFromImap(
       source: 'imap',
       ingestedAt: new Date().toISOString(),
     };
-    const threadHit = resolveInboxThreadRoot([...byKey.values()], {
-      inReplyTo: row.inReplyTo,
-      references: row.references,
-    });
+    const threadHit = resolveInboxThreadRoot(
+      [...byKey.values()],
+      {
+        inReplyTo: row.inReplyTo,
+        references: row.references,
+      },
+      caseOutboundIndex,
+    );
     if (threadHit) {
       row.threadRootId = threadHit.root.id;
     }
@@ -469,6 +496,22 @@ export async function replyPlatformSupportInbox(dataDir, { messageId, body, oper
   if (result?.messageId) {
     appendOutboundMessageId(row, result.messageId);
     row.references = mergeReferencesChain(references, result.messageId);
+    const linkedCase = await resolveCaseForInboxRow(dataDir, row);
+    if (linkedCase?.id) {
+      const { recordCaseEmailOutbound, appendCaseActivity } = await import('./platformCaseStore.mjs');
+      await recordCaseEmailOutbound(dataDir, linkedCase.id, {
+        messageId: result.messageId,
+        references: row.references,
+        kind: 'operator_reply',
+        inboxMessageId: row.id,
+      });
+      await appendCaseActivity(
+        dataDir,
+        linkedCase.id,
+        { type: 'email_outbound', body: text.slice(0, 2000), channel: 'email' },
+        operatorUsername,
+      );
+    }
   }
   if (!result?.messageId) {
     return { ok: false, error: 'SMTP gönderimi başarısız' };
