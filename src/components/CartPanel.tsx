@@ -12,7 +12,7 @@ import {
   normalizeGreenleafNumber,
 } from '../utils/customerValidation';
 import { formatCurrency } from '../utils/format';
-import { getSalePriceModeHint, SALE_PRICE_LABELS } from '../utils/salePricing';
+import { SALE_PRICE_LABELS } from '../utils/salePricing';
 import { DEFAULT_VAT_RATE, splitGrossAmount } from '../utils/vatAnalytics';
 import { getWholesaleTierLabel } from '../utils/wholesalePricing';
 import type { PosNote } from '../types/business';
@@ -200,6 +200,8 @@ export function CartPanel({
   const showCustomerExtra = compactCheckout || customerExtraOpen || !hasCartItems;
   /** Barkod/ürün araması yazılırken Greenleaf alanı gizlenir — liste için yer açılır */
   const showCustomerBar = compactCheckout || !searchActive;
+  /** Sepet dolu: Greenleaf no alanı gizlenir (müşteri alanı ayrı açılır) */
+  const showGreenleafField = showCustomerBar && !hasCartItems;
 
   useEffect(() => {
     if (cart.length === 0) {
@@ -282,11 +284,7 @@ export function CartPanel({
           </div>
         </div>
 
-        <p className="sale-price-mode-hint" role="note">
-          {getSalePriceModeHint(saleMode, partnerLocked)}
-        </p>
-
-        {searchActive && saleGreenleafNumber.trim() && (
+        {searchActive && !hasCartItems && saleGreenleafNumber.trim() && (
           <p className="cart-gl-active-pill" title="Greenleaf numarası kayıtlı — aramayı temizleyince alan geri gelir">
             GL {saleGreenleafNumber.trim()}
             {partnerLocked ? ' · Partner fiyat' : ''}
@@ -294,18 +292,20 @@ export function CartPanel({
         )}
 
         {showCustomerBar && (
-        <div className={`sale-customer-bar ${cartFocusLayout && !showCustomerExtra ? 'sale-customer-bar--slim' : ''}`}>
-          <input
-            type="text"
-            className="sale-greenleaf-input"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder={GREENLEAF_NO_PLACEHOLDER}
-            aria-label="Greenleaf numarası"
-            value={saleGreenleafNumber}
-            onChange={(e) => onGreenleafChange(e.target.value)}
-          />
+        <div className={`sale-customer-bar ${cartFocusLayout && !showCustomerExtra ? 'sale-customer-bar--slim' : ''}${!showGreenleafField ? ' sale-customer-bar--no-gl' : ''}`}>
+          {showGreenleafField && (
+            <input
+              type="text"
+              className="sale-greenleaf-input"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder={GREENLEAF_NO_PLACEHOLDER}
+              aria-label="Greenleaf numarası"
+              value={saleGreenleafNumber}
+              onChange={(e) => onGreenleafChange(e.target.value)}
+            />
+          )}
 
           {cartFocusLayout && (
             <button
