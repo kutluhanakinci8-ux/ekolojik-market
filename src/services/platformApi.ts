@@ -546,6 +546,52 @@ export async function fetchPlatformSecurityOverview(): Promise<{
   }
 }
 
+export type PlatformAuditTimelineEvent = {
+  kind: 'login' | 'activity';
+  tenantId: string;
+  businessName: string;
+  createdAt: string;
+  success?: boolean;
+  username?: string;
+  displayName?: string;
+  clientIp?: string | null;
+  title: string;
+  detail: string;
+  action?: string;
+};
+
+export type PlatformAuditPayload = {
+  generatedAt: string;
+  windowDays: number;
+  securityScore: number;
+  totals: {
+    activityEvents: number;
+    securityActivityEvents: number;
+    loginSuccess: number;
+    loginFailed: number;
+    failedLogins24h: number;
+  };
+  activity: PlatformSecurityPayload['activity'];
+  timeline: PlatformAuditTimelineEvent[];
+  recentFailedLogins: PlatformAuditTimelineEvent[];
+  notify: {
+    policyEnabled: boolean;
+    emailOps: boolean;
+    webhookConfigured: boolean;
+    thresholds: PlatformSecurityAlertPolicy['thresholds'];
+    cooldownMinutes: number;
+    history: Array<{ alertId: string; label: string; lastFiredAt: string }>;
+    activeThresholds: Array<{
+      id: string;
+      severity: string;
+      title: string;
+      detail: string;
+      metric: number;
+      threshold: number;
+    }>;
+  };
+};
+
 export type PlatformInfrastructureCheck = {
   id: string;
   label: string;
@@ -599,6 +645,47 @@ export type PlatformInfrastructurePayload = {
   cronJobs: Array<{ id: string; path: string; installed: boolean; sample: string }>;
   retention: { outboxDays: number; messagingDays: number; contactDays: number };
 };
+
+export async function fetchPlatformAuditOverview(days = 30): Promise<{
+  ok: boolean;
+  data?: PlatformAuditPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch(`/api/platform/audit?days=${days}`, { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformAuditPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Denetim özeti yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformAuditPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function downloadPlatformAuditCsv(days = 90): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/audit/export.csv?days=${days}`, {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `platform-denetim-${stamp}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
 
 export async function fetchPlatformInfrastructureOverview(): Promise<{
   ok: boolean;

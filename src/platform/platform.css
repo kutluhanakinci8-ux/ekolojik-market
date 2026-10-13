@@ -2655,3 +2655,119 @@
   background: #fffbeb;
   border-color: #fde68a;
 }
+
+/* —— Denetim sekmesi —— */
+
+.platform-audit--premium {
+  animation: platform-comms-fade 0.35s ease;
+}
+
+.platform-audit-hero-metrics {
+  text-align: center;
+}
+
+.platform-audit-subhead {
+  margin: 1rem 0 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.platform-audit-alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.platform-audit-alert {
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.86rem;
+}
+
+.platform-audit-alert--medium {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.platform-audit-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.platform-audit-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.platform-audit-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.platform-audit-event {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--pu-border, #e8ecef);
+  background: #fff;
+}
+
+.platform-audit-event.is-fail {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fff 0%, #fff5f5 100%);
+}
+
+.platform-audit-event-kind {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.45rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  height: fit-content;
+}
+
+.platform-audit-event--login .platform-audit-event-kind {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.platform-audit-event-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+.platform-audit-event-meta {
+  font-size: 0.75rem;
+  color: var(--pu-muted, #64748b);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}

@@ -342,6 +342,18 @@ export async function getPlatformSecurityExportCsv(dataDir, days = 90) {
   return { csv, filename: `platform-guvenlik-${stamp}.csv` };
 }
 
+export async function getPlatformAuditOverview(dataDir, { days = 30 } = {}) {
+  const { buildPlatformAuditOverview } = await import('./platformAuditMetrics.mjs');
+  const safeDays = Math.min(180, Math.max(7, Number(days) || 30));
+  return buildPlatformAuditOverview(dataDir, { days: safeDays });
+}
+
+export async function getPlatformAuditExportCsv(dataDir, days = 90) {
+  const { buildPlatformAuditExportCsv } = await import('./platformAuditMetrics.mjs');
+  const safeDays = Math.min(180, Math.max(7, Number(days) || 90));
+  return buildPlatformAuditExportCsv(dataDir, safeDays);
+}
+
 export async function getPlatformInfrastructureOverview(dataDir) {
   const { buildPlatformInfrastructureOverview } = await import('./platformInfrastructureMetrics.mjs');
   return buildPlatformInfrastructureOverview(dataDir);
