@@ -1,6 +1,7 @@
 import type { Customer } from '../types/business';
 import type { Product, Sale, StockMovement } from '../types/product';
 import type { SaleReturn } from '../types/saleReturn';
+import type { PaymentReminder } from '../types/paymentReminder';
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import {
   applySalesHistoryClearToSnapshot,
@@ -80,6 +81,29 @@ function mergeProductsById(local: Product[], remote: Product[]): Product[] {
   return [...map.values()];
 }
 
+/** Ödeme takvimi: yerel liste sunucuyu tamamen ezmesin (vergi seed / boş önbellek). */
+export function mergePaymentRemindersById(
+  local: PaymentReminder[],
+  remote: PaymentReminder[],
+): PaymentReminder[] {
+  const map = new Map<string, PaymentReminder>();
+  for (const item of remote) {
+    if (item?.id) map.set(item.id, item);
+  }
+  for (const item of local) {
+    if (!item?.id) continue;
+    const prev = map.get(item.id);
+    if (!prev || ts(item.updatedAt) >= ts(prev.updatedAt)) {
+      map.set(item.id, item);
+    }
+  }
+  return [...map.values()].sort((a, b) => {
+    const byDate = a.dueDate.localeCompare(b.dueDate);
+    if (byDate !== 0) return byDate;
+    return a.title.localeCompare(b.title, 'tr');
+  });
+}
+
 /** İki sekme / iki kasa: satışları birleştir; sunucuya yazmadan önce ve çekince kullan. */
 export function mergeStoreSnapshots(
   local: PersistedStoreSnapshot,
@@ -100,6 +124,10 @@ export function mergeStoreSnapshots(
       ...remoteClean.settings,
       ...localClean.settings,
       salesHistoryClearedAt: clearedAt ?? localClean.settings?.salesHistoryClearedAt,
+      paymentReminders: mergePaymentRemindersById(
+        localClean.settings?.paymentReminders ?? [],
+        remoteClean.settings?.paymentReminders ?? [],
+      ),
     },
     sales: mergeSalesById(localClean.sales ?? [], remoteClean.sales ?? []),
     saleReturns: mergeSaleReturnsById(localClean.saleReturns ?? [], remoteClean.saleReturns ?? []),
