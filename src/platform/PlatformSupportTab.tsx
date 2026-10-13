@@ -8,6 +8,7 @@ import {
   fetchPlatformSupportContactQueue,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
+  fetchPlatformSupportCaseAi,
   postPlatformSupportCaseAction,
   replyPlatformSupportInbox,
   savePlatformSupportSlaPolicy,
@@ -22,6 +23,7 @@ import {
 } from '../services/platformApi';
 import { KpiIcon, PlatformFilterSelect, RingProgress } from './platformUserUi';
 import { PlatformSupportTenant360 } from './PlatformSupportTenant360';
+import { PlatformSupportSlaLive } from './PlatformSupportSlaLive';
 
 const KIND_LABELS: Record<string, string> = {
   first_response: 'İlk yanıt bekliyor',
@@ -69,7 +71,7 @@ export function PlatformSupportTab() {
   const [policyDraft, setPolicyDraft] = useState<PlatformSupportSlaPolicy | null>(null);
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
-  const [section, setSection] = useState<'inbox' | 'queue' | 'cases'>('cases');
+  const [section, setSection] = useState<'inbox' | 'queue' | 'cases' | 'sla'>('cases');
   const [caseRows, setCaseRows] = useState<PlatformSupportCase[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [zendeskIdDraft, setZendeskIdDraft] = useState('');
@@ -85,6 +87,8 @@ export function PlatformSupportTab() {
   const [actionDraft, setActionDraft] = useState('');
   const [contactQueue, setContactQueue] = useState<PlatformSupportContactQueueItem[]>([]);
   const [contextTenantId, setContextTenantId] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -215,6 +219,26 @@ export function PlatformSupportTab() {
     void load();
   };
 
+  const runCaseAi = async (kind: 'summary' | 'draft_reply') => {
+    if (!selectedCaseId) return;
+    setAiBusy(true);
+    setPolicyMsg(null);
+    const res = await fetchPlatformSupportCaseAi(selectedCaseId, kind);
+    setAiBusy(false);
+    if (!res.ok) {
+      setPolicyMsg(res.error ?? 'AI önerisi alınamadı');
+      return;
+    }
+    if (kind === 'draft_reply' && res.text) {
+      setActionDraft(res.text);
+      setReplyChannel('email');
+      setPolicyMsg(res.provider === 'external' ? 'AI yanıt taslağı hazır' : 'Yerel taslak hazır');
+    } else if (res.text) {
+      setAiSummary(res.text);
+      setPolicyMsg(res.provider === 'external' ? 'AI özet hazır' : 'Yerel özet hazır');
+    }
+  };
+
   const sendCaseAction = async () => {
     if (!selectedCaseId || !actionDraft.trim()) return;
     const result = await postPlatformSupportCaseAction(selectedCaseId, {
@@ -335,6 +359,13 @@ export function PlatformSupportTab() {
         >
           Mesaj kuyruğu & SLA
         </button>
+        <button
+          type="button"
+          className={`platform-support-subnav-btn ${section === 'sla' ? 'platform-support-subnav-btn--active' : ''}`}
+          onClick={() => setSection('sla')}
+        >
+          SLA canlı
+        </button>
       </nav>
 
       {policyMsg ? <p className="platform-inline-msg">{policyMsg}</p> : null}
@@ -439,6 +470,17 @@ export function PlatformSupportTab() {
                     ))}
                   </div>
                 ) : null}
+                <div className="platform-support-360-actions">
+                  <button type="button" className="btn btn-secondary" disabled={aiBusy} onClick={() => void runCaseAi('summary')}>
+                    {aiBusy ? '…' : 'AI özet'}
+                  </button>
+                  <button type="button" className="btn btn-secondary" disabled={aiBusy} onClick={() => void runCaseAi('draft_reply')}>
+                    AI taslak
+                  </button>
+                </div>
+                {aiSummary ? (
+                  <pre className="platform-support-ai-summary">{aiSummary}</pre>
+                ) : null}
                 <div className="platform-support-policy-form">
                   <PlatformFilterSelect
                     label="Yanıt kanalı"
@@ -504,6 +546,10 @@ export function PlatformSupportTab() {
         </div>
         <PlatformSupportTenant360 tenantId={contextTenantId} onMessage={setPolicyMsg} />
         </div>
+      ) : null}
+
+      {section === 'sla' ? (
+        <PlatformSupportSlaLive windowDays={windowDays} />
       ) : null}
 
       {section === 'inbox' ? (

@@ -1325,6 +1325,56 @@ export async function postPlatformSupportCommand(payload: {
   return { ok: result.ok, error: result.error, hints };
 }
 
+export type PlatformSupportSlaLivePayload = {
+  generatedAt: string;
+  windowDays: number;
+  compliancePercent: number | null;
+  totals: {
+    queueSize: number;
+    pendingFirstResponse: number;
+    slaBreaches: number;
+    slaMet: number;
+    openThreads: number;
+  };
+  queueBySeverity: { critical: number; warning: number; info: number };
+  caseOverdue: number;
+  daily: Array<{ dateKey: string; met: number; breached: number; samples: number }>;
+  topQueue: Array<{
+    id: string;
+    severity: string;
+    businessName: string;
+    subject: string;
+    waitMs: number;
+  }>;
+};
+
+export async function fetchPlatformSupportSlaLive(
+  days?: number,
+): Promise<{ ok: boolean; data?: PlatformSupportSlaLivePayload; error?: string }> {
+  try {
+    const q = days != null && days > 0 ? `?days=${days}` : '';
+    const res = await fetch(`/api/platform/support/sla-live${q}`, { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSupportSlaLivePayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'SLA paneli yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformSupportSlaLivePayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function fetchPlatformSupportCaseAi(
+  caseId: string,
+  kind: 'summary' | 'draft_reply',
+): Promise<{ ok: boolean; text?: string; provider?: string; error?: string }> {
+  const result = await platformSecurityPost(`/api/platform/support/cases/${caseId}/ai`, { kind });
+  const text = (result as { text?: string }).text;
+  const provider = (result as { provider?: string }).provider;
+  return { ok: result.ok, text, provider, error: result.error };
+}
+
 export async function downloadPlatformSupportCsv(days?: number): Promise<{ ok: boolean; error?: string }> {
   try {
     const q = days != null && days > 0 ? `?days=${days}` : '';

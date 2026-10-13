@@ -512,6 +512,16 @@ export async function postPlatformSupportCommand(dataDir, body, operatorUsername
   return runPlatformSupportCommand(dataDir, body, operatorUsername);
 }
 
+export async function getPlatformSupportSlaLive(dataDir, query = {}) {
+  const { buildPlatformSupportSlaLive } = await import('./platformSupportSlaLive.mjs');
+  return buildPlatformSupportSlaLive(dataDir, query);
+}
+
+export async function suggestPlatformSupportCaseAi(dataDir, caseId, body = {}) {
+  const { suggestPlatformSupportCaseAi: suggest } = await import('./platformSupportAi.mjs');
+  return suggest(dataDir, caseId, body);
+}
+
 export async function patchPlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername) {
   const { updatePlatformTenantLifecycle } = await import('./platformTenantLifecycle.mjs');
   return updatePlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername);
