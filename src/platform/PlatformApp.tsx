@@ -4,6 +4,7 @@ import { useStore } from '../store/StoreProvider';
 import { decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
 import { isPlatformApiRole } from '../config/platformOperators';
 import { PlatformAuditTab } from './PlatformAuditTab';
+import { PlatformBillingTab } from './PlatformBillingTab';
 import { PlatformCommsTab } from './PlatformCommsTab';
 import { PlatformOverviewTab } from './PlatformOverviewTab';
 import { PlatformSecurityTab } from './PlatformSecurityTab';
@@ -12,7 +13,15 @@ import { PlatformTenantsTab } from './PlatformTenantsTab';
 import { PlatformUsersTab, type PlatformUsersTabFocus } from './PlatformUsersTab';
 import './platform.css';
 
-type PlatformTab = 'overview' | 'tenants' | 'users' | 'security' | 'audit' | 'comms' | 'infrastructure';
+type PlatformTab =
+  | 'overview'
+  | 'billing'
+  | 'tenants'
+  | 'users'
+  | 'security'
+  | 'audit'
+  | 'comms'
+  | 'infrastructure';
 
 export function PlatformApp() {
   const store = useStore();
@@ -67,6 +76,13 @@ export function PlatformApp() {
         </button>
         <button
           type="button"
+          className={`platform-tab ${activeTab === 'billing' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('billing')}
+        >
+          Gelir
+        </button>
+        <button
+          type="button"
           className={`platform-tab ${activeTab === 'tenants' ? 'platform-tab--active' : ''}`}
           onClick={() => setActiveTab('tenants')}
         >
@@ -111,6 +127,8 @@ export function PlatformApp() {
 
       {activeTab === 'infrastructure' ? (
         <PlatformInfrastructureTab />
+      ) : activeTab === 'billing' ? (
+        <PlatformBillingTab />
       ) : activeTab === 'comms' ? (
         <PlatformCommsTab />
       ) : activeTab === 'tenants' ? (

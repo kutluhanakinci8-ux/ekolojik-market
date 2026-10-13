@@ -354,6 +354,20 @@ export async function getPlatformAuditExportCsv(dataDir, days = 90) {
   return buildPlatformAuditExportCsv(dataDir, safeDays);
 }
 
+export async function getPlatformBillingOverview(dataDir, { days = 30 } = {}) {
+  const { buildPlatformBillingOverview } = await import('./platformBillingMetrics.mjs');
+  const safeDays = Math.min(90, Math.max(7, Number(days) || 30));
+  return buildPlatformBillingOverview(dataDir, { days: safeDays });
+}
+
+export async function getPlatformBillingExportCsv(dataDir, days = 30) {
+  const overview = await getPlatformBillingOverview(dataDir, { days });
+  const { buildPlatformBillingCsv } = await import('./platformBillingMetrics.mjs');
+  const csv = buildPlatformBillingCsv(overview);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { csv, filename: `platform-gelir-${stamp}.csv` };
+}
+
 export async function getPlatformInfrastructureOverview(dataDir) {
   const { buildPlatformInfrastructureOverview } = await import('./platformInfrastructureMetrics.mjs');
   return buildPlatformInfrastructureOverview(dataDir);

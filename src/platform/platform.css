@@ -2771,3 +2771,67 @@
   align-items: center;
   gap: 0.35rem;
 }
+
+.platform-billing-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--pu-muted, #64748b);
+  max-width: 42rem;
+}
+
+.platform-billing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
+.platform-billing-columns {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+@media (max-width: 960px) {
+  .platform-billing-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-billing-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 160px;
+  padding-top: 0.5rem;
+}
+
+.platform-billing-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+
+.platform-billing-bar {
+  width: 100%;
+  max-width: 14px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #0d9488 0%, #14b8a6 100%);
+}
+
+.platform-billing-bar-label {
+  font-size: 0.55rem;
+  color: var(--pu-muted, #64748b);
+  margin-top: 0.25rem;
+}
+
+.platform-billing-kpi-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

@@ -592,6 +592,54 @@ export type PlatformAuditPayload = {
   };
 };
 
+export type PlatformBillingTenantRow = {
+  tenantId: string;
+  businessName: string;
+  plan: string;
+  lifecycleStatus: string;
+  revenueWindowTry: number;
+  revenue7dTry: number;
+  salesWindow: number;
+  receivablesTotalTry: number;
+  collections30dTry: number;
+  collectionRatePercent: number | null;
+  pendingPaymentAmountTry: number;
+  overduePaymentAmountTry: number;
+  estimatedMrrTry: number;
+};
+
+export type PlatformBillingPayload = {
+  generatedAt: string;
+  windowDays: number;
+  planPricingNote: string;
+  totals: {
+    revenueWindowTry: number;
+    revenue7dTry: number;
+    salesWindow: number;
+    receivablesTotalTry: number;
+    collections30dTry: number;
+    portfolioCollectionRatePercent: number | null;
+    debtorsCount: number;
+    pendingPaymentAmountTry: number;
+    overduePaymentAmountTry: number;
+    overduePaymentCount: number;
+    estimatedMrrTry: number;
+    estimatedArrTry: number;
+    billableTenants: number;
+    tenantCount: number;
+  };
+  planMix: Array<{ plan: string; count: number; mrrPerTenantTry: number; mrrTotalTry: number }>;
+  revenueByDay: Array<{ date: string; revenueTry: number }>;
+  topDebtors: Array<{
+    tenantId: string;
+    businessName: string;
+    customerId: string;
+    name: string;
+    balanceTry: number;
+  }>;
+  tenants: PlatformBillingTenantRow[];
+};
+
 export type PlatformInfrastructureCheck = {
   id: string;
   label: string;
@@ -679,6 +727,47 @@ export async function downloadPlatformAuditCsv(days = 90): Promise<{ ok: boolean
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `platform-denetim-${stamp}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function fetchPlatformBillingOverview(days = 30): Promise<{
+  ok: boolean;
+  data?: PlatformBillingPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch(`/api/platform/billing?days=${days}`, { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformBillingPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Gelir özeti yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformBillingPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function downloadPlatformBillingCsv(days = 30): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/billing/export.csv?days=${days}`, {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `platform-gelir-${stamp}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
     return { ok: true };
