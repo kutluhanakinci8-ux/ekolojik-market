@@ -604,18 +604,26 @@ export function PlatformSupportTab() {
             <div className="platform-panel-head">
               <h3>destek@ gelen</h3>
               <button type="button" className="btn btn-secondary" onClick={() => void onInboxSync()} disabled={inboxSyncing}>
-                {inboxSyncing ? 'Senkron…' : 'IMAP senkron'}
+                {inboxSyncing ? 'Senkron…' : mailboxConfigured ? 'IMAP + outbox' : 'Güncelle'}
               </button>
             </div>
             {!mailboxConfigured ? (
               <p className="platform-support-hint">
-                Ayrı posta kutusu için VPS’te <code>destek@</code> ve <code>EKOLOJIK_SUPPORT_IMAP_*</code> env tanımlayın. Kurulum:{' '}
+                Mağaza <strong>Posta</strong> üzerinden <code>destek@ekolojikmarket.com.tr</code> adresine yazılanlar burada listelenir
+                (outbox köprüsü). Gönderim <strong>PENDING</strong> ise SMTP henüz çıkmamış olabilir; yine de gelen kutusunda görünür.
+                Harici posta ve IMAP için VPS’te <code>EKOLOJIK_SUPPORT_IMAP_*</code> —{' '}
                 <code>scripts/sunucu-ekolojik-destek-mailbox.sh</code>
               </p>
-            ) : null}
+            ) : (
+              <p className="platform-support-hint platform-table-muted">
+                IMAP ile dış mail + mağaza outbox birlikte senkronlanır.
+              </p>
+            )}
             <ul className="platform-support-inbox-items">
               {inboxMessages.length === 0 ? (
-                <li className="platform-support-inbox-empty">Henüz kayıt yok — senkron deneyin.</li>
+                <li className="platform-support-inbox-empty">
+                  Henüz kayıt yok — yöneticiden destek@ gönderin veya Güncelle’ye basın.
+                </li>
               ) : (
                 inboxMessages.map((m) => (
                   <li key={m.id}>
@@ -626,6 +634,9 @@ export function PlatformSupportTab() {
                     >
                       <span className="platform-support-inbox-item-subject">{m.subject || '(konu yok)'}</span>
                       <span className="platform-support-inbox-item-from">{m.from}</span>
+                      {'outboxStatus' in m && m.outboxStatus && m.outboxStatus !== 'sent' ? (
+                        <span className="platform-support-inbox-item-status">{String(m.outboxStatus).toUpperCase()}</span>
+                      ) : null}
                       <span className="platform-support-inbox-item-date">{formatDateTime(m.receivedAt)}</span>
                     </button>
                   </li>
