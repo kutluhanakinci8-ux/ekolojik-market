@@ -241,6 +241,8 @@ export async function getPlatformSecurityOverview(dataDir) {
   const scorePayload = computeSecurityScore(userOps.totals, roster, recommendations);
   const loginTrend = buildLoginTrend(allLoginEntries, 14);
   const tenantSnapshots = tenantSecuritySnapshots(analytics);
+  const { summarizePlatformActivity } = await import('./platformActivityMetrics.mjs');
+  const activitySummary = summarizePlatformActivity(storesByTenant, 30);
 
   return buildPlatformSecurityOverview({
     userOps,
@@ -249,7 +251,24 @@ export async function getPlatformSecurityOverview(dataDir) {
     recommendations,
     scorePayload,
     tenantSnapshots,
+    activitySummary,
   });
+}
+
+export async function getPlatformSecurityExportCsv(dataDir, days = 90) {
+  const storesByTenant = [];
+  for (const tenantId of await allTenantIds(dataDir)) {
+    const store = await readTenantStore(dataDir, tenantId);
+    if (!store) continue;
+    const businessName = String(store?.settings?.businessName ?? '').trim()
+      || (tenantId === 'main' ? 'Greenleaf Market' : tenantId);
+    storesByTenant.push({ store, tenantId, businessName });
+  }
+  const { buildPlatformSecurityCsv } = await import('./platformActivityMetrics.mjs');
+  const safeDays = Math.min(180, Math.max(7, Number(days) || 90));
+  const csv = buildPlatformSecurityCsv(storesByTenant, safeDays);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { csv, filename: `platform-guvenlik-${stamp}.csv` };
 }
 
 export async function getPlatformUserOperations(dataDir) {

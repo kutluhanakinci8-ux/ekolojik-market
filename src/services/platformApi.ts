@@ -259,7 +259,53 @@ export type PlatformSecurityPayload = {
     adminCount: number;
   }>;
   recentLogins: PlatformRecentLoginRow[];
+  activity: {
+    events30d: number;
+    securityEvents30d: number;
+    topActions: Array<{ action: string; label: string; count: number }>;
+    byTenant: Array<{
+      tenantId: string;
+      businessName: string;
+      events30d: number;
+      securityEvents30d: number;
+    }>;
+    recentSecurity: Array<{
+      tenantId: string;
+      businessName: string;
+      id: string;
+      action: string;
+      actionLabel: string;
+      username: string;
+      displayName: string;
+      summary: string;
+      sessionId?: string;
+      createdAt: string;
+    }>;
+  };
 };
+
+export async function downloadPlatformSecurityCsv(days = 90): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/security/export.csv?days=${days}`, {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `platform-guvenlik-${stamp}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
 
 export async function fetchPlatformSecurityOverview(): Promise<{
   ok: boolean;

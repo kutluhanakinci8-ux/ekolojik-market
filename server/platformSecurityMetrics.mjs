@@ -271,6 +271,7 @@ export function buildPlatformSecurityOverview({
   recommendations,
   scorePayload,
   tenantSnapshots,
+  activitySummary,
 }) {
   const high = recommendations.filter((r) => r.priority === 'high').length;
   const medium = recommendations.filter((r) => r.priority === 'medium').length;
@@ -286,5 +287,6 @@ export function buildPlatformSecurityOverview({
     failedByIp: failedByIp.slice(0, 12),
     tenantSnapshots,
     recentLogins: (userOps.recentLogins ?? []).slice(0, 40),
+    activity: activitySummary,
   };
 }
