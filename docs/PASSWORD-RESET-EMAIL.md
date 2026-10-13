@@ -19,8 +19,9 @@
 
 ## EkoPos akışı
 
-1. Yönetici: **Ayarlar → Kullanıcılar** → «Şifre sıfırlama e-postası» (her kullanıcı için).
-2. Kullanıcı: **Giriş → Şifremi unuttum** → kullanıcı adı + kayıtlı e-posta.
+1. **Zorunlu kayıt:** Aktif kullanıcıların `recoveryEmail` alanı dolu olmalıdır. Yeni kullanıcı oluştururken yönetici e-postayı girer; e-postası olmayan mevcut kullanıcı girişten sonra (şifre değiştirme adımından sonra) **Şifre sıfırlama e-postası gerekli** ekranında adresini kaydeder — POS’a devam edemez.
+2. Yönetici: **Ayarlar → Kullanıcılar** → «Şifre sıfırlama e-postası» (aktif kullanıcılar için zorunlu).
+3. Kullanıcı: **Giriş → Şifremi unuttum** → kullanıcı adı + kayıtlı e-posta.
 3. Sunucu: `POST /api/auth/password-reset-request` → outbox → SMTP → **bildirim@** ile gönderim.
 4. Kullanıcı linke tıklar → `/giris?reset=...` → yeni şifre → `POST /api/auth/password-reset-confirm`.
 

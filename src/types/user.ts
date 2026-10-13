@@ -30,6 +30,7 @@ export interface AuthSession {
   allowedTabs: AppPage[];
   loggedInAt: string;
   mustChangePassword?: boolean;
+  mustSetRecoveryEmail?: boolean;
 }
 
 export type LoginResult =

@@ -211,13 +211,14 @@ export function UsersManagement({ store }: UsersManagementProps) {
               />
             </label>
             <label className="settings-field">
-              <span>Şifre sıfırlama e-postası</span>
+              <span>Şifre sıfırlama e-postası {form.isActive ? '(zorunlu)' : ''}</span>
               <input
                 type="email"
                 value={form.recoveryEmail}
                 onChange={(e) => setForm((prev) => ({ ...prev, recoveryEmail: e.target.value }))}
                 autoComplete="email"
-                placeholder="bildirim ile gönderilir"
+                placeholder="bildirim@ekolojikmarket.com.tr üzerinden gönderilir"
+                required={form.isActive}
               />
             </label>
             <label className="settings-field">

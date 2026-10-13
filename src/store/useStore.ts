@@ -3295,8 +3295,10 @@ export function usePosStoreState() {
       displayName: string;
       username: string;
       password?: string;
+      recoveryEmail?: string;
       role: UserRole;
       allowedTabs: AppPage[];
+      isActive?: boolean;
     },
     editingId?: string,
   ): string | null => {
@@ -3317,6 +3319,11 @@ export function usePosStoreState() {
     }
     if (data.role === 'cashier' && data.allowedTabs.length === 0) {
       return 'Kasiyer için en az bir sekme seçmelisiniz.';
+    }
+    const active = data.isActive !== false;
+    const recovery = data.recoveryEmail?.trim().toLowerCase() ?? '';
+    if (active && (!recovery.includes('@') || recovery.length < 5)) {
+      return 'Şifre sıfırlama e-postası zorunludur (geçerli bir adres girin).';
     }
     return null;
   }, [users]);
@@ -4105,7 +4112,27 @@ export function usePosStoreState() {
     }
 
     return null;
-  }, [users, validateUserForm, authSession, logout, logActivity, syncReady, persistStoreNow]);
+  }, [users, validateUserForm, authSession, logout, logActivity, syncReady, persistStoreNow, settings]);
+
+  const saveRecoveryEmail = useCallback(async (email: string): Promise<string | null> => {
+    if (!authSession) return 'Oturum bulunamadı.';
+    const user = users.find((item) => item.id === authSession.userId);
+    if (!user) return 'Kullanıcı bulunamadı.';
+
+    const recoveryEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recoveryEmail)) {
+      return 'Geçerli bir e-posta adresi girin.';
+    }
+
+    return updateUser(user.id, {
+      displayName: user.displayName,
+      username: user.username,
+      recoveryEmail,
+      role: user.role,
+      allowedTabs: [...user.allowedTabs],
+      isActive: user.isActive,
+    });
+  }, [authSession, users, updateUser]);
 
   const removeUser = useCallback((id: string): string | null => {
     const user = users.find((item) => item.id === id);
@@ -5350,6 +5377,7 @@ export function usePosStoreState() {
     syncServerReachable,
     syncFetchError,
     changePassword,
+    saveRecoveryEmail,
     verifyAdminCredentials,
     unlockUserLogin,
     getLoginLockouts,

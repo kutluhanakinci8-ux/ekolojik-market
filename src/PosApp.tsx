@@ -4,6 +4,7 @@ import { saveTenantId, normalizeStoreCodeInput } from './storage/tenantSession';
 import { setCurrencyDisplaySettings } from './utils/format';
 import { AppShell } from './components/AppShell';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { RecoveryEmailModal } from './components/RecoveryEmailModal';
 import { DashboardScreen } from './components/DashboardScreen';
 import { AccountingScreen } from './components/AccountingScreen';
 import { ReportsScreen } from './components/ReportsScreen';
@@ -218,6 +219,10 @@ export function PosApp() {
 
   if (store.authSession.mustChangePassword) {
     return <ChangePasswordModal store={store} />;
+  }
+
+  if (store.authSession.mustSetRecoveryEmail) {
+    return <RecoveryEmailModal store={store} />;
   }
 
   if (postaOnboardingOpen) {
