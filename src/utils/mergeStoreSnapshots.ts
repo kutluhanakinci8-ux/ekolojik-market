@@ -53,6 +53,15 @@ function mergeCustomersById(local: Customer[], remote: Customer[]): Customer[] {
   return [...map.values()];
 }
 
+/** Sunucu snapshot'ında imageUrl yok; yerelde data: yükleme var — birleştirmede düşmesin */
+function mergeProductImageUrl(local: Product, chosen: Product): Product {
+  const localUrl = local.imageUrl?.trim();
+  if (!localUrl?.startsWith('data:image/')) return chosen;
+  const chosenUrl = chosen.imageUrl?.trim();
+  if (chosenUrl?.startsWith('data:image/')) return chosen;
+  return { ...chosen, imageUrl: localUrl };
+}
+
 function mergeProductsById(local: Product[], remote: Product[]): Product[] {
   const map = new Map<number, Product>();
   for (const p of remote) map.set(p.id, p);
@@ -62,9 +71,11 @@ function mergeProductsById(local: Product[], remote: Product[]): Product[] {
       map.set(p.id, p);
       continue;
     }
+    let chosen = prev;
     if (p.stock !== prev.stock) {
-      map.set(p.id, p.stock < prev.stock ? p : prev);
+      chosen = p.stock < prev.stock ? p : prev;
     }
+    map.set(p.id, mergeProductImageUrl(p, chosen));
   }
   return [...map.values()];
 }
