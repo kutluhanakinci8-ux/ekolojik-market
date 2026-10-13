@@ -864,8 +864,7 @@ const server = createServer(async (req, res) => {
           res.end(JSON.stringify({ ok: true, policy }));
           return;
         }
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { updatePlatformSecurityAlertPolicy } = await import('./server/platformApi.mjs');
         const result = await updatePlatformSecurityAlertPolicy(DATA_DIR, body);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -881,8 +880,7 @@ const server = createServer(async (req, res) => {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { platformSecurityNotifyCheck } = await import('./server/platformApi.mjs');
         const result = await platformSecurityNotifyCheck(DATA_DIR, { force: body.force === true });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -913,8 +911,7 @@ const server = createServer(async (req, res) => {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const tenantId = String(body.tenantId ?? '').trim();
         const userId = String(body.userId ?? '').trim();
         if (!tenantId || !userId) {
@@ -1063,8 +1060,7 @@ const server = createServer(async (req, res) => {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { platformIntegrationsProbe } = await import('./server/platformApi.mjs');
         const result = await platformIntegrationsProbe(DATA_DIR, body);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1105,8 +1101,7 @@ const server = createServer(async (req, res) => {
           res.end(JSON.stringify({ ok: true, ...payload }));
           return;
         }
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { patchPlatformConsoleSettings } = await import('./server/platformApi.mjs');
         const result = await patchPlatformConsoleSettings(DATA_DIR, body);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1190,8 +1185,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { createPlatformSupportCaseFromInbox } = await import('./server/platformApi.mjs');
         const result = await createPlatformSupportCaseFromInbox(
           DATA_DIR,
@@ -1246,8 +1240,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { postPlatformSupportCommand } = await import('./server/platformApi.mjs');
         const result = await postPlatformSupportCommand(DATA_DIR, body, authPayload.username ?? 'platform');
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1282,8 +1275,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { createPlatformSupportCaseFromContact } = await import('./server/platformApi.mjs');
         const result = await createPlatformSupportCaseFromContact(
           DATA_DIR,
@@ -1304,8 +1296,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { createPlatformSupportCaseFromQueue } = await import('./server/platformApi.mjs');
         const result = await createPlatformSupportCaseFromQueue(
           DATA_DIR,
@@ -1326,8 +1317,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { createPlatformSupportCase } = await import('./server/platformApi.mjs');
         const result = await createPlatformSupportCase(DATA_DIR, body, authPayload.username ?? 'platform');
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1344,8 +1334,7 @@ const server = createServer(async (req, res) => {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { suggestPlatformSupportCaseAi } = await import('./server/platformApi.mjs');
         const result = await suggestPlatformSupportCaseAi(DATA_DIR, platformSupportCaseAiMatch[1], body);
         res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1363,8 +1352,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { postPlatformSupportCaseAction } = await import('./server/platformApi.mjs');
         const result = await postPlatformSupportCaseAction(
           DATA_DIR,
@@ -1402,8 +1390,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { patchPlatformSupportCase } = await import('./server/platformApi.mjs');
         const result = await patchPlatformSupportCase(
           DATA_DIR,
@@ -1425,8 +1412,7 @@ const server = createServer(async (req, res) => {
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
       if (!authPayload) return;
       try {
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { replyPlatformSupportInboxMessage } = await import('./server/platformApi.mjs');
         const result = await replyPlatformSupportInboxMessage(
           DATA_DIR,

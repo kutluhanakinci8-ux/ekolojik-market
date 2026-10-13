@@ -46,6 +46,10 @@ function formatDurationMs(ms: number | null | undefined): string {
 function userMessage(err: unknown, fallback: string): string {
   if (typeof err === 'string' && err.trim()) return err;
   if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === 'object') {
+    const msg = (err as { message?: unknown; error?: unknown }).message ?? (err as { error?: unknown }).error;
+    if (typeof msg === 'string' && msg.trim()) return msg;
+  }
   return fallback;
 }
 
