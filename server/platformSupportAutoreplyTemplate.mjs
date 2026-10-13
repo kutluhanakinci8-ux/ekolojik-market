@@ -1,10 +1,12 @@
 /** Platform destek@ — otomatik alındı (HTML + düz metin) */
 
 import { getPlatformSupportMailAddress, getPlatformSupportMailPresentation } from './platformSupportMailConfig.mjs';
+import { getPlatformSupportMailBrand } from './platformSupportMailBrand.mjs';
 
 const BRAND_GREEN = '#1b4332';
 const BRAND_GREEN_MID = '#2d6a4f';
 const BRAND_GREEN_LIGHT = '#d8f3dc';
+const FOOTER_BG = '#f3f6f4';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -14,18 +16,69 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-function publicSiteUrl() {
-  return (
-    process.env.EKOLOJIK_PUBLIC_BASE_URL?.trim()
-    || process.env.EKOLOJIK_PUBLIC_URL?.trim()
-    || 'https://www.ekolojikmarket.com.tr'
-  ).replace(/\/$/, '');
+function socialIconLetter(key) {
+  const map = { instagram: 'IG', facebook: 'f', youtube: '▶', linkedin: 'in', x: 'X' };
+  return map[key] ?? '•';
+}
+
+function renderMailFooterHtml() {
+  const brand = getPlatformSupportMailBrand();
+  const year = new Date().getFullYear();
+  const socialCells = brand.social
+    .map(
+      (s) => `
+    <td style="padding:0 6px 0 0;">
+      <a href="${escapeHtml(s.url)}" title="${escapeHtml(s.label)}" style="display:inline-block;min-width:40px;height:40px;line-height:40px;text-align:center;border-radius:10px;border:1px solid #d0ddd4;background:#ffffff;color:${BRAND_GREEN};font-size:13px;font-weight:700;text-decoration:none;">${escapeHtml(socialIconLetter(s.key))}</a>
+    </td>`,
+    )
+    .join('');
+
+  const socialRow = brand.social.length
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0 0;"><tr>
+        <td style="font-size:12px;color:#5c6b60;padding-right:12px;vertical-align:middle;">Bizi takip edin</td>
+        ${socialCells}
+      </tr></table>`
+    : '';
+
+  return `
+          <tr>
+            <td style="padding:0;background:${FOOTER_BG};border-top:1px solid #e2ebe4;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:24px 32px 20px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:56px;vertical-align:top;padding-right:14px;">
+                          <img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.siteName)}" width="48" height="48" style="display:block;border:0;max-width:48px;height:auto;"/>
+                        </td>
+                        <td style="vertical-align:top;">
+                          <div style="font-size:16px;font-weight:700;color:#1a2e1a;line-height:1.3;">${escapeHtml(brand.siteName)}</div>
+                          <div style="margin-top:8px;">
+                            <a href="${escapeHtml(brand.contactFormUrl)}" style="font-size:14px;font-weight:600;color:${BRAND_GREEN_MID};text-decoration:underline;">Destek Al</a>
+                          </div>
+                          <div style="font-size:12px;color:#6b7c6f;margin-top:6px;line-height:1.5;">
+                            Formu doldurarak talebinizi iletebilirsiniz.
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                    ${socialRow}
+                    <p style="margin:18px 0 0;font-size:11px;line-height:1.55;color:#7a8a7e;">
+                      Bu işlemi siz yapmadıysanız veya ek yardım gerekiyorsa bu e-postayı yanıtlayarak bizimle iletişime geçebilirsiniz.
+                    </p>
+                    <p style="margin:12px 0 0;font-size:11px;color:#9aa89d;">© ${year} ${escapeHtml(brand.siteName)} · <a href="${escapeHtml(brand.site)}" style="color:${BRAND_GREEN_MID};text-decoration:none;">${escapeHtml(brand.site.replace(/^https?:\/\//, ''))}</a></p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
 }
 
 export function formatPlatformSupportAutoreplyText({ brandName, messageId, supportEmail }) {
   const brand = brandName || 'Ekolojik Destek';
   const mail = supportEmail || getPlatformSupportMailAddress();
-  return [
+  const siteBrand = getPlatformSupportMailBrand();
+  const lines = [
     'Merhaba,',
     '',
     `${brand} destek ekibine yazdığınız için teşekkür ederiz.`,
@@ -33,21 +86,29 @@ export function formatPlatformSupportAutoreplyText({ brandName, messageId, suppo
     '',
     `Talep referansı: ${messageId}`,
     '',
-    'Bu e-posta otomatik gönderilmiştir. Yanıtınız destek ekibimize ulaşır.',
+    'Bu mesaja yanıt vererek yazışmaya devam edebilirsiniz.',
+    '',
+    `Destek formu: ${siteBrand.contactFormUrl}`,
     '',
     '— Ekolojik Destek',
     mail,
-    publicSiteUrl(),
-  ].join('\n');
+    siteBrand.site,
+  ];
+  if (siteBrand.social.length) {
+    lines.push('', 'Sosyal medya:');
+    for (const s of siteBrand.social) {
+      lines.push(`- ${s.label}: ${s.url}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, supportEmail }) {
   const pres = getPlatformSupportMailPresentation();
   const brand = brandName || pres.fromName || 'Ekolojik Destek';
   const mail = supportEmail || pres.from || getPlatformSupportMailAddress();
-  const site = publicSiteUrl();
+  const siteBrand = getPlatformSupportMailBrand();
   const ref = escapeHtml(messageId);
-  const year = new Date().getFullYear();
 
   return `<!DOCTYPE html>
 <html lang="tr">
@@ -79,7 +140,7 @@ export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, suppo
             </td>
           </tr>
           <tr>
-            <td style="padding:32px 32px 8px;">
+            <td style="padding:32px 32px 24px;">
               <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Merhaba,</p>
               <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#2d3b2f;">
                 <strong>${escapeHtml(brand)}</strong> destek ekibine yazdığınız için teşekkür ederiz.
@@ -93,28 +154,26 @@ export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, suppo
                   </td>
                 </tr>
               </table>
-              <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#4a5d4e;">
+              <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#4a5d4e;">
                 Bu mesaja yanıt vererek yazışmaya devam edebilirsiniz; ekip aynı konu başlığı altında talebinizi görür.
               </p>
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="border-radius:10px;background:${BRAND_GREEN_MID};">
-                    <a href="${escapeHtml(site)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">Ekolojik Market</a>
+                    <a href="${escapeHtml(siteBrand.contactFormUrl)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">Destek Al</a>
+                  </td>
+                  <td style="width:10px;"></td>
+                  <td style="border-radius:10px;border:1px solid #c5d6ca;">
+                    <a href="${escapeHtml(siteBrand.site)}" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:600;color:${BRAND_GREEN_MID};text-decoration:none;">Mağazayı ziyaret et</a>
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:8px 32px 28px;">
-              <hr style="border:none;border-top:1px solid #e8efe9;margin:20px 0 16px;"/>
-              <p style="margin:0;font-size:12px;line-height:1.55;color:#6b7c6f;">
-                Bu e-posta <a href="mailto:${escapeHtml(mail)}" style="color:${BRAND_GREEN_MID};text-decoration:none;">${escapeHtml(mail)}</a>
-                adresinden otomatik gönderilmiştir.
+              <p style="margin:20px 0 0;font-size:12px;line-height:1.55;color:#6b7c6f;">
+                Otomatik gönderim: <a href="mailto:${escapeHtml(mail)}" style="color:${BRAND_GREEN_MID};text-decoration:none;">${escapeHtml(mail)}</a>
               </p>
-              <p style="margin:10px 0 0;font-size:11px;color:#9aa89d;">© ${year} Ekolojik Market · Tüm hakları saklıdır.</p>
             </td>
           </tr>
+          ${renderMailFooterHtml()}
         </table>
       </td>
     </tr>
