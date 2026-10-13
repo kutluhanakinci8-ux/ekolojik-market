@@ -188,6 +188,37 @@ export function PlatformSupportTab() {
       ? caseRows.find((c) => c.links?.inboxMessageId === selectedMailThreadRootId) ?? null
       : null;
 
+  const inboxThreadKey = (m: PlatformSupportInboxMessage) => m.threadRootId || m.id;
+
+  const inboxThreads = useMemo(() => {
+    const map = new Map<string, PlatformSupportInboxMessage[]>();
+    for (const m of inboxMessages) {
+      const key = inboxThreadKey(m);
+      const list = map.get(key) ?? [];
+      list.push(m);
+      map.set(key, list);
+    }
+    const threads = [...map.entries()].map(([key, msgs]) => {
+      const sorted = [...msgs].sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt));
+      return { key, messages: sorted, head: sorted[0], count: sorted.length };
+    });
+    threads.sort((a, b) => Date.parse(b.head.receivedAt) - Date.parse(a.head.receivedAt));
+    return threads;
+  }, [inboxMessages]);
+
+  const selectedThreadMessages = useMemo(() => {
+    if (!selectedMail) return [];
+    const key = inboxThreadKey(selectedMail);
+    const thread = inboxThreads.find((t) => t.key === key);
+    const msgs = thread?.messages ?? [selectedMail];
+    return [...msgs].sort((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt));
+  }, [selectedMail, inboxThreads]);
+
+  const replyTargetMailId =
+    selectedThreadMessages.length > 0
+      ? selectedThreadMessages[selectedThreadMessages.length - 1].id
+      : selectedMailId;
+
   const onInboxSync = async () => {
     setInboxSyncing(true);
     setPolicyMsg(null);
@@ -202,8 +233,8 @@ export function PlatformSupportTab() {
   };
 
   const onReply = async () => {
-    if (!selectedMailId || !replyDraft.trim()) return;
-    const result = await replyPlatformSupportInbox(selectedMailId, replyDraft.trim());
+    if (!replyTargetMailId || !replyDraft.trim()) return;
+    const result = await replyPlatformSupportInbox(replyTargetMailId, replyDraft.trim());
     if (!result.ok) {
       setPolicyMsg(userMessage(result.error, 'Yanıt gönderilemedi'));
       return;
@@ -634,19 +665,22 @@ export function PlatformSupportTab() {
                   Henüz kayıt yok — yöneticiden destek@ gönderin veya Güncelle’ye basın.
                 </li>
               ) : (
-                inboxMessages.map((m) => (
-                  <li key={m.id}>
+                inboxThreads.map(({ head, count, key }) => (
+                  <li key={key}>
                     <button
                       type="button"
-                      className={`platform-support-inbox-item ${selectedMailId === m.id ? 'is-selected' : ''} ${!m.readAt ? 'is-unread' : ''}`}
-                      onClick={() => setSelectedMailId(m.id)}
+                      className={`platform-support-inbox-item ${inboxThreadKey(selectedMail ?? head) === key ? 'is-selected' : ''} ${!head.readAt ? 'is-unread' : ''}`}
+                      onClick={() => setSelectedMailId(head.id)}
                     >
-                      <span className="platform-support-inbox-item-subject">{m.subject || '(konu yok)'}</span>
-                      <span className="platform-support-inbox-item-from">{m.from}</span>
-                      {'outboxStatus' in m && m.outboxStatus && m.outboxStatus !== 'sent' ? (
-                        <span className="platform-support-inbox-item-status">{String(m.outboxStatus).toUpperCase()}</span>
+                      <span className="platform-support-inbox-item-subject">
+                        {head.subject || '(konu yok)'}
+                        {count > 1 ? <span className="platform-support-thread-count">{count} mesaj</span> : null}
+                      </span>
+                      <span className="platform-support-inbox-item-from">{head.from}</span>
+                      {'outboxStatus' in head && head.outboxStatus && head.outboxStatus !== 'sent' ? (
+                        <span className="platform-support-inbox-item-status">{String(head.outboxStatus).toUpperCase()}</span>
                       ) : null}
-                      <span className="platform-support-inbox-item-date">{formatDateTime(m.receivedAt)}</span>
+                      <span className="platform-support-inbox-item-date">{formatDateTime(head.receivedAt)}</span>
                     </button>
                   </li>
                 ))
@@ -709,7 +743,25 @@ export function PlatformSupportTab() {
                 {selectedMail.autoreplySentAt ? (
                   <p className="platform-inline-msg">Otomatik alındı maili gönderildi ({formatDateTime(selectedMail.autoreplySentAt)})</p>
                 ) : null}
-                <div className="platform-support-inbox-body">{selectedMail.bodyText || selectedMail.snippet}</div>
+                {selectedThreadMessages.length > 1 ? (
+                  <div className="platform-support-thread-timeline">
+                    <h4 className="platform-support-thread-title">Konuşma ({selectedThreadMessages.length})</h4>
+                    {selectedThreadMessages.map((msg) => (
+                      <article
+                        key={msg.id}
+                        className={`platform-support-thread-msg ${msg.id === selectedMail.id ? 'is-focused' : ''}`}
+                      >
+                        <header>
+                          <span>{formatDateTime(msg.receivedAt)}</span>
+                          <code>{msg.id}</code>
+                        </header>
+                        <p>{msg.bodyText || msg.snippet}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="platform-support-inbox-body">{selectedMail.bodyText || selectedMail.snippet}</div>
+                )}
                 <label className="platform-support-reply-label">
                   Yanıt (destek@)
                   <textarea rows={5} value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} />

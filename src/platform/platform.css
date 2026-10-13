@@ -3552,6 +3552,67 @@
   white-space: nowrap;
 }
 
+.platform-support-thread-count {
+  margin-left: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #2d6a4f;
+  background: #e8f5e9;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+}
+
+.platform-support-thread-timeline {
+  margin: 0.75rem 0;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.platform-support-thread-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1b4332;
+}
+
+.platform-support-thread-msg {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #e2ebe4;
+  background: #fafcfb;
+  font-size: 0.84rem;
+}
+
+.platform-support-thread-msg.is-focused {
+  border-color: #2d6a4f;
+  background: #f1f8f4;
+}
+
+.platform-support-thread-msg header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: #5c6b60;
+  margin-bottom: 0.35rem;
+}
+
+.platform-support-thread-msg header code {
+  font-size: 0.68rem;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-support-thread-msg p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .platform-support-inline-link {
   margin-left: 0.5rem;
   font-size: 0.78rem;
