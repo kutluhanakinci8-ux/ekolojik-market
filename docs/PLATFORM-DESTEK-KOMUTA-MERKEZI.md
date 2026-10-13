@@ -224,6 +224,6 @@ Destek sekmesinde **özet widget + case’e bağlama**; detay ilgili sekmede.
 - **D4:** Case detay omnichannel (e-posta / mesaj / iç not), makrolar, iletişim formu kuyruğu
 - **D5:** Kiracı 360 sağ panel, komut paleti (`/suspend`, `/requeue_outbox`), POS kısayolu
 - **D6:** AI özet/taslak (yerel şablon; `EKOLOJIK_POSTA_AI=1` + URL/key ile harici), **SLA canlı** sekmesi
-- **Sırada:** VPS destek@ (`sunucu-ekolojik-destek-mailbox.sh`, `EKOLOJIK_SUPPORT_*`)
+- **VPS destek@:** `bash scripts/sunucu-ekolojik-destek-mailbox.sh --apply` (root) → `EKOLOJIK_SUPPORT_*`, doğrulama: `sunucu-ekolojik-support-imap-dogrula.sh`
 
 İlgili kod (bugün): `PlatformSupportTab.tsx`, `platformSupportMetrics.mjs`, `postaInbox`, `messaging/store.mjs`, `contactMail.mjs`.
