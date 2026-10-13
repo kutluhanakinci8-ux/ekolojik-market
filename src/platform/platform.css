@@ -3707,6 +3707,14 @@
   margin: 0;
 }
 
+.platform-support-activity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .platform-support-activity-item--email_inbound,
 .platform-support-activity-item--email_inbound_closed {
   border-left: 3px solid #2d6a4f;

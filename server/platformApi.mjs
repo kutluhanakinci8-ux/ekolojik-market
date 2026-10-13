@@ -484,6 +484,36 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
   return detail(dataDir, caseId);
 }
 
+export async function getPlatformSupportCaseActivityExport(dataDir, caseId, format) {
+  const { getPlatformCase } = await import('./platformCaseStore.mjs');
+  const caseRow = await getPlatformCase(dataDir, caseId);
+  if (!caseRow) return { ok: false, error: 'Kayıt bulunamadı' };
+
+  const {
+    buildCaseActivityCsv,
+    buildCaseActivityPrintHtml,
+    caseActivityExportFilename,
+  } = await import('./platformSupportCaseExport.mjs');
+
+  if (format === 'csv') {
+    return {
+      ok: true,
+      body: buildCaseActivityCsv(caseRow),
+      contentType: 'text/csv; charset=utf-8',
+      filename: caseActivityExportFilename(caseRow, 'csv'),
+    };
+  }
+  if (format === 'html') {
+    return {
+      ok: true,
+      body: buildCaseActivityPrintHtml(caseRow),
+      contentType: 'text/html; charset=utf-8',
+      filename: caseActivityExportFilename(caseRow, 'html'),
+    };
+  }
+  return { ok: false, error: 'Geçersiz format' };
+}
+
 export async function postPlatformSupportCaseAction(dataDir, caseId, body, operatorUsername) {
   const { performPlatformCaseAction } = await import('./platformSupportCaseOmni.mjs');
   return performPlatformCaseAction(dataDir, caseId, body, operatorUsername);
