@@ -3718,6 +3718,36 @@
   padding-left: 0.5rem;
 }
 
+.platform-support-activity-body {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+  max-height: 360px;
+  overflow-y: auto;
+  font-size: 0.84rem;
+}
+
+.platform-support-email-html-details {
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+}
+
+.platform-support-email-html-details summary {
+  cursor: pointer;
+  color: #2d6a4f;
+  font-weight: 600;
+}
+
+.platform-support-email-html-frame {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+  height: 280px;
+  margin-top: 0.35rem;
+  border: 1px solid #e2ebe4;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .platform-support-reply-label {
   display: flex;
   flex-direction: column;

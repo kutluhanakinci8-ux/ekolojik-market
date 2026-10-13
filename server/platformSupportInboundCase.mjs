@@ -1,6 +1,7 @@
 /** Gelen destek e-postasını mevcut case'e bağlama (kapalı kayıt politikası) */
 
 import { readSupportSlaPolicy, DEFAULT_SUPPORT_SLA_POLICY } from './platformSupportPolicy.mjs';
+import { inboundBodyFromInboxRow } from './platformSupportActivityContent.mjs';
 
 function isTerminalCaseStatus(status) {
   return ['solved', 'closed'].includes(String(status ?? '').toLowerCase());
@@ -17,7 +18,7 @@ export async function readClosedCaseInboundMode(dataDir) {
  * @returns {{ ok: true, case } | { spawnNewCase: true, fromCase }}
  */
 export async function attachInboundEmailToCase(dataDir, linkedCase, row) {
-  const preview = String(row.bodyText ?? row.snippet ?? '').trim().slice(0, 2000);
+  const preview = inboundBodyFromInboxRow(row);
   const mode = await readClosedCaseInboundMode(dataDir);
   const terminal = isTerminalCaseStatus(linkedCase.status);
 
