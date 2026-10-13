@@ -20,10 +20,11 @@ import {
   type PlatformTenantUserRow,
 } from '../services/platformApi';
 import { saveTenantId } from '../storage/tenantSession';
-import { PlatformUsersTab } from './PlatformUsersTab';
+import { PlatformSecurityTab } from './PlatformSecurityTab';
+import { PlatformUsersTab, type PlatformUsersTabFocus } from './PlatformUsersTab';
 import './platform.css';
 
-type PlatformTab = 'overview' | 'users';
+type PlatformTab = 'overview' | 'users' | 'security';
 
 const PAYMENT_CATEGORY_LABELS: Record<string, string> = {
   rent: 'Kira',
@@ -67,6 +68,7 @@ export function PlatformApp() {
   const [calendarDays, setCalendarDays] = useState<PlatformCalendarDay[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<PlatformTab>('overview');
+  const [usersTabFocus, setUsersTabFocus] = useState<PlatformUsersTabFocus | null>(null);
 
   const loadTenants = useCallback(async () => {
     setLoading(true);
@@ -194,10 +196,27 @@ export function PlatformApp() {
         >
           Kullanıcı işlemleri
         </button>
+        <button
+          type="button"
+          className={`platform-tab ${activeTab === 'security' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          Güvenlik
+        </button>
       </nav>
 
-      {activeTab === 'users' ? (
-        <PlatformUsersTab />
+      {activeTab === 'security' ? (
+        <PlatformSecurityTab
+          onNavigateUsers={(focus) => {
+            setUsersTabFocus(focus);
+            setActiveTab('users');
+          }}
+        />
+      ) : activeTab === 'users' ? (
+        <PlatformUsersTab
+          focus={usersTabFocus}
+          onFocusApplied={() => setUsersTabFocus(null)}
+        />
       ) : (
         <>
       {error && <p className="landing-flash landing-flash--error" role="alert">{error}</p>}

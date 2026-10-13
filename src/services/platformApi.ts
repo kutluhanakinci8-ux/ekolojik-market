@@ -210,6 +210,75 @@ export type PlatformUserOperationsPayload = {
   recentLogins: PlatformRecentLoginRow[];
 };
 
+export type PlatformSecurityRecommendation = {
+  id: string;
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  affectedCount: number;
+  filter: {
+    tenantFilter?: string;
+    engagementFilter?: string;
+    roleFilter?: 'all' | 'admin' | 'cashier';
+  } | null;
+  meta?: { clientIp?: string };
+};
+
+export type PlatformSecurityPayload = {
+  generatedAt: string;
+  score: number;
+  grade: string;
+  dimensions: {
+    recoveryEmailPct: number;
+    adminMfaPct: number;
+    loginSuccessPct: number;
+    engagement30dPct: number;
+    totpCoveragePct: number;
+  };
+  recommendationSummary: { total: number; high: number; medium: number };
+  recommendations: PlatformSecurityRecommendation[];
+  totals: PlatformUserTotals;
+  loginTrend: Array<{ dateKey: string; success: number; failed: number }>;
+  failedByIp: Array<{
+    clientIp: string;
+    failedCount: number;
+    lastAt: string | null;
+    tenantCount: number;
+    sampleTenants: string;
+    distinctUsernames: number;
+  }>;
+  tenantSnapshots: Array<{
+    tenantId: string;
+    businessName: string;
+    securityScore: number;
+    recoveryEmailCoveragePct: number;
+    totpCoveragePct: number;
+    loginFailed30d: number;
+    loginSuccess30d: number;
+    missingRecoveryEmailCount: number;
+    adminCount: number;
+  }>;
+  recentLogins: PlatformRecentLoginRow[];
+};
+
+export async function fetchPlatformSecurityOverview(): Promise<{
+  ok: boolean;
+  data?: PlatformSecurityPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/security', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSecurityPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Güvenlik özeti yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformSecurityPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function fetchPlatformUserOperations(): Promise<{
   ok: boolean;
   data?: PlatformUserOperationsPayload;

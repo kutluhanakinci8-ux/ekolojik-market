@@ -20,6 +20,17 @@ const ENGAGEMENT_ORDER = ['active', 'new', 'dormant_30', 'dormant_60', 'never_lo
 
 type FilterEngagement = 'all' | PlatformUserRosterRow['engagement'];
 
+export type PlatformUsersTabFocus = {
+  tenantFilter?: string;
+  engagementFilter?: FilterEngagement;
+  roleFilter?: 'all' | 'admin' | 'cashier';
+};
+
+type PlatformUsersTabProps = {
+  focus?: PlatformUsersTabFocus | null;
+  onFocusApplied?: () => void;
+};
+
 function formatPct(n: number): string {
   return `${n}%`;
 }
@@ -54,7 +65,7 @@ function UsersTabSkeleton() {
   );
 }
 
-export function PlatformUsersTab() {
+export function PlatformUsersTab({ focus, onFocusApplied }: PlatformUsersTabProps = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totals, setTotals] = useState<PlatformUserTotals | null>(null);
@@ -94,6 +105,14 @@ export function PlatformUsersTab() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!focus || loading) return;
+    setTenantFilter(focus.tenantFilter ?? 'all');
+    setEngagementFilter(focus.engagementFilter ?? 'all');
+    setRoleFilter(focus.roleFilter ?? 'all');
+    onFocusApplied?.();
+  }, [focus, loading, onFocusApplied]);
 
   const filteredRoster = useMemo(() => {
     const q = search.trim().toLowerCase();

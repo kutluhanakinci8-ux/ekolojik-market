@@ -199,6 +199,59 @@ export async function getPlatformTenantDetail(dataDir, tenantId) {
   };
 }
 
+export async function getPlatformSecurityOverview(dataDir) {
+  const { analyzeTenantUsers, mergeRecentLogins, buildPlatformUserOperations } = await import(
+    './platformUserMetrics.mjs'
+  );
+  const {
+    buildLoginTrend,
+    aggregateFailedByIp,
+    buildSecurityRecommendations,
+    computeSecurityScore,
+    tenantSecuritySnapshots,
+    buildPlatformSecurityOverview,
+  } = await import('./platformSecurityMetrics.mjs');
+
+  const storesByTenant = [];
+  const analytics = [];
+  const allLoginEntries = [];
+
+  for (const tenantId of await allTenantIds(dataDir)) {
+    const store = await readTenantStore(dataDir, tenantId);
+    if (!store) continue;
+    const businessName = String(store?.settings?.businessName ?? '').trim()
+      || (tenantId === 'main' ? 'Greenleaf Market' : tenantId);
+    storesByTenant.push({ store, tenantId, businessName });
+    analytics.push(analyzeTenantUsers(store, tenantId, businessName));
+    for (const e of store.loginAuditLog ?? []) {
+      allLoginEntries.push(e);
+    }
+  }
+
+  const recentLogins = mergeRecentLogins(storesByTenant, 50);
+  const userOps = buildPlatformUserOperations(analytics, recentLogins);
+  const roster = userOps.roster;
+  const failedByIp = aggregateFailedByIp(storesByTenant, 7);
+  const recommendations = buildSecurityRecommendations(
+    userOps.totals,
+    roster,
+    failedByIp,
+    userOps.tenants,
+  );
+  const scorePayload = computeSecurityScore(userOps.totals, roster, recommendations);
+  const loginTrend = buildLoginTrend(allLoginEntries, 14);
+  const tenantSnapshots = tenantSecuritySnapshots(analytics);
+
+  return buildPlatformSecurityOverview({
+    userOps,
+    loginTrend,
+    failedByIp,
+    recommendations,
+    scorePayload,
+    tenantSnapshots,
+  });
+}
+
 export async function getPlatformUserOperations(dataDir) {
   const { analyzeTenantUsers, mergeRecentLogins, buildPlatformUserOperations } = await import(
     './platformUserMetrics.mjs'

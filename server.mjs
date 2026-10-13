@@ -819,6 +819,21 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/security' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSecurityOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSecurityOverview(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Güvenlik verisi alınamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/calendar' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
