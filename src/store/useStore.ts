@@ -832,7 +832,7 @@ function buildLocalSnapshot(
     purchaseInvoices,
     settings,
     priceType,
-    users,
+    users: usersForServerSnapshot(users),
     loginAuditLog,
     activityAuditLog,
     suppliers,
