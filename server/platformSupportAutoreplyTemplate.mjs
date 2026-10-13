@@ -2,6 +2,7 @@
 
 import { getPlatformSupportMailAddress, getPlatformSupportMailPresentation } from './platformSupportMailConfig.mjs';
 import { getPlatformSupportMailBrand } from './platformSupportMailBrand.mjs';
+import { supportPlusAddressForCase } from './platformSupportEmailCaseRef.mjs';
 
 const BRAND_GREEN = '#1b4332';
 const BRAND_GREEN_MID = '#2d6a4f';
@@ -102,6 +103,10 @@ export function formatPlatformSupportAutoreplyText({ brandName, messageId, suppo
     ...(caseRef ? [`Destek kaydı: ${caseRef}`, ''] : []),
     `Talep referansı: ${messageId}`,
     ...(caseRef ? [`[EKO-DESTEK-${caseNumber}]`] : []),
+    ...(caseNumber ? (() => {
+      const plus = supportPlusAddressForCase(caseNumber);
+      return plus ? ['', `Bu kayıt için yazışma adresi: ${plus}`] : [];
+    })() : []),
     '',
     'Bu mesaja yanıt vererek yazışmaya devam edebilirsiniz.',
     '',
@@ -130,8 +135,13 @@ export function formatPlatformSupportAutoreplyHtml({ brandName, messageId, suppo
   const caseRefHtml = caseRef
     ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#2d3b2f;">Destek kaydı: <strong>${escapeHtml(caseRef)}</strong></p>`
     : '';
+  const plusAddr = caseNumber ? supportPlusAddressForCase(caseNumber) : null;
   const caseTokenHtml = caseRef
-    ? `<div style="font-size:11px;color:#6b7c6f;margin-top:8px;">[EKO-DESTEK-${escapeHtml(String(caseNumber))}]</div>`
+    ? `<div style="font-size:11px;color:#6b7c6f;margin-top:8px;">[EKO-DESTEK-${escapeHtml(String(caseNumber))}]${
+      plusAddr
+        ? `<br/>Bu kayıt için: <a href="mailto:${escapeHtml(plusAddr)}" style="color:${BRAND_GREEN_MID};text-decoration:none;">${escapeHtml(plusAddr)}</a>`
+        : ''
+    }</div>`
     : '';
 
   return `<!DOCTYPE html>

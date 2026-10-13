@@ -5,6 +5,11 @@ import {
   mergeReferencesChain,
   buildCaseOutboundToInboxRootIndex,
 } from '../server/platformSupportEmailThread.mjs';
+import {
+  parseCaseNumberFromAddressField,
+  resolveInboundCaseNumber,
+  supportPlusAddressForCase,
+} from '../server/platformSupportEmailCaseRef.mjs';
 
 const root = {
   id: 'ps-root',
@@ -32,5 +37,12 @@ const caseIdx = buildCaseOutboundToInboxRootIndex([
 ]);
 const hit3 = resolveInboxThreadRoot(rows, { inReplyTo: '<only-on-case@test>' }, caseIdx);
 assert.equal(hit3?.root.id, 'ps-root', 'case outbound index threads');
+
+assert.equal(parseCaseNumberFromAddressField('destek+case42@ekolojikmarket.com.tr'), 42);
+assert.equal(
+  resolveInboundCaseNumber({ subject: 'Re: [Destek #7] yardım' }),
+  7,
+);
+assert.equal(supportPlusAddressForCase(7), 'destek+case7@ekolojikmarket.com.tr');
 
 console.log('platform-support-email-thread smoke: PASS');

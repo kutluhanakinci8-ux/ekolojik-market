@@ -131,7 +131,34 @@ export async function listPlatformSupportContactQueue(dataDir, { limit = 40 } = 
 }
 
 export async function processInboxRowForCase(dataDir, row) {
-  const { findCaseByLink, appendCaseActivity } = await import('./platformCaseStore.mjs');
+  const { findCaseByLink, findCaseByNumber, appendCaseActivity } = await import('./platformCaseStore.mjs');
+  const { resolveInboundCaseNumber } = await import('./platformSupportEmailCaseRef.mjs');
+
+  const hintedNumber = resolveInboundCaseNumber({
+    to: row.to,
+    deliveredTo: row.deliveredTo,
+    subject: row.subject,
+  });
+  if (hintedNumber) {
+    const byNumber = await findCaseByNumber(dataDir, hintedNumber);
+    if (byNumber?.links?.inboxMessageId) {
+      row.threadRootId = byNumber.links.inboxMessageId;
+      row.linkedCaseNumber = hintedNumber;
+      const preview = String(row.bodyText ?? row.snippet ?? '').trim().slice(0, 2000);
+      await appendCaseActivity(
+        dataDir,
+        byNumber.id,
+        {
+          type: 'email_inbound',
+          body: preview || '(boş gövde)',
+          channel: 'email',
+        },
+        'system',
+      );
+      return { ok: true, threaded: true, case: byNumber, viaCaseNumber: true };
+    }
+  }
+
   const rootId =
     row.threadRootId && row.threadRootId !== row.id ? row.threadRootId : row.id;
   const isReply = rootId !== row.id;

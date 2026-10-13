@@ -204,6 +204,13 @@ export async function findCaseByInboxRootId(dataDir, inboxRowId) {
   return findCaseByLink(dataDir, { inboxMessageId: id });
 }
 
+export async function findCaseByNumber(dataDir, caseNumber) {
+  const n = Number(caseNumber);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const cases = await readPlatformCases(dataDir);
+  return cases.find((c) => Number(c.number) === n) ?? null;
+}
+
 export async function appendCaseActivity(dataDir, caseId, entry, operatorUsername) {
   const cases = await readPlatformCases(dataDir);
   const idx = cases.findIndex((c) => c.id === caseId);
