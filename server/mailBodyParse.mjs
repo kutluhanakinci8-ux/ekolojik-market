@@ -131,8 +131,18 @@ export function repairUtf8Mojibake(str) {
   return str;
 }
 
+/** Outlook iOS bazen ı yerine ISO-8859-3 0xB9 (¹) gönderir */
+function repairOutlookMobileTurkish(str) {
+  let s = String(str ?? '');
+  if (!s.includes('\u00B9') && !s.includes('¹')) return s;
+  s = s.replace(/uygulamas[\u00B9¹]n[\u00B9¹]/gi, 'uygulamasını');
+  s = s.replace(/([\p{L}])[\u00B9¹]([\p{L}])/gu, '$1ı$2');
+  return s;
+}
+
 function normalizeMailText(str) {
-  return repairUtf8Mojibake(String(str ?? '').replace(/\0/g, '').trim());
+  const cleaned = String(str ?? '').replace(/\0/g, '').trim();
+  return repairOutlookMobileTurkish(repairUtf8Mojibake(cleaned));
 }
 
 function stripHtml(html) {
