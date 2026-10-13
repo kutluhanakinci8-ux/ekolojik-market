@@ -789,6 +789,43 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/alerts' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { listPlatformAlerts } = await import('./server/platformApi.mjs');
+        const payload = await listPlatformAlerts(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Uyarılar alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/calendar' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      const year = Number(url.searchParams.get('year')) || new Date().getFullYear();
+      const month = Number(url.searchParams.get('month')) || new Date().getMonth() + 1;
+      try {
+        const { getPlatformMergedCalendar } = await import('./server/platformApi.mjs');
+        const result = await getPlatformMergedCalendar(DATA_DIR, year, month);
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, calendar: result }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim alınamadı' }));
+      }
+      return;
+    }
+
     const platformTenantDetailMatch = pathname.match(/^\/api\/platform\/tenants\/([^/]+)$/);
     if (platformTenantDetailMatch && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
