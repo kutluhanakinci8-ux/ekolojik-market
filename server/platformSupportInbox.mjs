@@ -459,6 +459,15 @@ export async function listPlatformSupportInbox(dataDir, { limit = 50 } = {}) {
   };
 }
 
+export async function listSupportInboxThreadMessages(dataDir, rootInboxId) {
+  const root = String(rootInboxId ?? '').trim();
+  if (!root) return [];
+  const messages = await readMessages(dataDir);
+  return messages
+    .filter((m) => m.id === root || m.threadRootId === root)
+    .sort((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt));
+}
+
 export async function getPlatformSupportInboxMessage(dataDir, id) {
   const messages = await readMessages(dataDir);
   const row = messages.find((m) => m.id === id);

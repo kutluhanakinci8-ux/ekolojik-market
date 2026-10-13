@@ -130,8 +130,34 @@ export async function listPlatformSupportContactQueue(dataDir, { limit = 40 } = 
   };
 }
 
+async function attachInboundToLinkedCase(dataDir, row, linkedCase, extra = {}) {
+  const { attachInboundEmailToCase } = await import('./platformSupportInboundCase.mjs');
+  const result = await attachInboundEmailToCase(dataDir, linkedCase, row);
+  if (result.spawnNewCase) {
+    const from = result.fromCase;
+    row.threadRootId = null;
+    const created = await createPlatformCase(
+      dataDir,
+      {
+        kind: 'request',
+        channel: 'email',
+        status: 'new',
+        subject: row.subject || `Yeniden açılan: ${from.subject || 'Destek'}`,
+        requesterEmail: extractEmail(row.from) || from.requesterEmail,
+        requesterName: String(row.from ?? '').replace(/<[^>]+>/g, '').trim() || from.requesterName,
+        links: { inboxMessageId: row.id },
+        tags: ['destek-mail', 'auto', `reopen-from-${from.number}`],
+        notes: `Kapalı kayıt #${from.number} sonrası yeni gelen mail.`,
+      },
+      'system',
+    );
+    return { ok: true, spawned: true, case: created.case ?? created, ...extra };
+  }
+  return { ok: true, threaded: true, case: result.case, ...extra };
+}
+
 export async function processInboxRowForCase(dataDir, row) {
-  const { findCaseByLink, findCaseByNumber, appendCaseActivity } = await import('./platformCaseStore.mjs');
+  const { findCaseByLink, findCaseByNumber } = await import('./platformCaseStore.mjs');
   const { resolveInboundCaseNumber } = await import('./platformSupportEmailCaseRef.mjs');
 
   const hintedNumber = resolveInboundCaseNumber({
@@ -144,18 +170,7 @@ export async function processInboxRowForCase(dataDir, row) {
     if (byNumber?.links?.inboxMessageId) {
       row.threadRootId = byNumber.links.inboxMessageId;
       row.linkedCaseNumber = hintedNumber;
-      const preview = String(row.bodyText ?? row.snippet ?? '').trim().slice(0, 2000);
-      await appendCaseActivity(
-        dataDir,
-        byNumber.id,
-        {
-          type: 'email_inbound',
-          body: preview || '(boş gövde)',
-          channel: 'email',
-        },
-        'system',
-      );
-      return { ok: true, threaded: true, case: byNumber, viaCaseNumber: true };
+      return attachInboundToLinkedCase(dataDir, row, byNumber, { viaCaseNumber: true });
     }
   }
 
@@ -166,18 +181,7 @@ export async function processInboxRowForCase(dataDir, row) {
   if (isReply) {
     const linked = await findCaseByLink(dataDir, { inboxMessageId: rootId });
     if (linked) {
-      const preview = String(row.bodyText ?? row.snippet ?? '').trim().slice(0, 2000);
-      await appendCaseActivity(
-        dataDir,
-        linked.id,
-        {
-          type: 'email_inbound',
-          body: preview || '(boş gövde)',
-          channel: 'email',
-        },
-        'system',
-      );
-      return { ok: true, threaded: true, case: linked };
+      return attachInboundToLinkedCase(dataDir, row, linked);
     }
   }
 

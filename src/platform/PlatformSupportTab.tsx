@@ -19,6 +19,7 @@ import {
   type PlatformSupportContactQueueItem,
   type PlatformSupportInboxMessage,
   type PlatformSupportPayload,
+  type ClosedCaseInboundMode,
   type PlatformSupportSlaPolicy,
 } from '../services/platformApi';
 import { KpiIcon, PlatformFilterSelect, RingProgress } from './platformUserUi';
@@ -79,6 +80,7 @@ export function PlatformSupportTab() {
   const [windowDays, setWindowDays] = useState(14);
   const [exporting, setExporting] = useState(false);
   const [policyDraft, setPolicyDraft] = useState<PlatformSupportSlaPolicy | null>(null);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'email_inbound' | 'email_outbound' | 'note'>('all');
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
   const [section, setSection] = useState<'inbox' | 'queue' | 'cases' | 'sla'>('cases');
@@ -124,6 +126,7 @@ export function PlatformSupportTab() {
     setPolicyDraft({
       firstResponseTargetMinutes: result.data.policy.firstResponseTargetMinutes,
       staleWaitingHours: result.data.policy.staleWaitingHours,
+      closedCaseInbound: result.data.policy.closedCaseInbound ?? 'reopen',
     });
     const casesRes = await fetchPlatformSupportCases('all', 'all');
     if (casesRes.ok && casesRes.data) {
@@ -162,6 +165,25 @@ export function PlatformSupportTab() {
       }
     })();
   }, [selectedCaseId]);
+
+  const filteredCaseActivity = useMemo(() => {
+    const items = caseDetail?.case.activity ?? [];
+    if (activityFilter === 'all') return items;
+    if (activityFilter === 'email_inbound') {
+      return items.filter((a) => a.type === 'email_inbound' || a.type === 'email_inbound_closed');
+    }
+    return items.filter((a) => a.type === activityFilter);
+  }, [caseDetail?.case.activity, activityFilter]);
+
+  const activityTypeLabel = (type: string) => {
+    const map: Record<string, string> = {
+      email_inbound: 'Gelen e-posta',
+      email_inbound_closed: 'Gelen (kapalı kayıt)',
+      email_outbound: 'Giden e-posta',
+      note: 'İç not',
+    };
+    return map[type] ?? type;
+  };
 
   const filteredQueue = useMemo(() => {
     if (!data) return [];
@@ -540,7 +562,37 @@ export function PlatformSupportTab() {
                 <p className="platform-table-muted">
                   {selectedCase.channel} · {selectedCase.requesterEmail ?? selectedCase.requesterName ?? '—'}
                 </p>
-                {caseDetail?.inboxSnippet ? (
+                {caseDetail?.emailPreview ? (
+                  <div className="platform-support-case-email-chain">
+                    <h4>E-posta zinciri</h4>
+                    {caseDetail.emailPreview.plusAddress ? (
+                      <p className="platform-support-hint">
+                        Plus adres: <code>{caseDetail.emailPreview.plusAddress}</code>
+                      </p>
+                    ) : null}
+                    <ul className="platform-support-case-email-list">
+                      {caseDetail.emailPreview.messages.map((m) => (
+                        <li key={m.id} className={m.isReply ? 'is-reply' : 'is-root'}>
+                          <header>
+                            <span>{m.isReply ? 'Gelen yanıt' : 'İlk mail'}</span>
+                            <span>{formatDateTime(m.receivedAt)}</span>
+                          </header>
+                          <p className="platform-table-muted">{m.from}</p>
+                          <p className="platform-support-case-email-body">{m.bodyText}</p>
+                        </li>
+                      ))}
+                      {caseDetail.emailPreview.outboundEvents.map((e, idx) => (
+                        <li key={`out-${e.at}-${idx}`} className="is-outbound">
+                          <header>
+                            <span>Giden · {e.kind}</span>
+                            <span>{formatDateTime(e.at)}</span>
+                          </header>
+                          {e.messageId ? <code className="platform-support-mono-truncate">{e.messageId}</code> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : caseDetail?.inboxSnippet ? (
                   <p className="platform-support-hint">Gelen mail: {caseDetail.inboxSnippet.subject}</p>
                 ) : null}
                 {caseDetail?.messagingPreview?.messages?.length ? (
@@ -611,14 +663,33 @@ export function PlatformSupportTab() {
                 </button>
                 {caseDetail?.case.activity?.length ? (
                   <div className="platform-support-case-activity">
-                    <h4>Aktivite</h4>
+                    <div className="platform-support-activity-head">
+                      <h4>Aktivite</h4>
+                      <PlatformFilterSelect
+                        label="Filtre"
+                        icon="role"
+                        value={activityFilter}
+                        onChange={(v) => setActivityFilter(v as typeof activityFilter)}
+                      >
+                        <option value="all">Tümü</option>
+                        <option value="email_inbound">Gelen e-posta</option>
+                        <option value="email_outbound">Giden e-posta</option>
+                        <option value="note">İç not</option>
+                      </PlatformFilterSelect>
+                    </div>
                     <ul>
-                      {caseDetail.case.activity.slice(0, 12).map((a) => (
-                        <li key={a.id}>
-                          <span className="platform-table-muted">{formatDateTime(a.createdAt)} · {a.type}</span>
-                          <p>{a.body.slice(0, 200)}</p>
-                        </li>
-                      ))}
+                      {filteredCaseActivity.length === 0 ? (
+                        <li className="platform-support-hint">Bu filtrede kayıt yok.</li>
+                      ) : (
+                        filteredCaseActivity.slice(0, 24).map((a) => (
+                          <li key={a.id} className={`platform-support-activity-item platform-support-activity-item--${a.type}`}>
+                            <span className="platform-table-muted">
+                              {formatDateTime(a.createdAt)} · {activityTypeLabel(a.type)} · {a.createdBy}
+                            </span>
+                            <p>{a.body.slice(0, 400)}</p>
+                          </li>
+                        ))
+                      )}
                     </ul>
                   </div>
                 ) : selectedCase.notes ? (
@@ -851,6 +922,23 @@ export function PlatformSupportTab() {
                     })
                   }
                 />
+              </label>
+              <label>
+                Kapalı kayda gelen e-posta
+                <select
+                  className="platform-support-control"
+                  value={policyDraft.closedCaseInbound ?? 'reopen'}
+                  onChange={(e) =>
+                    setPolicyDraft({
+                      ...policyDraft,
+                      closedCaseInbound: e.target.value as ClosedCaseInboundMode,
+                    })
+                  }
+                >
+                  <option value="reopen">Kaydı yeniden aç</option>
+                  <option value="keep_closed">Kapalı kalsın (aktivite ekle)</option>
+                  <option value="new_case">Yeni kayıt aç</option>
+                </select>
               </label>
               <button type="button" className="btn btn-primary" onClick={() => void savePolicy()}>
                 Kaydet

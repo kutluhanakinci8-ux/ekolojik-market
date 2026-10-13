@@ -190,6 +190,7 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
     policy: {
       firstResponseTargetMinutes: policy.firstResponseTargetMinutes,
       staleWaitingHours: policy.staleWaitingHours,
+      closedCaseInbound: policy.closedCaseInbound ?? DEFAULT_SUPPORT_SLA_POLICY.closedCaseInbound,
     },
     capabilities: {
       messagingPublicConfigured,
