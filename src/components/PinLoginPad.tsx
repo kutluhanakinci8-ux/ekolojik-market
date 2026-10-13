@@ -2,8 +2,8 @@ import { useState } from 'react';
 import type { Store } from '../store/useStore';
 import { loadLastQuickUser } from '../storage/quickLogin';
 import { resolveLoginTenantId } from '../config/loginTenant';
-import { isOwnerAdminUsername } from '../config/ownerAdminUsers';
-import { DEFAULT_TENANT_ID, saveTenantId } from '../storage/tenantSession';
+import { isDedicatedPlatformOnlyUsername, PLATFORM_TENANT_ID } from '../config/platformOperators';
+import { saveTenantId } from '../storage/tenantSession';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { LoginTenantStoreSection } from './LoginTenantStoreSection';
 
@@ -30,7 +30,7 @@ export function PinLoginPad({
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const ownerLogin = isOwnerAdminUsername(username);
+  const platformOnlyLogin = isDedicatedPlatformOnlyUsername(username);
 
   const appendDigit = (digit: string) => {
     if (pin.length >= 6) return;
@@ -52,7 +52,7 @@ export function PinLoginPad({
     try {
       const resolvedTenant = resolveLoginTenantId(
         username,
-        ownerLogin ? DEFAULT_TENANT_ID : tenantId,
+        platformOnlyLogin ? PLATFORM_TENANT_ID : tenantId,
       );
       saveTenantId(resolvedTenant);
       await store.refreshTenantData();
@@ -75,8 +75,8 @@ export function PinLoginPad({
       <LoginTenantStoreSection
         tenantId={tenantId}
         onTenantIdChange={onTenantIdChange}
-        initialExpanded={initialExpandedTenant && !ownerLogin}
-        hideForOwnerAccount={ownerLogin}
+        initialExpanded={initialExpandedTenant && !platformOnlyLogin}
+        hideForOwnerAccount={platformOnlyLogin}
       />
 
       <label className="pin-login-username">

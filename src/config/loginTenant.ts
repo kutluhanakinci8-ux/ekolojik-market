@@ -1,16 +1,12 @@
-import { isOwnerAdminUsername } from './ownerAdminUsers';
-import { isPlatformTenantAdmin } from './tenantDataPolicy';
-import { DEFAULT_TENANT_ID, normalizeStoreCodeInput } from '../storage/tenantSession';
+import { isDedicatedPlatformOnlyUsername, PLATFORM_TENANT_ID } from './platformOperators';
+import { normalizeStoreCodeInput } from '../storage/tenantSession';
 
-/** Greenleaf sahibi hesaplar yanlışlıkla lima-market tenant ile API'ye gitmesin */
+/** Platform operatörü (kutluhan08) kiracı kodu gerektirmez; diğerleri formdaki mağaza kodunu kullanır */
 export function resolveLoginTenantId(username: string, tenantFromForm: string): string {
   const user = username.trim().toLowerCase();
   const tenant = normalizeStoreCodeInput(tenantFromForm);
-  if (isOwnerAdminUsername(user)) {
-    return DEFAULT_TENANT_ID;
-  }
-  if (isPlatformTenantAdmin(user)) {
-    return tenant;
+  if (isDedicatedPlatformOnlyUsername(user)) {
+    return PLATFORM_TENANT_ID;
   }
   return tenant;
 }

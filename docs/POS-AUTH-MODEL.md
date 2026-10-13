@@ -29,6 +29,6 @@ Eski tasarımda istemci her 5 saniyede `PUT /api/data` ile kullanıcı dizisini 
 
 ## Bilinen kullanıcılar (main tenant)
 
-- `kutluhan08` — mağaza sahibi (şifre işletme tarafından belirlenir)
+- `kutluhan08` — **platform operatörü** (Greenleaf kullanıcı listesinde değil; `/platform` — bkz. `docs/PLATFORM-OPERATOR.md`)
 - `yonetici` — varsayılan demo admin (`yonetici123` seed hash)
 - `kasiyer` — `kasiyer123`

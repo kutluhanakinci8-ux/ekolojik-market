@@ -1,3 +1,4 @@
+import { PLATFORM_TENANT_ID } from '../config/platformOperators';
 import { tenantLocalStorageSuffix } from '../storage/posLocalStorageKeys';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 
@@ -15,6 +16,9 @@ let refreshInFlight: Promise<{ ok: boolean; error?: string }> | null = null;
 function tenantQuery(tenantOverride?: string): string {
   const tenant = tenantOverride ?? loadTenantId();
   if (!tenant || tenant === DEFAULT_TENANT_ID) return '';
+  if (tenant === PLATFORM_TENANT_ID) {
+    return `?tenant=${encodeURIComponent(PLATFORM_TENANT_ID)}`;
+  }
   return `?tenant=${encodeURIComponent(tenant)}`;
 }
 
@@ -193,6 +197,8 @@ export async function exchangePosApiToken(
   token?: string;
   error?: string;
   httpStatus?: number;
+  role?: string;
+  tenantId?: string;
   user?: Record<string, unknown>;
 }> {
   try {
@@ -206,6 +212,8 @@ export async function exchangePosApiToken(
       ok?: boolean;
       token?: string;
       message?: string;
+      role?: string;
+      tenantId?: string;
       user?: Record<string, unknown>;
     };
     if (!res.ok || !data.ok || !data.token) {
@@ -215,10 +223,21 @@ export async function exchangePosApiToken(
         error: data.message ?? 'API token alınamadı',
       };
     }
-    savePosApiToken(data.token, authTenant);
-    syncPosApiTokenToCurrentTenant(authTenant);
+    const tokenTenant =
+      data.tenantId === PLATFORM_TENANT_ID || data.role === 'platform'
+        ? PLATFORM_TENANT_ID
+        : authTenant;
+    savePosApiToken(data.token, tokenTenant);
+    savePosApiToken(data.token, loadTenantId());
+    syncPosApiTokenToCurrentTenant(tokenTenant);
     startPosApiTokenRefreshScheduler();
-    return { ok: true, token: data.token, user: data.user };
+    return {
+      ok: true,
+      token: data.token,
+      role: data.role,
+      tenantId: data.tenantId ?? tokenTenant,
+      user: data.user,
+    };
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.' };
   }

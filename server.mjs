@@ -754,6 +754,63 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/auth/platform-token' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      try {
+        const { issuePlatformApiTokenFromCredentials } = await import('./server/platformAuth.mjs');
+        const result = await issuePlatformApiTokenFromCredentials(DATA_DIR, {
+          username: data?.username,
+          password: data?.password,
+        });
+        res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Platform token alınamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/tenants' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { listPlatformTenants } = await import('./server/platformApi.mjs');
+        const tenants = await listPlatformTenants(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, tenants }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste alınamadı' }));
+      }
+      return;
+    }
+
+    const platformTenantDetailMatch = pathname.match(/^\/api\/platform\/tenants\/([^/]+)$/);
+    if (platformTenantDetailMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      const targetTenant = normalizeTenantId(platformTenantDetailMatch[1]);
+      try {
+        const { getPlatformTenantDetail } = await import('./server/platformApi.mjs');
+        const detail = await getPlatformTenantDetail(DATA_DIR, targetTenant);
+        if (!detail) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, tenant: detail }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Detay alınamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/auth/pos-token' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
@@ -3224,8 +3281,11 @@ const server = createServer(async (req, res) => {
       if (!authPayload) return;
       const existingForAuth = await readTenantStore(DATA_DIR, resolvedTenant);
       const writer = existingForAuth?.users?.find((u) => u.id === authPayload.userId);
+      const writerUsername =
+        writer?.username
+        ?? (authPayload.role === 'platform' ? authPayload.username : undefined);
       const { assertTenantStoreWriteAllowed } = await import('./server/tenantWritePolicy.mjs');
-      const writePolicy = assertTenantStoreWriteAllowed(writer?.username, resolvedTenant);
+      const writePolicy = assertTenantStoreWriteAllowed(writerUsername, resolvedTenant);
       if (!writePolicy.ok) {
         res.writeHead(writePolicy.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: writePolicy.error }));

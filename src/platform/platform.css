@@ -1,0 +1,145 @@
+.platform-shell {
+  min-height: 100vh;
+  background: var(--surface-1, #f4f6f8);
+  color: var(--text-primary, #1a1a1a);
+  padding: 1.5rem 2rem 3rem;
+}
+
+.platform-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.platform-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.platform-subtitle {
+  margin: 0;
+  color: var(--text-muted, #5c6570);
+  font-size: 0.95rem;
+}
+
+.platform-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.platform-user {
+  font-weight: 600;
+}
+
+.platform-layout {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 360px);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .platform-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-tenant-list,
+.platform-detail {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.platform-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.platform-table th,
+.platform-table td {
+  padding: 0.6rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid #e8ecef;
+}
+
+.platform-row--active {
+  background: #f0f7f4;
+}
+
+.platform-muted {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.platform-warn {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.platform-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.btn-sm {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.platform-stats {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.platform-stats div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.platform-stats dt {
+  color: #6b7280;
+}
+
+.platform-stats dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.platform-user-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+}
+
+.platform-user-list li {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.platform-open-pos {
+  width: 100%;
+}
+
+.platform-detail h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.platform-detail h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+}

@@ -31,17 +31,8 @@ function sha256(text) {
   return createHash('sha256').update(text).digest('hex');
 }
 
-const ownerPassword = process.env.GREENLEAF_OWNER_PASSWORD?.trim();
-if (!ownerPassword) {
-  console.error('HATA: GREENLEAF_OWNER_PASSWORD ortam değişkeni gerekli (kutluhan08 şifresi).');
-  process.exit(1);
-}
-
-const seedUsers = [
-  { username: 'kutluhan08', passwordHash: sha256(ownerPassword) },
-];
-
 const demoAdminPassword = process.env.GREENLEAF_DEMO_ADMIN_PASSWORD?.trim();
+const seedUsers = [];
 if (demoAdminPassword) {
   seedUsers.push({ username: 'yonetici', passwordHash: sha256(demoAdminPassword) });
 } else {
@@ -60,16 +51,11 @@ const raw = JSON.parse(await readFile(storePath, 'utf8'));
 let vault = await readCredentialVault(dataDir, 'main');
 vault = mergeUsersIntoVault(vault, seedUsers);
 
-const ownerRecoveryEmail = process.env.GREENLEAF_OWNER_RECOVERY_EMAIL?.trim().toLowerCase();
-
 const users = (raw.users ?? []).map((u) => {
   const seed = seedUsers.find((s) => s.username === u.username);
   const patch = { ...u, updatedAt: new Date().toISOString() };
   if (seed) patch.passwordHash = seed.passwordHash;
-  if (u.username === 'kutluhan08' && ownerRecoveryEmail?.includes('@')) {
-    patch.recoveryEmail = ownerRecoveryEmail;
-  }
-  if (!seed && u.username !== 'kutluhan08') return u;
+  if (!seed) return u;
   return patch;
 });
 const store = applyVaultToStoreSnapshot({ ...raw, users, updatedAt: new Date().toISOString() }, vault);

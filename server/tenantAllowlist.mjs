@@ -51,6 +51,7 @@ export async function isTenantAllowlisted(tenantId) {
  */
 export async function assertTenantResolvable(dataDir, tenantId) {
   const id = normalizeTenantId(tenantId);
+  if (id === '__platform__') return { ok: true, tenantId: id };
   if (!isStrictTenantAllowlistEnabled()) {
     return { ok: true, tenantId: id };
   }

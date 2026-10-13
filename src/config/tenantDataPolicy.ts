@@ -1,20 +1,11 @@
-import { DEFAULT_TENANT_ID } from '../storage/tenantSession';
-import { isOwnerAdminUsername } from './ownerAdminUsers';
+import { isPlatformOperatorUsername } from './platformOperators';
 
-/** Tüm mağaza tenant verilerini sunucuya yazabilir (platform yöneticisi) */
-export const PLATFORM_TENANT_ADMIN_USERNAMES = new Set(['yonetici']);
-
+/** Tüm kiracı verilerini sunucuya yazabilir (platform operatörü) */
 export function isPlatformTenantAdmin(username: string): boolean {
-  return PLATFORM_TENANT_ADMIN_USERNAMES.has(username.trim().toLowerCase());
+  return isPlatformOperatorUsername(username);
 }
 
 /** Bu kullanıcı sunucuya veri yazabilir mi? (otomatik senkron / Sunucuya Yükle) */
-export function canPushTenantDataToServer(username: string, tenantId: string): boolean {
-  const normalized = username.trim().toLowerCase();
-  const tenant = tenantId.trim() || DEFAULT_TENANT_ID;
-  if (isPlatformTenantAdmin(normalized)) return true;
-  if (isOwnerAdminUsername(normalized)) {
-    return tenant === DEFAULT_TENANT_ID;
-  }
+export function canPushTenantDataToServer(_username: string, _tenantId: string): boolean {
   return true;
 }

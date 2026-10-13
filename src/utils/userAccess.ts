@@ -99,7 +99,10 @@ export function buildAuthSession(
     allowedTabs: resolveUserAllowedTabs(user, settings),
     loggedInAt: new Date().toISOString(),
     mustChangePassword: user.mustChangePassword === true,
-    mustSetRecoveryEmail: !String(user.recoveryEmail ?? '').includes('@'),
+    isPlatformOperator: String(user.id).startsWith('platform:'),
+    mustSetRecoveryEmail:
+      !String(user.id).startsWith('platform:')
+      && !String(user.recoveryEmail ?? '').includes('@'),
   };
 }
 
