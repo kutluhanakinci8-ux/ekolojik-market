@@ -387,6 +387,17 @@ export async function getPlatformSupportExportCsv(dataDir, days) {
   return { csv, filename: `platform-destek-${stamp}.csv` };
 }
 
+export async function getPlatformSettingsOverview(dataDir) {
+  const { buildPlatformSettingsOverview } = await import('./platformSettingsMetrics.mjs');
+  return buildPlatformSettingsOverview(dataDir);
+}
+
+export async function patchPlatformConsoleSettings(dataDir, patch) {
+  const { writeConsoleSettings } = await import('./platformConsoleSettings.mjs');
+  const console = await writeConsoleSettings(dataDir, patch ?? {});
+  return { ok: true, console };
+}
+
 export async function getPlatformInfrastructureOverview(dataDir) {
   const { buildPlatformInfrastructureOverview } = await import('./platformInfrastructureMetrics.mjs');
   return buildPlatformInfrastructureOverview(dataDir);

@@ -700,6 +700,62 @@ export type PlatformSupportPayload = {
   tenants: PlatformSupportTenantRow[];
 };
 
+export type PlatformConsoleSettings = {
+  maintenanceBanner: { enabled: boolean; message: string };
+  operatorNotes: string;
+  defaultTrialDays: number;
+  planMrrTryOverrides: Record<string, number | string>;
+  updatedAt?: string;
+};
+
+export type PlatformSettingsPayload = {
+  generatedAt: string;
+  runtime: {
+    nodeEnv: string;
+    strictTenantAllowlist: boolean;
+    publicRegistrationEnabled: boolean;
+    allowlist: string[];
+    allowlistSource: string;
+    registrationCount: number;
+    platformSessionEpoch: number;
+  };
+  integrations: {
+    mailTrackEnabled: boolean;
+    clickTrackEnabled: boolean;
+    engagementWebhookConfigured: boolean;
+    messagingPublicApiConfigured: boolean;
+    smtpHost: string | null;
+    publicRegisterEnv: string | null;
+    tenantStrictEnv: string | null;
+  };
+  operators: Array<{
+    username: string;
+    displayName: string;
+    recoveryEmailMasked: string | null;
+    updatedAt: string | null;
+  }>;
+  policies: {
+    securityAlerts: {
+      enabled: boolean;
+      emailOps: boolean;
+      webhookConfigured: boolean;
+      cooldownMinutes: number;
+      thresholds: PlatformSecurityAlertPolicy['thresholds'];
+    };
+    supportSla: {
+      firstResponseTargetMinutes: number;
+      staleWaitingHours: number;
+    };
+  };
+  console: PlatformConsoleSettings;
+  planMrrCatalog: Array<{
+    plan: string;
+    defaultMrrTry: number;
+    effectiveMrrTry: number;
+    overridden: boolean;
+  }>;
+};
+
 export type PlatformInfrastructureCheck = {
   id: string;
   label: string;
@@ -893,6 +949,43 @@ export async function downloadPlatformSupportCsv(days?: number): Promise<{ ok: b
     anchor.click();
     URL.revokeObjectURL(url);
     return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function fetchPlatformSettingsOverview(): Promise<{
+  ok: boolean;
+  data?: PlatformSettingsPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/settings', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSettingsPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Yapılandırma yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformSettingsPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function savePlatformConsoleSettings(
+  patch: Partial<PlatformConsoleSettings>,
+): Promise<{ ok: boolean; console?: PlatformConsoleSettings; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/settings', {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = (await res.json()) as { ok?: boolean; console?: PlatformConsoleSettings; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Ayarlar kaydedilemedi' };
+    }
+    return { ok: true, console: data.console };
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };
   }

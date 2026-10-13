@@ -123,6 +123,7 @@ function createInitialStore({
   phone,
   plan,
   productProfile = 'full',
+  trialDays = 14,
 }) {
   const now = new Date().toISOString();
   const userId = `U${Date.now()}`;
@@ -160,7 +161,12 @@ function createInitialStore({
       ...DEFAULT_SETTINGS,
       businessName,
       productProfile: profile,
-      tenantMeta: { email, phone, plan, trialEndsAt: new Date(Date.now() + 14 * 86400000).toISOString() },
+      tenantMeta: {
+        email,
+        phone,
+        plan,
+        trialEndsAt: new Date(Date.now() + Math.max(1, trialDays) * 86400000).toISOString(),
+      },
       postaOnboarding: createPostaOnboardingForProfile(profile, email),
       postaAliases: defaultAliasesForDomain(mailDomain),
       postaMail: {
@@ -242,6 +248,8 @@ export async function registerTenant(dataDir, payload) {
   }
 
   const passwordHash = hashPassword(password);
+  const { getDefaultTrialDays } = await import('./platformConsoleSettings.mjs');
+  const trialDays = await getDefaultTrialDays(dataDir);
   const store = createInitialStore({
     businessName,
     adminName,
@@ -251,6 +259,7 @@ export async function registerTenant(dataDir, payload) {
     phone,
     plan,
     productProfile,
+    trialDays,
   });
 
   await writeTenantStore(dataDir, tenantId, store);

@@ -1045,6 +1045,30 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/settings' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { getPlatformSettingsOverview } = await import('./server/platformApi.mjs');
+          const payload = await getPlatformSettingsOverview(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, ...payload }));
+          return;
+        }
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { patchPlatformConsoleSettings } = await import('./server/platformApi.mjs');
+        const result = await patchPlatformConsoleSettings(DATA_DIR, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ayarlar kaydedilemedi' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/export.csv' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;

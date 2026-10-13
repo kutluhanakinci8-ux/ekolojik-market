@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchPlatformSettingsOverview } from '../services/platformApi';
 import { Navigate } from 'react-router-dom';
 import { useStore } from '../store/StoreProvider';
 import { decodePosApiTokenClaims, loadPosApiToken } from '../services/posApiAuth';
@@ -6,6 +7,7 @@ import { isPlatformApiRole } from '../config/platformOperators';
 import { PlatformAuditTab } from './PlatformAuditTab';
 import { PlatformBillingTab } from './PlatformBillingTab';
 import { PlatformSupportTab } from './PlatformSupportTab';
+import { PlatformSettingsTab } from './PlatformSettingsTab';
 import { PlatformCommsTab } from './PlatformCommsTab';
 import { PlatformOverviewTab } from './PlatformOverviewTab';
 import { PlatformSecurityTab } from './PlatformSecurityTab';
@@ -23,6 +25,7 @@ type PlatformTab =
   | 'security'
   | 'audit'
   | 'comms'
+  | 'settings'
   | 'infrastructure';
 
 export function PlatformApp() {
@@ -31,6 +34,18 @@ export function PlatformApp() {
   const [activeTab, setActiveTab] = useState<PlatformTab>('overview');
   const [usersTabFocus, setUsersTabFocus] = useState<PlatformUsersTabFocus | null>(null);
   const [overviewRefreshTick, setOverviewRefreshTick] = useState(0);
+  const [maintenanceBanner, setMaintenanceBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetchPlatformSettingsOverview().then((result) => {
+      const banner = result.data?.console.maintenanceBanner;
+      if (result.ok && banner?.enabled && String(banner.message ?? '').trim()) {
+        setMaintenanceBanner(String(banner.message).trim());
+      } else {
+        setMaintenanceBanner(null);
+      }
+    });
+  }, [activeTab === 'settings']);
 
   if (!store.authSession || !isPlatformApiRole(claims?.role)) {
     return <Navigate to="/giris" replace />;
@@ -67,6 +82,12 @@ export function PlatformApp() {
           </button>
         </div>
       </header>
+
+      {maintenanceBanner ? (
+        <div className="platform-maintenance-banner" role="status">
+          {maintenanceBanner}
+        </div>
+      ) : null}
 
       <nav className="platform-tabs platform-tabs--premium" aria-label="Platform bölümleri">
         <button
@@ -127,6 +148,13 @@ export function PlatformApp() {
         </button>
         <button
           type="button"
+          className={`platform-tab ${activeTab === 'settings' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          Yapılandırma
+        </button>
+        <button
+          type="button"
           className={`platform-tab ${activeTab === 'infrastructure' ? 'platform-tab--active' : ''}`}
           onClick={() => setActiveTab('infrastructure')}
         >
@@ -134,7 +162,9 @@ export function PlatformApp() {
         </button>
       </nav>
 
-      {activeTab === 'infrastructure' ? (
+      {activeTab === 'settings' ? (
+        <PlatformSettingsTab />
+      ) : activeTab === 'infrastructure' ? (
         <PlatformInfrastructureTab />
       ) : activeTab === 'billing' ? (
         <PlatformBillingTab />

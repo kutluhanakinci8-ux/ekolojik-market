@@ -9,6 +9,7 @@ import {
   todayKey,
 } from './platformTenantMetrics.mjs';
 import { computeLifecycleStatus, readTenantLifecycleOverrides } from './platformTenantLifecycle.mjs';
+import { readConsoleSettings, resolvePlanMrrTry } from './platformConsoleSettings.mjs';
 
 /** Operasyonel tahmin — gerçek faturalandırma entegrasyonu değil */
 export const PLAN_MRR_TRY = {
@@ -26,10 +27,6 @@ function normalizePlan(plan) {
   return raw;
 }
 
-function planMrrTry(plan) {
-  const key = normalizePlan(plan);
-  return PLAN_MRR_TRY[key] ?? 0;
-}
 
 function saleTimestamp(sale) {
   return Date.parse(sale?.createdAt ?? sale?.date ?? '');
@@ -62,6 +59,8 @@ function dateKeyFromMs(ms) {
 }
 
 export async function buildPlatformBillingOverview(dataDir, { days = 30 } = {}) {
+  const consoleSettings = await readConsoleSettings(dataDir);
+  const mrrOverrides = consoleSettings.planMrrTryOverrides ?? {};
   const windowDays = Math.min(90, Math.max(7, Number(days) || 30));
   const now = Date.now();
   const windowStart = now - windowDays * 86400000;
@@ -155,7 +154,10 @@ export async function buildPlatformBillingOverview(dataDir, { days = 30 } = {}) 
       }
     }
 
-    const mrr = status === 'suspended' || status === 'missing_store' ? 0 : planMrrTry(planKey);
+    const mrr =
+      status === 'suspended' || status === 'missing_store'
+        ? 0
+        : resolvePlanMrrTry(planKey, mrrOverrides);
     if (mrr > 0 && (status === 'active' || status === 'trial')) {
       estimatedMrrTry += mrr;
       billableTenants += 1;
@@ -231,8 +233,8 @@ export async function buildPlatformBillingOverview(dataDir, { days = 30 } = {}) 
       .map(([plan, count]) => ({
         plan,
         count,
-        mrrPerTenantTry: planMrrTry(plan),
-        mrrTotalTry: planMrrTry(plan) * count,
+        mrrPerTenantTry: resolvePlanMrrTry(plan, mrrOverrides),
+        mrrTotalTry: resolvePlanMrrTry(plan, mrrOverrides) * count,
       }))
       .sort((a, b) => b.count - a.count),
     revenueByDay: revenueSeries,
