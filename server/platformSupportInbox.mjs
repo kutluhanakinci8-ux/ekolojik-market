@@ -15,7 +15,10 @@ import {
   getPlatformSupportMailAddress,
 } from './platformSupportMailConfig.mjs';
 import { sendViaEkolojikSmtp } from './ekolojikSmtp.mjs';
-import { buildPlatformSupportAutoreplyContent } from './platformSupportAutoreplyTemplate.mjs';
+import {
+  buildPlatformSupportAutoreplyContent,
+  buildPlatformSupportOperatorReplyContent,
+} from './platformSupportAutoreplyTemplate.mjs';
 import { PLATFORM_TENANT_ID } from './platformOperators.mjs';
 import { listMergedRecentOutbox } from './emailOutbox.mjs';
 import { readTenantStore } from './tenantAuth.mjs';
@@ -430,11 +433,15 @@ export async function replyPlatformSupportInbox(dataDir, { messageId, body, oper
   if (!text) return { ok: false, error: 'Yanıt metni gerekli' };
 
   const subject = row.subject?.toLowerCase().startsWith('re:') ? row.subject : `Re: ${row.subject || 'Destek'}`;
-  const signed = `${text}\n\n— ${operatorUsername || 'Ekolojik Platform'}`;
+  const { text: replyText, html: replyHtml } = buildPlatformSupportOperatorReplyContent({
+    body: text,
+    operatorUsername,
+  });
   const result = await sendSupportMail(dataDir, {
     to,
     subject,
-    text: signed,
+    text: replyText,
+    html: replyHtml,
     inReplyTo: row.messageId,
     references: row.references || row.messageId,
   });

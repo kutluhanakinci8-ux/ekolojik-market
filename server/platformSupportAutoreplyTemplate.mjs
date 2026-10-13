@@ -192,3 +192,105 @@ export function buildPlatformSupportAutoreplyContent({ messageId, brandName } = 
     html: formatPlatformSupportAutoreplyHtml(payload),
   };
 }
+
+function appendSupportMailPlainFooter(lines) {
+  const siteBrand = getPlatformSupportMailBrand();
+  const pres = getPlatformSupportMailPresentation();
+  const mail = pres.from || getPlatformSupportMailAddress();
+  lines.push('', `Destek formu: ${siteBrand.contactFormUrl}`, '', mail, siteBrand.site);
+  if (siteBrand.social.length) {
+    lines.push('', 'Sosyal medya:');
+    for (const s of siteBrand.social) {
+      lines.push(`- ${s.label}: ${s.url}`);
+    }
+  }
+  return lines;
+}
+
+function plainTextToHtmlBlocks(text) {
+  const normalized = String(text ?? '').replace(/\r\n/g, '\n').trim();
+  if (!normalized) return '';
+  return normalized
+    .split(/\n{2,}/)
+    .map((block) => {
+      const inner = escapeHtml(block).replace(/\n/g, '<br/>');
+      return `<p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#2d3b2f;">${inner}</p>`;
+    })
+    .join('');
+}
+
+function platformSupportMailShell({ title, headerTitle, headerSubtitle, mainRowsHtml }) {
+  const brandTitle = escapeHtml(headerTitle);
+  const subtitle = escapeHtml(headerSubtitle);
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="light"/>
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef2ef;font-family:'Segoe UI',system-ui,-apple-system,BlinkMacSystemFont,Roboto,Arial,sans-serif;color:#1a2e1a;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2ef;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #d8e2dc;box-shadow:0 12px 40px rgba(27,67,50,0.08);">
+          <tr>
+            <td style="background:linear-gradient(135deg,${BRAND_GREEN} 0%,${BRAND_GREEN_MID} 100%);padding:28px 32px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.85);margin-bottom:6px;">Ekolojik Platform</div>
+                    <div style="font-size:22px;font-weight:700;color:#ffffff;line-height:1.25;">${brandTitle}</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,0.9);margin-top:8px;">${subtitle}</div>
+                  </td>
+                  <td align="right" style="vertical-align:middle;width:48px;">
+                    <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.15);text-align:center;line-height:44px;font-size:22px;">🌿</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          ${mainRowsHtml}
+          ${renderMailFooterHtml()}
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export function formatPlatformSupportOperatorReplyText({ body, operatorUsername }) {
+  const signedBy = operatorUsername || 'Ekolojik Platform';
+  const lines = [String(body ?? '').trim(), '', `— ${signedBy}`];
+  return appendSupportMailPlainFooter(lines).join('\n');
+}
+
+export function formatPlatformSupportOperatorReplyHtml({ body, operatorUsername }) {
+  const pres = getPlatformSupportMailPresentation();
+  const brand = pres.fromName || 'Ekolojik Destek';
+  const signedBy = escapeHtml(operatorUsername || 'Ekolojik Platform');
+  const bodyHtml = plainTextToHtmlBlocks(body);
+  const mainRowsHtml = `
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              ${bodyHtml || '<p style="margin:0;font-size:15px;line-height:1.65;color:#2d3b2f;">&nbsp;</p>'}
+              <p style="margin:8px 0 0;font-size:14px;line-height:1.6;color:#4a5d4e;">— ${signedBy}</p>
+            </td>
+          </tr>`;
+  return platformSupportMailShell({
+    title: 'Destek yanıtı',
+    headerTitle: brand,
+    headerSubtitle: 'Yardım merkezi · Destek yanıtı',
+    mainRowsHtml,
+  });
+}
+
+export function buildPlatformSupportOperatorReplyContent({ body, operatorUsername } = {}) {
+  const payload = { body, operatorUsername };
+  return {
+    text: formatPlatformSupportOperatorReplyText(payload),
+    html: formatPlatformSupportOperatorReplyHtml(payload),
+  };
+}

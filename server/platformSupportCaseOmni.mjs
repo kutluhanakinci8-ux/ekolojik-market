@@ -7,6 +7,7 @@ import { getPlatformCase, appendCaseActivity } from './platformCaseStore.mjs';
 import { replyPlatformSupportInbox } from './platformSupportInbox.mjs';
 import { getPlatformSupportMailPresentation } from './platformSupportMailConfig.mjs';
 import { sendViaEkolojikSmtp } from './ekolojikSmtp.mjs';
+import { buildPlatformSupportOperatorReplyContent } from './platformSupportAutoreplyTemplate.mjs';
 
 const MACROS_PATH = (dataDir) => join(dataDir, 'platform', 'support-macros.json');
 
@@ -84,12 +85,16 @@ async function sendCaseEmail(dataDir, caseRow, text, operatorUsername) {
   const subject = caseRow.subject?.toLowerCase().startsWith('re:')
     ? caseRow.subject
     : `Re: ${caseRow.subject || 'Destek'}`;
-  const signed = `${text}\n\n— ${operatorUsername || 'Ekolojik Platform'}`;
+  const { text: replyText, html: replyHtml } = buildPlatformSupportOperatorReplyContent({
+    body: text,
+    operatorUsername,
+  });
   const result = await sendViaEkolojikSmtp({
     dataDir,
     to,
     subject,
-    text: signed,
+    text: replyText,
+    html: replyHtml,
     fromEmail: presentation.from,
     fromName: presentation.fromName,
     replyTo: presentation.replyTo,
