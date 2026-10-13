@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  createPlatformSupportCaseFromContact,
   createPlatformSupportCaseFromQueue,
   downloadPlatformSupportCsv,
+  fetchPlatformSupportCaseDetail,
   fetchPlatformSupportCases,
+  fetchPlatformSupportContactQueue,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
+  postPlatformSupportCaseAction,
   replyPlatformSupportInbox,
   savePlatformSupportSlaPolicy,
   syncPlatformSupportInbox,
   updatePlatformSupportCase,
   type PlatformSupportCase,
+  type PlatformSupportCaseDetail,
+  type PlatformSupportContactQueueItem,
   type PlatformSupportInboxMessage,
   type PlatformSupportPayload,
   type PlatformSupportSlaPolicy,
@@ -73,6 +79,10 @@ export function PlatformSupportTab() {
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
   const [inboxSyncing, setInboxSyncing] = useState(false);
+  const [caseDetail, setCaseDetail] = useState<PlatformSupportCaseDetail | null>(null);
+  const [replyChannel, setReplyChannel] = useState<'note' | 'email' | 'messaging'>('email');
+  const [actionDraft, setActionDraft] = useState('');
+  const [contactQueue, setContactQueue] = useState<PlatformSupportContactQueueItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,12 +112,33 @@ export function PlatformSupportTab() {
     if (casesRes.ok && casesRes.data) {
       setCaseRows(casesRes.data.cases);
     }
+    const contactRes = await fetchPlatformSupportContactQueue();
+    if (contactRes.ok && contactRes.data) {
+      setContactQueue(contactRes.data.items);
+    }
     setLoading(false);
   }, [windowDays]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!selectedCaseId) {
+      setCaseDetail(null);
+      return;
+    }
+    void (async () => {
+      const res = await fetchPlatformSupportCaseDetail(selectedCaseId);
+      if (res.ok && res.data) {
+        setCaseDetail(res.data);
+        const c = res.data.case;
+        if (c.links?.threadId && c.links?.tenantId) setReplyChannel('messaging');
+        else if (c.links?.inboxMessageId || c.requesterEmail) setReplyChannel('email');
+        else setReplyChannel('note');
+      }
+    })();
+  }, [selectedCaseId]);
 
   const compliancePct = data?.totals.compliancePercent ?? 0;
   const complianceVariant = compliancePct >= 85 ? 'brand' : compliancePct >= 60 ? 'warn' : 'muted';
@@ -172,6 +203,36 @@ export function PlatformSupportTab() {
       return;
     }
     setPolicyMsg('Talep kaydı oluşturuldu');
+    setSection('cases');
+    void load();
+  };
+
+  const sendCaseAction = async () => {
+    if (!selectedCaseId || !actionDraft.trim()) return;
+    const result = await postPlatformSupportCaseAction(selectedCaseId, {
+      channel: replyChannel,
+      body: actionDraft.trim(),
+    });
+    if (!result.ok) {
+      setPolicyMsg(result.error ?? 'Gönderilemedi');
+      return;
+    }
+    setActionDraft('');
+    setPolicyMsg(
+      replyChannel === 'note' ? 'İç not kaydedildi' : replyChannel === 'email' ? 'E-posta gönderildi' : 'Mesaj gönderildi',
+    );
+    void load();
+    const detail = await fetchPlatformSupportCaseDetail(selectedCaseId);
+    if (detail.ok && detail.data) setCaseDetail(detail.data);
+  };
+
+  const openCaseFromContact = async (contactId: string) => {
+    const result = await createPlatformSupportCaseFromContact(contactId);
+    if (!result.ok) {
+      setPolicyMsg(result.error ?? 'Talep oluşturulamadı');
+      return;
+    }
+    setPolicyMsg('İletişim formundan talep oluşturuldu');
     setSection('cases');
     void load();
   };
@@ -272,6 +333,28 @@ export function PlatformSupportTab() {
 
       {section === 'cases' ? (
         <div className="platform-support-inbox-layout">
+          {contactQueue.some((c) => !c.hasCase) ? (
+            <section className="platform-panel platform-support-contact-queue">
+              <h3>İletişim formu kuyruğu</h3>
+              <p className="platform-support-hint">
+                Yeni formlar otomatik talep oluşturur; eski kayıtlar için &quot;Talep&quot; kullanın.
+              </p>
+              <ul className="platform-support-inbox-items">
+                {contactQueue
+                  .filter((c) => !c.hasCase)
+                  .slice(0, 8)
+                  .map((c) => (
+                    <li key={c.id}>
+                      <button type="button" className="platform-support-inbox-item" onClick={() => void openCaseFromContact(c.id)}>
+                        <span className="platform-support-inbox-item-subject">{c.subject}</span>
+                        <span className="platform-support-inbox-item-from">{c.name} · {c.email}</span>
+                        <span className="platform-support-inbox-item-date">{formatDateTime(c.createdAt)}</span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          ) : null}
           <section className="platform-panel">
             <h3>Operasyon kayıtları (Case)</h3>
             <p className="platform-support-hint">
@@ -323,14 +406,75 @@ export function PlatformSupportTab() {
                 <p className="platform-table-muted">
                   {selectedCase.channel} · {selectedCase.requesterEmail ?? selectedCase.requesterName ?? '—'}
                 </p>
+                {caseDetail?.inboxSnippet ? (
+                  <p className="platform-support-hint">Gelen mail: {caseDetail.inboxSnippet.subject}</p>
+                ) : null}
+                {caseDetail?.messagingPreview?.messages?.length ? (
+                  <div className="platform-support-case-thread">
+                    {caseDetail.messagingPreview.messages.map((m) => (
+                      <p key={m.id} className="platform-table-muted">
+                        <strong>{m.direction === 'customer' ? 'Müşteri' : 'Kasa'}:</strong> {m.bodyText.slice(0, 120)}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="platform-support-policy-form">
+                  <PlatformFilterSelect
+                    label="Yanıt kanalı"
+                    icon="role"
+                    value={replyChannel}
+                    onChange={(v) => setReplyChannel(v as typeof replyChannel)}
+                  >
+                    <option value="email">E-posta (destek@)</option>
+                    <option value="messaging">Mesajlaşma</option>
+                    <option value="note">İç not</option>
+                  </PlatformFilterSelect>
+                  {caseDetail?.macros?.length ? (
+                    <PlatformFilterSelect
+                      label="Makro"
+                      icon="status"
+                      value=""
+                      onChange={(v) => {
+                        const macro = caseDetail.macros.find((m) => m.id === v);
+                        if (macro) setActionDraft(macro.body);
+                      }}
+                    >
+                      <option value="">Şablon seç…</option>
+                      {caseDetail.macros.map((m) => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </PlatformFilterSelect>
+                  ) : null}
+                </div>
+                <label className="platform-support-reply-label">
+                  {replyChannel === 'note' ? 'İç not' : 'Yanıt metni'}
+                  <textarea rows={5} value={actionDraft} onChange={(e) => setActionDraft(e.target.value)} />
+                </label>
+                <button type="button" className="btn btn-primary" onClick={() => void sendCaseAction()} disabled={!actionDraft.trim()}>
+                  Gönder
+                </button>
                 <label className="platform-support-reply-label">
                   Zendesk ticket ID
                   <input value={zendeskIdDraft} onChange={(e) => setZendeskIdDraft(e.target.value)} placeholder="örn. 12345" />
                 </label>
-                <button type="button" className="btn btn-primary" onClick={() => void saveCaseZendesk()}>
-                  Kaydet & açık yap
+                <button type="button" className="btn btn-secondary" onClick={() => void saveCaseZendesk()}>
+                  Zendesk kaydet
                 </button>
-                {selectedCase.notes ? <p className="platform-support-inbox-body">{selectedCase.notes}</p> : null}
+                {caseDetail?.case.activity?.length ? (
+                  <div className="platform-support-case-activity">
+                    <h4>Aktivite</h4>
+                    <ul>
+                      {caseDetail.case.activity.slice(0, 12).map((a) => (
+                        <li key={a.id}>
+                          <span className="platform-table-muted">{formatDateTime(a.createdAt)} · {a.type}</span>
+                          <p>{a.body.slice(0, 200)}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : selectedCase.notes ? (
+                  <p className="platform-support-inbox-body">{selectedCase.notes}</p>
+                ) : null}
               </>
             ) : (
               <p className="platform-support-hint">Soldan bir kayıt seçin.</p>
