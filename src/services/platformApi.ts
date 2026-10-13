@@ -640,9 +640,12 @@ export type PlatformBillingPayload = {
   tenants: PlatformBillingTenantRow[];
 };
 
+export type ClosedCaseInboundMode = 'reopen' | 'keep_closed' | 'new_case';
+
 export type PlatformSupportSlaPolicy = {
   firstResponseTargetMinutes: number;
   staleWaitingHours: number;
+  closedCaseInbound?: ClosedCaseInboundMode;
   windowDaysDefault?: number;
   updatedAt?: string;
 };
@@ -679,7 +682,7 @@ export type PlatformSupportTenantRow = {
 export type PlatformSupportPayload = {
   generatedAt: string;
   windowDays: number;
-  policy: Pick<PlatformSupportSlaPolicy, 'firstResponseTargetMinutes' | 'staleWaitingHours'>;
+  policy: Pick<PlatformSupportSlaPolicy, 'firstResponseTargetMinutes' | 'staleWaitingHours' | 'closedCaseInbound'>;
   capabilities: {
     messagingPublicConfigured: boolean;
     supportMailboxConfigured?: boolean;
@@ -1115,6 +1118,24 @@ export type PlatformSupportCaseDetail = {
     snippet: string;
     receivedAt: string;
   } | null;
+  emailPreview: {
+    rootInboxId: string;
+    plusAddress: string | null;
+    messages: Array<{
+      id: string;
+      from: string;
+      subject: string;
+      bodyText: string;
+      receivedAt: string;
+      isReply: boolean;
+    }>;
+    outboundEvents: Array<{
+      at: string;
+      kind: string;
+      messageId: string | null;
+      inboxMessageId: string | null;
+    }>;
+  } | null;
   macros: Array<{ id: string; label: string; body: string }>;
 };
 
@@ -1203,6 +1224,7 @@ export async function fetchPlatformSupportCaseDetail(
         case: data.case,
         messagingPreview: data.messagingPreview ?? null,
         inboxSnippet: data.inboxSnippet ?? null,
+        emailPreview: data.emailPreview ?? null,
         macros: data.macros ?? [],
       },
     };

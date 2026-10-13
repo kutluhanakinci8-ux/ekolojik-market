@@ -46,9 +46,14 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
   }
 
   let inboxSnippet = null;
+  let emailPreview = null;
   if (caseRow.links?.inboxMessageId) {
-    const { getPlatformSupportInboxMessage } = await import('./platformSupportInbox.mjs');
-    const msg = await getPlatformSupportInboxMessage(dataDir, caseRow.links.inboxMessageId);
+    const { getPlatformSupportInboxMessage, listSupportInboxThreadMessages } = await import(
+      './platformSupportInbox.mjs',
+    );
+    const rootId = caseRow.links.inboxMessageId;
+    const thread = await listSupportInboxThreadMessages(dataDir, rootId);
+    const msg = thread[0] ?? await getPlatformSupportInboxMessage(dataDir, rootId);
     if (msg) {
       inboxSnippet = {
         id: msg.id,
@@ -58,6 +63,26 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
         receivedAt: msg.receivedAt,
       };
     }
+    const { supportPlusAddressForCase } = await import('./platformSupportEmailCaseRef.mjs');
+    const outboundEvents = caseRow.links?.emailThread?.events ?? [];
+    emailPreview = {
+      rootInboxId: rootId,
+      plusAddress: supportPlusAddressForCase(caseRow.number),
+      messages: thread.map((m) => ({
+        id: m.id,
+        from: m.from,
+        subject: m.subject,
+        bodyText: String(m.bodyText ?? m.snippet ?? '').slice(0, 4000),
+        receivedAt: m.receivedAt,
+        isReply: Boolean(m.threadRootId && m.threadRootId !== m.id),
+      })),
+      outboundEvents: outboundEvents.slice(0, 20).map((e) => ({
+        at: e.at,
+        kind: e.kind,
+        messageId: e.messageId ?? null,
+        inboxMessageId: e.inboxMessageId ?? null,
+      })),
+    };
   }
 
   return {
@@ -65,6 +90,7 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
     case: caseRow,
     messagingPreview,
     inboxSnippet,
+    emailPreview,
     macros: await listPlatformSupportMacros(dataDir),
   };
 }

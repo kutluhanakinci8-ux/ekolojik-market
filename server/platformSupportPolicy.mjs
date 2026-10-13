@@ -3,10 +3,14 @@ import { join } from 'node:path';
 
 const POLICY_PATH = (dataDir) => join(dataDir, 'platform', 'support-sla.json');
 
+export const CLOSED_CASE_INBOUND_MODES = ['reopen', 'keep_closed', 'new_case'];
+
 export const DEFAULT_SUPPORT_SLA_POLICY = {
   firstResponseTargetMinutes: 240,
   staleWaitingHours: 24,
   windowDaysDefault: 14,
+  /** Kapalı/çözüldü kayda gelen e-posta: reopen | keep_closed | new_case */
+  closedCaseInbound: 'reopen',
 };
 
 export async function readSupportSlaPolicy(dataDir) {
