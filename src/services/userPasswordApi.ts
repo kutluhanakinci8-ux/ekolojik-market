@@ -31,12 +31,15 @@ export async function patchUserPassword(
   }
 }
 
-export async function requestPasswordResetEmail(username: string): Promise<{ ok: boolean; message: string }> {
+export async function requestPasswordResetEmail(
+  username: string,
+  email: string,
+): Promise<{ ok: boolean; message: string }> {
   try {
     const res = await fetch(`/api/auth/password-reset-request${tenantQuery()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ username: username.trim() }),
+      body: JSON.stringify({ username: username.trim(), email: email.trim() }),
     });
     const data = (await res.json()) as { ok?: boolean; message?: string };
     return {

@@ -60,10 +60,17 @@ const raw = JSON.parse(await readFile(storePath, 'utf8'));
 let vault = await readCredentialVault(dataDir, 'main');
 vault = mergeUsersIntoVault(vault, seedUsers);
 
+const ownerRecoveryEmail = process.env.GREENLEAF_OWNER_RECOVERY_EMAIL?.trim().toLowerCase();
+
 const users = (raw.users ?? []).map((u) => {
   const seed = seedUsers.find((s) => s.username === u.username);
-  if (!seed) return u;
-  return { ...u, passwordHash: seed.passwordHash, updatedAt: new Date().toISOString() };
+  const patch = { ...u, updatedAt: new Date().toISOString() };
+  if (seed) patch.passwordHash = seed.passwordHash;
+  if (u.username === 'kutluhan08' && ownerRecoveryEmail?.includes('@')) {
+    patch.recoveryEmail = ownerRecoveryEmail;
+  }
+  if (!seed && u.username !== 'kutluhan08') return u;
+  return patch;
 });
 const store = applyVaultToStoreSnapshot({ ...raw, users, updatedAt: new Date().toISOString() }, vault);
 

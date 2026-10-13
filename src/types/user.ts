@@ -17,6 +17,8 @@ export interface PosUser {
   pinHash?: string;
   totpSecret?: string;
   totpEnabled?: boolean;
+  /** Şifre sıfırlama — bildirim@ üzerinden bu adrese gönderilir */
+  recoveryEmail?: string;
 }
 
 export interface AuthSession {

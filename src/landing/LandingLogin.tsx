@@ -48,6 +48,8 @@ export function LandingLogin() {
   const [busy, setBusy] = useState(false);
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset')?.trim() ?? '');
   const [newPasswordReset, setNewPasswordReset] = useState('');
+  const [resetRequestEmail, setResetRequestEmail] = useState('');
+  const [forgotMode, setForgotMode] = useState(false);
   const ownerLogin = isOwnerAdminUsername(username);
 
   useEffect(() => {
@@ -134,13 +136,18 @@ export function LandingLogin() {
 
   const handleForgotPassword = async () => {
     const loginUser = username.trim();
+    const email = resetRequestEmail.trim();
     if (!loginUser) {
-      setError('Şifre sıfırlama için önce kullanıcı adınızı girin.');
+      setError('Şifre sıfırlama için kullanıcı adınızı girin.');
+      return;
+    }
+    if (!email.includes('@')) {
+      setError('Yönetici tarafından kayıtlı şifre sıfırlama e-postanızı girin.');
       return;
     }
     setBusy(true);
     setError(null);
-    const result = await requestPasswordResetEmail(loginUser);
+    const result = await requestPasswordResetEmail(loginUser, email);
     setBusy(false);
     if (result.ok) {
       setSuccess(result.message);
@@ -275,6 +282,23 @@ export function LandingLogin() {
               />
             )}
 
+            {forgotMode && !pendingTotpUserId && (
+              <label>
+                Şifre sıfırlama e-postası
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={resetRequestEmail}
+                  onChange={(e) => setResetRequestEmail(e.target.value)}
+                  placeholder="kayitli@eposta.com"
+                  required
+                />
+                <small className="login-field-hint">
+                  Bağlantı <strong>bildirim@ekolojikmarket.com.tr</strong> adresinden gönderilir (Ayarlar’da kayıtlı e-postanız).
+                </small>
+              </label>
+            )}
+
             {store.syncStatus === 'loading' && (
               <p className="login-sync-hint">Veriler sunucudan yükleniyor...</p>
             )}
@@ -295,8 +319,20 @@ export function LandingLogin() {
                 <button type="button" className="btn btn-text" onClick={() => setMode('pin')}>
                   PIN ile giriş (kasiyer)
                 </button>
-                <button type="button" className="btn btn-text" onClick={() => void handleForgotPassword()}>
-                  Şifremi unuttum
+                <button
+                  type="button"
+                  className="btn btn-text"
+                  onClick={() => {
+                    if (forgotMode) {
+                      void handleForgotPassword();
+                    } else {
+                      setForgotMode(true);
+                      setError(null);
+                      setSuccess(null);
+                    }
+                  }}
+                >
+                  {forgotMode ? 'Sıfırlama bağlantısı gönder' : 'Şifremi unuttum'}
                 </button>
               </>
             )}

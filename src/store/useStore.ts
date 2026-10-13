@@ -608,6 +608,9 @@ function normalizeUser(raw: Record<string, unknown>): PosUser {
     pinHash: typeof raw.pinHash === 'string' ? raw.pinHash : undefined,
     totpSecret: typeof raw.totpSecret === 'string' ? raw.totpSecret : undefined,
     totpEnabled: raw.totpEnabled === true,
+    recoveryEmail: typeof raw.recoveryEmail === 'string' && raw.recoveryEmail.includes('@')
+      ? raw.recoveryEmail.trim().toLowerCase()
+      : undefined,
   };
 
   return user;
@@ -3953,6 +3956,7 @@ export function usePosStoreState() {
     displayName: string;
     username: string;
     password: string;
+    recoveryEmail?: string;
     role: UserRole;
     allowedTabs: AppPage[];
     isActive: boolean;
@@ -3963,11 +3967,13 @@ export function usePosStoreState() {
     if (data.pin && !isValidPin(data.pin)) return 'PIN 6 haneli olmalıdır.';
 
     const now = new Date().toISOString();
+    const recoveryEmail = data.recoveryEmail?.trim().toLowerCase();
     const user: PosUser = {
       id: `U${Date.now()}`,
       username: data.username.trim().toLowerCase(),
       displayName: data.displayName.trim(),
       passwordHash: '',
+      recoveryEmail: recoveryEmail?.includes('@') ? recoveryEmail : undefined,
       role: data.role,
       allowedTabs: data.role === 'admin' ? ALL_APP_PAGES : data.allowedTabs,
       isActive: data.isActive,
@@ -4008,6 +4014,7 @@ export function usePosStoreState() {
       displayName: string;
       username: string;
       password?: string;
+      recoveryEmail?: string;
       role: UserRole;
       allowedTabs: AppPage[];
       isActive: boolean;
@@ -4056,11 +4063,13 @@ export function usePosStoreState() {
     } else if (data.pin) {
       pinHash = hashPin(data.pin);
     }
+    const recoveryEmail = data.recoveryEmail?.trim().toLowerCase();
     const updated: PosUser = {
       ...existing,
       username: data.username.trim().toLowerCase(),
       displayName: data.displayName.trim(),
       passwordHash: '',
+      recoveryEmail: recoveryEmail?.includes('@') ? recoveryEmail : undefined,
       pinHash,
       role: data.role,
       allowedTabs: data.role === 'admin' ? ALL_APP_PAGES : data.allowedTabs,

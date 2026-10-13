@@ -118,19 +118,31 @@ export async function handlePatchUserPassword(
   return { ok: true, user: publicUser };
 }
 
-export async function handlePasswordResetRequest(dataDir, tenantId, { username }, notifyEmail) {
+export async function handlePasswordResetRequest(dataDir, tenantId, { username, email }) {
   const normalized = String(username ?? '').trim().toLowerCase();
+  const { normalizeRecoveryEmail, sendPasswordResetEmail } = await import('./passwordResetMail.mjs');
+  const requestedEmail = normalizeRecoveryEmail(email);
   if (!normalized) {
     return { ok: false, status: 400, message: 'Kullanıcı adı gerekli' };
   }
+  if (!requestedEmail) {
+    return { ok: false, status: 400, message: 'Kayıtlı şifre sıfırlama e-postanızı girin' };
+  }
+
+  const genericOk = {
+    ok: true,
+    message: 'Talep alındı. Bilgiler doğruysa şifre sıfırlama bağlantısı e-postanıza gönderildi.',
+  };
+
   const { store } = await hydrateStoreWithCredentialVault(
     dataDir,
     tenantId,
     await readTenantStore(dataDir, tenantId),
   );
   const user = store?.users?.find((u) => u.username === normalized && u.isActive !== false);
-  if (!user) {
-    return { ok: true, message: 'Talep alındı. Kayıtlıysanız e-posta gönderilecektir.' };
+  const registeredEmail = normalizeRecoveryEmail(user?.recoveryEmail);
+  if (!user || !registeredEmail || registeredEmail !== requestedEmail) {
+    return genericOk;
   }
 
   const token = randomBytes(32).toString('base64url');
@@ -144,22 +156,17 @@ export async function handlePasswordResetRequest(dataDir, tenantId, { username }
   const baseUrl = process.env.EKOLOJIK_PUBLIC_BASE_URL?.trim() || 'https://www.ekolojikmarket.com.tr';
   const link = `${baseUrl}/giris?reset=${encodeURIComponent(token)}`;
 
-  const to = notifyEmail?.trim();
-  if (!to) {
-    return { ok: false, status: 503, message: 'Şifre sıfırlama e-postası yapılandırılmadı' };
-  }
-
-  const { sendCrmEmail } = await import('./crmOutreach.mjs');
-  const mail = await sendCrmEmail(dataDir, {
-    to,
-    subject: 'EkoPos şifre sıfırlama',
-    body: `Merhaba,\n\n${user.displayName || user.username} hesabı için şifre sıfırlama talebi alındı.\n\nBağlantı (1 saat geçerli):\n${link}\n\nBu talebi siz yapmadıysanız bu e-postayı yok sayın.\n`,
-    tenantId,
+  const mail = await sendPasswordResetEmail(dataDir, tenantId, {
+    to: registeredEmail,
+    displayName: user.displayName,
+    username: user.username,
+    resetLink: link,
+    expiresMinutes: 60,
   });
   if (!mail.ok) {
-    return { ok: false, status: 502, message: mail.error || 'E-posta gönderilemedi' };
+    return { ok: false, status: 502, message: mail.error || 'E-posta gönderilemedi (SMTP kontrol edin)' };
   }
-  return { ok: true, message: 'Şifre sıfırlama bağlantısı e-posta ile gönderildi' };
+  return genericOk;
 }
 
 export async function handlePasswordResetConfirm(dataDir, tenantId, { token, newPassword }) {

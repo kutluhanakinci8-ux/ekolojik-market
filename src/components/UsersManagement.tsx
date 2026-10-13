@@ -14,6 +14,7 @@ interface UsersManagementProps {
 interface UserFormState {
   displayName: string;
   username: string;
+  recoveryEmail: string;
   password: string;
   pin: string;
   clearPin: boolean;
@@ -25,6 +26,7 @@ interface UserFormState {
 const EMPTY_FORM: UserFormState = {
   displayName: '',
   username: '',
+  recoveryEmail: '',
   password: '',
   pin: '',
   clearPin: false,
@@ -72,6 +74,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
     setForm({
       displayName: user.displayName,
       username: user.username,
+      recoveryEmail: user.recoveryEmail ?? '',
       password: '',
       pin: '',
       clearPin: false,
@@ -111,6 +114,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
         const result = await store.updateUser(editingId, {
           displayName: form.displayName,
           username: form.username,
+          recoveryEmail: form.recoveryEmail.trim() || undefined,
           password: form.password || undefined,
           pin: form.pin || undefined,
           clearPin: form.clearPin,
@@ -127,6 +131,7 @@ export function UsersManagement({ store }: UsersManagementProps) {
         const result = await store.addUser({
           displayName: form.displayName,
           username: form.username,
+          recoveryEmail: form.recoveryEmail.trim() || undefined,
           password: form.password,
           pin: form.pin || undefined,
           role: form.role,
@@ -203,6 +208,16 @@ export function UsersManagement({ store }: UsersManagementProps) {
                 value={form.username}
                 onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value.toLowerCase() }))}
                 autoComplete="off"
+              />
+            </label>
+            <label className="settings-field">
+              <span>Şifre sıfırlama e-postası</span>
+              <input
+                type="email"
+                value={form.recoveryEmail}
+                onChange={(e) => setForm((prev) => ({ ...prev, recoveryEmail: e.target.value }))}
+                autoComplete="email"
+                placeholder="bildirim ile gönderilir"
               />
             </label>
             <label className="settings-field">

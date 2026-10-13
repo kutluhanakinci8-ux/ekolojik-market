@@ -808,11 +808,9 @@ const server = createServer(async (req, res) => {
         return;
       }
       const data = await readRequestBody(req);
-      const notifyEmail = process.env.GREENLEAF_PASSWORD_RESET_EMAIL?.trim()
-        || process.env.EKOLOJIK_OPS_EMAIL?.trim();
       try {
         const { handlePasswordResetRequest } = await import('./server/userPasswordApi.mjs');
-        const result = await handlePasswordResetRequest(DATA_DIR, resolvedTenant, data, notifyEmail);
+        const result = await handlePasswordResetRequest(DATA_DIR, resolvedTenant, data);
         res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
