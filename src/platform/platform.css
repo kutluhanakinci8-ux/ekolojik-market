@@ -1325,6 +1325,204 @@
   padding: 2rem;
 }
 
+/* —— Güvenlik sekmesi —— */
+
+.platform-security-hero .platform-security-grade-wrap {
+  position: relative;
+  text-align: center;
+}
+
+.platform-security-grade {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -58%);
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  pointer-events: none;
+}
+
+.platform-security-grade-wrap .platform-users-hero-stat-label {
+  margin-top: 0.25rem;
+}
+
+.platform-security-rec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.platform-security-rec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--pu-border);
+  background: #fafbfc;
+}
+
+.platform-security-rec--high {
+  border-left: 4px solid #dc2626;
+  background: linear-gradient(90deg, #fef2f2 0%, #fafbfc 40%);
+}
+
+.platform-security-rec--medium {
+  border-left: 4px solid #d97706;
+}
+
+.platform-security-rec--low {
+  border-left: 4px solid #64748b;
+}
+
+.platform-security-rec-main {
+  display: flex;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 12rem;
+}
+
+.platform-security-rec-priority {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  height: fit-content;
+}
+
+.platform-security-rec-priority--high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.platform-security-rec-priority--medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.platform-security-rec-priority--low {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.platform-security-rec-title {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.platform-security-rec-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.platform-security-rec-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.platform-security-rec-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 2rem;
+  text-align: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.platform-security-rec-btn {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.platform-security-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  height: 140px;
+  padding: 0.5rem 0 0;
+}
+
+.platform-security-trend-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.platform-security-trend-bar {
+  width: 100%;
+  max-width: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  border-radius: 6px 6px 2px 2px;
+  overflow: hidden;
+  background: #f1f5f9;
+  min-height: 4px;
+}
+
+.platform-security-trend-ok {
+  background: #10b981;
+  min-height: 2px;
+}
+
+.platform-security-trend-fail {
+  background: #f87171;
+  min-height: 2px;
+}
+
+.platform-security-trend-label {
+  font-size: 0.62rem;
+  color: var(--pu-muted);
+  margin-top: 0.35rem;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.platform-security-mini-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 8px;
+  font-weight: 700;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.platform-security-mini-score.is-warn {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.platform-security-ip {
+  font-size: 0.82rem;
+  background: #f1f5f9;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+}
+
+.platform-security-empty-hint {
+  margin: 0;
+  padding: 0.5rem 0;
+}
+
 @media (max-width: 720px) {
   .platform-users-hero--premium {
     padding: 1rem;
