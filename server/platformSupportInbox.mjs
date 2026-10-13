@@ -331,6 +331,7 @@ export async function importSupportInboxFromImap(
       outboundMessageIds: [],
       from: repairUtf8Mojibake(msg.from ?? ''),
       to: repairUtf8Mojibake(msg.to ?? ''),
+      deliveredTo: repairUtf8Mojibake(msg.deliveredTo ?? ''),
       subject: repairUtf8Mojibake(msg.subject ?? ''),
       receivedAt: msg.receivedAt ?? new Date().toISOString(),
       snippet: repairUtf8Mojibake(parsed.snippet || msg.snippet || ''),
