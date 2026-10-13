@@ -546,6 +546,96 @@ export async function fetchPlatformSecurityOverview(): Promise<{
   }
 }
 
+export type PlatformInfrastructureCheck = {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+};
+
+export type PlatformInfrastructurePayload = {
+  generatedAt: string;
+  score: number;
+  runtime: {
+    nodeVersion: string;
+    nodeEnv: string;
+    port: number;
+    uptimeSec: number;
+    dataDir: string;
+    appVersion: string;
+    deployRef: string | null;
+    platformSessionEpoch: number;
+  };
+  mail: {
+    smtpConfigured: boolean;
+    smtpHost: string | null;
+    smtpPort: number;
+    from: string | null;
+    opsEmail: string | null;
+    smtpHostHint: string | null;
+    imapConfigured: boolean;
+    imapHost: string | null;
+    imapUser: string | null;
+    lertaBridge: boolean;
+  };
+  outbox: {
+    counts: { pending: number; sent: number; failed: number };
+    byTenant: Array<{ tenantId: string; pending: number; sent: number; failed: number }>;
+    failedAlertThreshold: number;
+  };
+  isolation: {
+    ok: boolean;
+    checks: PlatformInfrastructureCheck[];
+    dataPaths: string[];
+    envHints: string[];
+  };
+  storage: Array<{ name: string; path: string; sizeBytes: number | null }>;
+  backup: {
+    backupRoot: string;
+    count: number;
+    latest: { name: string; at: string; sizeBytes: number } | null;
+    unreadable?: boolean;
+  };
+  cronJobs: Array<{ id: string; path: string; installed: boolean; sample: string }>;
+  retention: { outboxDays: number; messagingDays: number; contactDays: number };
+};
+
+export async function fetchPlatformInfrastructureOverview(): Promise<{
+  ok: boolean;
+  data?: PlatformInfrastructurePayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/infrastructure', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformInfrastructurePayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Altyapı özeti yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformInfrastructurePayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function runPlatformInfrastructureProbe(): Promise<{
+  ok: boolean;
+  probes?: {
+    smtp?: { ok: boolean; error?: string | null };
+    imap?: { ok: boolean; error?: string | null; message?: string | null };
+  };
+  error?: string;
+}> {
+  const result = await platformSecurityPost<{
+    probes?: {
+      smtp?: { ok: boolean; error?: string | null };
+      imap?: { ok: boolean; error?: string | null; message?: string | null };
+    };
+  }>('/api/platform/infrastructure/probe', {});
+  if (!result.ok) return result;
+  return { ok: true, probes: result.data?.probes };
+}
+
 export async function fetchPlatformTenantsLifecycle(): Promise<{
   ok: boolean;
   data?: PlatformTenantLifecyclePayload;

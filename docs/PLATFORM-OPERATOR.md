@@ -18,6 +18,7 @@
 4. **POS aç** — seçilen kiracı için tam POS (`/app`)
 5. **Kullanıcı işlemleri** sekmesi — toplam/aktif/terk, uyuyan hesaplar, 2FA ve e-posta kapsamı, mağaza özeti, filtreli kullanıcı dizini, son giriş akışı (`GET /api/platform/users`)
 6. **Kiracılar** sekmesi — plan/deneme, askıya alma, salt okunur mod, operasyon notları (`GET /api/platform/tenants/lifecycle`, `PUT /api/platform/tenants/:id/lifecycle`)
+7. **Altyapı** sekmesi — izolasyon kontrolleri, outbox, depolama, yedek/cron, SMTP/IMAP canlı test (`GET /api/platform/infrastructure`, `POST /api/platform/infrastructure/probe`)
 
 API: `GET /api/platform/alerts`, `GET /api/platform/calendar?year=&month=`, `GET /api/platform/users`, `GET /api/platform/tenants/lifecycle`
 

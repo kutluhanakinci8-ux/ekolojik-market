@@ -933,6 +933,40 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/infrastructure' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformInfrastructureOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformInfrastructureOverview(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Altyapı verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/infrastructure/probe' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = await readRequestBody(req);
+        const { platformInfrastructureProbe } = await import('./server/platformApi.mjs');
+        const result = await platformInfrastructureProbe(DATA_DIR, {
+          smtp: body?.smtp !== false,
+          imap: body?.imap !== false,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Probe başarısız' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/tenants/lifecycle' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;

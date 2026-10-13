@@ -6,11 +6,12 @@ import { isPlatformApiRole } from '../config/platformOperators';
 import { PlatformCommsTab } from './PlatformCommsTab';
 import { PlatformOverviewTab } from './PlatformOverviewTab';
 import { PlatformSecurityTab } from './PlatformSecurityTab';
+import { PlatformInfrastructureTab } from './PlatformInfrastructureTab';
 import { PlatformTenantsTab } from './PlatformTenantsTab';
 import { PlatformUsersTab, type PlatformUsersTabFocus } from './PlatformUsersTab';
 import './platform.css';
 
-type PlatformTab = 'overview' | 'tenants' | 'users' | 'security' | 'comms';
+type PlatformTab = 'overview' | 'tenants' | 'users' | 'security' | 'comms' | 'infrastructure';
 
 export function PlatformApp() {
   const store = useStore();
@@ -91,9 +92,18 @@ export function PlatformApp() {
         >
           Posta & mesaj
         </button>
+        <button
+          type="button"
+          className={`platform-tab ${activeTab === 'infrastructure' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('infrastructure')}
+        >
+          Altyapı
+        </button>
       </nav>
 
-      {activeTab === 'comms' ? (
+      {activeTab === 'infrastructure' ? (
+        <PlatformInfrastructureTab />
+      ) : activeTab === 'comms' ? (
         <PlatformCommsTab />
       ) : activeTab === 'tenants' ? (
         <PlatformTenantsTab />

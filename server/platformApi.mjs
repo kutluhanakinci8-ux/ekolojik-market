@@ -342,6 +342,16 @@ export async function getPlatformSecurityExportCsv(dataDir, days = 90) {
   return { csv, filename: `platform-guvenlik-${stamp}.csv` };
 }
 
+export async function getPlatformInfrastructureOverview(dataDir) {
+  const { buildPlatformInfrastructureOverview } = await import('./platformInfrastructureMetrics.mjs');
+  return buildPlatformInfrastructureOverview(dataDir);
+}
+
+export async function platformInfrastructureProbe(dataDir, options = {}) {
+  const { runInfrastructureProbes } = await import('./platformInfrastructureMetrics.mjs');
+  return runInfrastructureProbes(dataDir, options);
+}
+
 export async function getPlatformTenantsLifecycle(dataDir) {
   const { buildPlatformTenantsLifecycle } = await import('./platformTenantLifecycle.mjs');
   return buildPlatformTenantsLifecycle(dataDir);
