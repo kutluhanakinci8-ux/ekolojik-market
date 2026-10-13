@@ -125,10 +125,15 @@ echo "==> Mağaza sahibi tam yetki (kutluhan*)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/ensure-owner-admin-on-server.mjs" || true
 
 if [[ -f "${INSTALL_DIR}/.env" ]]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "${INSTALL_DIR}/.env"
-  set +a
+  while IFS= read -r line; do
+    case "$line" in
+      GREENLEAF_*=*)
+        key="${line%%=*}"
+        val="${line#*=}"
+        export "${key}=${val}"
+        ;;
+    esac
+  done < "${INSTALL_DIR}/.env"
 fi
 if [[ -n "${GREENLEAF_OWNER_PASSWORD:-}" ]]; then
   echo "==> Kimlik kasası (credential vault) — GREENLEAF_OWNER_PASSWORD ile..."
