@@ -21,6 +21,7 @@ import {
   type PlatformSupportSlaPolicy,
 } from '../services/platformApi';
 import { KpiIcon, PlatformFilterSelect, RingProgress } from './platformUserUi';
+import { PlatformSupportTenant360 } from './PlatformSupportTenant360';
 
 const KIND_LABELS: Record<string, string> = {
   first_response: 'İlk yanıt bekliyor',
@@ -83,6 +84,7 @@ export function PlatformSupportTab() {
   const [replyChannel, setReplyChannel] = useState<'note' | 'email' | 'messaging'>('email');
   const [actionDraft, setActionDraft] = useState('');
   const [contactQueue, setContactQueue] = useState<PlatformSupportContactQueueItem[]>([]);
+  const [contextTenantId, setContextTenantId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,6 +124,12 @@ export function PlatformSupportTab() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const c = caseRows.find((row) => row.id === selectedCaseId);
+    const tid = c?.tenantId ?? c?.links?.tenantId ?? null;
+    if (tid) setContextTenantId(tid);
+  }, [selectedCaseId, caseRows]);
 
   useEffect(() => {
     if (!selectedCaseId) {
@@ -332,7 +340,8 @@ export function PlatformSupportTab() {
       {policyMsg ? <p className="platform-inline-msg">{policyMsg}</p> : null}
 
       {section === 'cases' ? (
-        <div className="platform-support-inbox-layout">
+        <div className="platform-support-command-layout">
+        <div className="platform-support-inbox-layout platform-support-command-main">
           {contactQueue.some((c) => !c.hasCase) ? (
             <section className="platform-panel platform-support-contact-queue">
               <h3>İletişim formu kuyruğu</h3>
@@ -391,7 +400,19 @@ export function PlatformSupportTab() {
                       <td>{c.kind}</td>
                       <td>{c.status}</td>
                       <td>{c.subject}</td>
-                      <td>{c.businessName ?? c.tenantId ?? '—'}</td>
+                      <td>
+                        {c.tenantId ? (
+                          <button
+                            type="button"
+                            className="btn btn-text"
+                            onClick={() => setContextTenantId(c.tenantId!)}
+                          >
+                            {c.businessName ?? c.tenantId}
+                          </button>
+                        ) : (
+                          c.businessName ?? '—'
+                        )}
+                      </td>
                       <td>{c.externalTicketRef?.id ?? '—'}</td>
                     </tr>
                   ))
@@ -481,6 +502,8 @@ export function PlatformSupportTab() {
             )}
           </section>
         </div>
+        <PlatformSupportTenant360 tenantId={contextTenantId} onMessage={setPolicyMsg} />
+        </div>
       ) : null}
 
       {section === 'inbox' ? (
@@ -543,7 +566,8 @@ export function PlatformSupportTab() {
       ) : null}
 
       {section === 'queue' ? (
-        <>
+        <div className="platform-support-command-layout">
+        <div className="platform-support-command-main">
       <div className="platform-users-kpi-grid">
         <article className="platform-users-kpi platform-users-kpi--accent">
           <KpiIcon name="users" />
@@ -664,7 +688,13 @@ export function PlatformSupportTab() {
                       <span className="platform-table-muted">{KIND_LABELS[q.kind] ?? q.kind}</span>
                     </td>
                     <td>
-                      <span className="platform-table-primary">{q.businessName}</span>
+                      <button
+                        type="button"
+                        className="btn btn-text platform-table-primary"
+                        onClick={() => setContextTenantId(q.tenantId)}
+                      >
+                        {q.businessName}
+                      </button>
                       <span className="platform-table-muted">{q.tenantId}</span>
                     </td>
                     <td>
@@ -722,7 +752,9 @@ export function PlatformSupportTab() {
           </tbody>
         </table>
       </section>
-        </>
+        </div>
+        <PlatformSupportTenant360 tenantId={contextTenantId} onMessage={setPolicyMsg} />
+        </div>
       ) : null}
     </div>
   );

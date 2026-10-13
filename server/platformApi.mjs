@@ -499,6 +499,19 @@ export async function createPlatformSupportCaseFromContact(dataDir, contactId, o
   return createCaseFromContactMessage(dataDir, contactId, operatorUsername);
 }
 
+export async function getPlatformSupportTenant360(dataDir, tenantId) {
+  const { buildPlatformSupportTenant360 } = await import('./platformSupportTenant360.mjs');
+  return buildPlatformSupportTenant360(dataDir, tenantId);
+}
+
+export async function postPlatformSupportCommand(dataDir, body, operatorUsername) {
+  const { runPlatformSupportCommand, listPlatformSupportCommands } = await import('./platformSupportCommands.mjs');
+  if (body?.list === true) {
+    return { ok: true, commands: listPlatformSupportCommands() };
+  }
+  return runPlatformSupportCommand(dataDir, body, operatorUsername);
+}
+
 export async function patchPlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername) {
   const { updatePlatformTenantLifecycle } = await import('./platformTenantLifecycle.mjs');
   return updatePlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername);

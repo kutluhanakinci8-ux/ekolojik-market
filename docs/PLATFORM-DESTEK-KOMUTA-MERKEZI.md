@@ -222,6 +222,7 @@ Destek sekmesinde **özet widget + case’e bağlama**; detay ilgili sekmede.
 - **D2:** destek@ IMAP senkron, otomatik alındı, gelen kutusu UI, yanıt API (`platformSupportInbox.mjs`)
 - **D3:** Case modeli, Zendesk ref, kuyruk/gelen otomatik bağlama
 - **D4:** Case detay omnichannel (e-posta / mesaj / iç not), makrolar, iletişim formu kuyruğu
-- **Sırada:** D5 komuta 360 widget’ları (VPS destek@ env en sonda)
+- **D5:** Kiracı 360 sağ panel, komut paleti (`/suspend`, `/requeue_outbox`), POS kısayolu
+- **Sırada:** D6 AI (opsiyonel); VPS destek@ env en sonda
 
 İlgili kod (bugün): `PlatformSupportTab.tsx`, `platformSupportMetrics.mjs`, `postaInbox`, `messaging/store.mjs`, `contactMail.mjs`.

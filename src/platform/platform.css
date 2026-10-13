@@ -2956,6 +2956,78 @@
   margin-bottom: 1rem;
 }
 
+.platform-support-command-layout {
+  display: grid;
+  grid-template-columns: 1fr minmax(260px, 300px);
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+.platform-support-command-main {
+  min-width: 0;
+}
+
+.platform-support-360 {
+  position: sticky;
+  top: 0.5rem;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+.platform-support-360-widgets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin: 0.75rem 0;
+}
+
+.platform-support-360-card {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.platform-support-360-card h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+}
+
+.platform-support-360-card p {
+  margin: 0.15rem 0;
+  font-size: 0.82rem;
+}
+
+.platform-support-360-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.platform-support-360-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.platform-support-360-hints {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .platform-support-command-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-support-360 {
+    position: static;
+    max-height: none;
+  }
+}
+
 @media (max-width: 900px) {
   .platform-support-inbox-layout {
     grid-template-columns: 1fr;
