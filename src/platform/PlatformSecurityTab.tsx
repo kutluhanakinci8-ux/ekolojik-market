@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   downloadPlatformSecurityCsv,
   fetchPlatformSecurityOverview,
+  revokePlatformOperatorSessions,
+  revokeTenantUserPlatformSession,
+  runPlatformSecurityNotifyCheck,
+  savePlatformSecurityPolicy,
+  type PlatformSecurityAlertPolicy,
   type PlatformSecurityPayload,
   type PlatformSecurityRecommendation,
 } from '../services/platformApi';
@@ -48,6 +53,10 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PlatformSecurityPayload | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [policyDraft, setPolicyDraft] = useState<PlatformSecurityAlertPolicy | null>(null);
+  const [policyMsg, setPolicyMsg] = useState<string | null>(null);
+  const [notifyMsg, setNotifyMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,6 +68,7 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
       return;
     }
     setData(result.data);
+    if (result.data.alertPolicy) setPolicyDraft(result.data.alertPolicy);
     setLoading(false);
   }, []);
 
@@ -372,6 +382,234 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
           </div>
         </section>
       )}
+
+      {(data.thresholdAlerts?.length ?? 0) > 0 && (
+        <section className="platform-users-panel platform-security-threshold-panel" aria-label="Aktif eşik uyarıları">
+          <div className="platform-users-panel-head">
+            <h3>Aktif eşik uyarıları</h3>
+            <span className="platform-muted">24s başarısız giriş: {data.failedLogins24h ?? 0}</span>
+          </div>
+          <ul className="platform-security-rec-list">
+            {data.thresholdAlerts?.map((a) => (
+              <li key={a.id} className={`platform-security-rec platform-security-rec--${a.severity === 'high' ? 'high' : 'medium'}`}>
+                <div className="platform-security-rec-main">
+                  <strong>{a.title}</strong>
+                  <p className="platform-muted platform-security-rec-desc">{a.detail}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {policyDraft && (
+        <section className="platform-users-panel" aria-label="Uyarı politikası">
+          <div className="platform-users-panel-head">
+            <h3>Uyarı politikası</h3>
+            <span className="platform-muted">E-posta (ops) + HTTPS webhook</span>
+          </div>
+          <form
+            className="platform-security-policy-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void (async () => {
+                setBusy('policy');
+                setPolicyMsg(null);
+                const res = await savePlatformSecurityPolicy(policyDraft);
+                setBusy(null);
+                if (!res.ok) setPolicyMsg(res.error ?? 'Kayıt başarısız');
+                else {
+                  setPolicyMsg('Politika kaydedildi');
+                  if (res.policy) setPolicyDraft(res.policy);
+                }
+              })();
+            }}
+          >
+            <label className="platform-security-policy-check">
+              <input
+                type="checkbox"
+                checked={policyDraft.enabled}
+                onChange={(e) => setPolicyDraft({ ...policyDraft, enabled: e.target.checked })}
+              />
+              Eşik uyarıları etkin
+            </label>
+            <label className="platform-security-policy-check">
+              <input
+                type="checkbox"
+                checked={policyDraft.emailOps}
+                onChange={(e) => setPolicyDraft({ ...policyDraft, emailOps: e.target.checked })}
+              />
+              Ops e-postası (EKOLOJIK_OPS_EMAIL)
+            </label>
+            <label className="platform-security-policy-field">
+              <span>Webhook URL (HTTPS)</span>
+              <input
+                type="url"
+                value={policyDraft.webhookUrl}
+                placeholder="https://..."
+                onChange={(e) => setPolicyDraft({ ...policyDraft, webhookUrl: e.target.value })}
+              />
+            </label>
+            <div className="platform-security-policy-grid">
+              <label>
+                <span>24s max başarısız giriş</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={policyDraft.thresholds.failedLogins24h}
+                  onChange={(e) => setPolicyDraft({
+                    ...policyDraft,
+                    thresholds: { ...policyDraft.thresholds, failedLogins24h: Number(e.target.value) },
+                  })}
+                />
+              </label>
+              <label>
+                <span>Skor alt sınırı</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={policyDraft.thresholds.securityScoreBelow}
+                  onChange={(e) => setPolicyDraft({
+                    ...policyDraft,
+                    thresholds: { ...policyDraft.thresholds, securityScoreBelow: Number(e.target.value) },
+                  })}
+                />
+              </label>
+              <label>
+                <span>Yüksek öneri sayısı</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={policyDraft.thresholds.highRecommendations}
+                  onChange={(e) => setPolicyDraft({
+                    ...policyDraft,
+                    thresholds: { ...policyDraft.thresholds, highRecommendations: Number(e.target.value) },
+                  })}
+                />
+              </label>
+              <label>
+                <span>Bekleme (dk)</span>
+                <input
+                  type="number"
+                  min={30}
+                  value={policyDraft.cooldownMinutes}
+                  onChange={(e) => setPolicyDraft({ ...policyDraft, cooldownMinutes: Number(e.target.value) })}
+                />
+              </label>
+            </div>
+            <div className="platform-security-policy-actions">
+              <button type="submit" className="btn btn-primary" disabled={busy === 'policy'}>
+                Politikayı kaydet
+              </button>
+              <button
+                type="button"
+                className="btn btn-text"
+                disabled={busy === 'notify'}
+                onClick={() => void (async () => {
+                  setBusy('notify');
+                  setNotifyMsg(null);
+                  const res = await runPlatformSecurityNotifyCheck(false);
+                  setBusy(null);
+                  setNotifyMsg(res.sent ? 'Bildirim gönderildi' : (res.message ?? res.error ?? 'Tamamlandı'));
+                })()}
+              >
+                Kontrol et ve bildir
+              </button>
+              <button
+                type="button"
+                className="btn btn-text"
+                disabled={busy === 'notify'}
+                onClick={() => void (async () => {
+                  setBusy('notify');
+                  const res = await runPlatformSecurityNotifyCheck(true);
+                  setBusy(null);
+                  setNotifyMsg(res.sent ? 'Zorunlu bildirim gönderildi' : (res.message ?? res.error ?? 'Tamamlandı'));
+                })()}
+              >
+                Cooldown atla
+              </button>
+            </div>
+            {policyMsg && <p className="platform-muted">{policyMsg}</p>}
+            {notifyMsg && <p className="platform-muted">{notifyMsg}</p>}
+          </form>
+        </section>
+      )}
+
+      <section className="platform-users-panel" aria-label="Oturum yönetimi">
+        <div className="platform-users-panel-head">
+          <h3>Oturum sonlandırma</h3>
+          <span className="platform-muted">Platform epoch: {data.platformSessionEpoch ?? 0}</span>
+        </div>
+        <p className="platform-muted platform-security-session-hint">
+          Kiracı kullanıcıları mevcut POS tokenlarını kaybeder; platform operatörleri de dahil tüm platform oturumları sıfırlanır.
+        </p>
+        <div className="platform-security-policy-actions">
+          <button
+            type="button"
+            className="btn btn-text platform-security-danger-btn"
+            disabled={busy === 'platform-revoke'}
+            onClick={() => {
+              if (!window.confirm('Tüm platform operatör oturumları sonlandırılacak. Devam?')) return;
+              void (async () => {
+                setBusy('platform-revoke');
+                const res = await revokePlatformOperatorSessions();
+                setBusy(null);
+                if (!res.ok) setError(res.error ?? 'İşlem başarısız');
+                else window.alert('Platform oturumları sonlandırıldı. Tekrar giriş yapmanız gerekebilir.');
+                void load();
+              })();
+            }}
+          >
+            Tüm platform oturumlarını sonlandır
+          </button>
+        </div>
+        {(data.revokeCandidates?.length ?? 0) > 0 && (
+          <div className="platform-users-table-scroll platform-security-revoke-scroll">
+            <table className="platform-table platform-table--premium">
+              <thead>
+                <tr>
+                  <th>Kullanıcı</th>
+                  <th>Mağaza</th>
+                  <th>Rol</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {data.revokeCandidates?.map((u) => (
+                  <tr key={`${u.tenantId}-${u.userId}`}>
+                    <td>
+                      <strong>{u.displayName}</strong>
+                      <div className="platform-muted">@{u.username}</div>
+                    </td>
+                    <td>{u.businessName}</td>
+                    <td>{u.role === 'admin' ? 'Yönetici' : 'Kasiyer'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-text platform-security-danger-btn"
+                        disabled={busy === `revoke-${u.userId}`}
+                        onClick={() => {
+                          if (!window.confirm(`${u.displayName} oturumu sonlandırılsın mı?`)) return;
+                          void (async () => {
+                            setBusy(`revoke-${u.userId}`);
+                            const res = await revokeTenantUserPlatformSession(u.tenantId, u.userId);
+                            setBusy(null);
+                            if (!res.ok) setError(res.error ?? 'Sonlandırılamadı');
+                            else setNotifyMsg(`${u.username} oturumu sonlandırıldı`);
+                          })();
+                        }}
+                      >
+                        Oturumu kapat
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="platform-users-panel" aria-label="Son başarısız girişler">
         <div className="platform-users-panel-head">

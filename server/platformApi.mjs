@@ -244,7 +244,7 @@ export async function getPlatformSecurityOverview(dataDir) {
   const { summarizePlatformActivity } = await import('./platformActivityMetrics.mjs');
   const activitySummary = summarizePlatformActivity(storesByTenant, 30);
 
-  return buildPlatformSecurityOverview({
+  const overview = buildPlatformSecurityOverview({
     userOps,
     loginTrend,
     failedByIp,
@@ -253,6 +253,77 @@ export async function getPlatformSecurityOverview(dataDir) {
     tenantSnapshots,
     activitySummary,
   });
+
+  const { readSecurityAlertPolicy } = await import('./platformSecurityPolicy.mjs');
+  const { evaluateSecurityThresholdAlerts, countFailedLogins24h } = await import('./platformSecurityNotify.mjs');
+  const { readPlatformSessionEpoch } = await import('./platformSessionRevoke.mjs');
+  const alertPolicy = await readSecurityAlertPolicy(dataDir);
+  const failedLogins24h = countFailedLogins24h(storesByTenant);
+  const thresholdAlerts = evaluateSecurityThresholdAlerts(
+    {
+      score: overview.score,
+      recommendationSummary: overview.recommendationSummary,
+    },
+    failedLogins24h,
+    alertPolicy,
+  );
+
+  return {
+    ...overview,
+    failedLogins24h,
+    thresholdAlerts,
+    alertPolicy,
+    platformSessionEpoch: await readPlatformSessionEpoch(dataDir),
+    revokeCandidates: userOps.roster
+      .filter((u) => u.isActive)
+      .slice(0, 40)
+      .map((u) => ({
+        tenantId: u.tenantId,
+        userId: u.id,
+        username: u.username,
+        displayName: u.displayName,
+        businessName: u.businessName,
+        role: u.role,
+      })),
+  };
+}
+
+export async function updatePlatformSecurityAlertPolicy(dataDir, patch) {
+  const { readSecurityAlertPolicy, writeSecurityAlertPolicy } = await import('./platformSecurityPolicy.mjs');
+  const current = await readSecurityAlertPolicy(dataDir);
+  const next = await writeSecurityAlertPolicy(dataDir, {
+    ...current,
+    ...patch,
+    thresholds: { ...current.thresholds, ...(patch?.thresholds ?? {}) },
+  });
+  return { ok: true, policy: next };
+}
+
+export async function platformSecurityNotifyCheck(dataDir, { force = false } = {}) {
+  const overview = await getPlatformSecurityOverview(dataDir);
+  const storesByTenant = [];
+  for (const tenantId of await allTenantIds(dataDir)) {
+    const store = await readTenantStore(dataDir, tenantId);
+    if (!store) continue;
+    const businessName = String(store?.settings?.businessName ?? '').trim()
+      || (tenantId === 'main' ? 'Greenleaf Market' : tenantId);
+    storesByTenant.push({ store, tenantId, businessName });
+  }
+  const { runSecurityNotifyCheck } = await import('./platformSecurityNotify.mjs');
+  return runSecurityNotifyCheck(dataDir, overview, storesByTenant, { force });
+}
+
+export async function platformRevokeAllSessions(dataDir) {
+  const { bumpPlatformSessionEpoch } = await import('./platformSessionRevoke.mjs');
+  const epoch = await bumpPlatformSessionEpoch(dataDir);
+  return { ok: true, platformSessionEpoch: epoch };
+}
+
+export async function platformRevokeTenantUserSession(dataDir, tenantId, userId) {
+  const { bumpTenantUserAuthEpoch } = await import('./platformSessionRevoke.mjs');
+  const result = await bumpTenantUserAuthEpoch(dataDir, tenantId, userId);
+  if (!result.ok) return result;
+  return { ok: true, ...result };
 }
 
 export async function getPlatformSecurityExportCsv(dataDir, days = 90) {
