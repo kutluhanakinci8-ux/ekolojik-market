@@ -6,7 +6,7 @@ import {
   platformCommsRequeueFailed,
   type PlatformCommsPayload,
 } from '../services/platformApi';
-import { KpiIcon, PlatformFilterSelect } from './platformUserUi';
+import { KpiIcon, PlatformFilterSelect, RingProgress } from './platformUserUi';
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -128,66 +128,112 @@ export function PlatformCommsTab() {
   if (!data) return null;
 
   const successRate = data.outboxWindow.successRatePercent;
+  const deliveryPct =
+    successRate != null
+      ? Math.round(successRate)
+      : data.outboxWindow.attempted > 0
+        ? Math.round((data.outboxWindow.sent / data.outboxWindow.attempted) * 100)
+        : 100;
+  const deliveryVariant = deliveryPct >= 95 ? 'brand' : deliveryPct >= 80 ? 'warn' : 'warn';
 
   return (
-    <div className="platform-comms platform-users--premium">
-      <section className="platform-users-hero platform-users-hero--premium platform-comms-hero">
+    <div className="platform-comms platform-comms--premium platform-users--premium">
+      <header className="platform-users-hero platform-users-hero--premium platform-comms-hero">
         <div className="platform-users-hero-copy">
-          <span className="platform-users-hero-badge">Posta & mesaj</span>
-          <h2>İletişim operasyonları</h2>
+          <span className="platform-users-hero-badge">Communications Hub</span>
+          <h2>Posta & mesaj</h2>
           <p>
-            Tüm kiracılarda e-posta outbox, müşteri mesajlaşma SLA ve (varsa) açılma/tıklama istatistikleri.
-            Son güncelleme: {formatDateTime(data.generatedAt)}
+            E-posta outbox, müşteri mesajlaşma SLA ve kampanya etkileşimi — tüm kiracılar için tek operasyon merkezi.
           </p>
-          <div className="platform-users-hero-actions">
-            <PlatformFilterSelect
-              label="Pencere"
-              icon="status"
-              value={String(windowDays)}
-              onChange={(v) => setWindowDays(Number(v))}
-            >
-              <option value="7">7 gün</option>
-              <option value="14">14 gün</option>
-              <option value="30">30 gün</option>
-              <option value="90">90 gün</option>
-            </PlatformFilterSelect>
-            <button type="button" className="btn btn-text" onClick={() => void load()}>Yenile</button>
+          <time className="platform-users-hero-time" dateTime={data.generatedAt}>
+            Son güncelleme: {formatDateTime(data.generatedAt)}
+          </time>
+        </div>
+        <div className="platform-users-hero-actions">
+          <div className="platform-comms-hero-metrics">
+            <RingProgress
+              pct={deliveryPct}
+              size={72}
+              label="Teslimat"
+              variant={deliveryVariant}
+            />
+            <span className="platform-users-hero-stat-label">
+              Gönderim başarısı · {data.windowDays} gün
+            </span>
+          </div>
+          <ul className="platform-comms-capability-chips" aria-label="Altyapı durumu">
+            <li className={data.capabilities.smtpConfigured ? 'is-ok' : 'is-warn'}>
+              SMTP {data.capabilities.smtpConfigured ? 'hazır' : 'eksik'}
+            </li>
+            <li className={data.engagement.mailTrackEnabled ? 'is-ok' : 'is-muted'}>
+              Açılma izleme {data.engagement.mailTrackEnabled ? 'açık' : 'kapalı'}
+            </li>
+            <li className={data.engagement.clickTrackEnabled ? 'is-ok' : 'is-muted'}>
+              Tıklama {data.engagement.clickTrackEnabled ? 'açık' : 'kapalı'}
+            </li>
+          </ul>
+          <div className="platform-comms-hero-btns">
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn btn-text platform-security-export-btn"
               disabled={exportingCsv}
               onClick={() => void onExportCsv()}
             >
               {exportingCsv ? 'İndiriliyor…' : 'Kiracı raporu (CSV)'}
             </button>
+            <button type="button" className="btn btn-primary platform-users-refresh" onClick={() => void load()}>
+              Yenile
+            </button>
           </div>
-          {actionMsg && <p className="platform-comms-action-msg" role="status">{actionMsg}</p>}
         </div>
-        <div className="platform-users-hero-stat platform-comms-smtp-pill">
-          <span className="platform-users-hero-stat-label">SMTP</span>
-          <strong className={data.capabilities.smtpConfigured ? '' : 'platform-warn'}>
-            {data.capabilities.smtpConfigured ? 'Yapılandırılmış' : 'Eksik'}
-          </strong>
+      </header>
+
+      <section className="platform-comms-toolbar" aria-label="Rapor penceresi">
+        <div className="platform-users-filter-bar platform-comms-filter-bar">
+          <div className="platform-users-select-grid platform-comms-select-grid">
+            <PlatformFilterSelect
+              label="Rapor penceresi"
+              icon="status"
+              value={String(windowDays)}
+              onChange={(v) => setWindowDays(Number(v))}
+            >
+              <option value="7">Son 7 gün</option>
+              <option value="14">Son 14 gün</option>
+              <option value="30">Son 30 gün</option>
+              <option value="90">Son 90 gün</option>
+            </PlatformFilterSelect>
+          </div>
+          <p className="platform-comms-toolbar-hint">
+            Trend, SLA ve etkileşim metrikleri seçilen pencereye göre hesaplanır.
+          </p>
         </div>
+        {actionMsg && (
+          <p className="platform-comms-action-msg" role="status">{actionMsg}</p>
+        )}
       </section>
 
       <div className="platform-users-kpi-grid platform-users-kpi-grid--premium" aria-label="Özet KPI">
-        <article className="platform-users-kpi">
+        <article className="platform-users-kpi platform-users-kpi--primary">
           <KpiIcon name="login" />
           <div className="platform-users-kpi-body">
             <span className="platform-users-kpi-label">Bekleyen outbox</span>
             <strong className="platform-users-kpi-value">{data.outboxCounts.pending}</strong>
+            <span className="platform-users-kpi-sub">{data.pendingSample}+ örnek listeleniyor</span>
           </div>
         </article>
-        <article className="platform-users-kpi">
-          <KpiIcon name="active" />
+        <article className="platform-users-kpi platform-users-kpi--ring">
+          <RingProgress pct={deliveryPct} variant={deliveryVariant} />
           <div className="platform-users-kpi-body">
             <span className="platform-users-kpi-label">{data.windowDays}g gönderim</span>
             <strong className="platform-users-kpi-value">{data.outboxWindow.sent}</strong>
-            <span className="platform-users-kpi-sub">
-              Başarısız: {data.outboxWindow.failed}
-              {successRate != null ? ` · ${successRate}% başarı` : ''}
-            </span>
+            <div className="platform-users-login-rate">
+              <div className="platform-users-login-rate-bar">
+                <span style={{ width: `${deliveryPct}%` }} />
+              </div>
+              <span className="platform-users-kpi-sub">
+                {deliveryPct}% başarı · {data.outboxWindow.failed} başarısız
+              </span>
+            </div>
           </div>
         </article>
         <article className="platform-users-kpi platform-users-kpi--danger">
@@ -200,13 +246,13 @@ export function PlatformCommsTab() {
             )}
           </div>
         </article>
-        <article className="platform-users-kpi">
+        <article className="platform-users-kpi platform-users-kpi--warn">
           <KpiIcon name="users" />
           <div className="platform-users-kpi-body">
             <span className="platform-users-kpi-label">Açık mesaj konuları</span>
             <strong className="platform-users-kpi-value">{data.messagingTotals.open}</strong>
-            <span className="platform-users-kpi-sub">
-              İlk yanıt bekleyen: {data.messagingTotals.pendingFirstResponse}
+            <span className="platform-users-kpi-sub platform-users-kpi-sub--warn">
+              {data.messagingTotals.pendingFirstResponse} ilk yanıt bekliyor
             </span>
           </div>
         </article>
@@ -227,35 +273,53 @@ export function PlatformCommsTab() {
       <section className="platform-users-panel platform-comms-ops" aria-label="Operasyonlar">
         <div className="platform-users-panel-head">
           <h3>Operasyonlar</h3>
-          <span className="platform-muted">Outbox gönderimi ve başarısız kayıt yönetimi</span>
+          <span className="platform-muted">Platform düzeyinde outbox ve kuyruk yönetimi</span>
         </div>
-        <div className="platform-comms-ops-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={busy !== null || data.outboxCounts.pending === 0}
-            onClick={() => void runProcess()}
-          >
-            {busy === 'process' ? 'İşleniyor…' : 'Outbox işle (30)'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={busy !== null || data.outboxCounts.failed === 0}
-            onClick={() => void runRequeue()}
-          >
-            {busy === 'requeue' ? 'Kuyruğa alınıyor…' : 'Başarısızları yeniden kuyrukla'}
-          </button>
+        <div className="platform-comms-ops-grid">
+          <article className="platform-comms-ops-card">
+            <div className="platform-comms-ops-card-icon platform-comms-ops-card-icon--send" aria-hidden />
+            <div className="platform-comms-ops-card-body">
+              <h4>Bekleyen gönderim</h4>
+              <p>
+                Kuyruktaki en fazla 30 mesajı işler; kiracılar arasında adil sıra uygulanır.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy !== null || data.outboxCounts.pending === 0}
+                onClick={() => void runProcess()}
+              >
+                {busy === 'process' ? 'İşleniyor…' : `Outbox işle (${data.outboxCounts.pending} bekliyor)`}
+              </button>
+            </div>
+          </article>
+          <article className="platform-comms-ops-card">
+            <div className="platform-comms-ops-card-icon platform-comms-ops-card-icon--retry" aria-hidden />
+            <div className="platform-comms-ops-card-body">
+              <h4>Başarısız kayıtlar</h4>
+              <p>
+                Tüm kiracılardaki başarısız outbox öğelerini yeniden pending kuyruğuna alır.
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary platform-comms-ops-secondary"
+                disabled={busy !== null || data.outboxCounts.failed === 0}
+                onClick={() => void runRequeue()}
+              >
+                {busy === 'requeue' ? 'Kuyruğa alınıyor…' : `Yeniden kuyrukla (${data.outboxCounts.failed})`}
+              </button>
+            </div>
+          </article>
         </div>
       </section>
 
       {data.outboxByDay.length > 0 && (
-        <section className="platform-users-panel" aria-label="Gönderim trendi">
+        <section className="platform-users-panel platform-comms-trend-panel" aria-label="Gönderim trendi">
           <div className="platform-users-panel-head">
             <h3>Outbox trendi ({data.windowDays} gün)</h3>
             <span className="platform-muted">Gönderildi vs başarısız</span>
           </div>
-          <div className="platform-security-trend" role="img" aria-label="Outbox trendi">
+          <div className="platform-security-trend platform-comms-trend" role="img" aria-label="Outbox trendi">
             {data.outboxByDay.map((day) => {
               const total = day.sent + day.failed;
               const h = total ? Math.max(4, Math.round((total / trendMax) * 100)) : 2;
@@ -294,6 +358,7 @@ export function PlatformCommsTab() {
       <section className="platform-users-panel" aria-label="Kiracı tablosu">
         <div className="platform-users-panel-head">
           <h3>Kiracı özeti</h3>
+          <span className="platform-muted">{data.tenants.length} mağaza</span>
         </div>
         <div className="platform-users-table-scroll">
           <table className="platform-table platform-table--premium">
@@ -315,8 +380,16 @@ export function PlatformCommsTab() {
                     <strong>{t.businessName}</strong>
                     <div className="platform-muted">{t.tenantId}</div>
                   </td>
-                  <td>{t.outbox.pending}</td>
-                  <td className={t.outbox.failed > 0 ? 'platform-warn' : ''}>{t.outbox.failed}</td>
+                  <td>
+                    <span className={`platform-comms-num ${t.outbox.pending > 0 ? 'is-highlight' : ''}`}>
+                      {t.outbox.pending}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`platform-comms-num ${t.outbox.failed > 0 ? 'is-danger' : ''}`}>
+                      {t.outbox.failed}
+                    </span>
+                  </td>
                   <td>{t.messaging.open}</td>
                   <td>{t.messaging.pendingFirstResponse}</td>
                   <td>{formatDurationMs(t.firstResponse.medianMs)}</td>
@@ -339,15 +412,21 @@ export function PlatformCommsTab() {
           </div>
           <ul className="platform-comms-feed">
             {data.recentOutbox.slice(0, 16).map((row) => (
-              <li key={`${row.id}-${row.at}`}>
-                <span className={`platform-comms-folder platform-comms-folder--${row.folder}`}>
-                  {FOLDER_LABELS[row.folder] ?? row.folder}
+              <li key={`${row.id}-${row.at}`} className="platform-comms-feed-item">
+                <span className="platform-comms-feed-avatar" aria-hidden>
+                  {(row.subject || row.to || '?').trim().charAt(0).toUpperCase()}
                 </span>
                 <div className="platform-comms-feed-main">
-                  <strong>{row.subject || '(konu yok)'}</strong>
-                  <span>{row.to}</span>
-                  <span className="platform-muted">
-                    {row.tenantId} · {formatDateTime(row.at)}
+                  <div className="platform-comms-feed-top">
+                    <strong>{row.subject || '(konu yok)'}</strong>
+                    <span className={`platform-comms-folder platform-comms-folder--${row.folder}`}>
+                      {FOLDER_LABELS[row.folder] ?? row.folder}
+                    </span>
+                  </div>
+                  <span className="platform-comms-feed-to">{row.to}</span>
+                  <span className="platform-comms-feed-meta">
+                    <span className="platform-comms-tenant-pill">{row.tenantId}</span>
+                    {formatDateTime(row.at)}
                   </span>
                 </div>
               </li>
@@ -362,11 +441,12 @@ export function PlatformCommsTab() {
             </div>
             <ul className="platform-comms-feed platform-comms-feed--errors">
               {data.recentErrors.map((row) => (
-                <li key={row.id}>
+                <li key={row.id} className="platform-comms-feed-item platform-comms-feed-item--error">
+                  <span className="platform-comms-feed-avatar platform-comms-feed-avatar--error" aria-hidden>!</span>
                   <div className="platform-comms-feed-main">
                     <strong>{row.subject || row.to}</strong>
-                    <span className="platform-warn">{row.error}</span>
-                    <span className="platform-muted">{formatDateTime(row.at)}</span>
+                    <span className="platform-comms-error-text">{row.error}</span>
+                    <span className="platform-comms-feed-meta">{formatDateTime(row.at)}</span>
                   </div>
                 </li>
               ))}
