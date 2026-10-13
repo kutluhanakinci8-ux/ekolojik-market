@@ -13,7 +13,29 @@ function parseCharset(contentType) {
   return m[1].trim().toLowerCase().replace(/^utf8$/, 'utf-8');
 }
 
-function decodeBuffer(buf, charset) {
+function turkishLetterScore(str) {
+  return (String(str).match(/[ğüşöçıİĞÜŞÖÇ]/g) || []).length;
+}
+
+function pickBestDecoded(candidates) {
+  let best = candidates.find((c) => c && typeof c === 'string') ?? '';
+  for (const cand of candidates) {
+    if (!cand || typeof cand !== 'string') continue;
+    const bestBad = best.includes('\uFFFD');
+    const candBad = cand.includes('\uFFFD');
+    if (!candBad && bestBad) {
+      best = cand;
+      continue;
+    }
+    if (candBad && !bestBad) continue;
+    const ts = turkishLetterScore(cand);
+    const bs = turkishLetterScore(best);
+    if (ts > bs) best = cand;
+  }
+  return best;
+}
+
+function decodeBufferPrimary(buf, charset) {
   const c = parseCharset(charset);
   if (c === 'utf-8' || c === 'us-ascii' || c === 'ascii') {
     return buf.toString('utf8');
@@ -21,7 +43,12 @@ function decodeBuffer(buf, charset) {
   if (c === 'iso-8859-9' || c === 'windows-1254' || c === 'latin5') {
     return buf.toString('latin1');
   }
-  if (c === 'iso-8859-1' || c === 'latin1' || c === 'windows-1252') {
+  if (
+    c === 'iso-8859-1'
+    || c === 'iso-8859-3'
+    || c === 'latin1'
+    || c === 'windows-1252'
+  ) {
     return buf.toString('latin1');
   }
   try {
@@ -29,6 +56,17 @@ function decodeBuffer(buf, charset) {
   } catch {
     return buf.toString('latin1');
   }
+}
+
+function decodeBuffer(buf, charset) {
+  const c = parseCharset(charset);
+  const primary = decodeBufferPrimary(buf, charset);
+  const candidates = [primary];
+  if (c !== 'utf-8') candidates.push(buf.toString('utf8'));
+  if (c !== 'iso-8859-9' && c !== 'windows-1254') {
+    candidates.push(buf.toString('latin1'));
+  }
+  return pickBestDecoded(candidates);
 }
 
 function quotedPrintableToBuffer(input) {
