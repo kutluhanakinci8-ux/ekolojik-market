@@ -197,6 +197,12 @@ async function attachInboundToLinkedCase(dataDir, row, linkedCase, extra = {}) {
         htmlPreview: bodies.html,
       });
     }
+    const { notifyOpsSpawnedSupportCase } = await import('./platformSupportOpsNotify.mjs');
+    await notifyOpsSpawnedSupportCase(dataDir, {
+      closedCase: from,
+      newCase,
+      inboxRow: row,
+    });
     row.autoreplySentAt = new Date().toISOString();
     return { ok: true, spawned: true, case: newCase, ...extra };
   }

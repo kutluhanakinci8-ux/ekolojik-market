@@ -1407,6 +1407,54 @@ export async function fetchPlatformSupportCaseAi(
   return { ok: result.ok, text, provider, error: result.error };
 }
 
+export async function downloadPlatformSupportCaseActivityCsv(
+  caseId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/support/cases/${encodeURIComponent(caseId)}/activity/export.csv`, {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const nameMatch = disposition.match(/filename="([^"]+)"/);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = nameMatch?.[1] ?? `destek-aktivite-${caseId}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function openPlatformSupportCaseActivityPrint(
+  caseId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/support/cases/${encodeURIComponent(caseId)}/activity/export.html`, {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'Dışa aktarma açılamadı' };
+    }
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function downloadPlatformSupportCsv(days?: number): Promise<{ ok: boolean; error?: string }> {
   try {
     const q = days != null && days > 0 ? `?days=${days}` : '';

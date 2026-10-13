@@ -1346,6 +1346,66 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const platformSupportCaseActivityCsvMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/activity\/export\.csv$/,
+    );
+    if (platformSupportCaseActivityCsvMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCaseActivityExport } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseActivityExport(
+          DATA_DIR,
+          platformSupportCaseActivityCsvMatch[1],
+          'csv',
+        );
+        if (!result.ok) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.contentType,
+          'Content-Disposition': `attachment; filename="${result.filename}"`,
+        });
+        res.end(result.body);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseActivityHtmlMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/activity\/export\.html$/,
+    );
+    if (platformSupportCaseActivityHtmlMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCaseActivityExport } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseActivityExport(
+          DATA_DIR,
+          platformSupportCaseActivityHtmlMatch[1],
+          'html',
+        );
+        if (!result.ok) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.contentType,
+          'Content-Disposition': `inline; filename="${result.filename}"`,
+        });
+        res.end(result.body);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Dışa aktarma başarısız' }));
+      }
+      return;
+    }
+
     const platformSupportCaseActionMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)\/action$/);
     if (platformSupportCaseActionMatch && req.method === 'POST') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');

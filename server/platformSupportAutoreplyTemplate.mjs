@@ -229,6 +229,162 @@ export function buildPlatformSupportAutoreplyContent({ messageId, brandName, cas
   };
 }
 
+export function formatPlatformSupportSpawnCaseText({
+  brandName,
+  messageId,
+  supportEmail,
+  caseNumber,
+  closedNumber,
+  subject,
+}) {
+  const brand = brandName || 'Ekolojik Destek';
+  const mail = supportEmail || getPlatformSupportMailAddress();
+  const siteBrand = getPlatformSupportMailBrand();
+  const plus = supportPlusAddressForCase(caseNumber);
+  const lines = [
+    'Merhaba,',
+    '',
+    `Önceki destek kaydınız (#${closedNumber}) kapatılmış olduğu için mesajınız yeni bir kayıt altında değerlendiriliyor.`,
+    '',
+    `Yeni destek kaydı: #${caseNumber}`,
+    `Talep referansı: ${messageId}`,
+    `[EKO-DESTEK-${caseNumber}]`,
+    ...(plus ? [`Bu kayıt için yazışma adresi: ${plus}`] : []),
+    '',
+    `Konu: ${subject || 'Destek'}`,
+    '',
+    'Bu mesaja yanıt vererek yazışmaya devam edebilirsiniz; iş saatlerinde size dönüş yapacağız.',
+    '',
+    `Destek formu: ${siteBrand.contactFormUrl}`,
+    '',
+    '— Ekolojik Destek',
+    mail,
+    siteBrand.site,
+  ];
+  return lines.join('\n');
+}
+
+export function formatPlatformSupportSpawnCaseHtml({
+  brandName,
+  messageId,
+  supportEmail,
+  caseNumber,
+  closedNumber,
+}) {
+  const pres = getPlatformSupportMailPresentation();
+  const brand = brandName || pres.fromName || 'Ekolojik Destek';
+  const mail = supportEmail || pres.from || getPlatformSupportMailAddress();
+  const siteBrand = getPlatformSupportMailBrand();
+  const ref = escapeHtml(messageId);
+  const caseRef = formatCaseRefLabel(caseNumber);
+  const caseRefHtml = caseRef
+    ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#2d3b2f;">Yeni destek kaydı: <strong>${escapeHtml(caseRef)}</strong></p>`
+    : '';
+  const plusAddr = caseNumber ? supportPlusAddressForCase(caseNumber) : null;
+  const caseTokenHtml = caseRef
+    ? `<div style="font-size:11px;color:#6b7c6f;margin-top:8px;">[EKO-DESTEK-${escapeHtml(String(caseNumber))}]${
+      plusAddr
+        ? `<br/>Bu kayıt için: <a href="mailto:${escapeHtml(plusAddr)}" style="color:${BRAND_GREEN_MID};text-decoration:none;">${escapeHtml(plusAddr)}</a>`
+        : ''
+    }</div>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="light"/>
+  <title>Yeni destek kaydı</title>
+</head>
+<body style="margin:0;padding:0;background:#eef2ef;font-family:'Segoe UI',system-ui,-apple-system,BlinkMacSystemFont,Roboto,Arial,sans-serif;color:#1a2e1a;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2ef;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #d8e2dc;box-shadow:0 12px 40px rgba(27,67,50,0.08);">
+          <tr>
+            <td style="background:linear-gradient(135deg,${BRAND_GREEN} 0%,${BRAND_GREEN_MID} 100%);padding:28px 32px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.85);margin-bottom:6px;">Ekolojik Platform</div>
+                    <div style="font-size:22px;font-weight:700;color:#ffffff;line-height:1.25;">${escapeHtml(brand)}</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,0.9);margin-top:8px;">Yardım merkezi · Yeni kayıt bildirimi</div>
+                  </td>
+                  <td align="right" style="vertical-align:middle;width:48px;">
+                    <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.15);text-align:center;line-height:44px;font-size:22px;">🌿</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 24px;">
+              <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Merhaba,</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#2d3b2f;">
+                Önceki destek kaydınız (<strong>#${escapeHtml(String(closedNumber))}</strong>) kapatılmış olduğu için
+                mesajınız <strong>yeni bir kayıt</strong> altında değerlendiriliyor. İş saatlerinde en kısa sürede size dönüş yapacağız.
+              </p>
+              ${caseRefHtml}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;background:${BRAND_GREEN_LIGHT};border-radius:12px;border:1px solid #b7e4c7;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND_GREEN};margin-bottom:6px;">Talep referansı</div>
+                    <div style="font-family:ui-monospace,'SF Mono',Consolas,monospace;font-size:14px;color:#1b4332;word-break:break-all;">${ref}</div>
+                    ${caseTokenHtml}
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#4a5d4e;">
+                Bu mesaja yanıt vererek yazışmaya devam edebilirsiniz; ekip aynı konu başlığı altında talebinizi görür.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="border-radius:10px;background:${BRAND_GREEN_MID};">
+                    <a href="${escapeHtml(siteBrand.contactFormUrl)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">Destek Al</a>
+                  </td>
+                  <td style="width:10px;"></td>
+                  <td style="border-radius:10px;border:1px solid #c5d6ca;">
+                    <a href="${escapeHtml(siteBrand.site)}" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:600;color:${BRAND_GREEN_MID};text-decoration:none;">Mağazayı ziyaret et</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:20px 0 0;font-size:12px;line-height:1.55;color:#6b7c6f;">
+                Otomatik gönderim: <a href="mailto:${escapeHtml(mail)}" style="color:${BRAND_GREEN_MID};text-decoration:none;">${escapeHtml(mail)}</a>
+              </p>
+            </td>
+          </tr>
+          ${renderMailFooterHtml()}
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export function buildPlatformSupportSpawnCaseNoticeContent({
+  messageId,
+  caseNumber,
+  closedNumber,
+  subject,
+  brandName,
+} = {}) {
+  const pres = getPlatformSupportMailPresentation();
+  const payload = {
+    brandName: brandName || pres.fromName,
+    messageId,
+    supportEmail: pres.from,
+    caseNumber,
+    closedNumber,
+    subject,
+  };
+  return {
+    text: formatPlatformSupportSpawnCaseText(payload),
+    html: formatPlatformSupportSpawnCaseHtml(payload),
+  };
+}
+
 function appendSupportMailPlainFooter(lines) {
   const siteBrand = getPlatformSupportMailBrand();
   const pres = getPlatformSupportMailPresentation();

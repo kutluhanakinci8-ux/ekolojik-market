@@ -3,6 +3,8 @@ import {
   createPlatformSupportCaseFromContact,
   createPlatformSupportCaseFromQueue,
   downloadPlatformSupportCsv,
+  downloadPlatformSupportCaseActivityCsv,
+  openPlatformSupportCaseActivityPrint,
   fetchPlatformSupportCaseDetail,
   fetchPlatformSupportCases,
   fetchPlatformSupportContactQueue,
@@ -90,6 +92,7 @@ export function PlatformSupportTab() {
   const [data, setData] = useState<PlatformSupportPayload | null>(null);
   const [windowDays, setWindowDays] = useState(14);
   const [exporting, setExporting] = useState(false);
+  const [activityExporting, setActivityExporting] = useState<'csv' | 'html' | null>(null);
   const [policyDraft, setPolicyDraft] = useState<PlatformSupportSlaPolicy | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'email_inbound' | 'email_outbound' | 'note'>('all');
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
@@ -377,6 +380,17 @@ export function PlatformSupportTab() {
     const result = await downloadPlatformSupportCsv(windowDays);
     setExporting(false);
     if (!result.ok) setPolicyMsg(userMessage(result.error, 'CSV indirilemedi'));
+  };
+
+  const onExportCaseActivity = async (format: 'csv' | 'html') => {
+    if (!selectedCaseId) return;
+    setActivityExporting(format);
+    const result =
+      format === 'csv'
+        ? await downloadPlatformSupportCaseActivityCsv(selectedCaseId)
+        : await openPlatformSupportCaseActivityPrint(selectedCaseId);
+    setActivityExporting(null);
+    if (!result.ok) setPolicyMsg(userMessage(result.error, 'Aktivite dışa aktarılamadı'));
   };
 
   if (loading && !data) return <SupportSkeleton />;
@@ -698,42 +712,67 @@ export function PlatformSupportTab() {
                 <button type="button" className="btn btn-secondary" onClick={() => void saveCaseZendesk()}>
                   Zendesk kaydet
                 </button>
-                {caseDetail?.case.activity?.length ? (
+                {caseDetail ? (
                   <div className="platform-support-case-activity">
                     <div className="platform-support-activity-head">
                       <h4>Aktivite</h4>
-                      <PlatformFilterSelect
-                        label="Filtre"
-                        icon="role"
-                        value={activityFilter}
-                        onChange={(v) => setActivityFilter(v as typeof activityFilter)}
-                      >
-                        <option value="all">Tümü</option>
-                        <option value="email_inbound">Gelen e-posta</option>
-                        <option value="email_outbound">Giden e-posta</option>
-                        <option value="note">İç not</option>
-                      </PlatformFilterSelect>
+                      <div className="platform-support-activity-actions">
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          disabled={activityExporting !== null}
+                          onClick={() => void onExportCaseActivity('csv')}
+                        >
+                          {activityExporting === 'csv' ? 'İndiriliyor…' : 'CSV'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          disabled={activityExporting !== null}
+                          onClick={() => void onExportCaseActivity('html')}
+                          title="Yazdır veya PDF olarak kaydet"
+                        >
+                          {activityExporting === 'html' ? 'Açılıyor…' : 'PDF / yazdır'}
+                        </button>
+                        {caseDetail.case.activity?.length ? (
+                          <PlatformFilterSelect
+                            label="Filtre"
+                            icon="role"
+                            value={activityFilter}
+                            onChange={(v) => setActivityFilter(v as typeof activityFilter)}
+                          >
+                            <option value="all">Tümü</option>
+                            <option value="email_inbound">Gelen e-posta</option>
+                            <option value="email_outbound">Giden e-posta</option>
+                            <option value="note">İç not</option>
+                          </PlatformFilterSelect>
+                        ) : null}
+                      </div>
                     </div>
-                    <ul>
-                      {filteredCaseActivity.length === 0 ? (
-                        <li className="platform-support-hint">Bu filtrede kayıt yok.</li>
-                      ) : (
-                        filteredCaseActivity.slice(0, 24).map((a) => (
-                          <li key={a.id} className={`platform-support-activity-item platform-support-activity-item--${a.type}`}>
-                            <span className="platform-table-muted">
-                              {formatDateTime(a.createdAt)} · {activityTypeLabel(a.type)} · {a.createdBy}
-                            </span>
-                            <p className="platform-support-activity-body">{a.body}</p>
-                            {a.html ? (
-                              <details className="platform-support-email-html-details">
-                                <summary>HTML önizleme</summary>
-                                <SupportEmailHtmlFrame html={a.html} title={`Aktivite ${a.id}`} />
-                              </details>
-                            ) : null}
-                          </li>
-                        ))
-                      )}
-                    </ul>
+                    {caseDetail.case.activity?.length ? (
+                      <ul>
+                        {filteredCaseActivity.length === 0 ? (
+                          <li className="platform-support-hint">Bu filtrede kayıt yok.</li>
+                        ) : (
+                          filteredCaseActivity.slice(0, 24).map((a) => (
+                            <li key={a.id} className={`platform-support-activity-item platform-support-activity-item--${a.type}`}>
+                              <span className="platform-table-muted">
+                                {formatDateTime(a.createdAt)} · {activityTypeLabel(a.type)} · {a.createdBy}
+                              </span>
+                              <p className="platform-support-activity-body">{a.body}</p>
+                              {a.html ? (
+                                <details className="platform-support-email-html-details">
+                                  <summary>HTML önizleme</summary>
+                                  <SupportEmailHtmlFrame html={a.html} title={`Aktivite ${a.id}`} />
+                                </details>
+                              ) : null}
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    ) : (
+                      <p className="platform-support-hint">Henüz aktivite yok; dışa aktarma boş bir tablo üretir.</p>
+                    )}
                   </div>
                 ) : selectedCase.notes ? (
                   <p className="platform-support-inbox-body">{selectedCase.notes}</p>
