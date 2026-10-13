@@ -17,13 +17,21 @@ export function mergeStoreUserSecrets(existing, incoming) {
     return incoming;
   }
   const byId = new Map(existing.users.map((u) => [u.id, u]));
+  const byUsername = new Map(
+    existing.users.map((u) => [String(u.username ?? '').trim().toLowerCase(), u]),
+  );
   const users = incoming.users.map((user) => {
-    const prev = byId.get(user.id);
+    const prev = byId.get(user.id) ?? byUsername.get(String(user.username ?? '').trim().toLowerCase());
     if (!prev) return user;
     const next = { ...user };
-    if (!next.passwordHash && prev.passwordHash) next.passwordHash = prev.passwordHash;
-    if (!next.pinHash && prev.pinHash) next.pinHash = prev.pinHash;
-    if (!next.totpSecret && prev.totpSecret) next.totpSecret = prev.totpSecret;
+    const keepSecret = (field) => {
+      const incomingVal = next[field];
+      const prevVal = prev[field];
+      if ((!incomingVal || incomingVal === '') && prevVal) next[field] = prevVal;
+    };
+    keepSecret('passwordHash');
+    keepSecret('pinHash');
+    keepSecret('totpSecret');
     return next;
   });
   return { ...incoming, users };
