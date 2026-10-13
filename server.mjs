@@ -79,6 +79,7 @@ import {
 } from './server/postaAccessAuth.mjs';
 import { logPostaAccessExport } from './server/postaAccessAudit.mjs';
 import { mergeStoreUserSecrets, sanitizeStoreSnapshotForClient } from './server/storeApiSanitize.mjs';
+// credentialVault — writeStoreData içinde dinamik import
 import {
   buildOutboxCsv,
   buildContactCsv,
@@ -397,7 +398,18 @@ async function maybeMigrateLegacyPostaOnboardingStore(tenantId) {
 
 async function writeStoreData(data, tenantId = 'main') {
   await mkdir(DATA_DIR, { recursive: true });
-  await writeTenantStore(DATA_DIR, tenantId, data);
+  const {
+    readCredentialVault,
+    mergeUsersIntoVault,
+    applyVaultToStoreSnapshot,
+    writeCredentialVault,
+  } = await import('./server/credentialVault.mjs');
+  let vault = await readCredentialVault(DATA_DIR, tenantId);
+  vault = mergeUsersIntoVault(vault, data?.users);
+  const toWrite = applyVaultToStoreSnapshot(data, vault);
+  await writeTenantStore(DATA_DIR, tenantId, toWrite);
+  await writeCredentialVault(DATA_DIR, tenantId, vault);
+  data = toWrite;
   try {
     const { archiveTenantStoreAfterWrite } = await import('./server/tenantStoreAutoBackup.mjs');
     await archiveTenantStoreAfterWrite(DATA_DIR, tenantId, data);
@@ -3150,6 +3162,13 @@ const server = createServer(async (req, res) => {
         return;
       }
       const existing = await readTenantStore(DATA_DIR, resolvedTenant);
+      const {
+        readCredentialVault,
+        stripUntrustedUserSecretsFromIncoming,
+        applyVaultToStoreSnapshot,
+      } = await import('./server/credentialVault.mjs');
+      const credentialVault = await readCredentialVault(DATA_DIR, resolvedTenant);
+      data = stripUntrustedUserSecretsFromIncoming(data, credentialVault);
       if (existing && typeof existing === 'object') {
         if (!Array.isArray(data.products) && Array.isArray(existing.products)) {
           data.products = existing.products;
@@ -3174,7 +3193,8 @@ const server = createServer(async (req, res) => {
       } = await import('./server/tenantStoreGuard.mjs');
       let guarded = guardIsolatedTenantStoreWrite(resolvedTenant, existing, data);
       guarded = guardMainTenantStoreWrite(resolvedTenant, guarded);
-      const withSecrets = mergeStoreUserSecrets(existing, guarded);
+      let withSecrets = mergeStoreUserSecrets(existing, guarded, credentialVault.users);
+      withSecrets = applyVaultToStoreSnapshot(withSecrets, credentialVault);
       let toSave = withSecrets;
       if (!shouldSkipIrsaliyeStockMigration(resolvedTenant, existing ?? withSecrets)) {
         const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);

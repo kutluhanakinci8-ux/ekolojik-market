@@ -163,7 +163,9 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
     return { ok: false, status: tenantAffinity.status ?? 403, message: tenantAffinity.message };
   }
 
-  const store = await readTenantStore(dataDir, tenantId);
+  const rawStore = await readTenantStore(dataDir, tenantId);
+  const { hydrateStoreWithCredentialVault } = await import('./credentialVault.mjs');
+  const { store } = await hydrateStoreWithCredentialVault(dataDir, tenantId, rawStore);
   if (!store?.users?.length) {
     return { ok: false, status: 404, message: 'Mağaza bulunamadı' };
   }

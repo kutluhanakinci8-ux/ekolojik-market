@@ -10,24 +10,42 @@ export function sanitizeStoreSnapshotForClient(store) {
   return { ...store, users };
 }
 
+function isSha256Hex(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+}
+
 /** PUT ile gelen kullanıcı kayıtlarında boş bırakılan secret alanları diskteki değerle koru. */
-export function mergeStoreUserSecrets(existing, incoming) {
+export function mergeStoreUserSecrets(existing, incoming, vaultUsers = null) {
   if (!incoming || typeof incoming !== 'object') return incoming;
   if (!Array.isArray(incoming.users) || !Array.isArray(existing?.users)) {
     return incoming;
   }
+  const vault = vaultUsers && typeof vaultUsers === 'object' ? vaultUsers : {};
   const byId = new Map(existing.users.map((u) => [u.id, u]));
   const byUsername = new Map(
     existing.users.map((u) => [String(u.username ?? '').trim().toLowerCase(), u]),
   );
   const users = incoming.users.map((user) => {
-    const prev = byId.get(user.id) ?? byUsername.get(String(user.username ?? '').trim().toLowerCase());
+    const usernameKey = String(user.username ?? '').trim().toLowerCase();
+    const prev = byId.get(user.id) ?? byUsername.get(usernameKey);
     if (!prev) return user;
     const next = { ...user };
+    const vaultEntry = vault[usernameKey] ?? {};
     const keepSecret = (field) => {
       const incomingVal = next[field];
       const prevVal = prev[field];
-      if ((!incomingVal || incomingVal === '') && prevVal) next[field] = prevVal;
+      const vaultVal = vaultEntry[field];
+      if (field === 'passwordHash' && isSha256Hex(incomingVal) && incomingVal !== prevVal) {
+        next[field] = incomingVal;
+        return;
+      }
+      if ((!incomingVal || incomingVal === '') && prevVal) {
+        next[field] = prevVal;
+        return;
+      }
+      if ((!incomingVal || incomingVal === '') && vaultVal) {
+        next[field] = vaultVal;
+      }
     };
     keepSecret('passwordHash');
     keepSecret('pinHash');
