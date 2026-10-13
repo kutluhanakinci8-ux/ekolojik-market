@@ -767,6 +767,14 @@ function createSetMovement(
   };
 }
 
+/** Sunucuya PUT — boş hash alanları diskteki şifreyi silmesin */
+function usersForServerSnapshot(users: PosUser[]): PosUser[] {
+  return users.map((user) => {
+    const { passwordHash: _p, pinHash: _pin, totpSecret: _t, ...safe } = user;
+    return safe as PosUser;
+  });
+}
+
 function serializeProductsForSnapshot(products: Product[], settings: AppSettings): Product[] {
   const isolated = isTenantCatalogIsolated(undefined, settings);
   const localImages = isolated ? {} : loadAllImages();
