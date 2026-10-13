@@ -1,5 +1,7 @@
 /** Kullanıcı işlemleri — premium UI yardımcıları */
 
+import type { ChangeEvent, ReactNode } from 'react';
+
 export function userInitials(displayName: string, username: string): string {
   const parts = displayName.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
@@ -60,4 +62,33 @@ export function RingProgress({ pct, size = 52, label, variant = 'brand' }: RingP
 
 export function KpiIcon({ name }: { name: string }) {
   return <span className={`platform-kpi-icon platform-kpi-icon--${name}`} aria-hidden />;
+}
+
+type FilterSelectProps = {
+  label: string;
+  icon: 'store' | 'status' | 'role';
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+};
+
+export function PlatformFilterSelect({ label, icon, value, onChange, children }: FilterSelectProps) {
+  const active = value !== 'all';
+  return (
+    <label className={`platform-users-select-field ${active ? 'is-active' : ''}`}>
+      <span className="platform-users-select-field-label">{label}</span>
+      <div className="platform-users-select-shell">
+        <span className={`platform-users-select-icon platform-users-select-icon--${icon}`} aria-hidden />
+        <select
+          className="platform-users-select"
+          value={value}
+          onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
+          aria-label={label}
+        >
+          {children}
+        </select>
+        <span className="platform-users-select-chevron" aria-hidden />
+      </div>
+    </label>
+  );
 }
