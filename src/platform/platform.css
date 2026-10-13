@@ -3000,6 +3000,78 @@
   margin: 0 0 0.75rem;
 }
 
+.platform-integrations-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.platform-integrations-hero-main {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.platform-integrations-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.platform-integrations-connectors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.65rem;
+}
+
+.platform-integrations-connector {
+  border-radius: 12px;
+  border: 1px solid var(--pu-border, #e8ecef);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
+.platform-integrations-connector--ok {
+  border-color: #bbf7d0;
+  background: linear-gradient(180deg, #fff 0%, #f0fdf4 100%);
+}
+
+.platform-integrations-connector--warn {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.platform-integrations-connector--off {
+  opacity: 0.85;
+}
+
+.platform-integrations-connector-label {
+  font-weight: 700;
+}
+
+.platform-integrations-connector-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--pu-muted, #64748b);
+}
+
+.platform-integrations-connector-detail {
+  color: var(--pu-muted, #64748b);
+  font-size: 0.8rem;
+}
+
 .platform-maintenance-banner {
   margin: 0 0 0.75rem;
   padding: 0.65rem 1rem;

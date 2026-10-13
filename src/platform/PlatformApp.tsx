@@ -8,6 +8,7 @@ import { PlatformAuditTab } from './PlatformAuditTab';
 import { PlatformBillingTab } from './PlatformBillingTab';
 import { PlatformSupportTab } from './PlatformSupportTab';
 import { PlatformSettingsTab } from './PlatformSettingsTab';
+import { PlatformIntegrationsTab } from './PlatformIntegrationsTab';
 import { PlatformCommsTab } from './PlatformCommsTab';
 import { PlatformOverviewTab } from './PlatformOverviewTab';
 import { PlatformSecurityTab } from './PlatformSecurityTab';
@@ -26,6 +27,7 @@ type PlatformTab =
   | 'audit'
   | 'comms'
   | 'settings'
+  | 'integrations'
   | 'infrastructure';
 
 export function PlatformApp() {
@@ -155,6 +157,13 @@ export function PlatformApp() {
         </button>
         <button
           type="button"
+          className={`platform-tab ${activeTab === 'integrations' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('integrations')}
+        >
+          Entegrasyonlar
+        </button>
+        <button
+          type="button"
           className={`platform-tab ${activeTab === 'infrastructure' ? 'platform-tab--active' : ''}`}
           onClick={() => setActiveTab('infrastructure')}
         >
@@ -164,6 +173,8 @@ export function PlatformApp() {
 
       {activeTab === 'settings' ? (
         <PlatformSettingsTab />
+      ) : activeTab === 'integrations' ? (
+        <PlatformIntegrationsTab />
       ) : activeTab === 'infrastructure' ? (
         <PlatformInfrastructureTab />
       ) : activeTab === 'billing' ? (

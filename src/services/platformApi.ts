@@ -756,6 +756,47 @@ export type PlatformSettingsPayload = {
   }>;
 };
 
+export type PlatformIntegrationConnector = {
+  id: string;
+  category: string;
+  label: string;
+  priority: string;
+  status: 'ok' | 'warn' | 'off' | string;
+  detail: string;
+};
+
+export type PlatformIntegrationsPayload = {
+  generatedAt: string;
+  score: number;
+  connectors: PlatformIntegrationConnector[];
+  webhooks: Array<{
+    id: string;
+    label: string;
+    configured: boolean;
+    enabled: boolean;
+    urlMasked: string | null;
+    source: string;
+  }>;
+  realtime: {
+    path: string;
+    connectedClients: number;
+    lastBroadcastAt: string | null;
+    broadcastCount: number;
+  };
+  outbox: { pending: number; failed: number; sent: number };
+  tenants: Array<{
+    tenantId: string;
+    businessName: string;
+    mailMode: string;
+    smtpConfigured: boolean;
+    imapConfigured: boolean;
+    messagingPublicKey: string;
+    messagingKeySource: string | null;
+    mailHealthDone: boolean;
+    messagingEmbedDone: boolean;
+  }>;
+};
+
 export type PlatformInfrastructureCheck = {
   id: string;
   label: string;
@@ -986,6 +1027,63 @@ export async function savePlatformConsoleSettings(
       return { ok: false, error: data.error ?? 'Ayarlar kaydedilemedi' };
     }
     return { ok: true, console: data.console };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function fetchPlatformIntegrationsOverview(): Promise<{
+  ok: boolean;
+  data?: PlatformIntegrationsPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/integrations', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformIntegrationsPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Entegrasyon özeti yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformIntegrationsPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function runPlatformIntegrationsProbe(options: {
+  smtp?: boolean;
+  imap?: boolean;
+  engagementWebhook?: boolean;
+  securityWebhook?: boolean;
+}): Promise<{
+  ok: boolean;
+  probes?: Record<string, { ok?: boolean; skipped?: boolean; error?: string; status?: number }>;
+  error?: string;
+}> {
+  const result = await platformSecurityPost<{ probes?: Record<string, unknown> }>(
+    '/api/platform/integrations/probe',
+    options,
+  );
+  if (!result.ok) return result;
+  return { ok: true, probes: result.data?.probes as Record<string, { ok?: boolean; skipped?: boolean; error?: string; status?: number }> };
+}
+
+export async function downloadPlatformIntegrationsCsv(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/integrations/export.csv', { headers: posApiAuthHeaders() });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `platform-entegrasyon-${stamp}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };
   }

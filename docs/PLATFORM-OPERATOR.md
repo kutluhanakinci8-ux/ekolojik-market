@@ -23,6 +23,7 @@
 9. **Gelir** sekmesi — kiracı ciro, cari/tahsilat, plan dağılımı, tahmini MRR (`GET /api/platform/billing`, `GET /api/platform/billing/export.csv`)
 10. **Destek** sekmesi — mesaj SLA kuyruğu, eşik politikası, kiracı özet (`GET /api/platform/support`, `PUT /api/platform/support/policy`, `GET /api/platform/support/export.csv`)
 11. **Yapılandırma** sekmesi — runtime/allowlist özeti, operatör listesi, bakım bandı, deneme süresi, plan MRR (`GET /api/platform/settings`, `PUT /api/platform/settings` → `data/platform/console-settings.json`)
+12. **Entegrasyonlar** sekmesi — SMTP/IMAP, Lerta, mesaj API, webhook, kiracı kanal matrisi (`GET /api/platform/integrations`, `POST /api/platform/integrations/probe`, `GET /api/platform/integrations/export.csv`)
 
 API: `GET /api/platform/alerts`, `GET /api/platform/calendar?year=&month=`, `GET /api/platform/users`, `GET /api/platform/tenants/lifecycle`
 

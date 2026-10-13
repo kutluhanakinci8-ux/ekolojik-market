@@ -398,6 +398,24 @@ export async function patchPlatformConsoleSettings(dataDir, patch) {
   return { ok: true, console };
 }
 
+export async function getPlatformIntegrationsOverview(dataDir) {
+  const { buildPlatformIntegrationsOverview } = await import('./platformIntegrationsMetrics.mjs');
+  return buildPlatformIntegrationsOverview(dataDir);
+}
+
+export async function platformIntegrationsProbe(dataDir, options = {}) {
+  const { runPlatformIntegrationProbes } = await import('./platformIntegrationsMetrics.mjs');
+  return runPlatformIntegrationProbes(dataDir, options);
+}
+
+export async function getPlatformIntegrationsExportCsv(dataDir) {
+  const overview = await getPlatformIntegrationsOverview(dataDir);
+  const { buildPlatformIntegrationsCsv } = await import('./platformIntegrationsMetrics.mjs');
+  const csv = buildPlatformIntegrationsCsv(overview);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { csv, filename: `platform-entegrasyon-${stamp}.csv` };
+}
+
 export async function getPlatformInfrastructureOverview(dataDir) {
   const { buildPlatformInfrastructureOverview } = await import('./platformInfrastructureMetrics.mjs');
   return buildPlatformInfrastructureOverview(dataDir);
