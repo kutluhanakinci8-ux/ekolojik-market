@@ -313,44 +313,61 @@ export function PlatformSupportTab() {
 
   return (
     <div className="platform-support platform-support--premium platform-users--premium">
-      <header className="platform-users-hero platform-users-hero--premium platform-support-hero-premium">
-        <div className="platform-users-hero-copy">
-          <span className="platform-users-hero-badge">Destek ops</span>
-          <h2>Destek komuta merkezi</h2>
-          <time className="platform-users-hero-time" dateTime={data.generatedAt}>
-            Son güncelleme: {formatDateTime(data.generatedAt)}
-          </time>
-          <ul className="platform-overview-hero-chips platform-support-hero-chips" aria-label="Destek sinyalleri">
-            <li className={data.totals.queueSize > 0 ? 'is-warn' : 'is-ok'}>{data.totals.queueSize} kuyruk</li>
-            <li className={(data.cases?.open ?? 0) > 0 ? 'is-warn' : 'is-ok'}>{data.cases?.open ?? 0} açık talep</li>
-            <li className={inboxUnread > 0 ? 'is-warn' : 'is-muted'}>{inboxUnread} okunmamış mail</li>
-            <li className="is-muted">{mailboxAddress ?? 'destek@'}</li>
-          </ul>
+      <header className="platform-support-compact-hero" aria-label="Destek komuta merkezi">
+        <div className="platform-support-compact-hero-primary">
+          <div className="platform-support-compact-hero-title-row">
+            <h2>Destek komuta merkezi</h2>
+            <span className="platform-support-compact-hero-mail" title="Destek posta kutusu">
+              {mailboxAddress ?? 'destek@ekolojikmarket.com.tr'}
+            </span>
+          </div>
+          <p className="platform-support-compact-hero-meta">
+            <time dateTime={data.generatedAt}>Güncelleme {formatDateTime(data.generatedAt)}</time>
+            <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
+            <span className={data.totals.queueSize > 0 ? 'is-warn' : ''}>{data.totals.queueSize} kuyruk</span>
+            <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
+            <span className={(data.cases?.open ?? 0) > 0 ? 'is-warn' : ''}>{data.cases?.open ?? 0} talep</span>
+            <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
+            <span className={inboxUnread > 0 ? 'is-warn' : ''}>{inboxUnread} mail</span>
+          </p>
         </div>
-        <div className="platform-users-hero-actions platform-support-hero-actions-premium">
-          <div className="platform-users-hero-stat">
-            <RingProgress pct={compliancePct} size={72} label="SLA uyumu" variant={complianceVariant} />
-            <span className="platform-users-hero-stat-label">SLA uyumu ({windowDays}g)</span>
+        <div className="platform-support-compact-hero-toolbar">
+          <div className="platform-support-compact-hero-sla" title={`SLA uyumu (${windowDays} gün)`}>
+            <RingProgress pct={compliancePct} size={46} label="SLA" variant={complianceVariant} />
+            <span className="platform-support-compact-hero-sla-label">SLA</span>
           </div>
-          <div className="platform-support-hero-toolbar">
-            <PlatformFilterSelect
-              label="Pencere"
-              icon="status"
+          <label className="platform-support-compact-window">
+            <span className="visually-hidden">Metrik penceresi</span>
+            <select
+              className="platform-support-compact-window-select"
               value={String(windowDays)}
-              onChange={(v) => setWindowDays(Number(v))}
+              onChange={(e) => setWindowDays(Number(e.target.value))}
+              aria-label="Metrik penceresi"
             >
-              <option value="7">7 gün</option>
-              <option value="14">14 gün</option>
-              <option value="30">30 gün</option>
-              <option value="90">90 gün</option>
-            </PlatformFilterSelect>
-            <button type="button" className="btn platform-support-btn-ghost" onClick={() => void load()} disabled={loading}>
-              Yenile
-            </button>
-            <button type="button" className="btn platform-support-btn-light" onClick={() => void onExport()} disabled={exporting}>
-              {exporting ? 'İndiriliyor…' : 'CSV'}
-            </button>
-          </div>
+              <option value="7">7g</option>
+              <option value="14">14g</option>
+              <option value="30">30g</option>
+              <option value="90">90g</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="platform-support-compact-icon-btn"
+            onClick={() => void load()}
+            disabled={loading}
+            title="Yenile"
+          >
+            Yenile
+          </button>
+          <button
+            type="button"
+            className="platform-support-compact-icon-btn platform-support-compact-icon-btn--solid"
+            onClick={() => void onExport()}
+            disabled={exporting}
+            title="CSV indir"
+          >
+            CSV
+          </button>
         </div>
       </header>
 
