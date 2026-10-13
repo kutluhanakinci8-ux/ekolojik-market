@@ -166,6 +166,44 @@ export async function updatePlatformCase(dataDir, caseId, patch, operatorUsernam
   return { ok: true, case: row };
 }
 
+export async function recordCaseEmailOutbound(
+  dataDir,
+  caseId,
+  { messageId, references, kind, inboxMessageId } = {},
+) {
+  const cases = await readPlatformCases(dataDir);
+  const idx = cases.findIndex((c) => c.id === caseId);
+  if (idx < 0) return { ok: false, error: 'Kayıt bulunamadı' };
+
+  const row = cases[idx];
+  if (!row.links) row.links = {};
+  if (!row.links.emailThread) {
+    row.links.emailThread = { outboundIds: [], lastReferences: null, events: [] };
+  }
+  const thread = row.links.emailThread;
+  const mid = String(messageId ?? '').trim();
+  if (mid && !thread.outboundIds.includes(mid)) thread.outboundIds.push(mid);
+  if (references?.trim()) thread.lastReferences = String(references).trim();
+  if (!Array.isArray(thread.events)) thread.events = [];
+  thread.events.unshift({
+    at: new Date().toISOString(),
+    kind: String(kind ?? 'outbound').trim(),
+    messageId: mid || null,
+    inboxMessageId: inboxMessageId ? String(inboxMessageId) : null,
+  });
+  if (thread.events.length > 40) thread.events = thread.events.slice(0, 40);
+  row.updatedAt = new Date().toISOString();
+  cases[idx] = row;
+  await writePlatformCases(dataDir, cases);
+  return { ok: true, case: row };
+}
+
+export async function findCaseByInboxRootId(dataDir, inboxRowId) {
+  const id = String(inboxRowId ?? '').trim();
+  if (!id) return null;
+  return findCaseByLink(dataDir, { inboxMessageId: id });
+}
+
 export async function appendCaseActivity(dataDir, caseId, entry, operatorUsername) {
   const cases = await readPlatformCases(dataDir);
   const idx = cases.findIndex((c) => c.id === caseId);

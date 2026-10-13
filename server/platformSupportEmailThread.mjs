@@ -56,7 +56,25 @@ export function buildInboxMessageIdIndex(rows) {
  * Gelen mail başlıklarından kök gelen kutusu satırını bulur.
  * @returns {{ root: object, matchedId: string } | null}
  */
-export function resolveInboxThreadRoot(existingRows, { inReplyTo, references } = {}) {
+export function buildCaseOutboundToInboxRootIndex(cases) {
+  const map = new Map();
+  for (const c of cases ?? []) {
+    const root = c.links?.inboxMessageId;
+    if (!root) continue;
+    const outbound = c.links?.emailThread?.outboundIds ?? [];
+    for (const raw of outbound) {
+      const n = normalizeMessageId(raw);
+      if (n) map.set(n, root);
+    }
+  }
+  return map;
+}
+
+export function resolveInboxThreadRoot(
+  existingRows,
+  { inReplyTo, references } = {},
+  caseOutboundIndex = null,
+) {
   const index = buildInboxMessageIdIndex(existingRows);
   const candidates = threadCandidateIds({ inReplyTo, references });
   for (const id of candidates) {
@@ -65,6 +83,11 @@ export function resolveInboxThreadRoot(existingRows, { inReplyTo, references } =
       const rootId = hit.threadRootId || hit.id;
       const root = existingRows.find((r) => r.id === rootId) ?? hit;
       return { root, matchedId: id };
+    }
+    const caseRootId = caseOutboundIndex?.get(id);
+    if (caseRootId) {
+      const root = existingRows.find((r) => r.id === caseRootId);
+      if (root) return { root, matchedId: id };
     }
   }
   return null;

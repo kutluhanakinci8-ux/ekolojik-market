@@ -3,6 +3,7 @@ import {
   normalizeMessageId,
   resolveInboxThreadRoot,
   mergeReferencesChain,
+  buildCaseOutboundToInboxRootIndex,
 } from '../server/platformSupportEmailThread.mjs';
 
 const root = {
@@ -25,5 +26,11 @@ assert.equal(hit2, null, 'unknown thread stays new');
 
 assert.equal(normalizeMessageId('<Ab@c>'), 'ab@c');
 assert.ok(mergeReferencesChain('<a@x>', '<b@y>').includes('<b@y>'));
+
+const caseIdx = buildCaseOutboundToInboxRootIndex([
+  { links: { inboxMessageId: 'ps-root', emailThread: { outboundIds: ['<only-on-case@test>'] } } },
+]);
+const hit3 = resolveInboxThreadRoot(rows, { inReplyTo: '<only-on-case@test>' }, caseIdx);
+assert.equal(hit3?.root.id, 'ps-root', 'case outbound index threads');
 
 console.log('platform-support-email-thread smoke: PASS');
