@@ -24,6 +24,8 @@ export function getPlatformSupportImapConfig() {
 }
 
 export function isPlatformSupportImapConfigured() {
+  const pass = process.env.EKOLOJIK_SUPPORT_IMAP_PASS?.trim();
+  if (!pass) return false;
   const c = getPlatformSupportImapConfig();
   return Boolean(c.imapHost && c.imapUser && c.imapPassword);
 }
