@@ -48,10 +48,12 @@ function signPayload(secret, payloadB64) {
   return createHmac('sha256', secret).update(`${TOKEN_VERSION}.${payloadB64}`).digest('base64url');
 }
 
-export async function createPosApiToken(dataDir, { tenantId, userId, role }) {
+export async function createPosApiToken(dataDir, { tenantId, userId, role, username }) {
   const secret = await getPosApiSecret(dataDir);
   const exp = Date.now() + TOKEN_TTL_MS;
-  const payloadB64 = Buffer.from(JSON.stringify({ tenantId, userId, role, exp }), 'utf8').toString('base64url');
+  const payload = { tenantId, userId, role, exp };
+  if (username) payload.username = String(username).trim().toLowerCase();
+  const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
   const sig = signPayload(secret, payloadB64);
   return `${TOKEN_VERSION}.${payloadB64}.${sig}`;
 }
@@ -60,7 +62,7 @@ export async function verifyPosApiToken(
   dataDir,
   token,
   expectedTenantId,
-  { requireAdmin = false, refreshGraceMs = 0 } = {},
+  { requireAdmin = false, requirePlatform = false, refreshGraceMs = 0 } = {},
 ) {
   if (!token?.trim()) {
     return { ok: false, status: 401, error: 'Oturum token gerekli (POS girişi yapın)' };
@@ -96,10 +98,19 @@ export async function verifyPosApiToken(
       return { ok: false, status: 401, error: 'Token süresi doldu — tekrar giriş yapın' };
     }
   }
-  if (expectedTenantId && payload.tenantId !== expectedTenantId) {
-    return { ok: false, status: 403, error: 'Token bu mağaza için geçerli değil' };
+  const isPlatform = payload.role === 'platform';
+  if (requirePlatform && !isPlatform) {
+    return { ok: false, status: 403, error: 'Platform yöneticisi oturumu gerekli' };
   }
-  if (requireAdmin && payload.role !== 'admin') {
+  if (expectedTenantId && payload.tenantId !== expectedTenantId) {
+    if (!isPlatform) {
+      return { ok: false, status: 403, error: 'Token bu mağaza için geçerli değil' };
+    }
+    if (expectedTenantId === '__platform__') {
+      return { ok: false, status: 403, error: 'Token bu mağaza için geçerli değil' };
+    }
+  }
+  if (requireAdmin && payload.role !== 'admin' && !isPlatform) {
     return { ok: false, status: 403, error: 'Yönetici yetkisi gerekli' };
   }
 
@@ -155,8 +166,26 @@ const GREENLEAF_LOGIN_ALIASES = new Map([
 export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { username, password, pin }) {
   let normalized = String(username ?? '').trim().toLowerCase();
   const tenant = String(tenantId ?? 'main').trim() || 'main';
+  const {
+    isPlatformOperatorUsername,
+    normalizePlatformOperatorUsername,
+    isDedicatedPlatformOnlyUsername,
+  } = await import('./platformOperators.mjs');
+  if (isPlatformOperatorUsername(normalized) && password) {
+    const { issuePlatformApiTokenFromCredentials } = await import('./platformAuth.mjs');
+    const platformResult = await issuePlatformApiTokenFromCredentials(dataDir, { username: normalized, password });
+    if (platformResult.ok) return platformResult;
+    if (platformResult.status !== 401) return platformResult;
+    if (isDedicatedPlatformOnlyUsername(normalized)) {
+      return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
+    }
+  }
   if (tenant === 'main' && GREENLEAF_LOGIN_ALIASES.has(normalized)) {
     normalized = GREENLEAF_LOGIN_ALIASES.get(normalized);
+  }
+  normalized = normalizePlatformOperatorUsername(normalized);
+  if (isDedicatedPlatformOnlyUsername(normalized)) {
+    return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
   }
   const tenantAffinity = assertUserBelongsToTenant(normalized, tenantId);
   if (!tenantAffinity.ok) {
@@ -203,11 +232,27 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
 }
 
 export async function refreshPosApiTokenFromBearer(dataDir, token, tenantId) {
-  const verified = await verifyPosApiToken(dataDir, token, tenantId, {
+  const { PLATFORM_TENANT_ID } = await import('./platformOperators.mjs');
+  let verified = await verifyPosApiToken(dataDir, token, PLATFORM_TENANT_ID, {
     refreshGraceMs: TOKEN_REFRESH_GRACE_MS,
   });
   if (!verified.ok) {
+    verified = await verifyPosApiToken(dataDir, token, tenantId, {
+      refreshGraceMs: TOKEN_REFRESH_GRACE_MS,
+    });
+  }
+  if (!verified.ok) {
     return { ok: false, status: verified.status ?? 401, message: verified.error };
+  }
+
+  if (verified.payload.role === 'platform') {
+    const newToken = await createPosApiToken(dataDir, {
+      tenantId: PLATFORM_TENANT_ID,
+      userId: verified.payload.userId,
+      role: 'platform',
+      username: verified.payload.username,
+    });
+    return { ok: true, token: newToken, role: 'platform', userId: verified.payload.userId };
   }
 
   const store = await readTenantStore(dataDir, tenantId);

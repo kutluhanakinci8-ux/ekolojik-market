@@ -88,6 +88,7 @@ cp scripts/escposTurkish.mjs "${INSTALL_DIR}/scripts/"
 cp scripts/win-raw-escpos.ps1 "${INSTALL_DIR}/scripts/" 2>/dev/null || true
 cp scripts/sunucu-kur.sh "${INSTALL_DIR}/kur.sh"
 cp scripts/ensure-greenleaf-credentials.mjs "${INSTALL_DIR}/scripts/"
+cp scripts/ensure-platform-operator.mjs "${INSTALL_DIR}/scripts/"
 chmod +x "${INSTALL_DIR}/kur.sh"
 if [[ -f .env.example ]] && [[ ! -f "${INSTALL_DIR}/.env" ]]; then
   cp .env.example "${INSTALL_DIR}/.env"
@@ -136,11 +137,14 @@ if [[ -f "${INSTALL_DIR}/.env" ]]; then
   done < "${INSTALL_DIR}/.env"
 fi
 if [[ -n "${GREENLEAF_OWNER_PASSWORD:-}" ]]; then
-  echo "==> Kimlik kasası (credential vault) — GREENLEAF_OWNER_PASSWORD ile..."
+  echo "==> Platform operatörü (kutluhan08) — vault _platform..."
   GREENLEAF_OWNER_PASSWORD="${GREENLEAF_OWNER_PASSWORD}" \
-    node "${INSTALL_DIR}/scripts/ensure-greenleaf-credentials.mjs" --data-dir "${INSTALL_DIR}/data" || true
+    GREENLEAF_OWNER_RECOVERY_EMAIL="${GREENLEAF_OWNER_RECOVERY_EMAIL:-}" \
+    node "${INSTALL_DIR}/scripts/ensure-platform-operator.mjs" --data-dir "${INSTALL_DIR}/data" || true
+  echo "==> Kimlik kasası Greenleaf demo kullanıcıları (yonetici/kasiyer)..."
+  node "${INSTALL_DIR}/scripts/ensure-greenleaf-credentials.mjs" --data-dir "${INSTALL_DIR}/data" || true
 else
-  echo "==> Kimlik kasası atlandı (.env içinde GREENLEAF_OWNER_PASSWORD tanımlayın)"
+  echo "==> Platform operatörü atlandı (.env içinde GREENLEAF_OWNER_PASSWORD tanımlayın)"
 fi
 
 if [[ "${EKOLOJIK_DEPLOY_DATA_MIGRATIONS:-0}" == "1" ]]; then

@@ -10,6 +10,7 @@ import { LandingContact } from './landing/LandingContact';
 import { LandingLogin } from './landing/LandingLogin';
 import { LandingRegister } from './landing/LandingRegister';
 import { CustomerMessagesPortal } from './portal/CustomerMessagesPortal';
+import { PlatformApp } from './platform/PlatformApp';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="giris" element={<LandingLogin />} />
         <Route path="kayit" element={<LandingRegister />} />
       </Route>
+      <Route path="/platform" element={<PlatformApp />} />
       <Route path="/app" element={<PosApp />} />
       <Route path="/portal/mesajlar" element={<CustomerMessagesPortal />} />
       <Route path="*" element={<Navigate to="/" replace />} />

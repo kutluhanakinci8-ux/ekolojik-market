@@ -12,7 +12,8 @@ import {
 import { validateStoreCodeForLogin } from '../config/knownTenants';
 import { LoginTenantStoreSection } from '../components/LoginTenantStoreSection';
 import { resolveLoginTenantId } from '../config/loginTenant';
-import { isOwnerAdminUsername } from '../config/ownerAdminUsers';
+import { isDedicatedPlatformOnlyUsername } from '../config/platformOperators';
+import { isPlatformApiRole } from '../config/platformOperators';
 import {
   DEFAULT_TENANT_ID,
   normalizeStoreCodeInput,
@@ -50,12 +51,12 @@ export function LandingLogin() {
   const [newPasswordReset, setNewPasswordReset] = useState('');
   const [resetRequestEmail, setResetRequestEmail] = useState('');
   const [forgotMode, setForgotMode] = useState(false);
-  const ownerLogin = isOwnerAdminUsername(username);
+  const platformOnlyLogin = isDedicatedPlatformOnlyUsername(username);
 
   useEffect(() => {
-    if (!isOwnerAdminUsername(username)) return;
-    saveTenantId(DEFAULT_TENANT_ID);
-    setTenantId(DEFAULT_TENANT_ID);
+    if (!isDedicatedPlatformOnlyUsername(username)) return;
+    saveTenantId('__platform__');
+    setTenantId('__platform__');
   }, [username]);
 
   useEffect(() => {
@@ -82,6 +83,11 @@ export function LandingLogin() {
   }, []);
 
   const goToApp = () => {
+    const claims = decodePosApiTokenClaims(loadPosApiToken());
+    if (isPlatformApiRole(claims?.role)) {
+      navigate('/platform', { replace: true });
+      return;
+    }
     navigate('/app', { replace: true });
   };
 
@@ -93,7 +99,7 @@ export function LandingLogin() {
     const loginUser = (pendingTotpUserId ? pendingUsername : username).trim();
     const resolvedTenant = resolveLoginTenantId(
       loginUser,
-      ownerLogin ? DEFAULT_TENANT_ID : normalizeStoreCodeInput(tenantId),
+      platformOnlyLogin ? '__platform__' : normalizeStoreCodeInput(tenantId),
     );
     const tenantError = validateStoreCodeForLogin(resolvedTenant);
     if (tenantError) {
@@ -235,8 +241,8 @@ export function LandingLogin() {
                 <LoginTenantStoreSection
                   tenantId={tenantId}
                   onTenantIdChange={setTenantId}
-                  initialExpanded={loginPageTenantFromUrl && !ownerLogin}
-                  hideForOwnerAccount={ownerLogin}
+                  initialExpanded={loginPageTenantFromUrl && !platformOnlyLogin}
+                  hideForOwnerAccount={platformOnlyLogin}
                 />
                 <label>
                   Kullanıcı Adı

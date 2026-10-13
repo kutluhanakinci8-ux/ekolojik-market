@@ -234,6 +234,7 @@ import { isGreenleafPersistedImageUrl } from '../utils/greenleafProductImages';
 import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
 import { canPushTenantDataToServer } from '../config/tenantDataPolicy';
 import { resolveLoginTenantId } from '../config/loginTenant';
+import { PLATFORM_TENANT_ID } from '../config/platformOperators';
 import { TENANT_ID_CHANGED_EVENT } from '../storage/tenantSession';
 
 function storageKeys() {
@@ -3602,6 +3603,23 @@ export function usePosStoreState() {
 
       let user: PosUser | undefined;
       if (remoteAuth.ok) {
+        if (remoteAuth.role === 'platform' && remoteAuth.user && typeof remoteAuth.user === 'object') {
+          const platformUser = normalizeUser(remoteAuth.user as Record<string, unknown>);
+          user = {
+            ...platformUser,
+            role: 'admin',
+            allowedTabs: [...ALL_APP_PAGES],
+          };
+          setUsers([user]);
+          saveTenantId(PLATFORM_TENANT_ID);
+          syncPosLocalStorageKeys();
+          syncPosApiTokenToCurrentTenant(PLATFORM_TENANT_ID);
+          await finalizeLogin(user, 'password', {
+            password: passwordTrimmed,
+            apiToken: remoteAuth.token,
+          });
+          return { status: 'success' };
+        }
         if (remoteAuth.user && typeof remoteAuth.user === 'object') {
           user = normalizeUser(remoteAuth.user as Record<string, unknown>);
           setUsers((prev) => {
@@ -3610,7 +3628,7 @@ export function usePosStoreState() {
           });
         }
         const claims = decodePosApiTokenClaims(loadPosApiToken(authTenant));
-        if (claims?.tenantId?.trim()) {
+        if (claims?.tenantId?.trim() && claims.tenantId !== PLATFORM_TENANT_ID) {
           saveTenantId(claims.tenantId.trim());
           syncPosLocalStorageKeys();
         }

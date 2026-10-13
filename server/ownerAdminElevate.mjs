@@ -1,5 +1,5 @@
-/** Sunucu store.json — mağaza sahibi tam yetki (client ile aynı liste) */
-const OWNER_USERNAMES = new Set(['kutluhan08', 'kutluhan', 'kutluhanakinci8']);
+/** Sunucu store.json — mağaza sahibi yükseltmesi (platform operatörleri store içinde değil) */
+const OWNER_USERNAMES = new Set([]);
 
 const ALL_APP_PAGES = [
   'dashboard',

@@ -25,6 +25,7 @@ export function storeCodePlaceholder(): string {
  */
 export function validateStoreCodeForLogin(tenantId: string): string | null {
   const id = normalizeStoreCodeInput(tenantId);
+  if (id === '__platform__') return null;
   if (id === DEFAULT_TENANT_ID || KNOWN_TENANT_ALLOWLIST.includes(id)) {
     return null;
   }

@@ -1,8 +1,6 @@
-/** Tam yetkili mağaza sahibi — tüm sekmeler + yönetici onayları */
-export const OWNER_ADMIN_USERNAMES = new Set(
-  ['kutluhan08', 'kutluhan', 'kutluhanakinci8'].map((u) => u.toLowerCase()),
-);
+/** @deprecated Mağaza sahibi yükseltmesi — kutluhan08 artık platform operatörü (platformOperators.ts) */
+export const OWNER_ADMIN_USERNAMES = new Set<string>();
 
-export function isOwnerAdminUsername(username: string): boolean {
-  return OWNER_ADMIN_USERNAMES.has(username.trim().toLowerCase());
+export function isOwnerAdminUsername(_username: string): boolean {
+  return false;
 }

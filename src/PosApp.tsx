@@ -28,6 +28,9 @@ import {
 } from './storage/postaOnboardingSession';
 import { filterTabsForProductProfile, isPosLiteProfile } from './utils/tenantProductProfile';
 import { PosTenantBootstrap } from './components/PosTenantBootstrap';
+import { decodePosApiTokenClaims, loadPosApiToken } from './services/posApiAuth';
+import { isPlatformApiRole, isPlatformTenantId } from './config/platformOperators';
+import { loadTenantId } from './storage/tenantSession';
 import { WindowsZywellSetupBanner } from './components/pos/WindowsZywellSetupBanner';
 import { useAppReleaseRefresh } from './hooks/useAppReleaseRefresh';
 import { DEFAULT_ZYWELL_RECEIPT_PRINTER } from './types/receiptPrinter';
@@ -211,6 +214,11 @@ export function PosApp() {
 
   if (!store.authSession) {
     return <Navigate to="/giris" replace />;
+  }
+
+  const tokenClaims = decodePosApiTokenClaims(loadPosApiToken());
+  if (isPlatformApiRole(tokenClaims?.role) && isPlatformTenantId(loadTenantId())) {
+    return <Navigate to="/platform" replace />;
   }
 
   if (!store.catalogDisplayReady) {
