@@ -291,6 +291,24 @@ export async function getOutboxCounts(dataDir) {
   };
 }
 
+/** Kiracı bazında outbox dosya sayıları (platform raporu). */
+export async function getOutboxCountsByTenant(dataDir) {
+  const root = outboxRoot(dataDir);
+  await migrateLegacyFlatOutbox(root);
+  const tally = new Map();
+  for (const state of ['pending', 'sent', 'failed']) {
+    const locations = await collectJsonFilesInState(root, state);
+    for (const loc of locations) {
+      const tid = loc.tenantId || 'main';
+      if (!tally.has(tid)) {
+        tally.set(tid, { tenantId: tid, pending: 0, sent: 0, failed: 0 });
+      }
+      tally.get(tid)[state] += 1;
+    }
+  }
+  return [...tally.values()];
+}
+
 function isReady(message) {
   if (message.status !== 'pending') return false;
   const next = Date.parse(message.nextAttemptAt || message.createdAt);

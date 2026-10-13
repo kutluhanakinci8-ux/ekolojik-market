@@ -342,6 +342,44 @@ export async function getPlatformSecurityExportCsv(dataDir, days = 90) {
   return { csv, filename: `platform-guvenlik-${stamp}.csv` };
 }
 
+export async function getPlatformCommsOverview(dataDir, { days = 14 } = {}) {
+  const { buildPlatformCommsOverview } = await import('./platformCommsMetrics.mjs');
+  const safeDays = Math.min(90, Math.max(1, Number(days) || 14));
+  return buildPlatformCommsOverview(dataDir, { days: safeDays });
+}
+
+export async function platformCommsProcessOutbox(dataDir, { limit = 30 } = {}) {
+  const { createDeliverMessage } = await import('./emailOutboxProcessor.mjs');
+  const { processPendingOutbox } = await import('./emailOutbox.mjs');
+  const deliver = createDeliverMessage(dataDir);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 30));
+  const run = await processPendingOutbox(dataDir, deliver, { limit: safeLimit });
+  return { ok: true, processed: run };
+}
+
+export async function platformCommsRequeueFailed(dataDir, { tenantId, all = true, ids = [] } = {}) {
+  const { bulkRequeueFailedOutbox } = await import('./emailOutbox.mjs');
+  const useAll = all === true && (!ids || ids.length === 0);
+  const result = await bulkRequeueFailedOutbox(dataDir, {
+    tenantId: tenantId ? String(tenantId).trim() : undefined,
+    all: useAll,
+    ids: useAll ? [] : ids,
+  });
+  return result;
+}
+
+export async function getPlatformCommsExportCsv(dataDir, days = 14) {
+  const overview = await getPlatformCommsOverview(dataDir, { days });
+  const { buildPlatformCommsCsv } = await import('./platformCommsMetrics.mjs');
+  const csv = buildPlatformCommsCsv({
+    tenants: overview.tenants,
+    windowDays: overview.windowDays,
+    generatedAt: overview.generatedAt,
+  });
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { csv, filename: `platform-posta-mesaj-${stamp}.csv` };
+}
+
 export async function getPlatformUserOperations(dataDir) {
   const { analyzeTenantUsers, mergeRecentLogins, buildPlatformUserOperations } = await import(
     './platformUserMetrics.mjs'

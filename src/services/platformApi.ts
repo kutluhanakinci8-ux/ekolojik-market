@@ -316,6 +316,85 @@ export type PlatformSecurityAlertPolicy = {
   lastFired?: Record<string, string>;
 };
 
+export type PlatformCommsTenantRow = {
+  tenantId: string;
+  businessName: string;
+  outbox: { pending: number; sent: number; failed: number };
+  messaging: {
+    threadsTracked: number;
+    firstResponseRecorded: number;
+    pendingFirstResponse: number;
+    open: number;
+    waiting: number;
+    closed: number;
+  };
+  firstResponse: {
+    avgMs: number | null;
+    medianMs: number | null;
+    p90Ms: number | null;
+    samples: number;
+  };
+  engagement: { opens: number; clicks: number; bounces: number };
+};
+
+export type PlatformCommsPayload = {
+  generatedAt: string;
+  windowDays: number;
+  outboxCounts: { pending: number; sent: number; failed: number };
+  outboxWindow: {
+    sent: number;
+    failed: number;
+    attempted: number;
+    successRatePercent: number | null;
+  };
+  outboxByDay: Array<{ date: string; sent: number; failed: number }>;
+  failureBreakdown: Array<{ id: string; label: string; count: number; sample: string | null }>;
+  recentErrors: Array<{
+    id: string;
+    to: string;
+    subject: string;
+    at: string;
+    error: string;
+    errorClass: string;
+  }>;
+  pendingSample: number;
+  recentOutbox: Array<{
+    id: string;
+    tenantId: string;
+    folder: string;
+    to: string;
+    subject: string;
+    at: string;
+    lastError: string | null;
+  }>;
+  engagement: {
+    windowDays: number;
+    mailTrackEnabled: boolean;
+    clickTrackEnabled: boolean;
+    webhookConfigured: boolean;
+    totals: {
+      opens: number;
+      uniqueOpens: number;
+      clicks: number;
+      uniqueClicks: number;
+      bounces: number;
+    };
+    byTenant: Array<{ tenantId: string; opens: number; clicks: number; bounces: number }>;
+  };
+  messagingTotals: {
+    open: number;
+    waiting: number;
+    closed: number;
+    pendingFirstResponse: number;
+  };
+  tenants: PlatformCommsTenantRow[];
+  capabilities: {
+    smtpConfigured: boolean;
+    mailTrackEnabled: boolean;
+    failedAlertThreshold: number;
+  };
+};
+
 async function platformSecurityPost<T>(path: string, body?: unknown): Promise<{ ok: boolean; data?: T; error?: string }> {
   try {
     const res = await fetch(path, {
@@ -421,6 +500,81 @@ export async function fetchPlatformSecurityOverview(): Promise<{
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };
   }
+}
+
+export async function fetchPlatformCommsOverview(days = 14): Promise<{
+  ok: boolean;
+  data?: PlatformCommsPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch(`/api/platform/comms?days=${days}`, { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformCommsPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Posta/mesaj özeti yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformCommsPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function downloadPlatformCommsCsv(days = 14): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/comms/export.csv?days=${days}`, {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `platform-posta-mesaj-${stamp}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function platformCommsProcessOutbox(limit = 30): Promise<{
+  ok: boolean;
+  processed?: {
+    processed: number;
+    sent: number;
+    failed: number;
+    deferred: number;
+  };
+  error?: string;
+}> {
+  const result = await platformSecurityPost<{
+    processed: { processed: number; sent: number; failed: number; deferred: number };
+  }>('/api/platform/comms/outbox/process', { limit });
+  if (!result.ok) return result;
+  return { ok: true, processed: result.data?.processed };
+}
+
+export async function platformCommsRequeueFailed(options?: {
+  tenantId?: string;
+  all?: boolean;
+  ids?: string[];
+}): Promise<{ ok: boolean; requeued?: number; errors?: Array<{ id: string; error: string }>; error?: string }> {
+  const result = await platformSecurityPost<{
+    requeued: number;
+    errors?: Array<{ id: string; error: string }>;
+  }>('/api/platform/comms/outbox/requeue', {
+    tenantId: options?.tenantId,
+    all: options?.all ?? true,
+    ids: options?.ids ?? [],
+  });
+  if (!result.ok) return result;
+  return { ok: true, requeued: result.data?.requeued, errors: result.data?.errors };
 }
 
 export async function fetchPlatformUserOperations(): Promise<{

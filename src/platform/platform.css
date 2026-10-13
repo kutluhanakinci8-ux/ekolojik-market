@@ -1701,3 +1701,125 @@
     grid-template-columns: 1fr;
   }
 }
+
+.platform-comms-hero {
+  align-items: flex-start;
+}
+
+.platform-comms-smtp-pill {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--pu-border);
+  background: #fff;
+}
+
+.platform-comms-action-msg {
+  margin: 0.75rem 0 0;
+  font-size: 0.88rem;
+  color: var(--pu-text-muted, #5c6570);
+}
+
+.platform-comms-ops-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.platform-comms-failure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.platform-comms-failure-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--pu-border);
+  background: #fafbfc;
+  font-size: 0.88rem;
+}
+
+.platform-comms-failure-label {
+  color: var(--pu-text-muted, #5c6570);
+}
+
+.platform-comms-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 960px) {
+  .platform-comms-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-comms-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.platform-comms-feed > li {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--pu-border);
+  background: #fafbfc;
+}
+
+.platform-comms-feed-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.platform-comms-feed-main strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.platform-comms-folder {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.45rem;
+  border-radius: 6px;
+  background: #e8ecf0;
+  color: #4a5560;
+}
+
+.platform-comms-folder--sent {
+  background: #e6f4ea;
+  color: #1e6b3a;
+}
+
+.platform-comms-folder--failed {
+  background: #fdecea;
+  color: #b42318;
+}
+
+.platform-comms-folder--pending {
+  background: #fff4e5;
+  color: #9a6700;
+}

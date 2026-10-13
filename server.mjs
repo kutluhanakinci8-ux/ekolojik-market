@@ -933,6 +933,77 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/comms' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformCommsOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformCommsOverview(DATA_DIR, { days: daysParam || 14 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Posta/mesaj verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/comms/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformCommsExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformCommsExportCsv(DATA_DIR, daysParam || 14);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/comms/outbox/process' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = await readRequestBody(req);
+        const { platformCommsProcessOutbox } = await import('./server/platformApi.mjs');
+        const result = await platformCommsProcessOutbox(DATA_DIR, { limit: body?.limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Outbox işlenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/comms/outbox/requeue' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = await readRequestBody(req);
+        const { platformCommsRequeueFailed } = await import('./server/platformApi.mjs');
+        const result = await platformCommsRequeueFailed(DATA_DIR, {
+          tenantId: body?.tenantId,
+          all: body?.all !== false,
+          ids: Array.isArray(body?.ids) ? body.ids : [],
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Yeniden kuyruk başarısız' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/calendar' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;

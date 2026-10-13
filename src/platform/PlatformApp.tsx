@@ -20,11 +20,12 @@ import {
   type PlatformTenantUserRow,
 } from '../services/platformApi';
 import { saveTenantId } from '../storage/tenantSession';
+import { PlatformCommsTab } from './PlatformCommsTab';
 import { PlatformSecurityTab } from './PlatformSecurityTab';
 import { PlatformUsersTab, type PlatformUsersTabFocus } from './PlatformUsersTab';
 import './platform.css';
 
-type PlatformTab = 'overview' | 'users' | 'security';
+type PlatformTab = 'overview' | 'users' | 'security' | 'comms';
 
 const PAYMENT_CATEGORY_LABELS: Record<string, string> = {
   rent: 'Kira',
@@ -203,9 +204,18 @@ export function PlatformApp() {
         >
           Güvenlik
         </button>
+        <button
+          type="button"
+          className={`platform-tab ${activeTab === 'comms' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('comms')}
+        >
+          Posta & mesaj
+        </button>
       </nav>
 
-      {activeTab === 'security' ? (
+      {activeTab === 'comms' ? (
+        <PlatformCommsTab />
+      ) : activeTab === 'security' ? (
         <PlatformSecurityTab
           onNavigateUsers={(focus) => {
             setUsersTabFocus(focus);
