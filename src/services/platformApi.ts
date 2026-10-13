@@ -144,6 +144,90 @@ export async function fetchPlatformCalendar(year: number, month: number): Promis
   }
 }
 
+export type PlatformUserTotals = {
+  totalUsers: number;
+  activeCount: number;
+  inactiveCount: number;
+  churnedCount: number;
+  dormant30dCount: number;
+  dormant60dCount: number;
+  newUsers30d: number;
+  adminCount: number;
+  cashierCount: number;
+  totpEnabledCount: number;
+  missingRecoveryEmailCount: number;
+  mustChangePasswordCount: number;
+  loggedInLast7d: number;
+  loggedInLast30d: number;
+  loginSuccess30d: number;
+  loginFailed30d: number;
+  totpCoveragePct: number;
+  recoveryEmailCoveragePct: number;
+  engagementRate30d: number;
+};
+
+export type PlatformTenantUserStats = PlatformUserTotals & {
+  tenantId: string;
+  businessName: string;
+};
+
+export type PlatformUserRosterRow = {
+  tenantId: string;
+  businessName: string;
+  id: string;
+  username: string;
+  displayName: string;
+  role: 'admin' | 'cashier';
+  isActive: boolean;
+  engagement: string;
+  totpEnabled: boolean;
+  hasRecoveryEmail: boolean;
+  mustChangePassword: boolean;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  updatedAt: string | null;
+};
+
+export type PlatformRecentLoginRow = {
+  tenantId: string;
+  businessName: string;
+  id: string;
+  username: string;
+  displayName?: string;
+  success: boolean;
+  method?: string;
+  createdAt: string;
+  failureReason?: string;
+  clientIp?: string;
+};
+
+export type PlatformUserOperationsPayload = {
+  generatedAt: string;
+  totals: PlatformUserTotals;
+  engagementBreakdown: Record<string, number>;
+  tenants: PlatformTenantUserStats[];
+  roster: PlatformUserRosterRow[];
+  recentLogins: PlatformRecentLoginRow[];
+};
+
+export async function fetchPlatformUserOperations(): Promise<{
+  ok: boolean;
+  data?: PlatformUserOperationsPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/users', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformUserOperationsPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Kullanıcı işlemleri yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformUserOperationsPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function fetchPlatformTenantDetail(tenantId: string): Promise<{
   ok: boolean;
   tenant?: PlatformTenantSummary & {
