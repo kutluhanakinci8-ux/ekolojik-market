@@ -431,6 +431,21 @@ export async function getPlatformTenantsLifecycle(dataDir) {
   return buildPlatformTenantsLifecycle(dataDir);
 }
 
+export async function getPlatformSupportInbox(dataDir, options = {}) {
+  const { listPlatformSupportInbox } = await import('./platformSupportInbox.mjs');
+  return listPlatformSupportInbox(dataDir, options);
+}
+
+export async function syncPlatformSupportInbox(dataDir, options = {}) {
+  const { syncPlatformSupportInbox: sync } = await import('./platformSupportInbox.mjs');
+  return sync(dataDir, options);
+}
+
+export async function replyPlatformSupportInboxMessage(dataDir, payload, operatorUsername) {
+  const { replyPlatformSupportInbox } = await import('./platformSupportInbox.mjs');
+  return replyPlatformSupportInbox(dataDir, { ...payload, operatorUsername });
+}
+
 export async function patchPlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername) {
   const { updatePlatformTenantLifecycle } = await import('./platformTenantLifecycle.mjs');
   return updatePlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername);

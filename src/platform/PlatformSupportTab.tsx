@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   downloadPlatformSupportCsv,
+  fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
+  replyPlatformSupportInbox,
   savePlatformSupportSlaPolicy,
+  syncPlatformSupportInbox,
+  type PlatformSupportInboxMessage,
   type PlatformSupportPayload,
   type PlatformSupportSlaPolicy,
 } from '../services/platformApi';
@@ -54,6 +58,14 @@ export function PlatformSupportTab() {
   const [policyDraft, setPolicyDraft] = useState<PlatformSupportSlaPolicy | null>(null);
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
+  const [section, setSection] = useState<'inbox' | 'queue'>('inbox');
+  const [inboxMessages, setInboxMessages] = useState<PlatformSupportInboxMessage[]>([]);
+  const [inboxUnread, setInboxUnread] = useState(0);
+  const [mailboxConfigured, setMailboxConfigured] = useState(false);
+  const [mailboxAddress, setMailboxAddress] = useState<string | null>(null);
+  const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [inboxSyncing, setInboxSyncing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +77,16 @@ export function PlatformSupportTab() {
       return;
     }
     setData(result.data);
+    setInboxUnread(result.data.inbox?.unread ?? 0);
+    setMailboxConfigured(result.data.capabilities.supportMailboxConfigured === true);
+    setMailboxAddress(result.data.capabilities.supportMailboxAddress ?? null);
+    const inboxRes = await fetchPlatformSupportInbox();
+    if (inboxRes.ok && inboxRes.data) {
+      setInboxMessages(inboxRes.data.messages);
+      setInboxUnread(inboxRes.data.unread);
+      setMailboxConfigured(inboxRes.data.mailbox.configured);
+      setMailboxAddress(inboxRes.data.mailbox.address);
+    }
     setPolicyDraft({
       firstResponseTargetMinutes: result.data.policy.firstResponseTargetMinutes,
       staleWaitingHours: result.data.policy.staleWaitingHours,
@@ -97,6 +119,33 @@ export function PlatformSupportTab() {
     void load();
   };
 
+  const selectedMail = inboxMessages.find((m) => m.id === selectedMailId) ?? null;
+
+  const onInboxSync = async () => {
+    setInboxSyncing(true);
+    setPolicyMsg(null);
+    const result = await syncPlatformSupportInbox();
+    setInboxSyncing(false);
+    if (!result.ok) {
+      setPolicyMsg(result.error ?? 'Senkron başarısız');
+      return;
+    }
+    setPolicyMsg(result.message ?? 'Gelen kutusu güncellendi');
+    void load();
+  };
+
+  const onReply = async () => {
+    if (!selectedMailId || !replyDraft.trim()) return;
+    const result = await replyPlatformSupportInbox(selectedMailId, replyDraft.trim());
+    if (!result.ok) {
+      setPolicyMsg(result.error ?? 'Yanıt gönderilemedi');
+      return;
+    }
+    setReplyDraft('');
+    setPolicyMsg('Yanıt destek@ üzerinden gönderildi');
+    void load();
+  };
+
   const onExport = async () => {
     setExporting(true);
     const result = await downloadPlatformSupportCsv(windowDays);
@@ -121,9 +170,9 @@ export function PlatformSupportTab() {
     <div className="platform-support">
       <section className="platform-users-hero platform-support-hero">
         <div>
-          <h2>Destek & SLA</h2>
+          <h2>Destek komuta merkezi</h2>
           <p>
-            Müşteri mesaj kuyruğu, ilk yanıt süreleri ve kiracı mesajlaşma hazırlığı — Posta sekmesinden bağımsız operasyon görünümü.
+            <strong>{mailboxAddress ?? 'destek@ekolojikmarket.com.tr'}</strong> gelen kutusu, otomatik “talebiniz alındı” (destek@) ve üretim mesaj kuyruğu. QA/smoke kayıtları gizlenir.
           </p>
           {!data.capabilities.messagingPublicConfigured ? (
             <p className="platform-support-hint">Genel mesajlaşma API yapılandırması eksik olabilir; kuyruk yine kiracı verisinden okunur.</p>
@@ -150,6 +199,84 @@ export function PlatformSupportTab() {
         </div>
       </section>
 
+      <nav className="platform-support-subnav" aria-label="Destek görünümü">
+        <button
+          type="button"
+          className={`platform-support-subnav-btn ${section === 'inbox' ? 'platform-support-subnav-btn--active' : ''}`}
+          onClick={() => setSection('inbox')}
+        >
+          Gelen kutusu {inboxUnread > 0 ? `(${inboxUnread})` : ''}
+        </button>
+        <button
+          type="button"
+          className={`platform-support-subnav-btn ${section === 'queue' ? 'platform-support-subnav-btn--active' : ''}`}
+          onClick={() => setSection('queue')}
+        >
+          Mesaj kuyruğu & SLA
+        </button>
+      </nav>
+
+      {section === 'inbox' ? (
+        <div className="platform-support-inbox-layout">
+          <section className="platform-panel platform-support-inbox-list">
+            <div className="platform-panel-head">
+              <h3>destek@ gelen</h3>
+              <button type="button" className="btn btn-secondary" onClick={() => void onInboxSync()} disabled={inboxSyncing}>
+                {inboxSyncing ? 'Senkron…' : 'IMAP senkron'}
+              </button>
+            </div>
+            {!mailboxConfigured ? (
+              <p className="platform-support-hint">
+                Ayrı posta kutusu için VPS’te <code>destek@</code> ve <code>EKOLOJIK_SUPPORT_IMAP_*</code> env tanımlayın. Kurulum:{' '}
+                <code>scripts/sunucu-ekolojik-destek-mailbox.sh</code>
+              </p>
+            ) : null}
+            <ul className="platform-support-inbox-items">
+              {inboxMessages.length === 0 ? (
+                <li className="platform-support-inbox-empty">Henüz kayıt yok — senkron deneyin.</li>
+              ) : (
+                inboxMessages.map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      className={`platform-support-inbox-item ${selectedMailId === m.id ? 'is-selected' : ''} ${!m.readAt ? 'is-unread' : ''}`}
+                      onClick={() => setSelectedMailId(m.id)}
+                    >
+                      <span className="platform-support-inbox-item-subject">{m.subject || '(konu yok)'}</span>
+                      <span className="platform-support-inbox-item-from">{m.from}</span>
+                      <span className="platform-support-inbox-item-date">{formatDateTime(m.receivedAt)}</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </section>
+          <section className="platform-panel platform-support-inbox-detail">
+            {selectedMail ? (
+              <>
+                <h3>{selectedMail.subject}</h3>
+                <p className="platform-table-muted">{selectedMail.from}</p>
+                {selectedMail.autoreplySentAt ? (
+                  <p className="platform-inline-msg">Otomatik alındı maili gönderildi ({formatDateTime(selectedMail.autoreplySentAt)})</p>
+                ) : null}
+                <div className="platform-support-inbox-body">{selectedMail.bodyText || selectedMail.snippet}</div>
+                <label className="platform-support-reply-label">
+                  Yanıt (destek@)
+                  <textarea rows={5} value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} />
+                </label>
+                <button type="button" className="btn btn-primary" onClick={() => void onReply()} disabled={!replyDraft.trim()}>
+                  Gönder
+                </button>
+              </>
+            ) : (
+              <p className="platform-support-hint">Listeden bir mail seçin.</p>
+            )}
+          </section>
+        </div>
+      ) : null}
+
+      {section === 'queue' ? (
+        <>
       <div className="platform-users-kpi-grid">
         <article className="platform-users-kpi platform-users-kpi--accent">
           <KpiIcon name="users" />
@@ -322,6 +449,8 @@ export function PlatformSupportTab() {
           </tbody>
         </table>
       </section>
+        </>
+      ) : null}
     </div>
   );
 }

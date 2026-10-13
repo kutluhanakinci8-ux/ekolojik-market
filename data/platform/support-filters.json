@@ -1,0 +1,6 @@
+{
+  "hideSmoke": true,
+  "tenantIds": ["test-magaza"],
+  "subjectPatterns": ["qa\\s*bot", "smoke", "botiletisim", "e2e", "faz\\d+"],
+  "customerNamePatterns": ["qa\\s*bot", "smoke", "akis\\s*a\\s*smoke"]
+}

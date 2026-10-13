@@ -2,10 +2,12 @@
 
 import { readTenantStore, listTenantIds } from './tenantAuth.mjs';
 import { listMessagingThreads } from './messaging/store.mjs';
-import { getMessagingSlaMetrics } from './messaging/sla.mjs';
 import { ensurePostaOnboarding } from './postaOnboarding.mjs';
 import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
 import { readSupportSlaPolicy, DEFAULT_SUPPORT_SLA_POLICY } from './platformSupportPolicy.mjs';
+import { readSupportFilterConfig, filterProductionMessagingThreads } from './platformSupportFilters.mjs';
+import { listPlatformSupportInbox } from './platformSupportInbox.mjs';
+import { computeMessagingSlaFromThreads } from './messaging/sla.mjs';
 
 async function allTenantIds(dataDir) {
   const ids = ['main', ...(await listTenantIds(dataDir))];
@@ -69,6 +71,7 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
   let pendingFirstResponseTotal = 0;
 
   const messagingPublicConfigured = isMessagingPublicApiConfigured();
+  const smokeFilter = await readSupportFilterConfig(dataDir);
 
   for (const tenantId of await allTenantIds(dataDir)) {
     const store = await readTenantStore(dataDir, tenantId);
@@ -77,9 +80,9 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
       ? ensurePostaOnboarding(store.settings, store.settings?.tenantMeta?.email)
       : null;
 
-    const sla = await getMessagingSlaMetrics(dataDir, tenantId, { days: windowDays });
     const listed = await listMessagingThreads(dataDir, tenantId, { limit: 200, includeArchived: false });
-    const threads = listed.threads ?? [];
+    const threads = filterProductionMessagingThreads(listed.threads ?? [], tenantId, smokeFilter);
+    const sla = computeMessagingSlaFromThreads(threads, { days: windowDays, tenantId });
 
     let tenantBreaches = 0;
     let tenantQueue = 0;
@@ -177,6 +180,8 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
 
   tenantRows.sort((a, b) => b.queueItems - a.queueItems || b.slaBreaches - a.slaBreaches);
 
+  const inbox = await listPlatformSupportInbox(dataDir, { limit: 8 });
+
   return {
     generatedAt: new Date().toISOString(),
     windowDays,
@@ -186,6 +191,21 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
     },
     capabilities: {
       messagingPublicConfigured,
+      supportMailboxConfigured: inbox.mailbox?.configured === true,
+      supportMailboxAddress: inbox.mailbox?.address ?? null,
+    },
+    inbox: {
+      unread: inbox.unread,
+      total: inbox.total,
+      lastSyncAt: inbox.lastSyncAt,
+      recent: (inbox.messages ?? []).map((m) => ({
+        id: m.id,
+        from: m.from,
+        subject: m.subject,
+        receivedAt: m.receivedAt,
+        readAt: m.readAt,
+        autoreplySentAt: m.autoreplySentAt,
+      })),
     },
     totals: {
       openThreads: openTotal,

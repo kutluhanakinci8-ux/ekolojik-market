@@ -680,7 +680,24 @@ export type PlatformSupportPayload = {
   generatedAt: string;
   windowDays: number;
   policy: Pick<PlatformSupportSlaPolicy, 'firstResponseTargetMinutes' | 'staleWaitingHours'>;
-  capabilities: { messagingPublicConfigured: boolean };
+  capabilities: {
+    messagingPublicConfigured: boolean;
+    supportMailboxConfigured?: boolean;
+    supportMailboxAddress?: string | null;
+  };
+  inbox?: {
+    unread: number;
+    total: number;
+    lastSyncAt: string | null;
+    recent: Array<{
+      id: string;
+      from: string;
+      subject: string;
+      receivedAt: string;
+      readAt: string | null;
+      autoreplySentAt: string | null;
+    }>;
+  };
   totals: {
     openThreads: number;
     waitingThreads: number;
@@ -969,6 +986,70 @@ export async function savePlatformSupportSlaPolicy(
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };
   }
+}
+
+export type PlatformSupportInboxMessage = {
+  id: string;
+  from: string;
+  to: string;
+  subject: string;
+  receivedAt: string;
+  snippet: string;
+  bodyText: string;
+  readAt: string | null;
+  autoreplySentAt: string | null;
+  externalTicketRef: string | null;
+};
+
+export type PlatformSupportInboxPayload = {
+  mailbox: {
+    configured: boolean;
+    address: string;
+    imapUser: string;
+    separateMailbox: boolean;
+    autoreplyFrom: string;
+    fallbackToPlatformImap?: boolean;
+  };
+  lastSyncAt: string | null;
+  messages: PlatformSupportInboxMessage[];
+  unread: number;
+  total: number;
+};
+
+export async function fetchPlatformSupportInbox(): Promise<{
+  ok: boolean;
+  data?: PlatformSupportInboxPayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/inbox', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSupportInboxPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Gelen kutusu yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformSupportInboxPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function syncPlatformSupportInbox(): Promise<{
+  ok: boolean;
+  message?: string;
+  error?: string;
+}> {
+  const result = await platformSecurityPost<{ message?: string }>('/api/platform/support/inbox/sync', {});
+  if (!result.ok) return result;
+  return { ok: true, message: result.data?.message };
+}
+
+export async function replyPlatformSupportInbox(
+  messageId: string,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await platformSecurityPost('/api/platform/support/inbox/reply', { messageId, body });
+  return { ok: result.ok, error: result.error };
 }
 
 export async function downloadPlatformSupportCsv(days?: number): Promise<{ ok: boolean; error?: string }> {

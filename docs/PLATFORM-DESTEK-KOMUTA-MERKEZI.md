@@ -206,18 +206,20 @@ Destek sekmesinde **özet widget + case’e bağlama**; detay ilgili sekmede.
 
 ---
 
-## 10. Açık kararlar (sizin onayı)
+## 10. Onaylanan kararlar (2026-10-13)
 
-1. **Sekme adı:** “Destek” mi “Operasyon” mu?  
-2. **destek@** gelen kutusu: IMAP’ta ayrı klasör mü, `info@` içinde etiket/filtre mi?  
-3. **Otomatik yanıt:** İlk mailde anında “talebiniz alındı” — `destek@` mı `bildirim@` mı?  
-4. **Smoke verisi:** Prod kuyruktan tamamen gizle mi, ayrı “Test” görünümü mü?  
-5. **Case verisi:** Tek `data/platform/` dosyası mı, ileride harici ticket sistemi (Zendesk) köprüsü mü?
+| Konu | Karar |
+|------|--------|
+| Sekme adı | **Destek** |
+| destek@ | **Ayrı posta kutusu** (`scripts/sunucu-ekolojik-destek-mailbox.sh`) |
+| Otomatik alındı | **destek@** (giden kimlik) |
+| Smoke/QA | **Tamamen gizli** (`data/platform/support-filters.json`) |
+| Harici ticket | **Evet** — `externalTicketRef` alanı (Zendesk vb. Faz D3) |
 
----
+## 11. Uygulama durumu
 
-## 11. Sonraki adım
-
-Onayladığınız kararlara göre **Faz D1 + D2** için tek PR açılabilir: `destek@` alias rehberi + inbox API iskeleti + Destek UI’da “Gelen” alt sekmesi.
+- **D1:** Smoke filtresi + üretim SLA/kuyruk (`platformSupportFilters.mjs`)
+- **D2:** destek@ IMAP senkron, otomatik alındı, gelen kutusu UI, yanıt API (`platformSupportInbox.mjs`)
+- **Sırada:** D3 Case modeli, D4 omnichannel, D5 komuta 360 widget’ları
 
 İlgili kod (bugün): `PlatformSupportTab.tsx`, `platformSupportMetrics.mjs`, `postaInbox`, `messaging/store.mjs`, `contactMail.mjs`.

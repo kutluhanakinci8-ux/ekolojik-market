@@ -13,9 +13,7 @@ function percentile(sorted, p) {
   return sorted[idx];
 }
 
-export async function getMessagingSlaMetrics(dataDir, tenantId = 'main', { days = 14 } = {}) {
-  const listed = await listMessagingThreads(dataDir, tenantId, { limit: 500, includeArchived: true });
-  const threads = listed.threads ?? [];
+export function computeMessagingSlaFromThreads(threads, { days = 14, tenantId = 'main' } = {}) {
   const windowMs = Math.max(1, Number(days) || 14) * 86400_000;
   const cutoff = Date.now() - windowMs;
 
@@ -69,4 +67,10 @@ export async function getMessagingSlaMetrics(dataDir, tenantId = 'main', { days 
       samples: responseMs.length,
     },
   };
+}
+
+export async function getMessagingSlaMetrics(dataDir, tenantId = 'main', { days = 14 } = {}) {
+  const listed = await listMessagingThreads(dataDir, tenantId, { limit: 500, includeArchived: true });
+  const threads = listed.threads ?? [];
+  return computeMessagingSlaFromThreads(threads, { days, tenantId });
 }

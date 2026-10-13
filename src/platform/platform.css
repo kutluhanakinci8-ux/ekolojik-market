@@ -2927,6 +2927,107 @@
   justify-content: center;
 }
 
+.platform-support-subnav {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.platform-support-subnav-btn {
+  border: 1px solid var(--pu-border, #e2e8f0);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.platform-support-subnav-btn--active {
+  background: var(--pu-brand, #14532d);
+  border-color: var(--pu-brand, #14532d);
+  color: #fff;
+}
+
+.platform-support-inbox-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 900px) {
+  .platform-support-inbox-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-support-inbox-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.platform-support-inbox-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid #eef2f6;
+  background: transparent;
+  padding: 0.65rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.platform-support-inbox-item.is-selected {
+  background: #f0fdf4;
+}
+
+.platform-support-inbox-item.is-unread .platform-support-inbox-item-subject {
+  font-weight: 700;
+}
+
+.platform-support-inbox-item-subject {
+  font-size: 0.88rem;
+}
+
+.platform-support-inbox-item-from,
+.platform-support-inbox-item-date {
+  font-size: 0.75rem;
+  color: var(--pu-muted, #64748b);
+}
+
+.platform-support-inbox-body {
+  white-space: pre-wrap;
+  font-size: 0.88rem;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.platform-support-reply-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin: 0.75rem 0;
+}
+
+.platform-support-reply-label textarea {
+  font-weight: 400;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--pu-border, #e2e8f0);
+}
+
 .platform-support-kpi-ring-caption {
   margin-top: 0.35rem;
   text-align: center;

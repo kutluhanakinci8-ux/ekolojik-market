@@ -1119,6 +1119,58 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/inbox' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportInbox } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportInbox(DATA_DIR, {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Gelen kutusu alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/inbox/sync' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { syncPlatformSupportInbox } = await import('./server/platformApi.mjs');
+        const result = await syncPlatformSupportInbox(DATA_DIR, { maxMessages: 50 });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Senkron başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/inbox/reply' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { replyPlatformSupportInboxMessage } = await import('./server/platformApi.mjs');
+        const result = await replyPlatformSupportInboxMessage(
+          DATA_DIR,
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Yanıt gönderilemedi' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/export.csv' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;

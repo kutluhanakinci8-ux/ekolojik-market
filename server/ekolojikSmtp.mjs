@@ -88,13 +88,15 @@ export async function sendViaEkolojikSmtp({
   text,
   html,
   fromName,
+  fromEmail,
   replyTo,
   inReplyTo,
   references,
   attachments,
 }) {
   const c = await resolveMailConfig(dataDir, tenantId);
-  const from = buildFromHeader(fromName || c.fromName, c.from);
+  const fromAddr = fromEmail?.includes('@') ? fromEmail.trim() : c.from;
+  const from = buildFromHeader(fromName || c.fromName, fromAddr);
   const reply = replyTo?.includes('@') ? replyTo : c.replyTo || undefined;
   const headers = {};
   if (inReplyTo?.includes('@') || inReplyTo?.startsWith('<')) headers['In-Reply-To'] = inReplyTo;
