@@ -1208,6 +1208,41 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/tenant-360' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const tenantId = url.searchParams.get('tenantId');
+        const { getPlatformSupportTenant360 } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportTenant360(DATA_DIR, tenantId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : '360 alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/command' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { postPlatformSupportCommand } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCommand(DATA_DIR, body, authPayload.username ?? 'platform');
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Komut başarısız' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/contact-queue' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;

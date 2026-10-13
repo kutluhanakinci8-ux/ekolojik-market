@@ -1242,6 +1242,89 @@ export async function createPlatformSupportCaseFromContact(
   return { ok: result.ok, error: result.error };
 }
 
+export type PlatformSupportTenant360Payload = {
+  tenantId: string;
+  businessName: string;
+  demo: boolean;
+  lifecycle: {
+    statusLabel: string;
+    suspended: boolean;
+    readOnly: boolean;
+  } | null;
+  accounting: {
+    receivablesTotalTry: number;
+    debtorsCount: number;
+    overduePaymentCount: number;
+    overduePaymentAmountTry: number;
+    collections30dTry?: number;
+    pendingPaymentCount?: number;
+  };
+  stock: {
+    productCount: number;
+    lowStockCount: number;
+    lowStockSample: Array<{ id: string; name: string; stock: number }>;
+  };
+  sales: { recentSaleCount30d: number; revenue30dTry: number };
+  security: {
+    securityScore: number;
+    loginFailed30d: number;
+    loginSuccess30d: number;
+  } | null;
+  comms: {
+    outbox: { pending: number; sent: number; failed: number };
+    messaging: { open?: number; pendingFirstResponse?: number };
+  };
+  openCases: Array<{ id: string; number: number; subject: string }>;
+};
+
+export async function fetchPlatformSupportTenant360(
+  tenantId: string,
+): Promise<{ ok: boolean; data?: PlatformSupportTenant360Payload; error?: string }> {
+  try {
+    const res = await fetch(
+      `/api/platform/support/tenant-360?tenantId=${encodeURIComponent(tenantId)}`,
+      { headers: posApiAuthHeaders() },
+    );
+    const data = (await res.json()) as PlatformSupportTenant360Payload & {
+      ok?: boolean;
+      error?: string;
+      generatedAt?: string;
+      users?: unknown;
+      quickLinks?: unknown;
+    };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? '360 yüklenemedi' };
+    }
+    return {
+      ok: true,
+      data: {
+        tenantId: data.tenantId,
+        businessName: data.businessName,
+        demo: data.demo,
+        lifecycle: data.lifecycle,
+        accounting: data.accounting,
+        stock: data.stock,
+        sales: data.sales,
+        security: data.security,
+        comms: data.comms,
+        openCases: data.openCases,
+      },
+    };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function postPlatformSupportCommand(payload: {
+  tenantId?: string;
+  command?: string;
+  line?: string;
+}): Promise<{ ok: boolean; error?: string; hints?: string[] }> {
+  const result = await platformSecurityPost('/api/platform/support/command', payload);
+  const hints = (result as { hints?: string[] }).hints;
+  return { ok: result.ok, error: result.error, hints };
+}
+
 export async function downloadPlatformSupportCsv(days?: number): Promise<{ ok: boolean; error?: string }> {
   try {
     const q = days != null && days > 0 ? `?days=${days}` : '';
