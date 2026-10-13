@@ -1032,10 +1032,9 @@ const server = createServer(async (req, res) => {
           res.end(JSON.stringify({ ok: true, policy }));
           return;
         }
-        const raw = await readRequestBody(req);
-        const body = raw ? JSON.parse(raw) : {};
+        const body = (await readRequestBody(req)) ?? {};
         const { updatePlatformSupportSlaPolicy } = await import('./server/platformApi.mjs');
-        const result = await updatePlatformSupportSlaPolicy(DATA_DIR, body ?? {});
+        const result = await updatePlatformSupportSlaPolicy(DATA_DIR, body);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {

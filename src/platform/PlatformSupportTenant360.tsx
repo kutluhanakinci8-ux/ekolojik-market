@@ -61,7 +61,7 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
 
   if (!tenantId) {
     return (
-      <aside className="platform-panel platform-support-360">
+      <aside className="platform-panel platform-panel--premium platform-support-360">
         <h3>Kiracı 360</h3>
         <p className="platform-support-hint">Talep veya kuyruk satırından kiracı seçildiğinde özet burada görünür.</p>
       </aside>
@@ -79,7 +79,7 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
 
   if (!data) {
     return (
-      <aside className="platform-panel platform-support-360">
+      <aside className="platform-panel platform-panel--premium platform-support-360">
         <h3>Kiracı 360</h3>
         <p className="platform-support-hint">Özet alınamadı.</p>
       </aside>
