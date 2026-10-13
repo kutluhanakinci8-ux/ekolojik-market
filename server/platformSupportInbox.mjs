@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fetchRecentMailboxMessages, verifyImapMailbox } from './billEmailImap.mjs';
-import { parseMailBody, repairUtf8Mojibake } from './mailBodyParse.mjs';
+import { parseMailBody, repairUtf8Mojibake, turkishLetterScore } from './mailBodyParse.mjs';
 import { parseThreadHeadersFromRaw } from './postaConversation.mjs';
 import { supportInboxStatus } from './platformSupportMailConfig.mjs';
 import { messageDedupeKey } from './billEmailInboxStore.mjs';
@@ -251,8 +251,14 @@ export async function importSupportInboxFromImap(
         prior.bodyText?.includes('\uFFFD')
         || prior.snippet?.includes('\uFFFD')
         || prior.bodyHtml?.includes('\uFFFD');
+      const outlookTypo = /[\u00B9¹]/.test(prior.bodyText ?? '');
       const fixedText = repairUtf8Mojibake(parsed.text ?? '');
-      if (corrupt && fixedText && !fixedText.includes('\uFFFD')) {
+      const betterText =
+        fixedText
+        && !fixedText.includes('\uFFFD')
+        && fixedText !== prior.bodyText
+        && (corrupt || outlookTypo || turkishLetterScore(fixedText) > turkishLetterScore(prior.bodyText ?? ''));
+      if (betterText) {
         prior.bodyText = fixedText;
         prior.bodyHtml = repairUtf8Mojibake(parsed.html ?? '');
         prior.snippet = repairUtf8Mojibake(parsed.snippet || prior.snippet || '');

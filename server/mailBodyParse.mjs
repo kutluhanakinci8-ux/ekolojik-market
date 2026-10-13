@@ -13,7 +13,7 @@ function parseCharset(contentType) {
   return m[1].trim().toLowerCase().replace(/^utf8$/, 'utf-8');
 }
 
-function turkishLetterScore(str) {
+export function turkishLetterScore(str) {
   return (String(str).match(/[ğüşöçıİĞÜŞÖÇ]/g) || []).length;
 }
 
