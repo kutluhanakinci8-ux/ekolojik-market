@@ -130,9 +130,37 @@ export async function listPlatformSupportContactQueue(dataDir, { limit = 40 } = 
   };
 }
 
+export async function processInboxRowForCase(dataDir, row) {
+  const { findCaseByLink, appendCaseActivity } = await import('./platformCaseStore.mjs');
+  const rootId =
+    row.threadRootId && row.threadRootId !== row.id ? row.threadRootId : row.id;
+  const isReply = rootId !== row.id;
+
+  if (isReply) {
+    const linked = await findCaseByLink(dataDir, { inboxMessageId: rootId });
+    if (linked) {
+      const preview = String(row.bodyText ?? row.snippet ?? '').trim().slice(0, 2000);
+      await appendCaseActivity(
+        dataDir,
+        linked.id,
+        {
+          type: 'email_inbound',
+          body: preview || '(boş gövde)',
+          channel: 'email',
+        },
+        'system',
+      );
+      return { ok: true, threaded: true, case: linked };
+    }
+  }
+
+  return autoCreateCaseForInboxRow(dataDir, row);
+}
+
 export async function autoCreateCaseForInboxRow(dataDir, row) {
+  const rootId = row.threadRootId || row.id;
   const existing = await import('./platformCaseStore.mjs').then((m) =>
-    m.findCaseByLink(dataDir, { inboxMessageId: row.id }),
+    m.findCaseByLink(dataDir, { inboxMessageId: rootId }),
   );
   if (existing) return { skipped: true, case: existing };
   return createPlatformCase(
@@ -144,7 +172,7 @@ export async function autoCreateCaseForInboxRow(dataDir, row) {
       subject: row.subject || 'E-posta destek',
       requesterEmail: extractEmail(row.from),
       requesterName: String(row.from ?? '').replace(/<[^>]+>/g, '').trim() || null,
-      links: { inboxMessageId: row.id },
+      links: { inboxMessageId: rootId },
       tags: ['destek-mail', 'auto'],
     },
     'system',

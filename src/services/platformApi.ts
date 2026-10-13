@@ -1000,6 +1000,7 @@ export type PlatformSupportInboxMessage = {
   id: string;
   messageId?: string | null;
   inReplyTo?: string | null;
+  threadRootId?: string | null;
   from: string;
   to: string;
   subject: string;

@@ -182,8 +182,11 @@ export function PlatformSupportTab() {
   };
 
   const selectedMail = inboxMessages.find((m) => m.id === selectedMailId) ?? null;
+  const selectedMailThreadRootId = selectedMail?.threadRootId || selectedMail?.id;
   const selectedMailCase =
-    selectedMail ? caseRows.find((c) => c.links?.inboxMessageId === selectedMail.id) ?? null : null;
+    selectedMail
+      ? caseRows.find((c) => c.links?.inboxMessageId === selectedMailThreadRootId) ?? null
+      : null;
 
   const onInboxSync = async () => {
     setInboxSyncing(true);
@@ -663,6 +666,15 @@ export function PlatformSupportTab() {
                       <span className="platform-support-hint"> Müşteriye otomatik yanıtta gösterilen kod.</span>
                     </dd>
                   </div>
+                  {selectedMail.threadRootId && selectedMail.threadRootId !== selectedMail.id ? (
+                    <div>
+                      <dt>Thread kökü</dt>
+                      <dd>
+                        <code>{selectedMail.threadRootId}</code>
+                        <span className="platform-support-hint"> Bu mail mevcut konuşmanın devamı.</span>
+                      </dd>
+                    </div>
+                  ) : null}
                   {selectedMailCase ? (
                     <div>
                       <dt>Destek kaydı</dt>
