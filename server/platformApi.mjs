@@ -198,3 +198,21 @@ export async function getPlatformTenantDetail(dataDir, tenantId) {
     topDebtors: receivablesFull.topDebtors ?? [],
   };
 }
+
+export async function getPlatformUserOperations(dataDir) {
+  const { analyzeTenantUsers, mergeRecentLogins, buildPlatformUserOperations } = await import(
+    './platformUserMetrics.mjs'
+  );
+  const storesByTenant = [];
+  const analytics = [];
+  for (const tenantId of await allTenantIds(dataDir)) {
+    const store = await readTenantStore(dataDir, tenantId);
+    if (!store) continue;
+    const businessName = String(store?.settings?.businessName ?? '').trim()
+      || (tenantId === 'main' ? 'Greenleaf Market' : tenantId);
+    storesByTenant.push({ store, tenantId, businessName });
+    analytics.push(analyzeTenantUsers(store, tenantId, businessName));
+  }
+  const recentLogins = mergeRecentLogins(storesByTenant, 50);
+  return buildPlatformUserOperations(analytics, recentLogins);
+}

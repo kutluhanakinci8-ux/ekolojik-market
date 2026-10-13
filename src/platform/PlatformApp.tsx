@@ -20,7 +20,10 @@ import {
   type PlatformTenantUserRow,
 } from '../services/platformApi';
 import { saveTenantId } from '../storage/tenantSession';
+import { PlatformUsersTab } from './PlatformUsersTab';
 import './platform.css';
+
+type PlatformTab = 'overview' | 'users';
 
 const PAYMENT_CATEGORY_LABELS: Record<string, string> = {
   rent: 'Kira',
@@ -63,6 +66,7 @@ export function PlatformApp() {
   const [alertsAsOf, setAlertsAsOf] = useState<string | null>(null);
   const [calendarDays, setCalendarDays] = useState<PlatformCalendarDay[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<PlatformTab>('overview');
 
   const loadTenants = useCallback(async () => {
     setLoading(true);
@@ -175,6 +179,27 @@ export function PlatformApp() {
         </div>
       </header>
 
+      <nav className="platform-tabs" aria-label="Platform bölümleri">
+        <button
+          type="button"
+          className={`platform-tab ${activeTab === 'overview' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          Genel bakış
+        </button>
+        <button
+          type="button"
+          className={`platform-tab ${activeTab === 'users' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('users')}
+        >
+          Kullanıcı işlemleri
+        </button>
+      </nav>
+
+      {activeTab === 'users' ? (
+        <PlatformUsersTab />
+      ) : (
+        <>
       {error && <p className="landing-flash landing-flash--error" role="alert">{error}</p>}
 
       <section className="platform-kpi-row" aria-label="Özet metrikler">
@@ -394,6 +419,8 @@ export function PlatformApp() {
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }
