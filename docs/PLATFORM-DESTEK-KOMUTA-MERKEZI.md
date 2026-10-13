@@ -220,6 +220,8 @@ Destek sekmesinde **özet widget + case’e bağlama**; detay ilgili sekmede.
 
 - **D1:** Smoke filtresi + üretim SLA/kuyruk (`platformSupportFilters.mjs`)
 - **D2:** destek@ IMAP senkron, otomatik alındı, gelen kutusu UI, yanıt API (`platformSupportInbox.mjs`)
-- **Sırada:** D3 Case modeli, D4 omnichannel, D5 komuta 360 widget’ları
+- **D3:** Case modeli, Zendesk ref, kuyruk/gelen otomatik bağlama
+- **D4:** Case detay omnichannel (e-posta / mesaj / iç not), makrolar, iletişim formu kuyruğu
+- **Sırada:** D5 komuta 360 widget’ları (VPS destek@ env en sonda)
 
 İlgili kod (bugün): `PlatformSupportTab.tsx`, `platformSupportMetrics.mjs`, `postaInbox`, `messaging/store.mjs`, `contactMail.mjs`.

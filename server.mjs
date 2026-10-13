@@ -1208,6 +1208,46 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/contact-queue' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const { getPlatformSupportContactQueue } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportContactQueue(DATA_DIR, {
+          limit: Number(url.searchParams.get('limit') || 40),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/from-contact' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { createPlatformSupportCaseFromContact } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCaseFromContact(
+          DATA_DIR,
+          body.contactId,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/cases/from-queue' && req.method === 'POST') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
@@ -1248,7 +1288,46 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const platformSupportCaseActionMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)\/action$/);
+    if (platformSupportCaseActionMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { postPlatformSupportCaseAction } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseAction(
+          DATA_DIR,
+          platformSupportCaseActionMatch[1],
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İşlem başarısız' }));
+      }
+      return;
+    }
+
     const platformSupportCaseMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)$/);
+    if (platformSupportCaseMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCaseDetail } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseDetail(DATA_DIR, platformSupportCaseMatch[1]);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt alınamadı' }));
+      }
+      return;
+    }
+
     if (platformSupportCaseMatch && req.method === 'PUT') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
@@ -3856,6 +3935,12 @@ const server = createServer(async (req, res) => {
         const tenantId = resolveTenantId(url);
         const result = await saveContactMessage(DATA_DIR, data ?? {});
         if (result.ok && result.contact) {
+          try {
+            const { autoCreateCaseForContactRow } = await import('./server/platformSupportCases.mjs');
+            void autoCreateCaseForContactRow(DATA_DIR, result.contact);
+          } catch {
+            /* case bridge opsiyonel */
+          }
           let portalUrl;
           try {
             const link = await linkContactFormToMessagingThread(DATA_DIR, tenantId, result.contact, {

@@ -1086,6 +1086,42 @@ export type PlatformSupportCase = {
   createdAt: string;
   updatedAt: string;
   notes: string;
+  activity?: Array<{
+    id: string;
+    type: string;
+    body: string;
+    channel: string | null;
+    createdAt: string;
+    createdBy: string;
+  }>;
+};
+
+export type PlatformSupportCaseDetail = {
+  case: PlatformSupportCase;
+  messagingPreview: {
+    thread: { id: string; customerName?: string };
+    messages: Array<{ id: string; direction: string; bodyText: string; createdAt: string; authorName?: string }>;
+  } | null;
+  inboxSnippet: {
+    id: string;
+    subject: string;
+    from: string;
+    snippet: string;
+    receivedAt: string;
+  } | null;
+  macros: Array<{ id: string; label: string; body: string }>;
+};
+
+export type PlatformSupportContactQueueItem = {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  messagePreview: string;
+  createdAt: string;
+  hasCase: boolean;
+  caseId: string | null;
+  caseNumber: number | null;
 };
 
 export type PlatformSupportCasesPayload = {
@@ -1143,6 +1179,66 @@ export async function createPlatformSupportCaseFromQueue(payload: {
   customerName?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const result = await platformSecurityPost('/api/platform/support/cases/from-queue', payload);
+  return { ok: result.ok, error: result.error };
+}
+
+export async function fetchPlatformSupportCaseDetail(
+  caseId: string,
+): Promise<{ ok: boolean; data?: PlatformSupportCaseDetail; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/support/cases/${caseId}`, { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSupportCaseDetail & { ok?: boolean; error?: string; case?: PlatformSupportCase };
+    if (!res.ok || !data.ok || !data.case) {
+      return { ok: false, error: data.error ?? 'Detay yüklenemedi' };
+    }
+    return {
+      ok: true,
+      data: {
+        case: data.case,
+        messagingPreview: data.messagingPreview ?? null,
+        inboxSnippet: data.inboxSnippet ?? null,
+        macros: data.macros ?? [],
+      },
+    };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function postPlatformSupportCaseAction(
+  caseId: string,
+  payload: { channel: 'note' | 'email' | 'messaging'; body: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await platformSecurityPost(`/api/platform/support/cases/${caseId}/action`, payload);
+  return { ok: result.ok, error: result.error };
+}
+
+export async function fetchPlatformSupportContactQueue(): Promise<{
+  ok: boolean;
+  data?: { items: PlatformSupportContactQueueItem[]; withoutCase: number };
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/contact-queue', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      items?: PlatformSupportContactQueueItem[];
+      withoutCase?: number;
+      error?: string;
+    };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'İletişim kuyruğu yüklenemedi' };
+    }
+    return { ok: true, data: { items: data.items ?? [], withoutCase: data.withoutCase ?? 0 } };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function createPlatformSupportCaseFromContact(
+  contactId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await platformSecurityPost('/api/platform/support/cases/from-contact', { contactId });
   return { ok: result.ok, error: result.error };
 }
 

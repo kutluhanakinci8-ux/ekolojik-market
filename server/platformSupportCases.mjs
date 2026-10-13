@@ -60,6 +60,76 @@ export async function createCaseFromMessagingQueue(dataDir, { tenantId, threadId
   );
 }
 
+export async function autoCreateCaseForContactRow(dataDir, contact) {
+  const existing = await import('./platformCaseStore.mjs').then((m) =>
+    m.findCaseByLink(dataDir, { contactMessageId: contact.id }),
+  );
+  if (existing) return { skipped: true, case: existing };
+  return createPlatformCase(
+    dataDir,
+    {
+      kind: 'request',
+      channel: 'contact_form',
+      status: 'new',
+      subject: contact.subject || 'İletişim formu',
+      requesterName: contact.name,
+      requesterEmail: contact.email,
+      links: { contactMessageId: contact.id },
+      tags: ['contact-form', 'auto'],
+    },
+    'system',
+  );
+}
+
+export async function createCaseFromContactMessage(dataDir, contactId, operatorUsername) {
+  const { listContactMessages } = await import('./tenantAuth.mjs');
+  const items = await listContactMessages(dataDir, 200);
+  const contact = items.find((c) => c.id === contactId);
+  if (!contact) return { ok: false, error: 'İletişim kaydı bulunamadı' };
+
+  return createPlatformCase(
+    dataDir,
+    {
+      kind: 'request',
+      channel: 'contact_form',
+      subject: contact.subject || 'İletişim formu',
+      requesterName: contact.name,
+      requesterEmail: contact.email,
+      links: { contactMessageId: contact.id },
+      tags: ['contact-form'],
+      notes: contact.message ? `Form mesajı:\n${contact.message}` : '',
+    },
+    operatorUsername,
+  );
+}
+
+export async function listPlatformSupportContactQueue(dataDir, { limit = 40 } = {}) {
+  const { listContactMessages } = await import('./tenantAuth.mjs');
+  const { findCaseByLink } = await import('./platformCaseStore.mjs');
+  const items = await listContactMessages(dataDir, limit);
+  const rows = [];
+  for (const c of items) {
+    const linked = await findCaseByLink(dataDir, { contactMessageId: c.id });
+    rows.push({
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      subject: c.subject,
+      messagePreview: String(c.message ?? '').slice(0, 160),
+      createdAt: c.createdAt,
+      hasCase: Boolean(linked),
+      caseId: linked?.id ?? null,
+      caseNumber: linked?.number ?? null,
+    });
+  }
+  return {
+    generatedAt: new Date().toISOString(),
+    total: rows.length,
+    withoutCase: rows.filter((r) => !r.hasCase).length,
+    items: rows,
+  };
+}
+
 export async function autoCreateCaseForInboxRow(dataDir, row) {
   const existing = await import('./platformCaseStore.mjs').then((m) =>
     m.findCaseByLink(dataDir, { inboxMessageId: row.id }),

@@ -61,8 +61,16 @@ async function slaDueAt(dataDir) {
   return new Date(Date.now() + minutes * 60_000).toISOString();
 }
 
+export async function getPlatformCase(dataDir, caseId) {
+  const cases = await readPlatformCases(dataDir);
+  return cases.find((c) => c.id === caseId) ?? null;
+}
+
 export async function findCaseByLink(dataDir, link) {
   const cases = await readPlatformCases(dataDir);
+  if (link.contactMessageId) {
+    return cases.find((c) => c.links?.contactMessageId === link.contactMessageId) ?? null;
+  }
   if (link.inboxMessageId) {
     return cases.find((c) => c.links?.inboxMessageId === link.inboxMessageId) ?? null;
   }
@@ -115,6 +123,7 @@ export async function createPlatformCase(dataDir, input, operatorUsername) {
     updatedAt: now,
     createdBy: operatorUsername ?? 'system',
     notes: String(input.notes ?? '').trim() || '',
+    activity: Array.isArray(input.activity) ? input.activity : [],
   };
 
   cases.unshift(row);
@@ -155,6 +164,40 @@ export async function updatePlatformCase(dataDir, caseId, patch, operatorUsernam
   cases[idx] = row;
   await writePlatformCases(dataDir, cases);
   return { ok: true, case: row };
+}
+
+export async function appendCaseActivity(dataDir, caseId, entry, operatorUsername) {
+  const cases = await readPlatformCases(dataDir);
+  const idx = cases.findIndex((c) => c.id === caseId);
+  if (idx < 0) return { ok: false, error: 'Kayıt bulunamadı' };
+
+  const row = cases[idx];
+  if (!Array.isArray(row.activity)) row.activity = [];
+  const item = {
+    id: `act-${randomUUID()}`,
+    type: String(entry.type ?? 'note').trim(),
+    body: String(entry.body ?? '').trim(),
+    channel: entry.channel ? String(entry.channel).trim() : null,
+    createdAt: new Date().toISOString(),
+    createdBy: operatorUsername ?? 'platform',
+  };
+  if (!item.body) return { ok: false, error: 'Metin gerekli' };
+
+  row.activity.unshift(item);
+  if (row.activity.length > 120) row.activity = row.activity.slice(0, 120);
+  if (item.type === 'note') {
+    const block = `[${item.createdAt.slice(0, 16)} ${item.createdBy}] ${item.body}`;
+    row.notes = row.notes ? `${row.notes}\n\n${block}` : block;
+  }
+  row.updatedAt = item.createdAt;
+  row.updatedBy = operatorUsername ?? row.updatedBy;
+  if (item.type !== 'note' && !['solved', 'closed'].includes(row.status)) {
+    row.status = 'open';
+  }
+
+  cases[idx] = row;
+  await writePlatformCases(dataDir, cases);
+  return { ok: true, activity: item, case: row };
 }
 
 export function summarizeCases(cases) {

@@ -479,6 +479,26 @@ export async function getPlatformSupportCasesExportCsv(dataDir) {
   return { csv, filename: `platform-talepler-${stamp}.csv` };
 }
 
+export async function getPlatformSupportCaseDetail(dataDir, caseId) {
+  const { getPlatformSupportCaseDetail: detail } = await import('./platformSupportCaseOmni.mjs');
+  return detail(dataDir, caseId);
+}
+
+export async function postPlatformSupportCaseAction(dataDir, caseId, body, operatorUsername) {
+  const { performPlatformCaseAction } = await import('./platformSupportCaseOmni.mjs');
+  return performPlatformCaseAction(dataDir, caseId, body, operatorUsername);
+}
+
+export async function getPlatformSupportContactQueue(dataDir, query = {}) {
+  const { listPlatformSupportContactQueue } = await import('./platformSupportCases.mjs');
+  return listPlatformSupportContactQueue(dataDir, query);
+}
+
+export async function createPlatformSupportCaseFromContact(dataDir, contactId, operatorUsername) {
+  const { createCaseFromContactMessage } = await import('./platformSupportCases.mjs');
+  return createCaseFromContactMessage(dataDir, contactId, operatorUsername);
+}
+
 export async function patchPlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername) {
   const { updatePlatformTenantLifecycle } = await import('./platformTenantLifecycle.mjs');
   return updatePlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername);

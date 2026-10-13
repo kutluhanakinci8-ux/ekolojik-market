@@ -1,0 +1,17 @@
+[
+  {
+    "id": "first_reply",
+    "label": "İlk yanıt",
+    "body": "Merhaba,\n\nTalebiniz için teşekkürler. İnceliyoruz; en kısa sürede bilgi vereceğiz.\n\nSaygılarımızla,"
+  },
+  {
+    "id": "sla_sorry",
+    "label": "SLA özür",
+    "body": "Merhaba,\n\nYanıtımızın geciktiği için özür dileriz. Konuyu önceliklendirdik.\n\nSaygılarımızla,"
+  },
+  {
+    "id": "resolved",
+    "label": "Çözüldü",
+    "body": "Merhaba,\n\nKaydınızı çözüldü olarak işaretledik. Başka bir sorunuz olursa yazabilirsiniz.\n\nSaygılarımızla,"
+  }
+]
