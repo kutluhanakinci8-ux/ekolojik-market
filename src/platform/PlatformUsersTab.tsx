@@ -5,7 +5,7 @@ import {
   type PlatformUserRosterRow,
   type PlatformUserTotals,
 } from '../services/platformApi';
-import { avatarHue, KpiIcon, RingProgress, userInitials } from './platformUserUi';
+import { avatarHue, KpiIcon, PlatformFilterSelect, RingProgress, userInitials } from './platformUserUi';
 
 const ENGAGEMENT_LABELS: Record<string, string> = {
   active: 'Aktif',
@@ -114,6 +114,18 @@ export function PlatformUsersTab() {
     if (loginFilter === 'all') return recentLogins;
     return recentLogins.filter((e) => (loginFilter === 'success' ? e.success : !e.success));
   }, [recentLogins, loginFilter]);
+
+  const rosterFiltersActive = search.trim() !== ''
+    || tenantFilter !== 'all'
+    || engagementFilter !== 'all'
+    || roleFilter !== 'all';
+
+  const resetRosterFilters = useCallback(() => {
+    setSearch('');
+    setTenantFilter('all');
+    setEngagementFilter('all');
+    setRoleFilter('all');
+  }, []);
 
   const loginSuccessRate = useMemo(() => {
     if (!totals) return 0;
@@ -350,45 +362,67 @@ export function PlatformUsersTab() {
             <h3>Kullanıcı dizini</h3>
             <p className="platform-muted">{filteredRoster.length} / {roster.length} kayıt</p>
           </div>
-          <div className="platform-users-filters platform-users-filters--premium">
-            <label className="platform-users-search-wrap">
+          <div className="platform-users-filter-bar" role="search">
+            <label className="platform-users-search-wrap platform-users-search-wrap--premium">
               <span className="platform-users-search-icon" aria-hidden />
               <input
                 type="search"
                 placeholder="Ad, kullanıcı adı, mağaza…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="platform-users-search"
+                className="platform-users-search platform-users-search--premium"
               />
+              {search.trim() !== '' && (
+                <button
+                  type="button"
+                  className="platform-users-search-clear"
+                  onClick={() => setSearch('')}
+                  aria-label="Aramayı temizle"
+                />
+              )}
             </label>
-            <select value={tenantFilter} onChange={(e) => setTenantFilter(e.target.value)} aria-label="Mağaza">
-              <option value="all">Tüm mağazalar</option>
-              {tenantStats.map((t) => (
-                <option key={t.tenantId} value={t.tenantId}>{t.businessName}</option>
-              ))}
-            </select>
-            <select
-              value={engagementFilter}
-              onChange={(e) => setEngagementFilter(e.target.value as FilterEngagement)}
-              aria-label="Durum"
-            >
-              <option value="all">Tüm durumlar</option>
-              {Object.entries(ENGAGEMENT_LABELS).map(([k, label]) => (
-                <option key={k} value={k}>{label}</option>
-              ))}
-            </select>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as 'all' | 'admin' | 'cashier')}
-              aria-label="Rol"
-            >
-              <option value="all">Tüm roller</option>
-              <option value="admin">Yönetici</option>
-              <option value="cashier">Kasiyer</option>
-            </select>
+            <div className="platform-users-select-grid">
+              <PlatformFilterSelect
+                label="Mağaza"
+                icon="store"
+                value={tenantFilter}
+                onChange={setTenantFilter}
+              >
+                <option value="all">Tüm mağazalar</option>
+                {tenantStats.map((t) => (
+                  <option key={t.tenantId} value={t.tenantId}>{t.businessName}</option>
+                ))}
+              </PlatformFilterSelect>
+              <PlatformFilterSelect
+                label="Durum"
+                icon="status"
+                value={engagementFilter}
+                onChange={(v) => setEngagementFilter(v as FilterEngagement)}
+              >
+                <option value="all">Tüm durumlar</option>
+                {Object.entries(ENGAGEMENT_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>{label}</option>
+                ))}
+              </PlatformFilterSelect>
+              <PlatformFilterSelect
+                label="Rol"
+                icon="role"
+                value={roleFilter}
+                onChange={(v) => setRoleFilter(v as 'all' | 'admin' | 'cashier')}
+              >
+                <option value="all">Tüm roller</option>
+                <option value="admin">Yönetici</option>
+                <option value="cashier">Kasiyer</option>
+              </PlatformFilterSelect>
+            </div>
+            {rosterFiltersActive && (
+              <button type="button" className="platform-users-filter-reset" onClick={resetRosterFilters}>
+                Filtreleri sıfırla
+              </button>
+            )}
           </div>
         </div>
-        <div className="platform-users-chip-row">
+        <div className="platform-users-chip-row platform-users-chip-row--premium">
           {ENGAGEMENT_ORDER.map((key) => {
             const count = engagementBreakdown[key] ?? 0;
             if (!count) return null;
@@ -396,10 +430,12 @@ export function PlatformUsersTab() {
               <button
                 key={key}
                 type="button"
-                className={`platform-users-chip ${engagementFilter === key ? 'platform-users-chip--on' : ''}`}
+                className={`platform-users-chip platform-users-chip--seg platform-users-chip--seg-${key} ${engagementFilter === key ? 'platform-users-chip--on' : ''}`}
                 onClick={() => setEngagementFilter(engagementFilter === key ? 'all' : key)}
               >
-                {ENGAGEMENT_LABELS[key]} ({count})
+                <span className="platform-users-chip-dot" aria-hidden />
+                {ENGAGEMENT_LABELS[key]}
+                <span className="platform-users-chip-count">{count}</span>
               </button>
             );
           })}
