@@ -15,6 +15,7 @@ import {
   getPlatformSupportMailAddress,
 } from './platformSupportMailConfig.mjs';
 import { sendViaEkolojikSmtp } from './ekolojikSmtp.mjs';
+import { buildPlatformSupportAutoreplyContent } from './platformSupportAutoreplyTemplate.mjs';
 import { PLATFORM_TENANT_ID } from './platformOperators.mjs';
 import { listMergedRecentOutbox } from './emailOutbox.mjs';
 import { readTenantStore } from './tenantAuth.mjs';
@@ -147,21 +148,6 @@ export async function maybeIngestOutboxForSupport(dataDir, outboxMessage) {
   }
 }
 
-function formatAutoreplyText({ fromName, messageId }) {
-  const brand = fromName || 'Ekolojik Market';
-  return [
-    'Merhaba,',
-    '',
-    `${brand} destek ekibine yazdığınız için teşekkür ederiz.`,
-    'Talebiniz alındı; en kısa sürede size dönüş yapacağız.',
-    '',
-    `Referans: ${messageId}`,
-    '',
-    '— Ekolojik Destek',
-    'destek@ekolojikmarket.com.tr',
-  ].join('\n');
-}
-
 async function sendSupportMail(dataDir, { to, subject, text, html, inReplyTo, references }) {
   const pres = getPlatformSupportMailPresentation();
   return sendViaEkolojikSmtp({
@@ -187,11 +173,15 @@ async function maybeSendAutoreply(dataDir, row) {
   const subject = row.subject?.toLowerCase().startsWith('re:')
     ? row.subject
     : `Re: ${row.subject || 'Destek talebiniz'}`;
-  const text = formatAutoreplyText({ fromName: pres.fromName, messageId: row.id });
+  const { text, html } = buildPlatformSupportAutoreplyContent({
+    messageId: row.id,
+    brandName: pres.fromName,
+  });
   const result = await sendSupportMail(dataDir, {
     to: from,
     subject,
     text,
+    html,
     inReplyTo: row.messageId,
     references: row.references || row.messageId,
   });
