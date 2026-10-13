@@ -34,5 +34,13 @@ export function mergeStoreUserSecrets(existing, incoming) {
     keepSecret('totpSecret');
     return next;
   });
+  for (const prev of existing.users) {
+    if (!prev?.id) continue;
+    const inList = users.some(
+      (u) => u.id === prev.id
+        || String(u.username ?? '').trim().toLowerCase() === String(prev.username ?? '').trim().toLowerCase(),
+    );
+    if (!inList) users.push(prev);
+  }
   return { ...incoming, users };
 }

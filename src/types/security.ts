@@ -22,8 +22,8 @@ export interface LoginLockoutRecord {
   lastAttemptAt: string;
 }
 
-export const LOGIN_MAX_ATTEMPTS = 5;
-export const LOGIN_LOCKOUT_MS = 5 * 60 * 1000;
+export const LOGIN_MAX_ATTEMPTS = 8;
+export const LOGIN_LOCKOUT_MS = 2 * 60 * 1000;
 export const IDLE_LOGOUT_MS = 5 * 60 * 1000;
 export const MAX_LOGIN_AUDIT_ENTRIES = 200;
 

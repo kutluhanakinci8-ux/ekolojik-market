@@ -788,6 +788,20 @@ function serializeProductsForSnapshot(products: Product[], settings: AppSettings
   });
 }
 
+/** Sunucu GET şifre hash döndürmez; boş hash PUT ile diskteki hash'i silmesin. */
+function usersForServerSnapshot(users: PosUser[]): PosUser[] {
+  return users.map((user) => {
+    const copy: PosUser = { ...user };
+    if (!copy.passwordHash?.trim()) {
+      copy.passwordHash = '';
+      delete (copy as Partial<PosUser>).passwordHash;
+    }
+    if (!copy.pinHash?.trim()) delete copy.pinHash;
+    if (!copy.totpSecret?.trim()) delete copy.totpSecret;
+    return copy;
+  });
+}
+
 function buildLocalSnapshot(
   products: Product[],
   productSets: ProductSet[],
@@ -1007,7 +1021,7 @@ export function usePosStoreState() {
       purchaseInvoices,
       settings,
       priceType,
-      overrides?.users ?? users,
+      usersForServerSnapshot(overrides?.users ?? users),
       loginAuditLog,
       activityAuditLog,
       suppliers,
@@ -3556,18 +3570,23 @@ export function usePosStoreState() {
         { username: normalized, password: passwordTrimmed },
         authTenant,
       );
-      if (!lockCheck.allowed) {
-        if (!remoteAuth.ok) {
-          if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
-            return {
-              status: 'locked',
-              message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
-              retryAfterMs: lockCheck.retryAfterMs,
-            };
-          }
+      if (remoteAuth.ok) {
+        clearLoginLockout(normalized);
+      } else if (!lockCheck.allowed) {
+        if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
+          return {
+            status: 'locked',
+            message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
+            retryAfterMs: lockCheck.retryAfterMs,
+          };
+        }
+        if (remoteAuth.httpStatus === 401) {
           return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
         }
-        clearLoginLockout(normalized);
+        return {
+          status: 'error',
+          message: remoteAuth.error ?? 'Sunucuya bağlanılamadı. Tekrar deneyin.',
+        };
       }
 
       let user: PosUser | undefined;
@@ -3615,7 +3634,11 @@ export function usePosStoreState() {
           return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
         }
       } else {
-        recordFailedLogin(normalized);
+        const credRejected = remoteAuth.httpStatus === 401
+          || (remoteAuth.error ?? '').toLowerCase().includes('hatalı');
+        if (credRejected) {
+          recordFailedLogin(normalized);
+        }
         await appendLoginAudit({
           username: normalized,
           success: false,
@@ -3624,7 +3647,9 @@ export function usePosStoreState() {
         });
         return {
           status: 'error',
-          message: remoteAuth.error ?? 'Kullanıcı adı veya şifre hatalı.',
+          message: credRejected
+            ? 'Kullanıcı adı veya şifre hatalı.'
+            : (remoteAuth.error ?? 'Sunucuya bağlanılamadı. Tekrar deneyin.'),
         };
       }
 
@@ -3698,18 +3723,23 @@ export function usePosStoreState() {
       syncPosLocalStorageKeys();
 
       let remoteAuth = await exchangePosApiToken({ username: normalized, pin: pinTrimmed }, authTenant);
-      if (!lockCheck.allowed) {
-        if (!remoteAuth.ok) {
-          if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
-            return {
-              status: 'locked',
-              message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
-              retryAfterMs: lockCheck.retryAfterMs,
-            };
-          }
+      if (remoteAuth.ok) {
+        clearLoginLockout(normalized);
+      } else if (!lockCheck.allowed) {
+        if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
+          return {
+            status: 'locked',
+            message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
+            retryAfterMs: lockCheck.retryAfterMs,
+          };
+        }
+        if (remoteAuth.httpStatus === 401) {
           return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
         }
-        clearLoginLockout(normalized);
+        return {
+          status: 'error',
+          message: remoteAuth.error ?? 'Sunucuya bağlanılamadı. Tekrar deneyin.',
+        };
       }
 
       let user: PosUser | undefined;
@@ -3756,7 +3786,11 @@ export function usePosStoreState() {
           return { status: 'error', message: 'Kullanıcı adı veya PIN hatalı.' };
         }
       } else {
-        recordFailedLogin(normalized);
+        const credRejected = remoteAuth.httpStatus === 401
+          || (remoteAuth.error ?? '').toLowerCase().includes('hatalı');
+        if (credRejected) {
+          recordFailedLogin(normalized);
+        }
         await appendLoginAudit({
           username: normalized,
           success: false,
@@ -3765,7 +3799,9 @@ export function usePosStoreState() {
         });
         return {
           status: 'error',
-          message: remoteAuth.error ?? 'Kullanıcı adı veya PIN hatalı.',
+          message: credRejected
+            ? 'Kullanıcı adı veya PIN hatalı.'
+            : (remoteAuth.error ?? 'Sunucuya bağlanılamadı. Tekrar deneyin.'),
         };
       }
 

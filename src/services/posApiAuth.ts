@@ -188,7 +188,13 @@ export async function exchangePosApiToken(
     pin?: string;
   },
   tenantId?: string,
-): Promise<{ ok: boolean; token?: string; error?: string; user?: Record<string, unknown> }> {
+): Promise<{
+  ok: boolean;
+  token?: string;
+  error?: string;
+  httpStatus?: number;
+  user?: Record<string, unknown>;
+}> {
   try {
     const authTenant = tenantId ?? loadTenantId();
     const res = await fetch(`/api/auth/pos-token${tenantQuery(authTenant)}`, {
@@ -203,13 +209,17 @@ export async function exchangePosApiToken(
       user?: Record<string, unknown>;
     };
     if (!res.ok || !data.ok || !data.token) {
-      return { ok: false, error: data.message ?? 'API token alınamadı' };
+      return {
+        ok: false,
+        httpStatus: res.status,
+        error: data.message ?? 'API token alınamadı',
+      };
     }
     savePosApiToken(data.token, authTenant);
     syncPosApiTokenToCurrentTenant(authTenant);
     startPosApiTokenRefreshScheduler();
     return { ok: true, token: data.token, user: data.user };
   } catch {
-    return { ok: false, error: 'API token isteği başarısız' };
+    return { ok: false, error: 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.' };
   }
 }
