@@ -1099,6 +1099,7 @@ export type PlatformSupportCase = {
     id: string;
     type: string;
     body: string;
+    html?: string | null;
     channel: string | null;
     createdAt: string;
     createdBy: string;
@@ -1126,6 +1127,7 @@ export type PlatformSupportCaseDetail = {
       from: string;
       subject: string;
       bodyText: string;
+      bodyHtml?: string | null;
       receivedAt: string;
       isReply: boolean;
     }>;
@@ -1134,6 +1136,8 @@ export type PlatformSupportCaseDetail = {
       kind: string;
       messageId: string | null;
       inboxMessageId: string | null;
+      textPreview?: string | null;
+      htmlPreview?: string | null;
     }>;
   } | null;
   macros: Array<{ id: string; label: string; body: string }>;

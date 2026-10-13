@@ -169,7 +169,7 @@ export async function updatePlatformCase(dataDir, caseId, patch, operatorUsernam
 export async function recordCaseEmailOutbound(
   dataDir,
   caseId,
-  { messageId, references, kind, inboxMessageId } = {},
+  { messageId, references, kind, inboxMessageId, textPreview, htmlPreview } = {},
 ) {
   const cases = await readPlatformCases(dataDir);
   const idx = cases.findIndex((c) => c.id === caseId);
@@ -190,6 +190,8 @@ export async function recordCaseEmailOutbound(
     kind: String(kind ?? 'outbound').trim(),
     messageId: mid || null,
     inboxMessageId: inboxMessageId ? String(inboxMessageId) : null,
+    textPreview: textPreview ? String(textPreview).slice(0, 4000) : null,
+    htmlPreview: htmlPreview ? String(htmlPreview).slice(0, 120_000) : null,
   });
   if (thread.events.length > 40) thread.events = thread.events.slice(0, 40);
   row.updatedAt = new Date().toISOString();
@@ -226,7 +228,11 @@ export async function appendCaseActivity(dataDir, caseId, entry, operatorUsernam
     createdAt: new Date().toISOString(),
     createdBy: operatorUsername ?? 'platform',
   };
-  if (!item.body) return { ok: false, error: 'Metin gerekli' };
+  if (entry.html?.trim()) {
+    item.html = String(entry.html).trim();
+  }
+  if (!item.body && !item.html) return { ok: false, error: 'Metin gerekli' };
+  if (!item.body && item.html) item.body = '(HTML e-posta)';
 
   row.activity.unshift(item);
   if (row.activity.length > 120) row.activity = row.activity.slice(0, 120);

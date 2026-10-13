@@ -28,6 +28,7 @@ import {
   mergeReferencesChain,
   resolveInboxThreadRoot,
 } from './platformSupportEmailThread.mjs';
+import { clipEmailActivityText, clipEmailActivityHtml } from './platformSupportActivityContent.mjs';
 
 const INBOX_DIR = (dataDir) => join(dataDir, 'platform', 'support-inbox');
 const SUPPORT_LOCAL = () => getPlatformSupportMailAddress().toLowerCase();
@@ -514,11 +515,18 @@ export async function replyPlatformSupportInbox(dataDir, { messageId, body, oper
         references: row.references,
         kind: 'operator_reply',
         inboxMessageId: row.id,
+        textPreview: clipEmailActivityText(text),
+        htmlPreview: clipEmailActivityHtml(replyHtml),
       });
       await appendCaseActivity(
         dataDir,
         linkedCase.id,
-        { type: 'email_outbound', body: text.slice(0, 2000), channel: 'email' },
+        {
+          type: 'email_outbound',
+          body: clipEmailActivityText(text),
+          html: clipEmailActivityHtml(replyHtml),
+          channel: 'email',
+        },
         operatorUsername,
       );
     }

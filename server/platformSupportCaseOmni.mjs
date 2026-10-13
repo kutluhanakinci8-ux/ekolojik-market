@@ -8,6 +8,7 @@ import { replyPlatformSupportInbox } from './platformSupportInbox.mjs';
 import { getPlatformSupportMailPresentation } from './platformSupportMailConfig.mjs';
 import { sendViaEkolojikSmtp } from './ekolojikSmtp.mjs';
 import { buildPlatformSupportOperatorReplyContent } from './platformSupportAutoreplyTemplate.mjs';
+import { clipEmailActivityText, clipEmailActivityHtml } from './platformSupportActivityContent.mjs';
 
 const MACROS_PATH = (dataDir) => join(dataDir, 'platform', 'support-macros.json');
 
@@ -72,7 +73,8 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
         id: m.id,
         from: m.from,
         subject: m.subject,
-        bodyText: String(m.bodyText ?? m.snippet ?? '').slice(0, 4000),
+        bodyText: clipEmailActivityText(m.bodyText ?? m.snippet ?? ''),
+        bodyHtml: m.bodyHtml ? clipEmailActivityHtml(m.bodyHtml) : null,
         receivedAt: m.receivedAt,
         isReply: Boolean(m.threadRootId && m.threadRootId !== m.id),
       })),
@@ -81,6 +83,8 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
         kind: e.kind,
         messageId: e.messageId ?? null,
         inboxMessageId: e.inboxMessageId ?? null,
+        textPreview: e.textPreview ?? null,
+        htmlPreview: e.htmlPreview ?? null,
       })),
     };
   }
@@ -128,7 +132,14 @@ async function sendCaseEmail(dataDir, caseRow, text, operatorUsername) {
   if (!result?.messageId) {
     return { ok: false, error: result?.error ?? 'SMTP gönderimi başarısız' };
   }
-  return { ok: true, to, result };
+  const { recordCaseEmailOutbound } = await import('./platformCaseStore.mjs');
+  await recordCaseEmailOutbound(dataDir, caseRow.id, {
+    messageId: result.messageId,
+    kind: 'operator_reply',
+    textPreview: clipEmailActivityText(text),
+    htmlPreview: clipEmailActivityHtml(replyHtml),
+  });
+  return { ok: true, to, result, replyHtml };
 }
 
 export async function performPlatformCaseAction(dataDir, caseId, { channel, body }, operatorUsername) {
@@ -150,7 +161,12 @@ export async function performPlatformCaseAction(dataDir, caseId, { channel, body
     const logged = await appendCaseActivity(
       dataDir,
       caseId,
-      { type: 'email_out', body: text, channel: 'email' },
+      {
+        type: 'email_outbound',
+        body: clipEmailActivityText(text),
+        html: sent.replyHtml ? clipEmailActivityHtml(sent.replyHtml) : undefined,
+        channel: 'email',
+      },
       operatorUsername,
     );
     return { ...logged, delivery: sent };

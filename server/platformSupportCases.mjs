@@ -151,7 +151,54 @@ async function attachInboundToLinkedCase(dataDir, row, linkedCase, extra = {}) {
       },
       'system',
     );
-    return { ok: true, spawned: true, case: created.case ?? created, ...extra };
+    const newCase = created.case ?? created;
+    const { appendCaseActivity } = await import('./platformCaseStore.mjs');
+    const { inboundBodyFromInboxRow } = await import('./platformSupportActivityContent.mjs');
+    await appendCaseActivity(
+      dataDir,
+      from.id,
+      {
+        type: 'case_spawned',
+        body: `Gelen e-posta yeni kayıt #${newCase.number} olarak açıldı (kapalı kayıt politikası).`,
+        channel: 'email',
+      },
+      'system',
+    );
+    await appendCaseActivity(
+      dataDir,
+      newCase.id,
+      {
+        type: 'email_inbound',
+        body: inboundBodyFromInboxRow(row),
+        channel: 'email',
+      },
+      'system',
+    );
+    const { notifyCustomerSpawnedCase } = await import('./platformSupportSpawnCaseNotify.mjs');
+    const notify = await notifyCustomerSpawnedCase(dataDir, {
+      closedCase: from,
+      newCase,
+      inboxRow: row,
+    });
+    if (notify?.messageId) {
+      const { recordCaseEmailOutbound } = await import('./platformCaseStore.mjs');
+      const { buildSpawnCaseNotificationBodies } = await import('./platformSupportSpawnCaseNotify.mjs');
+      const bodies = buildSpawnCaseNotificationBodies({
+        closedNumber: from.number,
+        newNumber: newCase.number,
+        newInboxId: row.id,
+        subject: row.subject,
+      });
+      await recordCaseEmailOutbound(dataDir, newCase.id, {
+        messageId: notify.messageId,
+        kind: 'spawn_notify',
+        inboxMessageId: row.id,
+        textPreview: bodies.text,
+        htmlPreview: bodies.html,
+      });
+    }
+    row.autoreplySentAt = new Date().toISOString();
+    return { ok: true, spawned: true, case: newCase, ...extra };
   }
   return { ok: true, threaded: true, case: result.case, ...extra };
 }

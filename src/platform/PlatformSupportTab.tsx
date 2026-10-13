@@ -31,6 +31,17 @@ const KIND_LABELS: Record<string, string> = {
   stale_waiting: 'Beklemede (eski)',
 };
 
+function SupportEmailHtmlFrame({ html, title }: { html: string; title: string }) {
+  return (
+    <iframe
+      className="platform-support-email-html-frame"
+      sandbox=""
+      srcDoc={html}
+      title={title}
+    />
+  );
+}
+
 const SEV_LABELS: Record<string, string> = {
   critical: 'Kritik',
   warning: 'Uyarı',
@@ -170,7 +181,16 @@ export function PlatformSupportTab() {
     const items = caseDetail?.case.activity ?? [];
     if (activityFilter === 'all') return items;
     if (activityFilter === 'email_inbound') {
-      return items.filter((a) => a.type === 'email_inbound' || a.type === 'email_inbound_closed');
+      return items.filter((a) =>
+        a.type === 'email_inbound'
+        || a.type === 'email_inbound_closed',
+      );
+    }
+    if (activityFilter === 'email_outbound') {
+      return items.filter((a) =>
+        a.type === 'email_outbound'
+        || a.type === 'email_out',
+      );
     }
     return items.filter((a) => a.type === activityFilter);
   }, [caseDetail?.case.activity, activityFilter]);
@@ -180,6 +200,8 @@ export function PlatformSupportTab() {
       email_inbound: 'Gelen e-posta',
       email_inbound_closed: 'Gelen (kapalı kayıt)',
       email_outbound: 'Giden e-posta',
+      email_out: 'Giden e-posta',
+      case_spawned: 'Yeni kayıt (politika)',
       note: 'İç not',
     };
     return map[type] ?? type;
@@ -579,6 +601,12 @@ export function PlatformSupportTab() {
                           </header>
                           <p className="platform-table-muted">{m.from}</p>
                           <p className="platform-support-case-email-body">{m.bodyText}</p>
+                          {m.bodyHtml ? (
+                            <details className="platform-support-email-html-details">
+                              <summary>HTML önizleme (gelen)</summary>
+                              <SupportEmailHtmlFrame html={m.bodyHtml} title={`Gelen mail ${m.id}`} />
+                            </details>
+                          ) : null}
                         </li>
                       ))}
                       {caseDetail.emailPreview.outboundEvents.map((e, idx) => (
@@ -587,6 +615,15 @@ export function PlatformSupportTab() {
                             <span>Giden · {e.kind}</span>
                             <span>{formatDateTime(e.at)}</span>
                           </header>
+                          {e.textPreview ? (
+                            <p className="platform-support-case-email-body">{e.textPreview}</p>
+                          ) : null}
+                          {e.htmlPreview ? (
+                            <details className="platform-support-email-html-details" open={e.kind === 'operator_reply'}>
+                              <summary>HTML önizleme (giden)</summary>
+                              <SupportEmailHtmlFrame html={e.htmlPreview} title={`Giden ${e.kind}`} />
+                            </details>
+                          ) : null}
                           {e.messageId ? <code className="platform-support-mono-truncate">{e.messageId}</code> : null}
                         </li>
                       ))}
@@ -686,7 +723,13 @@ export function PlatformSupportTab() {
                             <span className="platform-table-muted">
                               {formatDateTime(a.createdAt)} · {activityTypeLabel(a.type)} · {a.createdBy}
                             </span>
-                            <p>{a.body.slice(0, 400)}</p>
+                            <p className="platform-support-activity-body">{a.body}</p>
+                            {a.html ? (
+                              <details className="platform-support-email-html-details">
+                                <summary>HTML önizleme</summary>
+                                <SupportEmailHtmlFrame html={a.html} title={`Aktivite ${a.id}`} />
+                              </details>
+                            ) : null}
                           </li>
                         ))
                       )}
