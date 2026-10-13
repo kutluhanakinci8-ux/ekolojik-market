@@ -208,6 +208,9 @@ export async function enqueueEkolojikMail(
   const root = outboxRoot(dataDir);
   const path = join(dirPendingTenant(root, message.tenantId), filename);
   await writeFile(path, JSON.stringify(message, null, 2), 'utf8');
+  void import('./platformSupportInbox.mjs')
+    .then((m) => m.maybeIngestOutboxForSupport(dataDir, message))
+    .catch(() => {});
   return { ok: true, duplicate: false, message, file: filename };
 }
 
@@ -368,6 +371,9 @@ export async function processPendingOutbox(dataDir, sendFn, { limit = 20 } = {})
       await writeFile(dest, JSON.stringify(message, null, 2), 'utf8');
       await unlink(full);
       results.sent += 1;
+      void import('./platformSupportInbox.mjs')
+        .then((m) => m.maybeIngestOutboxForSupport(dataDir, message))
+        .catch(() => {});
     } catch (error) {
       message.attempts = (message.attempts ?? 0) + 1;
       message.lastError = error instanceof Error ? error.message : String(error);

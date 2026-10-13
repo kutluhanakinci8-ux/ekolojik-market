@@ -38,12 +38,16 @@ export function getPlatformSupportMailPresentation() {
 }
 
 export function supportInboxStatus() {
+  const imapConfigured = isPlatformSupportImapConfigured();
   return {
-    configured: isPlatformSupportImapConfigured(),
+    configured: imapConfigured,
     address: getPlatformSupportMailAddress(),
     imapUser: getPlatformSupportImapConfig().imapUser,
     separateMailbox: true,
     autoreplyFrom: getPlatformSupportMailAddress(),
     fallbackToPlatformImap: !process.env.EKOLOJIK_SUPPORT_IMAP_USER?.trim() && isEkolojikImapConfigured(),
+    /** Mağaza outbox → destek@ gelen kutusu (IMAP olmadan da çalışır) */
+    outboxBridge: true,
+    bridgePrimary: !imapConfigured,
   };
 }

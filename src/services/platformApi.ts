@@ -1007,6 +1007,8 @@ export type PlatformSupportInboxMessage = {
   readAt: string | null;
   autoreplySentAt: string | null;
   externalTicketRef: string | null;
+  outboxStatus?: string;
+  source?: string;
 };
 
 export type PlatformSupportInboxPayload = {
