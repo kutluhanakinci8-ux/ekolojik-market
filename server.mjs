@@ -1208,6 +1208,23 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/sla-live' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const days = Number(url.searchParams.get('days') || 7);
+        const { getPlatformSupportSlaLive } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportSlaLive(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'SLA verisi alınamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/tenant-360' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -1319,6 +1336,24 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseAiMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)\/ai$/);
+    if (platformSupportCaseAiMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { suggestPlatformSupportCaseAi } = await import('./server/platformApi.mjs');
+        const result = await suggestPlatformSupportCaseAi(DATA_DIR, platformSupportCaseAiMatch[1], body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'AI önerisi alınamadı' }));
       }
       return;
     }
