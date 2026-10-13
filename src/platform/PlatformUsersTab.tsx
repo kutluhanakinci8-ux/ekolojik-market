@@ -265,10 +265,9 @@ export function PlatformUsersTab() {
         <ul className="platform-users-engagement-legend">
           {ENGAGEMENT_ORDER.map((key) => {
             const count = engagementBreakdown[key] ?? 0;
-            if (count === 0) return null;
             const pct = totals.totalUsers ? Math.round((count / totals.totalUsers) * 100) : 0;
             return (
-              <li key={key}>
+              <li key={key} className={count === 0 ? 'platform-users-legend-item--empty' : ''}>
                 <span className={`platform-users-legend-dot platform-users-legend-dot--${key}`} />
                 <span>{ENGAGEMENT_LABELS[key]}</span>
                 <strong>{count}</strong>
@@ -418,6 +417,13 @@ export function PlatformUsersTab() {
               </tr>
             </thead>
             <tbody>
+              {filteredRoster.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="platform-users-empty">
+                    Filtrelere uyan kullanıcı bulunamadı. Aramayı veya filtreleri değiştirin.
+                  </td>
+                </tr>
+              )}
               {filteredRoster.map((row) => (
                 <tr key={`${row.tenantId}-${row.id}`} className={!row.isActive ? 'platform-users-row--inactive' : ''}>
                   <td>
@@ -496,6 +502,9 @@ export function PlatformUsersTab() {
           </div>
         </div>
         <ul className="platform-users-timeline">
+          {filteredLogins.length === 0 && (
+            <li className="platform-users-timeline-empty">Bu filtre için giriş kaydı yok.</li>
+          )}
           {filteredLogins.map((entry) => (
             <li
               key={`${entry.tenantId}-${entry.id}`}
