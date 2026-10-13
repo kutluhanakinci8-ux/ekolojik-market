@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  downloadPlatformSecurityCsv,
   fetchPlatformSecurityOverview,
   type PlatformSecurityPayload,
   type PlatformSecurityRecommendation,
@@ -46,6 +47,7 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PlatformSecurityPayload | null>(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +91,15 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
   if (!data) return null;
 
   const { totals, dimensions } = data;
+  const activity = data.activity;
+  const topActionMax = Math.max(1, ...(activity?.topActions.map((a) => a.count) ?? [1]));
+
+  const handleCsvExport = async () => {
+    setExportingCsv(true);
+    const result = await downloadPlatformSecurityCsv(90);
+    if (!result.ok) setError(result.error ?? 'CSV indirilemedi');
+    setExportingCsv(false);
+  };
 
   return (
     <div className="platform-security platform-security--premium platform-users--premium">
@@ -115,9 +126,19 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
               Güvenlik skoru · Not {data.grade}
             </span>
           </div>
-          <button type="button" className="btn btn-primary platform-users-refresh" onClick={() => void load()}>
-            Yenile
-          </button>
+          <div className="platform-security-hero-btns">
+            <button
+              type="button"
+              className="btn btn-text platform-security-export-btn"
+              disabled={exportingCsv}
+              onClick={() => void handleCsvExport()}
+            >
+              {exportingCsv ? 'İndiriliyor…' : 'Denetim CSV (90g)'}
+            </button>
+            <button type="button" className="btn btn-primary platform-users-refresh" onClick={() => void load()}>
+              Yenile
+            </button>
+          </div>
         </div>
       </header>
 
@@ -157,7 +178,59 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
             <span className="platform-users-kpi-sub">{totals.loginFailed30d} başarısız deneme</span>
           </div>
         </article>
+        {activity && (
+          <article className="platform-users-kpi platform-users-kpi--warn">
+            <KpiIcon name="roles" />
+            <div className="platform-users-kpi-body">
+              <span className="platform-users-kpi-label">Güvenlik işlemleri (30g)</span>
+              <strong className="platform-users-kpi-value">{activity.securityEvents30d}</strong>
+              <span className="platform-users-kpi-sub">{activity.events30d} toplam aktivite kaydı</span>
+            </div>
+          </article>
+        )}
       </div>
+
+      {activity && activity.topActions.length > 0 && (
+        <section className="platform-users-panel" aria-label="Güvenlik aktivite dağılımı">
+          <div className="platform-users-panel-head">
+            <h3>Kasa güvenlik işlemleri (30g)</h3>
+            <span className="platform-muted">Kullanıcı, 2FA, yedek ve ayar değişiklikleri</span>
+          </div>
+          <ul className="platform-security-action-bars">
+            {activity.topActions.map((row) => (
+              <li key={row.action}>
+                <span className="platform-security-action-label">{row.label}</span>
+                <div className="platform-users-mini-bar platform-security-action-bar">
+                  <span style={{ width: `${Math.round((row.count / topActionMax) * 100)}%` }} />
+                </div>
+                <strong className="platform-security-action-count">{row.count}</strong>
+              </li>
+            ))}
+          </ul>
+          {activity.byTenant.some((t) => t.securityEvents30d > 0) && (
+            <div className="platform-users-table-scroll platform-security-tenant-activity-scroll">
+              <table className="platform-table platform-table--premium">
+                <thead>
+                  <tr>
+                    <th>Mağaza</th>
+                    <th>Güvenlik işlemi</th>
+                    <th>Toplam aktivite</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activity.byTenant.filter((t) => t.securityEvents30d > 0).map((t) => (
+                    <tr key={t.tenantId}>
+                      <td><strong>{t.businessName}</strong></td>
+                      <td>{t.securityEvents30d}</td>
+                      <td className="platform-muted">{t.events30d}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="platform-users-panel" aria-label="Güvenlik önerileri">
         <div className="platform-users-panel-head">
@@ -243,6 +316,30 @@ export function PlatformSecurityTab({ onNavigateUsers }: Props) {
           </table>
         </div>
       </section>
+
+      {activity && activity.recentSecurity.length > 0 && (
+        <section className="platform-users-panel" aria-label="Son güvenlik işlemleri">
+          <div className="platform-users-panel-head">
+            <h3>Son güvenlik işlemleri</h3>
+            <span className="platform-muted">Tüm kiracılar — activity audit</span>
+          </div>
+          <ul className="platform-security-activity-list">
+            {activity.recentSecurity.map((entry) => (
+              <li key={`${entry.tenantId}-${entry.id}`} className="platform-security-activity-item">
+                <div className="platform-security-activity-top">
+                  <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
+                  <span className="platform-users-pill platform-users-pill--active">{entry.actionLabel}</span>
+                </div>
+                <p className="platform-security-activity-who">
+                  <strong>{entry.displayName || entry.username}</strong>
+                  <span className="platform-muted"> · {entry.businessName}</span>
+                </p>
+                <p className="platform-muted platform-security-activity-summary">{entry.summary}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {data.failedByIp.length > 0 && (
         <section className="platform-users-panel" aria-label="Başarısız giriş IP">
