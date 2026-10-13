@@ -199,9 +199,34 @@ async function safeMaybeSendAutoreply(dataDir, row) {
   }
 }
 
+function extractSenderEmail(fromLabel) {
+  return String(fromLabel ?? '').match(/[\w.+-]+@[\w.-]+/)?.[0]?.toLowerCase() ?? '';
+}
+
+/** Dış müşteri IMAP maili — otomatik alındı (iç outbox / bounce hariç) */
+function shouldAutoreplyForInboxRow(row) {
+  if (row.autoreplySentAt) return false;
+  if (row.source === 'outbox-bridge') return false;
+  const from = extractSenderEmail(row.from);
+  if (!from.includes('@')) return false;
+  if (from.includes('mailer-daemon') || from.includes('postmaster')) return false;
+  const support = getPlatformSupportMailAddress().toLowerCase();
+  if (from === support) return false;
+  return true;
+}
+
+async function applyAutoreplyIfNeeded(dataDir, row, autoreplies) {
+  if (!shouldAutoreplyForInboxRow(row)) return;
+  const ar = await safeMaybeSendAutoreply(dataDir, row);
+  if (ar?.ok) {
+    row.autoreplySentAt = new Date().toISOString();
+  }
+  autoreplies.push({ id: row.id, ...ar });
+}
+
 export async function importSupportInboxFromImap(
   dataDir,
-  { maxMessages = 40, sendAutoreply = true, sinceDays = 60 } = {},
+  { maxMessages = 40, sendAutoreply: _sendAutoreply = true, sinceDays = 60 } = {},
 ) {
   if (!isPlatformSupportImapConfigured()) {
     return { ok: true, skipped: true, scanned: 0, added: 0, autoreplies: [] };
@@ -255,6 +280,7 @@ export async function importSupportInboxFromImap(
         prior.subject = repairUtf8Mojibake(msg.subject ?? prior.subject);
         refreshed += 1;
       }
+      await applyAutoreplyIfNeeded(dataDir, prior, autoreplies);
       continue;
     }
 
@@ -283,16 +309,11 @@ export async function importSupportInboxFromImap(
     const { autoCreateCaseForInboxRow } = await import('./platformSupportCases.mjs');
     await autoCreateCaseForInboxRow(dataDir, row);
 
-    if (sendAutoreply) {
-      const ar = await safeMaybeSendAutoreply(dataDir, row);
-      if (ar?.ok) {
-        row.autoreplySentAt = new Date().toISOString();
-      }
-      autoreplies.push({ id: row.id, ...ar });
-    }
+    await applyAutoreplyIfNeeded(dataDir, row, autoreplies);
   }
 
-  if (added > 0 || refreshed > 0) {
+  const autoreplySent = autoreplies.some((a) => a.ok);
+  if (added > 0 || refreshed > 0 || autoreplySent) {
     const merged = [...byKey.values()].sort(
       (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
     );
@@ -368,7 +389,7 @@ export async function syncPlatformSupportInbox(dataDir, { maxMessages = 40 } = {
 
 export async function listPlatformSupportInbox(dataDir, { limit = 50 } = {}) {
   await importSupportInboxFromOutbox(dataDir, { limit: 120 });
-  await importSupportInboxFromImap(dataDir, { maxMessages: 30, sendAutoreply: false });
+  await importSupportInboxFromImap(dataDir, { maxMessages: 30, sendAutoreply: true });
   const messages = await readMessages(dataDir);
   const unread = messages.filter((m) => !m.readAt).length;
   let lastSyncAt = null;
