@@ -81,9 +81,12 @@ assert.ok(!guarded.users.some((u) => u.username === 'yonetici'), 'Lima: yeni yon
 const readSan = sanitizeIsolatedTenantStoreRead('lima-market', { products: greenleafBulk });
 assert.equal(readSan.products.length, 0, 'Lima GET: Greenleaf bulk okunamaz');
 
-assert.equal(assertTenantStoreWriteAllowed('kutluhan08', 'main').ok, true);
-assert.equal(assertTenantStoreWriteAllowed('kutluhan08', 'lima-market').ok, false);
-assert.equal(assertTenantStoreWriteAllowed('yonetici', 'lima-market').ok, true);
+const writeMain = await assertTenantStoreWriteAllowed('kutluhan08', 'main', null);
+assert.equal(writeMain.ok, true);
+const writeLimaOp = await assertTenantStoreWriteAllowed('kutluhan08', 'lima-market', null);
+assert.equal(writeLimaOp.ok, true);
+const writeLimaAdmin = await assertTenantStoreWriteAllowed('yonetici', 'lima-market', null);
+assert.equal(writeLimaAdmin.ok, true);
 
 const mainWithLimaUser = sanitizeMainTenantStoreRead('main', {
   users: [{ username: 'kutluhan08' }, { username: 'limaadmin' }],

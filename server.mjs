@@ -933,6 +933,45 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/tenants/lifecycle' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformTenantsLifecycle } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformTenantsLifecycle(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kiracı verisi alınamadı' }));
+      }
+      return;
+    }
+
+    const platformTenantLifecycleMatch = pathname.match(/^\/api\/platform\/tenants\/([^/]+)\/lifecycle$/);
+    if (platformTenantLifecycleMatch && req.method === 'PUT') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      const targetTenant = normalizeTenantId(platformTenantLifecycleMatch[1]);
+      try {
+        const body = await readRequestBody(req);
+        const { patchPlatformTenantLifecycle } = await import('./server/platformApi.mjs');
+        const result = await patchPlatformTenantLifecycle(
+          DATA_DIR,
+          targetTenant,
+          body ?? {},
+          authPayload.username,
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Güncelleme başarısız' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/comms' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -3522,7 +3561,7 @@ const server = createServer(async (req, res) => {
         writer?.username
         ?? (authPayload.role === 'platform' ? authPayload.username : undefined);
       const { assertTenantStoreWriteAllowed } = await import('./server/tenantWritePolicy.mjs');
-      const writePolicy = assertTenantStoreWriteAllowed(writerUsername, resolvedTenant);
+      const writePolicy = await assertTenantStoreWriteAllowed(writerUsername, resolvedTenant, DATA_DIR);
       if (!writePolicy.ok) {
         res.writeHead(writePolicy.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: writePolicy.error }));

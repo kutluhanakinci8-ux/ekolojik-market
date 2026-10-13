@@ -220,6 +220,12 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
     return { ok: false, status: tenantAffinity.status ?? 403, message: tenantAffinity.message };
   }
 
+  const { assertTenantLoginAllowed } = await import('./platformTenantLifecycle.mjs');
+  const loginGate = await assertTenantLoginAllowed(dataDir, tenantId);
+  if (!loginGate.ok) {
+    return { ok: false, status: 403, message: loginGate.message };
+  }
+
   const rawStore = await readTenantStore(dataDir, tenantId);
   const { hydrateStoreWithCredentialVault } = await import('./credentialVault.mjs');
   const { store } = await hydrateStoreWithCredentialVault(dataDir, tenantId, rawStore);

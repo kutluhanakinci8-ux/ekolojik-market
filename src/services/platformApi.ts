@@ -316,6 +316,50 @@ export type PlatformSecurityAlertPolicy = {
   lastFired?: Record<string, string>;
 };
 
+export type PlatformTenantLifecycleRow = {
+  tenantId: string;
+  businessName: string;
+  label: string;
+  status: 'active' | 'trial' | 'trial_expired' | 'suspended' | 'missing_store';
+  statusReason: string;
+  statusLabel: string;
+  plan: string | null;
+  productProfile: string;
+  trialEndsAt: string | null;
+  trialDaysLeft: number | null;
+  registrationEmail: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  activeUserCount: number;
+  revenue30dTry: number;
+  onAllowlist: boolean;
+  suspended: boolean;
+  readOnly: boolean;
+  opsNotes: string;
+  postaOnboardingStatus: string | null;
+};
+
+export type PlatformTenantLifecyclePayload = {
+  generatedAt: string;
+  config: {
+    strictAllowlist: boolean;
+    allowlist: string[];
+    publicRegistrationEnabled: boolean;
+  };
+  totals: {
+    tenants: number;
+    active: number;
+    trial: number;
+    trial_expired: number;
+    suspended: number;
+    missing_store: number;
+    readOnly: number;
+    allowlisted: number;
+    trialEnding7d: number;
+  };
+  tenants: PlatformTenantLifecycleRow[];
+};
+
 export type PlatformCommsTenantRow = {
   tenantId: string;
   businessName: string;
@@ -497,6 +541,54 @@ export async function fetchPlatformSecurityOverview(): Promise<{
     }
     const { ok: _ok, error: _err, ...payload } = data;
     return { ok: true, data: payload as PlatformSecurityPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function fetchPlatformTenantsLifecycle(): Promise<{
+  ok: boolean;
+  data?: PlatformTenantLifecyclePayload;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/tenants/lifecycle', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformTenantLifecyclePayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Kiracı listesi yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformTenantLifecyclePayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function savePlatformTenantLifecycle(
+  tenantId: string,
+  patch: {
+    suspended?: boolean;
+    readOnly?: boolean;
+    opsNotes?: string;
+    plan?: string;
+    trialEndsAt?: string | null;
+  },
+): Promise<{ ok: boolean; tenant?: PlatformTenantLifecycleRow; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/tenants/${encodeURIComponent(tenantId)}/lifecycle`, {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      tenant?: PlatformTenantLifecycleRow;
+      error?: string;
+    };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Kaydedilemedi' };
+    }
+    return { ok: true, tenant: data.tenant };
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };
   }

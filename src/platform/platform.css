@@ -2406,3 +2406,132 @@
 .platform-row--active {
   background: #ecfdf5 !important;
 }
+
+/* —— Kiracılar sekmesi —— */
+
+.platform-tenants--premium {
+  animation: platform-comms-fade 0.35s ease;
+}
+
+.platform-tenants-hero-metrics {
+  text-align: center;
+}
+
+.platform-tenants-filter-bar {
+  max-width: none;
+}
+
+.platform-tenants-filter-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.platform-tenant-status {
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+}
+
+.platform-tenant-status--active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.platform-tenant-status--trial {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.platform-tenant-status--trial_expired {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.platform-tenant-status--suspended {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.platform-tenant-status--missing_store {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.platform-tenant-flag {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.platform-tenants-editor {
+  position: sticky;
+  top: 1rem;
+}
+
+.platform-tenants-meta {
+  margin-bottom: 0.75rem;
+}
+
+.platform-tenants-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.platform-tenants-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.platform-tenants-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--pu-muted, #64748b);
+}
+
+.platform-tenants-field .platform-users-select,
+.platform-tenants-field .platform-users-search--premium {
+  width: 100%;
+  font-weight: 400;
+}
+
+.platform-tenants-notes {
+  font: inherit;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #dbe3ea;
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.platform-tenants-notes:focus {
+  outline: none;
+  border-color: #0d6b4d;
+  box-shadow: 0 0 0 3px rgba(13, 107, 77, 0.14);
+}
+
+.platform-tenants-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.platform-tabs--premium {
+  flex-wrap: wrap;
+  width: auto;
+  max-width: 100%;
+}

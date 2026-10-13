@@ -342,6 +342,16 @@ export async function getPlatformSecurityExportCsv(dataDir, days = 90) {
   return { csv, filename: `platform-guvenlik-${stamp}.csv` };
 }
 
+export async function getPlatformTenantsLifecycle(dataDir) {
+  const { buildPlatformTenantsLifecycle } = await import('./platformTenantLifecycle.mjs');
+  return buildPlatformTenantsLifecycle(dataDir);
+}
+
+export async function patchPlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername) {
+  const { updatePlatformTenantLifecycle } = await import('./platformTenantLifecycle.mjs');
+  return updatePlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername);
+}
+
 export async function getPlatformCommsOverview(dataDir, { days = 14 } = {}) {
   const { buildPlatformCommsOverview } = await import('./platformCommsMetrics.mjs');
   const safeDays = Math.min(90, Math.max(1, Number(days) || 14));

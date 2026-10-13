@@ -6,10 +6,11 @@ import { isPlatformApiRole } from '../config/platformOperators';
 import { PlatformCommsTab } from './PlatformCommsTab';
 import { PlatformOverviewTab } from './PlatformOverviewTab';
 import { PlatformSecurityTab } from './PlatformSecurityTab';
+import { PlatformTenantsTab } from './PlatformTenantsTab';
 import { PlatformUsersTab, type PlatformUsersTabFocus } from './PlatformUsersTab';
 import './platform.css';
 
-type PlatformTab = 'overview' | 'users' | 'security' | 'comms';
+type PlatformTab = 'overview' | 'tenants' | 'users' | 'security' | 'comms';
 
 export function PlatformApp() {
   const store = useStore();
@@ -64,6 +65,13 @@ export function PlatformApp() {
         </button>
         <button
           type="button"
+          className={`platform-tab ${activeTab === 'tenants' ? 'platform-tab--active' : ''}`}
+          onClick={() => setActiveTab('tenants')}
+        >
+          Kiracılar
+        </button>
+        <button
+          type="button"
           className={`platform-tab ${activeTab === 'users' ? 'platform-tab--active' : ''}`}
           onClick={() => setActiveTab('users')}
         >
@@ -87,6 +95,8 @@ export function PlatformApp() {
 
       {activeTab === 'comms' ? (
         <PlatformCommsTab />
+      ) : activeTab === 'tenants' ? (
+        <PlatformTenantsTab />
       ) : activeTab === 'security' ? (
         <PlatformSecurityTab
           onNavigateUsers={(focus) => {
