@@ -685,6 +685,14 @@ export type PlatformSupportPayload = {
     supportMailboxConfigured?: boolean;
     supportMailboxAddress?: string | null;
   };
+  cases?: {
+    total: number;
+    open: number;
+    new: number;
+    request: number;
+    incident: number;
+    overdue: number;
+  };
   inbox?: {
     unread: number;
     total: number;
@@ -1049,6 +1057,92 @@ export async function replyPlatformSupportInbox(
   body: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const result = await platformSecurityPost('/api/platform/support/inbox/reply', { messageId, body });
+  return { ok: result.ok, error: result.error };
+}
+
+export type PlatformSupportCase = {
+  id: string;
+  number: number;
+  kind: 'request' | 'incident' | 'system';
+  channel: string;
+  status: 'new' | 'open' | 'pending' | 'solved' | 'closed';
+  priority: string;
+  tenantId: string | null;
+  businessName: string | null;
+  subject: string;
+  requesterName: string | null;
+  requesterEmail: string | null;
+  assignee: string | null;
+  tags: string[];
+  links: {
+    inboxMessageId: string | null;
+    threadId: string | null;
+    tenantId: string | null;
+    contactMessageId: string | null;
+    alertKind: string | null;
+  };
+  externalTicketRef: { provider: string; id: string; url: string | null } | null;
+  slaDueAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  notes: string;
+};
+
+export type PlatformSupportCasesPayload = {
+  generatedAt: string;
+  totals: PlatformSupportPayload['cases'];
+  cases: PlatformSupportCase[];
+};
+
+export async function fetchPlatformSupportCases(
+  status?: string,
+  kind?: string,
+): Promise<{ ok: boolean; data?: PlatformSupportCasesPayload; error?: string }> {
+  try {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (kind) params.set('kind', kind);
+    const q = params.toString() ? `?${params}` : '';
+    const res = await fetch(`/api/platform/support/cases${q}`, { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSupportCasesPayload & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Talepler yüklenemedi' };
+    }
+    const { ok: _ok, error: _err, ...payload } = data;
+    return { ok: true, data: payload as PlatformSupportCasesPayload };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function updatePlatformSupportCase(
+  caseId: string,
+  patch: Partial<PlatformSupportCase> & { externalTicketRef?: PlatformSupportCase['externalTicketRef'] | null },
+): Promise<{ ok: boolean; case?: PlatformSupportCase; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/support/cases/${caseId}`, {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = (await res.json()) as { ok?: boolean; case?: PlatformSupportCase; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Kayıt güncellenemedi' };
+    }
+    return { ok: true, case: data.case };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function createPlatformSupportCaseFromQueue(payload: {
+  tenantId: string;
+  threadId: string;
+  businessName?: string;
+  subject?: string;
+  customerName?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const result = await platformSecurityPost('/api/platform/support/cases/from-queue', payload);
   return { ok: result.ok, error: result.error };
 }
 

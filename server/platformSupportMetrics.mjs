@@ -7,6 +7,7 @@ import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
 import { readSupportSlaPolicy, DEFAULT_SUPPORT_SLA_POLICY } from './platformSupportPolicy.mjs';
 import { readSupportFilterConfig, filterProductionMessagingThreads } from './platformSupportFilters.mjs';
 import { listPlatformSupportInbox } from './platformSupportInbox.mjs';
+import { readPlatformCases, summarizeCases } from './platformCaseStore.mjs';
 import { computeMessagingSlaFromThreads } from './messaging/sla.mjs';
 
 async function allTenantIds(dataDir) {
@@ -181,6 +182,7 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
   tenantRows.sort((a, b) => b.queueItems - a.queueItems || b.slaBreaches - a.slaBreaches);
 
   const inbox = await listPlatformSupportInbox(dataDir, { limit: 8 });
+  const caseTotals = summarizeCases(await readPlatformCases(dataDir));
 
   return {
     generatedAt: new Date().toISOString(),
@@ -194,6 +196,7 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
       supportMailboxConfigured: inbox.mailbox?.configured === true,
       supportMailboxAddress: inbox.mailbox?.address ?? null,
     },
+    cases: caseTotals,
     inbox: {
       unread: inbox.unread,
       total: inbox.total,
