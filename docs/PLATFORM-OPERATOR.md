@@ -12,9 +12,12 @@
 
 ## Konsol (`/platform`)
 
-- Tüm kiracıların özet tablosu: ürün sayısı, düşük stok, son 30 gün satış, aktif kullanıcı
-- **Detay**: kullanıcılar, 2FA, şifre sıfırlama e-postası eksikleri
-- **POS aç**: seçilen kiracı için `/app` (stok, muhasebe, tahsilat — tam POS)
+1. **Cari & tahsilat** — kiracı bazında açık cari, 30 gün tahsilat, en borçlu müşteriler
+2. **Otomatik uyarılar** — gecikmiş ödemeler, bugünkü vadeler, düşük stok, eksik sıfırlama e-postası
+3. **Birleşik ödeme takvimi** — tüm kiracıların `paymentReminders` (elektrik, su, vergi, kira vb.) tek görünümde
+4. **POS aç** — seçilen kiracı için tam POS (`/app`)
+
+API: `GET /api/platform/alerts`, `GET /api/platform/calendar?year=&month=`
 
 ## Teknik
 

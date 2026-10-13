@@ -143,3 +143,156 @@
   margin: 1.25rem 0 0.5rem;
   font-size: 1rem;
 }
+
+.platform-kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.platform-kpi {
+  flex: 1;
+  min-width: 140px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.platform-kpi-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.platform-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.platform-section-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.platform-alerts {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.platform-alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.platform-alert-btn {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.platform-alert-btn:hover {
+  background: #f3f4f6;
+}
+
+.platform-alert--critical .platform-alert-store {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.platform-alert--warning .platform-alert-store {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.platform-alert-store {
+  font-size: 0.8rem;
+}
+
+.platform-calendar {
+  margin-top: 1.5rem;
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.platform-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+}
+
+.platform-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.platform-calendar-day {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.65rem;
+  font-size: 0.85rem;
+}
+
+.platform-calendar-day header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.platform-calendar-pending {
+  font-size: 0.75rem;
+  color: #b45309;
+  font-weight: 500;
+}
+
+.platform-calendar-day ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.platform-calendar-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: #f9fafb;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.platform-calendar-item:hover {
+  background: #f0f7f4;
+}
