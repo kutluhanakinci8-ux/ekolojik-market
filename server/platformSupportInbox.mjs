@@ -149,6 +149,9 @@ export async function syncPlatformSupportInbox(dataDir, { maxMessages = 40 } = {
     byKey.set(dedupe, row);
     added += 1;
 
+    const { autoCreateCaseForInboxRow } = await import('./platformSupportCases.mjs');
+    await autoCreateCaseForInboxRow(dataDir, row);
+
     const ar = await maybeSendAutoreply(dataDir, row);
     if (ar?.ok) {
       row.autoreplySentAt = new Date().toISOString();

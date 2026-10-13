@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  createPlatformSupportCaseFromQueue,
   downloadPlatformSupportCsv,
+  fetchPlatformSupportCases,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
   replyPlatformSupportInbox,
   savePlatformSupportSlaPolicy,
   syncPlatformSupportInbox,
+  updatePlatformSupportCase,
+  type PlatformSupportCase,
   type PlatformSupportInboxMessage,
   type PlatformSupportPayload,
   type PlatformSupportSlaPolicy,
@@ -58,7 +62,10 @@ export function PlatformSupportTab() {
   const [policyDraft, setPolicyDraft] = useState<PlatformSupportSlaPolicy | null>(null);
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
-  const [section, setSection] = useState<'inbox' | 'queue'>('inbox');
+  const [section, setSection] = useState<'inbox' | 'queue' | 'cases'>('cases');
+  const [caseRows, setCaseRows] = useState<PlatformSupportCase[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [zendeskIdDraft, setZendeskIdDraft] = useState('');
   const [inboxMessages, setInboxMessages] = useState<PlatformSupportInboxMessage[]>([]);
   const [inboxUnread, setInboxUnread] = useState(0);
   const [mailboxConfigured, setMailboxConfigured] = useState(false);
@@ -91,6 +98,10 @@ export function PlatformSupportTab() {
       firstResponseTargetMinutes: result.data.policy.firstResponseTargetMinutes,
       staleWaitingHours: result.data.policy.staleWaitingHours,
     });
+    const casesRes = await fetchPlatformSupportCases('all', 'all');
+    if (casesRes.ok && casesRes.data) {
+      setCaseRows(casesRes.data.cases);
+    }
     setLoading(false);
   }, [windowDays]);
 
@@ -143,6 +154,40 @@ export function PlatformSupportTab() {
     }
     setReplyDraft('');
     setPolicyMsg('Yanıt destek@ üzerinden gönderildi');
+    void load();
+  };
+
+  const selectedCase = caseRows.find((c) => c.id === selectedCaseId) ?? null;
+
+  const openCaseFromQueue = async (q: PlatformSupportPayload['queue'][0]) => {
+    const result = await createPlatformSupportCaseFromQueue({
+      tenantId: q.tenantId,
+      threadId: q.threadId,
+      businessName: q.businessName,
+      subject: q.subject,
+      customerName: q.customerName,
+    });
+    if (!result.ok) {
+      setPolicyMsg(result.error ?? 'Talep oluşturulamadı');
+      return;
+    }
+    setPolicyMsg('Talep kaydı oluşturuldu');
+    setSection('cases');
+    void load();
+  };
+
+  const saveCaseZendesk = async () => {
+    if (!selectedCaseId) return;
+    const id = zendeskIdDraft.trim();
+    const result = await updatePlatformSupportCase(selectedCaseId, {
+      externalTicketRef: id ? { provider: 'zendesk', id, url: null } : null,
+      status: 'open',
+    });
+    if (!result.ok) {
+      setPolicyMsg(result.error ?? 'Kaydedilemedi');
+      return;
+    }
+    setPolicyMsg('Zendesk referansı kaydedildi');
     void load();
   };
 
@@ -209,12 +254,90 @@ export function PlatformSupportTab() {
         </button>
         <button
           type="button"
+          className={`platform-support-subnav-btn ${section === 'cases' ? 'platform-support-subnav-btn--active' : ''}`}
+          onClick={() => setSection('cases')}
+        >
+          Talepler & sorunlar {data?.cases?.open ? `(${data.cases.open})` : ''}
+        </button>
+        <button
+          type="button"
           className={`platform-support-subnav-btn ${section === 'queue' ? 'platform-support-subnav-btn--active' : ''}`}
           onClick={() => setSection('queue')}
         >
           Mesaj kuyruğu & SLA
         </button>
       </nav>
+
+      {policyMsg ? <p className="platform-inline-msg">{policyMsg}</p> : null}
+
+      {section === 'cases' ? (
+        <div className="platform-support-inbox-layout">
+          <section className="platform-panel">
+            <h3>Operasyon kayıtları (Case)</h3>
+            <p className="platform-support-hint">
+              E-posta senkronunda otomatik talep; Zendesk ID ileride köprü için. Dosya:{' '}
+              <code>data/platform/support-cases.json</code>
+            </p>
+            <table className="platform-table platform-table--scroll">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Tür</th>
+                  <th>Durum</th>
+                  <th>Konu</th>
+                  <th>Kiracı</th>
+                  <th>Zendesk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {caseRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>Henüz kayıt yok</td>
+                  </tr>
+                ) : (
+                  caseRows.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <button type="button" className="btn btn-text" onClick={() => {
+                          setSelectedCaseId(c.id);
+                          setZendeskIdDraft(c.externalTicketRef?.id ?? '');
+                        }}>
+                          {c.number}
+                        </button>
+                      </td>
+                      <td>{c.kind}</td>
+                      <td>{c.status}</td>
+                      <td>{c.subject}</td>
+                      <td>{c.businessName ?? c.tenantId ?? '—'}</td>
+                      <td>{c.externalTicketRef?.id ?? '—'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </section>
+          <section className="platform-panel">
+            {selectedCase ? (
+              <>
+                <h3>#{selectedCase.number} — {selectedCase.subject}</h3>
+                <p className="platform-table-muted">
+                  {selectedCase.channel} · {selectedCase.requesterEmail ?? selectedCase.requesterName ?? '—'}
+                </p>
+                <label className="platform-support-reply-label">
+                  Zendesk ticket ID
+                  <input value={zendeskIdDraft} onChange={(e) => setZendeskIdDraft(e.target.value)} placeholder="örn. 12345" />
+                </label>
+                <button type="button" className="btn btn-primary" onClick={() => void saveCaseZendesk()}>
+                  Kaydet & açık yap
+                </button>
+                {selectedCase.notes ? <p className="platform-support-inbox-body">{selectedCase.notes}</p> : null}
+              </>
+            ) : (
+              <p className="platform-support-hint">Soldan bir kayıt seçin.</p>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       {section === 'inbox' ? (
         <div className="platform-support-inbox-layout">
@@ -379,12 +502,13 @@ export function PlatformSupportTab() {
                 <th>Müşteri / konu</th>
                 <th>Bekleme</th>
                 <th>Güncelleme</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {filteredQueue.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>Kuyruk boş</td>
+                  <td colSpan={6}>Kuyruk boş</td>
                 </tr>
               ) : (
                 filteredQueue.map((q) => (
@@ -405,6 +529,11 @@ export function PlatformSupportTab() {
                     </td>
                     <td>{formatDurationMs(q.waitMs)}</td>
                     <td>{formatDateTime(q.updatedAt)}</td>
+                    <td>
+                      <button type="button" className="btn btn-text" onClick={() => void openCaseFromQueue(q)}>
+                        Talep
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

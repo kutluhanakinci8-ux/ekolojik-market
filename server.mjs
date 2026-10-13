@@ -1149,6 +1149,129 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/cases' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const { getPlatformSupportCases } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportCases(DATA_DIR, {
+          status: url.searchParams.get('status') || undefined,
+          kind: url.searchParams.get('kind') || undefined,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Talepler alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCasesExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformSupportCasesExportCsv(DATA_DIR);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/from-inbox' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { createPlatformSupportCaseFromInbox } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCaseFromInbox(
+          DATA_DIR,
+          body.messageId,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/from-queue' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { createPlatformSupportCaseFromQueue } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCaseFromQueue(
+          DATA_DIR,
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { createPlatformSupportCase } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCase(DATA_DIR, body, authPayload.username ?? 'platform');
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)$/);
+    if (platformSupportCaseMatch && req.method === 'PUT') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const raw = await readRequestBody(req);
+        const body = raw ? JSON.parse(raw) : {};
+        const { patchPlatformSupportCase } = await import('./server/platformApi.mjs');
+        const result = await patchPlatformSupportCase(
+          DATA_DIR,
+          platformSupportCaseMatch[1],
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt güncellenemedi' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/inbox/reply' && req.method === 'POST') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);

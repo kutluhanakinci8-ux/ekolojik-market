@@ -446,6 +446,39 @@ export async function replyPlatformSupportInboxMessage(dataDir, payload, operato
   return replyPlatformSupportInbox(dataDir, { ...payload, operatorUsername });
 }
 
+export async function getPlatformSupportCases(dataDir, query = {}) {
+  const { listPlatformSupportCases } = await import('./platformSupportCases.mjs');
+  return listPlatformSupportCases(dataDir, query);
+}
+
+export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorUsername) {
+  const { updatePlatformCase } = await import('./platformCaseStore.mjs');
+  return updatePlatformCase(dataDir, caseId, patch, operatorUsername);
+}
+
+export async function createPlatformSupportCase(dataDir, input, operatorUsername) {
+  const { createPlatformCase } = await import('./platformCaseStore.mjs');
+  return createPlatformCase(dataDir, input, operatorUsername);
+}
+
+export async function createPlatformSupportCaseFromInbox(dataDir, messageId, operatorUsername) {
+  const { createCaseFromInboxMessage } = await import('./platformSupportCases.mjs');
+  return createCaseFromInboxMessage(dataDir, messageId, operatorUsername);
+}
+
+export async function createPlatformSupportCaseFromQueue(dataDir, payload, operatorUsername) {
+  const { createCaseFromMessagingQueue } = await import('./platformSupportCases.mjs');
+  return createCaseFromMessagingQueue(dataDir, payload, operatorUsername);
+}
+
+export async function getPlatformSupportCasesExportCsv(dataDir) {
+  const payload = await getPlatformSupportCases(dataDir, { limit: 500 });
+  const { buildPlatformCasesCsv } = await import('./platformSupportCases.mjs');
+  const csv = buildPlatformCasesCsv(payload);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { csv, filename: `platform-talepler-${stamp}.csv` };
+}
+
 export async function patchPlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername) {
   const { updatePlatformTenantLifecycle } = await import('./platformTenantLifecycle.mjs');
   return updatePlatformTenantLifecycle(dataDir, tenantId, patch, operatorUsername);
