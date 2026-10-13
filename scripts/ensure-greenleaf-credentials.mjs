@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 /**
  * main tenant — credential vault + store.json şifre hash onarımı.
- * Kullanım: node scripts/ensure-greenleaf-credentials.mjs [--data-dir /var/www/market-pos/data]
+ * Şifreler repoda tutulmaz; yalnızca ortam değişkenleri.
+ *
+ * Kullanım:
+ *   GREENLEAF_OWNER_PASSWORD='...' node scripts/ensure-greenleaf-credentials.mjs --data-dir /var/www/market-pos/data
+ *
+ * İsteğe bağlı:
+ *   GREENLEAF_DEMO_ADMIN_PASSWORD — yonetici (varsayılan seed hash korunur)
+ *   GREENLEAF_DEMO_CASHIER_PASSWORD — kasiyer (varsayılan seed hash korunur)
  */
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -17,25 +24,41 @@ const dataDir = process.argv.includes('--data-dir')
   ? process.argv[process.argv.indexOf('--data-dir') + 1]
   : join(process.cwd(), 'data');
 
-const ADMIN_HASH = '6e4896950cae800fae0e3e1ae26f1ee90e9a70c7c30fb95715f28be0ce13eac0';
-const CASHIER_HASH = 'c2b3ad8c4da0c33240128ade14f44f9996407e1df97b97564c26e6da292fd715';
+const DEFAULT_ADMIN_HASH = '6e4896950cae800fae0e3e1ae26f1ee90e9a70c7c30fb95715f28be0ce13eac0';
+const DEFAULT_CASHIER_HASH = 'c2b3ad8c4da0c33240128ade14f44f9996407e1df97b97564c26e6da292fd715';
 
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex');
 }
 
-const ownerPassword = process.env.GREENLEAF_OWNER_PASSWORD?.trim() || 'EkoPos2026';
+const ownerPassword = process.env.GREENLEAF_OWNER_PASSWORD?.trim();
+if (!ownerPassword) {
+  console.error('HATA: GREENLEAF_OWNER_PASSWORD ortam değişkeni gerekli (kutluhan08 şifresi).');
+  process.exit(1);
+}
 
 const seedUsers = [
   { username: 'kutluhan08', passwordHash: sha256(ownerPassword) },
-  { username: 'yonetici', passwordHash: ADMIN_HASH },
-  { username: 'kasiyer', passwordHash: CASHIER_HASH },
 ];
+
+const demoAdminPassword = process.env.GREENLEAF_DEMO_ADMIN_PASSWORD?.trim();
+if (demoAdminPassword) {
+  seedUsers.push({ username: 'yonetici', passwordHash: sha256(demoAdminPassword) });
+} else {
+  seedUsers.push({ username: 'yonetici', passwordHash: DEFAULT_ADMIN_HASH });
+}
+
+const demoCashierPassword = process.env.GREENLEAF_DEMO_CASHIER_PASSWORD?.trim();
+if (demoCashierPassword) {
+  seedUsers.push({ username: 'kasiyer', passwordHash: sha256(demoCashierPassword) });
+} else {
+  seedUsers.push({ username: 'kasiyer', passwordHash: DEFAULT_CASHIER_HASH });
+}
 
 const storePath = join(dataDir, 'store.json');
 const raw = JSON.parse(await readFile(storePath, 'utf8'));
 let vault = await readCredentialVault(dataDir, 'main');
-vault = mergeUsersIntoVault(vault, seedUsers.map((s) => ({ username: s.username, passwordHash: s.passwordHash })));
+vault = mergeUsersIntoVault(vault, seedUsers);
 
 const users = (raw.users ?? []).map((u) => {
   const seed = seedUsers.find((s) => s.username === u.username);

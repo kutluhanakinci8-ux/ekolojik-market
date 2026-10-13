@@ -796,6 +796,84 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/auth/password-reset-request' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const clientIp = req.socket?.remoteAddress ?? 'unknown';
+      const rate = checkRateLimit(`pwd-reset:${clientIp}`, { limit: 6, windowMs: 60 * 60 * 1000 });
+      if (!rate.ok) {
+        res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, message: 'Çok fazla deneme. Lütfen sonra tekrar deneyin.' }));
+        return;
+      }
+      const data = await readRequestBody(req);
+      const notifyEmail = process.env.GREENLEAF_PASSWORD_RESET_EMAIL?.trim()
+        || process.env.EKOLOJIK_OPS_EMAIL?.trim();
+      try {
+        const { handlePasswordResetRequest } = await import('./server/userPasswordApi.mjs');
+        const result = await handlePasswordResetRequest(DATA_DIR, resolvedTenant, data, notifyEmail);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Şifre sıfırlama hatası',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/password-reset-confirm' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const data = await readRequestBody(req);
+      try {
+        const { handlePasswordResetConfirm } = await import('./server/userPasswordApi.mjs');
+        const result = await handlePasswordResetConfirm(DATA_DIR, resolvedTenant, data);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Şifre sıfırlama hatası',
+        }));
+      }
+      return;
+    }
+
+    const userPasswordRoute = pathname.match(/^\/api\/users\/([^/]+)\/password$/);
+    if (userPasswordRoute && req.method === 'PATCH') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant);
+      if (!authPayload) return;
+      const data = await readRequestBody(req);
+      try {
+        const { handlePatchUserPassword } = await import('./server/userPasswordApi.mjs');
+        const result = await handlePatchUserPassword(
+          DATA_DIR,
+          resolvedTenant,
+          decodeURIComponent(userPasswordRoute[1]),
+          authPayload,
+          data ?? {},
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Şifre güncellenemedi',
+        }));
+      }
+      return;
+    }
+
     if (pathname === '/api/crm/send-email' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;

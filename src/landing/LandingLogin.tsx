@@ -20,6 +20,10 @@ import {
   saveTenantId,
 } from '../storage/tenantSession';
 import { purgeLegacyLoginLockouts } from '../utils/loginLockout';
+import {
+  confirmPasswordReset,
+  requestPasswordResetEmail,
+} from '../services/userPasswordApi';
 
 type LoginMode = 'password' | 'pin';
 
@@ -42,6 +46,8 @@ export function LandingLogin() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(registerState?.message ?? null);
   const [busy, setBusy] = useState(false);
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset')?.trim() ?? '');
+  const [newPasswordReset, setNewPasswordReset] = useState('');
   const ownerLogin = isOwnerAdminUsername(username);
 
   useEffect(() => {
@@ -126,6 +132,43 @@ export function LandingLogin() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    const loginUser = username.trim();
+    if (!loginUser) {
+      setError('Şifre sıfırlama için önce kullanıcı adınızı girin.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const result = await requestPasswordResetEmail(loginUser);
+    setBusy(false);
+    if (result.ok) {
+      setSuccess(result.message);
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleResetConfirm = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!resetToken || newPasswordReset.length < 4) {
+      setError('Yeni şifre en az 4 karakter olmalıdır.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const result = await confirmPasswordReset(resetToken, newPasswordReset);
+    setBusy(false);
+    if (result.ok) {
+      setSuccess(result.message);
+      setResetToken('');
+      setNewPasswordReset('');
+      navigate('/giris', { replace: true });
+    } else {
+      setError(result.message);
+    }
+  };
+
   const resetTotpStep = () => {
     setPendingTotpUserId(null);
     setPendingUsername('');
@@ -141,7 +184,34 @@ export function LandingLogin() {
           <p>Mevcut hesabınızla POS paneline erişin</p>
         </div>
 
-        {mode === 'pin' && !pendingTotpUserId ? (
+        {resetToken ? (
+          <form className="landing-form-grid" onSubmit={handleResetConfirm}>
+            <p className="login-totp-hint">E-postanızdaki bağlantı ile yeni şifrenizi belirleyin.</p>
+            <PasswordField
+              label="Yeni şifre"
+              autoComplete="new-password"
+              value={newPasswordReset}
+              onChange={setNewPasswordReset}
+              placeholder="••••••••"
+              required
+            />
+            {error && <p className="landing-flash landing-flash--error" role="alert">{error}</p>}
+            {success && <p className="landing-flash landing-flash--success" role="status">{success}</p>}
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? 'Kaydediliyor...' : 'Şifreyi güncelle'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-text"
+              onClick={() => {
+                setResetToken('');
+                navigate('/giris', { replace: true });
+              }}
+            >
+              Giriş ekranına dön
+            </button>
+          </form>
+        ) : mode === 'pin' && !pendingTotpUserId ? (
           <PinLoginPad
             store={store}
             tenantId={tenantId}
@@ -221,9 +291,14 @@ export function LandingLogin() {
                 Geri dön
               </button>
             ) : (
-              <button type="button" className="btn btn-text" onClick={() => setMode('pin')}>
-                PIN ile giriş (kasiyer)
-              </button>
+              <>
+                <button type="button" className="btn btn-text" onClick={() => setMode('pin')}>
+                  PIN ile giriş (kasiyer)
+                </button>
+                <button type="button" className="btn btn-text" onClick={() => void handleForgotPassword()}>
+                  Şifremi unuttum
+                </button>
+              </>
             )}
           </form>
         )}

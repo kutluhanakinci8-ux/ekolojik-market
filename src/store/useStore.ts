@@ -45,6 +45,7 @@ import {
   startPosApiTokenRefreshScheduler,
   stopPosApiTokenRefreshScheduler,
 } from '../services/posApiAuth';
+import { patchUserPassword } from '../services/userPasswordApi';
 import {
   clearAuthSession,
   clearAuthSessionsForAllKnownTenants,
@@ -149,7 +150,7 @@ import {
   recordFailedLogin,
 } from '../utils/loginLockout';
 import { hashPin, isValidPin, verifyPin } from '../utils/pin';
-import { hashPassword, verifyPassword } from '../utils/password';
+import { verifyPassword } from '../utils/password';
 import { generateTotpSecret, verifyTotpCode, buildTotpUri } from '../utils/totp';
 import { DEFAULT_PRODUCT_SETS } from '../data/defaultProductSets';
 import { getCartUnitPrice, resolveSalePriceType } from '../utils/salePricing';
@@ -3848,10 +3849,14 @@ export function usePosStoreState() {
     const user = users.find((item) => item.id === authSession.userId);
     if (!user) return 'Kullanıcı bulunamadı.';
 
-    const passwordHash = hashPassword(newPassword);
+    const apiResult = await patchUserPassword(user.id, newPassword);
+    if (!apiResult.ok) {
+      return apiResult.message ?? 'Şifre sunucuda güncellenemedi';
+    }
+
     const updated: PosUser = {
       ...user,
-      passwordHash,
+      passwordHash: '',
       mustChangePassword: false,
       updatedAt: new Date().toISOString(),
     };
@@ -3862,7 +3867,7 @@ export function usePosStoreState() {
     setAuthSession(session);
     logActivity(session, 'password_change', 'Şifre değiştirildi');
     return null;
-  }, [authSession, users, logActivity]);
+  }, [authSession, users, logActivity, settings]);
 
   const verifyAdminCredentials = useCallback(async (
     adminUsername: string,
@@ -3958,12 +3963,11 @@ export function usePosStoreState() {
     if (data.pin && !isValidPin(data.pin)) return 'PIN 6 haneli olmalıdır.';
 
     const now = new Date().toISOString();
-    const passwordHash = hashPassword(data.password);
     const user: PosUser = {
       id: `U${Date.now()}`,
       username: data.username.trim().toLowerCase(),
       displayName: data.displayName.trim(),
-      passwordHash,
+      passwordHash: '',
       role: data.role,
       allowedTabs: data.role === 'admin' ? ALL_APP_PAGES : data.allowedTabs,
       isActive: data.isActive,
@@ -3988,6 +3992,10 @@ export function usePosStoreState() {
       const saved = await persistStoreNow({ users: nextUsers });
       if (!saved) {
         return 'Kullanıcı oluşturuldu ancak sunucuya kaydedilemedi. Lütfen tekrar deneyin.';
+      }
+      const pwResult = await patchUserPassword(user.id, data.password);
+      if (!pwResult.ok) {
+        return pwResult.message ?? 'Kullanıcı oluşturuldu ancak şifre sunucuya yazılamadı.';
       }
     }
 
@@ -4036,7 +4044,12 @@ export function usePosStoreState() {
       return 'Ana yönetici pasif yapılamaz.';
     }
 
-    const passwordHash = data.password ? hashPassword(data.password) : existing.passwordHash;
+    if (data.password) {
+      const pwResult = await patchUserPassword(id, data.password);
+      if (!pwResult.ok) {
+        return pwResult.message ?? 'Şifre güncellenemedi';
+      }
+    }
     let pinHash = existing.pinHash;
     if (data.clearPin) {
       pinHash = undefined;
@@ -4047,7 +4060,7 @@ export function usePosStoreState() {
       ...existing,
       username: data.username.trim().toLowerCase(),
       displayName: data.displayName.trim(),
-      passwordHash,
+      passwordHash: '',
       pinHash,
       role: data.role,
       allowedTabs: data.role === 'admin' ? ALL_APP_PAGES : data.allowedTabs,

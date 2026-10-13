@@ -20,7 +20,10 @@ Eski tasarımda istemci her 5 saniyede `PUT /api/data` ile kullanıcı dizisini 
 
 ## Operasyon
 
-- Şifre sıfırlama: `node scripts/ensure-greenleaf-credentials.mjs` (VPS) veya Ayarlar → kullanıcı şifresi değiştir.
+- VPS `.env`: `GREENLEAF_OWNER_PASSWORD` (zorunlu, deploy sonrası vault senkronu).
+- `GREENLEAF_PASSWORD_RESET_EMAIL` — «Şifremi unuttum» bağlantısı bu adrese gider.
+- Onarım: `GREENLEAF_OWNER_PASSWORD='...' node scripts/ensure-greenleaf-credentials.mjs --data-dir /var/www/market-pos/data`
+- Şifre değişimi: `PATCH /api/users/:id/password` (oturum gerekli) veya giriş sayfası sıfırlama akışı.
 - Giriş testi: `POST /api/auth/pos-token` body `{"username":"kutluhan08","password":"..."}`.
 
 ## Bilinen kullanıcılar (main tenant)
