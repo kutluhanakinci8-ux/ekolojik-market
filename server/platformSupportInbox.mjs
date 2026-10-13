@@ -198,6 +198,98 @@ async function maybeSendAutoreply(dataDir, row) {
   return { ok: Boolean(result?.messageId), ...result };
 }
 
+async function safeMaybeSendAutoreply(dataDir, row) {
+  try {
+    return await maybeSendAutoreply(dataDir, row);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Otomatik yanıt gönderilemedi',
+    };
+  }
+}
+
+export async function importSupportInboxFromImap(
+  dataDir,
+  { maxMessages = 40, sendAutoreply = true, sinceDays = 60 } = {},
+) {
+  if (!isPlatformSupportImapConfigured()) {
+    return { ok: true, skipped: true, scanned: 0, added: 0, autoreplies: [] };
+  }
+  const config = getPlatformSupportImapConfig();
+  const sinceDate = new Date(Date.now() - sinceDays * 86400000);
+  let fetched = [];
+  try {
+    fetched = await fetchRecentMailboxMessages(config, 'INBOX', {
+      sinceDate,
+      maxMessages,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'IMAP tarama hatası',
+      scanned: 0,
+      added: 0,
+      autoreplies: [],
+    };
+  }
+
+  const existing = await readMessages(dataDir);
+  const byKey = new Map(existing.map((r) => [r.dedupeKey, r]));
+  let added = 0;
+  const autoreplies = [];
+
+  for (const msg of fetched) {
+    const raw = msg.rawSource || msg.text || '';
+    const parsed = parseMailBody(raw);
+    const threadHdr = parseThreadHeadersFromRaw(raw);
+    const dedupe = dedupeKey(msg);
+    if (byKey.has(dedupe)) continue;
+
+    const row = {
+      id: `ps-${randomUUID()}`,
+      dedupeKey: dedupe,
+      messageId: msg.messageId ?? null,
+      inReplyTo: threadHdr.inReplyTo ?? null,
+      references: threadHdr.references ?? null,
+      from: repairUtf8Mojibake(msg.from ?? ''),
+      to: repairUtf8Mojibake(msg.to ?? ''),
+      subject: repairUtf8Mojibake(msg.subject ?? ''),
+      receivedAt: msg.receivedAt ?? new Date().toISOString(),
+      snippet: repairUtf8Mojibake(parsed.snippet || msg.snippet || ''),
+      bodyText: repairUtf8Mojibake(parsed.text ?? ''),
+      bodyHtml: repairUtf8Mojibake(parsed.html ?? ''),
+      readAt: null,
+      autoreplySentAt: null,
+      externalTicketRef: null,
+      source: 'imap',
+      ingestedAt: new Date().toISOString(),
+    };
+    byKey.set(dedupe, row);
+    added += 1;
+
+    const { autoCreateCaseForInboxRow } = await import('./platformSupportCases.mjs');
+    await autoCreateCaseForInboxRow(dataDir, row);
+
+    if (sendAutoreply) {
+      const ar = await safeMaybeSendAutoreply(dataDir, row);
+      if (ar?.ok) {
+        row.autoreplySentAt = new Date().toISOString();
+      }
+      autoreplies.push({ id: row.id, ...ar });
+    }
+  }
+
+  if (added > 0) {
+    const merged = [...byKey.values()].sort(
+      (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
+    );
+    await writeMessages(dataDir, merged);
+  }
+
+  return { ok: true, scanned: fetched.length, added, autoreplies };
+}
+
 export async function syncPlatformSupportInbox(dataDir, { maxMessages = 40 } = {}) {
   const bridge = await importSupportInboxFromOutbox(dataDir, { limit: 120 });
 
@@ -231,82 +323,40 @@ export async function syncPlatformSupportInbox(dataDir, { maxMessages = 40 } = {
     return { ok: false, error: error instanceof Error ? error.message : 'IMAP bağlantı hatası' };
   }
 
-  const sinceDate = new Date(Date.now() - 60 * 86400000);
-  let fetched = [];
-  try {
-    fetched = await fetchRecentMailboxMessages(config, 'INBOX', {
-      sinceDate,
-      maxMessages,
-    });
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'IMAP tarama hatası' };
+  const imap = await importSupportInboxFromImap(dataDir, { maxMessages, sendAutoreply: true });
+  if (!imap.ok) {
+    return { ok: false, error: imap.error ?? 'IMAP içe aktarma başarısız' };
   }
 
-  const existing = await readMessages(dataDir);
-  const byKey = new Map(existing.map((r) => [r.dedupeKey, r]));
-  let added = 0;
-  const autoreplies = [];
-
-  for (const msg of fetched) {
-    const raw = msg.rawSource || msg.text || '';
-    const parsed = parseMailBody(raw);
-    const threadHdr = parseThreadHeadersFromRaw(raw);
-    const dedupe = dedupeKey(msg);
-    if (byKey.has(dedupe)) continue;
-
-    const row = {
-      id: `ps-${randomUUID()}`,
-      dedupeKey: dedupe,
-      messageId: msg.messageId ?? null,
-      inReplyTo: threadHdr.inReplyTo ?? null,
-      references: threadHdr.references ?? null,
-      from: repairUtf8Mojibake(msg.from ?? ''),
-      to: repairUtf8Mojibake(msg.to ?? ''),
-      subject: repairUtf8Mojibake(msg.subject ?? ''),
-      receivedAt: msg.receivedAt ?? new Date().toISOString(),
-      snippet: repairUtf8Mojibake(parsed.snippet || msg.snippet || ''),
-      bodyText: repairUtf8Mojibake(parsed.text ?? ''),
-      bodyHtml: repairUtf8Mojibake(parsed.html ?? ''),
-      readAt: null,
-      autoreplySentAt: null,
-      externalTicketRef: null,
-      ingestedAt: new Date().toISOString(),
-    };
-    byKey.set(dedupe, row);
-    added += 1;
-
-    const { autoCreateCaseForInboxRow } = await import('./platformSupportCases.mjs');
-    await autoCreateCaseForInboxRow(dataDir, row);
-
-    const ar = await maybeSendAutoreply(dataDir, row);
-    if (ar?.ok) {
-      row.autoreplySentAt = new Date().toISOString();
-    }
-    autoreplies.push({ id: row.id, ...ar });
-  }
-
-  const merged = [...byKey.values()].sort(
-    (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
-  );
-  await writeMessages(dataDir, merged);
+  await ensureStore(dataDir);
   await writeFile(
     META_FILE(dataDir),
-    JSON.stringify({ lastSyncAt: new Date().toISOString(), added, scanned: fetched.length }, null, 2),
+    JSON.stringify(
+      {
+        lastSyncAt: new Date().toISOString(),
+        added: imap.added,
+        scanned: imap.scanned,
+        bridgeImported: bridge.added,
+      },
+      null,
+      2,
+    ),
     'utf8',
   );
 
   return {
     ok: true,
-    scanned: fetched.length,
-    added: added + bridge.added,
+    scanned: imap.scanned,
+    added: imap.added + bridge.added,
     bridgeImported: bridge.added,
-    autoreplies,
-    message: `${fetched.length} IMAP · ${added} yeni · ${bridge.added} outbox köprüsü`,
+    autoreplies: imap.autoreplies,
+    message: `${imap.scanned} IMAP · ${imap.added} yeni · ${bridge.added} outbox köprüsü`,
   };
 }
 
 export async function listPlatformSupportInbox(dataDir, { limit = 50 } = {}) {
   await importSupportInboxFromOutbox(dataDir, { limit: 120 });
+  await importSupportInboxFromImap(dataDir, { maxMessages: 30, sendAutoreply: false });
   const messages = await readMessages(dataDir);
   const unread = messages.filter((m) => !m.readAt).length;
   let lastSyncAt = null;
