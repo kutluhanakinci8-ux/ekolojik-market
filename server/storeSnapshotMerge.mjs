@@ -44,6 +44,25 @@ function filterAfterClear(items, clearedAt) {
   return items.filter((row) => ts(row.createdAt) > t0);
 }
 
+function mergePaymentRemindersById(incoming, existing) {
+  const map = new Map();
+  for (const item of existing ?? []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  for (const item of incoming ?? []) {
+    if (!item?.id) continue;
+    const prev = map.get(item.id);
+    if (!prev || ts(item.updatedAt) >= ts(prev.updatedAt)) {
+      map.set(item.id, item);
+    }
+  }
+  return [...map.values()].sort((a, b) => {
+    const byDate = String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''));
+    if (byDate !== 0) return byDate;
+    return String(a.title ?? '').localeCompare(String(b.title ?? ''), 'tr');
+  });
+}
+
 export function mergeIncomingStoreWithExisting(incoming, existing) {
   if (!existing || typeof existing !== 'object') return incoming;
   const clearedAt = existing.settings?.salesHistoryClearedAt ?? incoming.settings?.salesHistoryClearedAt;
@@ -68,6 +87,18 @@ export function mergeIncomingStoreWithExisting(incoming, existing) {
       out.stockMovements,
       filterAfterClear(existing.stockMovements, clearedAt),
     );
+  }
+  const incomingReminders = incoming.settings?.paymentReminders;
+  const existingReminders = existing.settings?.paymentReminders;
+  if (Array.isArray(incomingReminders) || Array.isArray(existingReminders)) {
+    out.settings = {
+      ...(existing.settings ?? {}),
+      ...(incoming.settings ?? {}),
+      paymentReminders: mergePaymentRemindersById(
+        incomingReminders ?? [],
+        existingReminders ?? [],
+      ),
+    };
   }
   out.updatedAt = new Date(Math.max(ts(incoming.updatedAt), ts(existing.updatedAt), Date.now())).toISOString();
   return out;
