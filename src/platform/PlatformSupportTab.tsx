@@ -43,6 +43,12 @@ function formatDurationMs(ms: number | null | undefined): string {
   return `${(ms / 3600_000).toFixed(1)} sa`;
 }
 
+function userMessage(err: unknown, fallback: string): string {
+  if (typeof err === 'string' && err.trim()) return err;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   try {
@@ -54,7 +60,7 @@ function formatDateTime(iso: string | null | undefined): string {
 
 function SupportSkeleton() {
   return (
-    <div className="platform-support platform-support--loading" aria-busy="true">
+    <div className="platform-support platform-support--premium platform-support--loading" aria-busy="true">
       <div className="platform-users-skeleton-hero" />
       <div className="platform-users-skeleton-kpis" />
       <div className="platform-users-skeleton-block" />
@@ -89,13 +95,14 @@ export function PlatformSupportTab() {
   const [contextTenantId, setContextTenantId] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [macroPick, setMacroPick] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     const result = await fetchPlatformSupportOverview(windowDays);
     if (!result.ok || !result.data) {
-      setError(result.error ?? 'Veri yüklenemedi');
+      setError(userMessage(result.error, 'Veri yüklenemedi'));
       setLoading(false);
       return;
     }
@@ -152,9 +159,6 @@ export function PlatformSupportTab() {
     })();
   }, [selectedCaseId]);
 
-  const compliancePct = data?.totals.compliancePercent ?? 0;
-  const complianceVariant = compliancePct >= 85 ? 'brand' : compliancePct >= 60 ? 'warn' : 'muted';
-
   const filteredQueue = useMemo(() => {
     if (!data) return [];
     if (queueFilter === 'all') return data.queue;
@@ -166,7 +170,7 @@ export function PlatformSupportTab() {
     setPolicyMsg(null);
     const result = await savePlatformSupportSlaPolicy(policyDraft);
     if (!result.ok) {
-      setPolicyMsg(result.error ?? 'Kaydedilemedi');
+      setPolicyMsg(userMessage(result.error, 'Kaydedilemedi'));
       return;
     }
     setPolicyMsg('SLA eşikleri kaydedildi');
@@ -181,7 +185,7 @@ export function PlatformSupportTab() {
     const result = await syncPlatformSupportInbox();
     setInboxSyncing(false);
     if (!result.ok) {
-      setPolicyMsg(result.error ?? 'Senkron başarısız');
+      setPolicyMsg(userMessage(result.error, 'Senkron başarısız'));
       return;
     }
     setPolicyMsg(result.message ?? 'Gelen kutusu güncellendi');
@@ -192,7 +196,7 @@ export function PlatformSupportTab() {
     if (!selectedMailId || !replyDraft.trim()) return;
     const result = await replyPlatformSupportInbox(selectedMailId, replyDraft.trim());
     if (!result.ok) {
-      setPolicyMsg(result.error ?? 'Yanıt gönderilemedi');
+      setPolicyMsg(userMessage(result.error, 'Yanıt gönderilemedi'));
       return;
     }
     setReplyDraft('');
@@ -211,7 +215,7 @@ export function PlatformSupportTab() {
       customerName: q.customerName,
     });
     if (!result.ok) {
-      setPolicyMsg(result.error ?? 'Talep oluşturulamadı');
+      setPolicyMsg(userMessage(result.error, 'Talep oluşturulamadı'));
       return;
     }
     setPolicyMsg('Talep kaydı oluşturuldu');
@@ -226,7 +230,7 @@ export function PlatformSupportTab() {
     const res = await fetchPlatformSupportCaseAi(selectedCaseId, kind);
     setAiBusy(false);
     if (!res.ok) {
-      setPolicyMsg(res.error ?? 'AI önerisi alınamadı');
+      setPolicyMsg(userMessage(res.error, 'AI önerisi alınamadı'));
       return;
     }
     if (kind === 'draft_reply' && res.text) {
@@ -246,7 +250,7 @@ export function PlatformSupportTab() {
       body: actionDraft.trim(),
     });
     if (!result.ok) {
-      setPolicyMsg(result.error ?? 'Gönderilemedi');
+      setPolicyMsg(userMessage(result.error, 'Gönderilemedi'));
       return;
     }
     setActionDraft('');
@@ -261,7 +265,7 @@ export function PlatformSupportTab() {
   const openCaseFromContact = async (contactId: string) => {
     const result = await createPlatformSupportCaseFromContact(contactId);
     if (!result.ok) {
-      setPolicyMsg(result.error ?? 'Talep oluşturulamadı');
+      setPolicyMsg(userMessage(result.error, 'Talep oluşturulamadı'));
       return;
     }
     setPolicyMsg('İletişim formundan talep oluşturuldu');
@@ -277,7 +281,7 @@ export function PlatformSupportTab() {
       status: 'open',
     });
     if (!result.ok) {
-      setPolicyMsg(result.error ?? 'Kaydedilemedi');
+      setPolicyMsg(userMessage(result.error, 'Kaydedilemedi'));
       return;
     }
     setPolicyMsg('Zendesk referansı kaydedildi');
@@ -288,13 +292,13 @@ export function PlatformSupportTab() {
     setExporting(true);
     const result = await downloadPlatformSupportCsv(windowDays);
     setExporting(false);
-    if (!result.ok) setPolicyMsg(result.error ?? 'CSV indirilemedi');
+    if (!result.ok) setPolicyMsg(userMessage(result.error, 'CSV indirilemedi'));
   };
 
   if (loading && !data) return <SupportSkeleton />;
   if (error && !data) {
     return (
-      <div className="platform-support platform-panel">
+      <div className="platform-support platform-support--premium platform-panel platform-panel--premium">
         <p className="platform-error">{error}</p>
         <button type="button" className="btn btn-primary" onClick={() => void load()}>
           Yeniden dene
@@ -304,53 +308,70 @@ export function PlatformSupportTab() {
   }
   if (!data) return null;
 
-  return (
-    <div className="platform-support">
-      <section className="platform-users-hero platform-support-hero">
-        <div>
-          <h2>Destek komuta merkezi</h2>
-          <p>
-            <strong>{mailboxAddress ?? 'destek@ekolojikmarket.com.tr'}</strong> gelen kutusu, otomatik “talebiniz alındı” (destek@) ve üretim mesaj kuyruğu. QA/smoke kayıtları gizlenir.
-          </p>
-          {!data.capabilities.messagingPublicConfigured ? (
-            <p className="platform-support-hint">Genel mesajlaşma API yapılandırması eksik olabilir; kuyruk yine kiracı verisinden okunur.</p>
-          ) : null}
-        </div>
-        <div className="platform-support-hero-actions">
-          <PlatformFilterSelect
-            label="Pencere"
-            icon="status"
-            value={String(windowDays)}
-            onChange={(v) => setWindowDays(Number(v))}
-          >
-            <option value="7">7 gün</option>
-            <option value="14">14 gün</option>
-            <option value="30">30 gün</option>
-            <option value="90">90 gün</option>
-          </PlatformFilterSelect>
-          <button type="button" className="btn btn-text" onClick={() => void load()} disabled={loading}>
-            Yenile
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={() => void onExport()} disabled={exporting}>
-            {exporting ? 'İndiriliyor…' : 'CSV'}
-          </button>
-        </div>
-      </section>
+  const compliancePct = data.totals.compliancePercent ?? 0;
+  const complianceVariant = compliancePct >= 85 ? 'brand' : compliancePct >= 60 ? 'warn' : 'muted';
 
-      <nav className="platform-support-subnav" aria-label="Destek görünümü">
+  return (
+    <div className="platform-support platform-support--premium platform-users--premium">
+      <header className="platform-users-hero platform-users-hero--premium platform-support-hero-premium">
+        <div className="platform-users-hero-copy">
+          <span className="platform-users-hero-badge">Destek ops</span>
+          <h2>Destek komuta merkezi</h2>
+          <time className="platform-users-hero-time" dateTime={data.generatedAt}>
+            Son güncelleme: {formatDateTime(data.generatedAt)}
+          </time>
+          <ul className="platform-overview-hero-chips platform-support-hero-chips" aria-label="Destek sinyalleri">
+            <li className={data.totals.queueSize > 0 ? 'is-warn' : 'is-ok'}>{data.totals.queueSize} kuyruk</li>
+            <li className={(data.cases?.open ?? 0) > 0 ? 'is-warn' : 'is-ok'}>{data.cases?.open ?? 0} açık talep</li>
+            <li className={inboxUnread > 0 ? 'is-warn' : 'is-muted'}>{inboxUnread} okunmamış mail</li>
+            <li className="is-muted">{mailboxAddress ?? 'destek@'}</li>
+          </ul>
+        </div>
+        <div className="platform-users-hero-actions platform-support-hero-actions-premium">
+          <div className="platform-users-hero-stat">
+            <RingProgress pct={compliancePct} size={72} label="SLA uyumu" variant={complianceVariant} />
+            <span className="platform-users-hero-stat-label">SLA uyumu ({windowDays}g)</span>
+          </div>
+          <div className="platform-support-hero-toolbar">
+            <PlatformFilterSelect
+              label="Pencere"
+              icon="status"
+              value={String(windowDays)}
+              onChange={(v) => setWindowDays(Number(v))}
+            >
+              <option value="7">7 gün</option>
+              <option value="14">14 gün</option>
+              <option value="30">30 gün</option>
+              <option value="90">90 gün</option>
+            </PlatformFilterSelect>
+            <button type="button" className="btn platform-support-btn-ghost" onClick={() => void load()} disabled={loading}>
+              Yenile
+            </button>
+            <button type="button" className="btn platform-support-btn-light" onClick={() => void onExport()} disabled={exporting}>
+              {exporting ? 'İndiriliyor…' : 'CSV'}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <nav className="platform-support-subnav platform-support-subnav--premium" aria-label="Destek görünümü">
         <button
           type="button"
           className={`platform-support-subnav-btn ${section === 'inbox' ? 'platform-support-subnav-btn--active' : ''}`}
           onClick={() => setSection('inbox')}
         >
-          Gelen kutusu {inboxUnread > 0 ? `(${inboxUnread})` : ''}
+          Gelen kutusu
+          {inboxUnread > 0 ? <span className="platform-support-subnav-count">{inboxUnread}</span> : null}
         </button>
         <button
           type="button"
           className={`platform-support-subnav-btn ${section === 'cases' ? 'platform-support-subnav-btn--active' : ''}`}
           onClick={() => setSection('cases')}
         >
-          Talepler & sorunlar {data?.cases?.open ? `(${data.cases.open})` : ''}
+          Talepler & sorunlar
+          {(data.cases?.open ?? 0) > 0 ? (
+            <span className="platform-support-subnav-count">{data.cases?.open}</span>
+          ) : null}
         </button>
         <button
           type="button"
@@ -368,13 +389,17 @@ export function PlatformSupportTab() {
         </button>
       </nav>
 
-      {policyMsg ? <p className="platform-inline-msg">{policyMsg}</p> : null}
+      {policyMsg ? (
+        <p className="platform-support-toast" role="status">
+          {policyMsg}
+        </p>
+      ) : null}
 
       {section === 'cases' ? (
         <div className="platform-support-command-layout">
         <div className="platform-support-inbox-layout platform-support-command-main">
           {contactQueue.some((c) => !c.hasCase) ? (
-            <section className="platform-panel platform-support-contact-queue">
+            <section className="platform-panel platform-panel--premium platform-support-contact-queue">
               <h3>İletişim formu kuyruğu</h3>
               <p className="platform-support-hint">
                 Yeni formlar otomatik talep oluşturur; eski kayıtlar için &quot;Talep&quot; kullanın.
@@ -395,7 +420,7 @@ export function PlatformSupportTab() {
               </ul>
             </section>
           ) : null}
-          <section className="platform-panel">
+          <section className="platform-panel platform-panel--premium">
             <h3>Operasyon kayıtları (Case)</h3>
             <p className="platform-support-hint">
               E-posta senkronunda otomatik talep; Zendesk ID ileride köprü için. Dosya:{' '}
@@ -451,7 +476,7 @@ export function PlatformSupportTab() {
               </tbody>
             </table>
           </section>
-          <section className="platform-panel">
+          <section className="platform-panel platform-panel--premium">
             {selectedCase ? (
               <>
                 <h3>#{selectedCase.number} — {selectedCase.subject}</h3>
@@ -493,20 +518,24 @@ export function PlatformSupportTab() {
                     <option value="note">İç not</option>
                   </PlatformFilterSelect>
                   {caseDetail?.macros?.length ? (
-                    <PlatformFilterSelect
-                      label="Makro"
-                      icon="status"
-                      value=""
-                      onChange={(v) => {
-                        const macro = caseDetail.macros.find((m) => m.id === v);
-                        if (macro) setActionDraft(macro.body);
-                      }}
-                    >
-                      <option value="">Şablon seç…</option>
-                      {caseDetail.macros.map((m) => (
-                        <option key={m.id} value={m.id}>{m.label}</option>
-                      ))}
-                    </PlatformFilterSelect>
+                    <label className="platform-support-field">
+                      <span className="platform-support-field-label">Makro şablon</span>
+                      <select
+                        className="platform-support-control"
+                        value={macroPick}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setMacroPick(v);
+                          const macro = caseDetail.macros.find((m) => m.id === v);
+                          if (macro) setActionDraft(macro.body);
+                        }}
+                      >
+                        <option value="">Şablon seç…</option>
+                        {caseDetail.macros.map((m) => (
+                          <option key={m.id} value={m.id}>{m.label}</option>
+                        ))}
+                      </select>
+                    </label>
                   ) : null}
                 </div>
                 <label className="platform-support-reply-label">
@@ -554,7 +583,7 @@ export function PlatformSupportTab() {
 
       {section === 'inbox' ? (
         <div className="platform-support-inbox-layout">
-          <section className="platform-panel platform-support-inbox-list">
+          <section className="platform-panel platform-panel--premium platform-support-inbox-list">
             <div className="platform-panel-head">
               <h3>destek@ gelen</h3>
               <button type="button" className="btn btn-secondary" onClick={() => void onInboxSync()} disabled={inboxSyncing}>
@@ -587,7 +616,7 @@ export function PlatformSupportTab() {
               )}
             </ul>
           </section>
-          <section className="platform-panel platform-support-inbox-detail">
+          <section className="platform-panel platform-panel--premium platform-support-inbox-detail">
             {selectedMail ? (
               <>
                 <h3>{selectedMail.subject}</h3>
@@ -652,7 +681,7 @@ export function PlatformSupportTab() {
       </div>
 
       <div className="platform-support-columns">
-        <section className="platform-panel platform-support-policy">
+        <section className="platform-panel platform-panel--premium platform-support-policy">
           <h3>SLA eşikleri</h3>
           {policyDraft ? (
             <div className="platform-support-policy-form">
@@ -694,8 +723,8 @@ export function PlatformSupportTab() {
           {policyMsg ? <p className="platform-inline-msg">{policyMsg}</p> : null}
         </section>
 
-        <section className="platform-panel">
-          <div className="platform-panel-head">
+        <section className="platform-panel platform-panel--premium">
+          <div className="platform-panel platform-panel--premium-head">
             <h3>Öncelikli kuyruk</h3>
             <PlatformFilterSelect
               label="Tür"
@@ -762,7 +791,7 @@ export function PlatformSupportTab() {
         </section>
       </div>
 
-      <section className="platform-panel">
+      <section className="platform-panel platform-panel--premium">
         <h3>Kiracı SLA özeti</h3>
         <table className="platform-table platform-table--scroll">
           <thead>
