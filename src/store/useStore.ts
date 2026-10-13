@@ -3836,7 +3836,18 @@ export function usePosStoreState() {
     const normalized = adminUsername.trim().toLowerCase();
     const admin = users.find((item) => item.username === normalized && item.isActive && item.role === 'admin');
     if (!admin) return 'Yönetici bulunamadı.';
-    if (!verifyPassword(adminPassword, admin.passwordHash)) return 'Yönetici şifresi hatalı.';
+
+    const authTenant = resolveLoginTenantId(normalized, loadTenantId());
+    const remoteAuth = await exchangePosApiToken(
+      { username: normalized, password: adminPassword.trim() },
+      authTenant,
+    );
+    const localHashOk =
+      Boolean(admin.passwordHash) && verifyPassword(adminPassword, admin.passwordHash);
+    if (!remoteAuth.ok && !(import.meta.env.DEV && localHashOk)) {
+      return 'Yönetici şifresi hatalı.';
+    }
+
     if (admin.totpEnabled && admin.totpSecret) {
       if (!totpCode) return '2FA doğrulama kodu gerekli.';
       if (!verifyTotpCode(admin.totpSecret, totpCode)) return '2FA doğrulama kodu hatalı.';

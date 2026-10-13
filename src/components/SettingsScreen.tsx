@@ -133,11 +133,18 @@ export function SettingsScreen({ store }: SettingsScreenProps) {
   };
 
   const handlePush = () => {
+    const runPush = async () => {
+      const saved = await store.pushStoreToServer();
+      setBackupMessage(saved ? 'Veriler sunucuya yüklendi.' : 'Sunucuya yazılamadı.');
+    };
+    if (store.authSession?.role === 'admin') {
+      void runPush();
+      return;
+    }
     setPendingApproval({
       reason: 'backup_push',
-      action: async () => {
-        const saved = await store.pushStoreToServer();
-        setBackupMessage(saved ? 'Veriler sunucuya yüklendi.' : 'Sunucuya yazılamadı.');
+      action: () => {
+        void runPush();
       },
     });
   };
