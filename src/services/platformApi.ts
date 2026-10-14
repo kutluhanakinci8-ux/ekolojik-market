@@ -1237,12 +1237,14 @@ export async function fetchPlatformSupportCases(
   status?: string,
   kind?: string,
   tag?: string,
+  limit?: number,
 ): Promise<{ ok: boolean; data?: PlatformSupportCasesPayload; error?: string }> {
   try {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (kind) params.set('kind', kind);
     if (tag && tag !== 'all') params.set('tag', tag);
+    if (limit != null && limit > 0) params.set('limit', String(limit));
     const q = params.toString() ? `?${params}` : '';
     const res = await fetch(`/api/platform/support/cases${q}`, { headers: posApiAuthHeaders() });
     const data = (await res.json()) as PlatformSupportCasesPayload & { ok?: boolean; error?: string };

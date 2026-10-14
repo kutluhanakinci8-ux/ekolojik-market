@@ -80,7 +80,14 @@ export async function findCaseByExternalTicket(dataDir, provider, ticketId) {
   );
 }
 
-export async function findCaseByLink(dataDir, link) {
+function pickMessagingLinkedCase(matches) {
+  if (!matches?.length) return null;
+  const active = matches.find((c) => c.status !== 'closed' && c.status !== 'solved');
+  if (active) return active;
+  return [...matches].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+}
+
+export async function findCaseByLink(dataDir, link, { includeClosedMessaging = false } = {}) {
   const cases = await readPlatformCases(dataDir);
   if (link.contactMessageId) {
     return cases.find((c) => c.links?.contactMessageId === link.contactMessageId) ?? null;
@@ -89,18 +96,22 @@ export async function findCaseByLink(dataDir, link) {
     return cases.find((c) => c.links?.inboxMessageId === link.inboxMessageId) ?? null;
   }
   if (link.tenantId && link.threadId) {
-    return (
-      cases.find(
-        (c) => c.links?.tenantId === link.tenantId && c.links?.threadId === link.threadId && c.status !== 'closed',
-      ) ?? null
+    const matches = cases.filter(
+      (c) => c.links?.tenantId === link.tenantId && c.links?.threadId === link.threadId,
     );
+    if (!matches.length) return null;
+    if (includeClosedMessaging) return pickMessagingLinkedCase(matches);
+    return matches.find((c) => c.status !== 'closed' && c.status !== 'solved') ?? null;
   }
   return null;
 }
 
 export async function createPlatformCase(dataDir, input, operatorUsername) {
   const cases = await readPlatformCases(dataDir);
-  const existing = input.links ? await findCaseByLink(dataDir, input.links) : null;
+  const messagingLink = input.links?.tenantId && input.links?.threadId;
+  const existing = input.links
+    ? await findCaseByLink(dataDir, input.links, { includeClosedMessaging: Boolean(messagingLink) })
+    : null;
   if (existing) return { ok: true, duplicate: true, case: existing };
 
   const now = new Date().toISOString();
