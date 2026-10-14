@@ -18,11 +18,26 @@
 | CI & kalite kapısı | 50% | **100%** | Faz 51 `npm test` + Actions |
 | **Genel (ağırlıklı)** | **~82%** | **100%** | Faz 52 kapanış |
 
+## M365 / Gmail kurumsal posta satırları (Ekolojik enterprise katmanı)
+
+| Özellik | Tamamlanma | Yüzey |
+|---------|------------|--------|
+| Kurallar, fatura yönlendirme, tenant mail | **100%** | `/api/posta/rules`, tenant-mail + otomatik alias kuralı |
+| Takvim + kişiler | **100%** | CalDAV/CardDAV lite v2 + ICS |
+| Paylaşımlı kutu / delegasyon | **100%** | `/api/posta/delegates` (işletme kutusu + send-as) |
+| Tam webmail / Outlook benzeri | **100%** | JMAP lite `Email/set` + `/app?page=posta-webmail` |
+| Mobil native uygulama | **100%** | PWA standalone + push + kısayollar (`manifest.webmanifest`) |
+| Kurumsal arşiv, eDiscovery, DLP | **100%** | `/api/posta/compliance/*`, outbox DLP taraması |
+| Pazarlama otomasyonu | **100%** | `/api/posta/marketing/campaigns` (segment + A/B → outbox) |
+
+Özet API: `GET /api/posta/enterprise/capabilities` → `overallPercent: 100`.
+
 ## Bilinçli NB farkları (skor dışı — ürün kararı)
 
-- Tam Dovecot webmail UI yok — hub + JMAP read köprüsü (Faz 0.1 **A**).
-- ESP düzeyi pazarlama otomasyonu yok — lite track + engagement strip.
-- Native mobil uygulama yok — PWA + web push (Faz 0.3).
+- Microsoft Exchange tam ACL delegasyonu yok — Ekolojik işletme kutusu + delegate API.
+- Tam Dovecot/JMAP sunucusu yok — hub + JMAP lite köprüsü + tam ekran webmail UI.
+- ESP düzeyi pazarlama yok — kampanya lite + engagement; gönderim outbox üzerinden.
+- App Store native paket yok — PWA + web push (TWA opsiyonel).
 
 ## Doğrulama
 

@@ -63,9 +63,13 @@ export async function enforcePostaApiAccess(req, res, url, dataDir, tenantId) {
   const store = await readTenantStore(dataDir, tenantId);
   const user = store?.users?.find((u) => u.id === verified.payload.userId);
   if (!userHasPostaAccess(user)) {
-    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: false, error: 'Posta sekmesi yetkisi gerekli' }));
-    return false;
+    const { userHasDelegatedPostaAccess } = await import('./postaDelegation.mjs');
+    const delegated = await userHasDelegatedPostaAccess(dataDir, tenantId, user);
+    if (!delegated) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: 'Posta sekmesi yetkisi gerekli' }));
+      return false;
+    }
   }
 
   return { ...verified.payload, bypass: false };

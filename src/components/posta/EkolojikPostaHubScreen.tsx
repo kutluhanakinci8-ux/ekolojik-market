@@ -1203,6 +1203,9 @@ export function EkolojikPostaHubScreen({
           </div>
         )}
         <div className="posta-hub-hero-actions">
+          <a className="btn btn-sm btn-outline" href="/app?page=posta-webmail&view=posta">
+            Tam ekran webmail
+          </a>
           {pushConfig && (
             <div className="posta-hub-push-anchor" ref={pushPanelRef}>
               <button

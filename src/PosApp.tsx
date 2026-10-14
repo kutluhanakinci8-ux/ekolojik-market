@@ -12,6 +12,7 @@ import { SalesScreen } from './components/SalesScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { StockScreen } from './components/StockScreen';
 import { EkolojikPostaHubScreen } from './components/posta/EkolojikPostaHubScreen';
+import { PostaWebmailLiteScreen } from './components/posta/PostaWebmailLiteScreen';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useStore } from './store/StoreProvider';
 import { canAccessPage, canRevealCostProfit, getDefaultLandingPage } from './utils/userAccess';
@@ -44,6 +45,7 @@ function renderPage(
     threadId: string | null;
     onConsumed: () => void;
   },
+  postaWebmailFull?: boolean,
 ) {
   switch (page) {
     case 'dashboard':
@@ -70,6 +72,9 @@ function renderPage(
     case 'cashier':
       return <AccountingScreen key={page} store={store} initialTab="kasa" />;
     case 'posta':
+      if (postaWebmailFull) {
+        return <PostaWebmailLiteScreen key="posta-webmail" store={store} />;
+      }
       return (
         <EkolojikPostaHubScreen
           key={`${page}-${postaDeepLink?.customerId ?? ''}-${postaDeepLink?.threadId ?? ''}`}
@@ -109,8 +114,12 @@ export function PosApp() {
   const [postaOnboardingOpen, setPostaOnboardingOpen] = useState(false);
   const deepLinkCustomerId = searchParams.get('customerId')?.trim() || null;
   const deepLinkThreadId = searchParams.get('threadId')?.trim() || null;
+  const postaWebmailFull = searchParams.get('page') === 'posta-webmail';
   const viewPosta =
-    searchParams.get('view') === 'posta' || Boolean(deepLinkCustomerId) || Boolean(deepLinkThreadId);
+    searchParams.get('view') === 'posta' ||
+    postaWebmailFull ||
+    Boolean(deepLinkCustomerId) ||
+    Boolean(deepLinkThreadId);
 
   const clearPostaDeepLink = () => {
     if (!searchParams.get('customerId') && !searchParams.get('threadId') && searchParams.get('view') !== 'posta') {
@@ -277,11 +286,16 @@ export function PosApp() {
       onBrandSecretClick={showCostProfitToggle ? store.toggleCostProfitReveal : undefined}
       navBadgeOverrides={postaUnread > 0 ? { posta: postaUnread } : undefined}
     >
-      {renderPage(page, store, {
-        customerId: page === 'posta' ? deepLinkCustomerId : null,
-        threadId: page === 'posta' ? deepLinkThreadId : null,
-        onConsumed: clearPostaDeepLink,
-      })}
+      {renderPage(
+        page,
+        store,
+        {
+          customerId: page === 'posta' ? deepLinkCustomerId : null,
+          threadId: page === 'posta' ? deepLinkThreadId : null,
+          onConsumed: clearPostaDeepLink,
+        },
+        postaWebmailFull,
+      )}
     </AppShell>
     </>
   );

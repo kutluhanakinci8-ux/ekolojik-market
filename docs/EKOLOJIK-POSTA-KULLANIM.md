@@ -20,7 +20,7 @@ NB **Lerta Posta** ile aynı **düzen** (klasörler, Yaz, Sohbet, Tam görünüm
 
 ### Gelen ve IMAP
 
-- **Tam webmail / Dovecot JMAP yok** — okuma ve klasörler POS **Posta hub** ve salt okunur **JMAP lite** köprüsü (`GET /api/posta/jmap-lite/*`) üzerinden; gönderim hub **Yaz** ve outbox ile yapılır.
+- **Tam webmail** — **Posta hub** + tam ekran **Webmail (JMAP lite)** (`/app?page=posta-webmail&view=posta`); `POST /api/posta/jmap-lite/Email/set` ile okundu/yıldız. Gönderim hub **Yaz** ve outbox ile yapılır. Dovecot/JMAP sunucusu yok — REST köprüsü.
 - **IMAP yenile**: yapılandırılmışsa kutuyu senkronize eder (Gelen, Gönderilen, Spam, Çöp, Taslaklar).
 - Mesaj detayında **Sunucu klasörü** (inbox / sent / junk / trash / drafts), IMAP bayraklarıyla uyumlu gösterilir.
 - **Konuşma** modu: aynı konuya ait yanıtlar tek zincirde.

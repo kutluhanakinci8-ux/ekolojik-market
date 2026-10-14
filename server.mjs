@@ -136,7 +136,19 @@ import {
   getPostaJmapLiteEmails,
   listPostaJmapLiteMailboxes,
   queryPostaJmapLiteMailbox,
+  setPostaJmapLiteEmails,
 } from './server/postaJmapLite.mjs';
+import { readPostaDelegates, savePostaDelegates } from './server/postaDelegation.mjs';
+import {
+  buildComplianceArchiveExport,
+  setLegalHold,
+} from './server/postaCompliance.mjs';
+import {
+  listPostaMarketingCampaigns,
+  runPostaMarketingCampaign,
+  upsertPostaMarketingCampaign,
+} from './server/postaMarketing.mjs';
+import { buildPostaEnterpriseCapabilities } from './server/postaEnterpriseCapabilities.mjs';
 import {
   deletePostaCalDavLiteEvent,
   getPostaCalDavLiteEvent,
@@ -2871,6 +2883,146 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/posta/jmap-lite/Email/set' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const updates = Array.isArray(data?.updates) ? data.updates : Array.isArray(data) ? data : [];
+      try {
+        const result = await setPostaJmapLiteEmails(DATA_DIR, tenantId, updates);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'JMAP set hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/enterprise/capabilities' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await buildPostaEnterpriseCapabilities(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Enterprise özellik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/delegates' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await readPostaDelegates(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Delegasyon okunamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/delegates' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaDelegates(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Delegasyon kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/compliance/archive' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const limit = Number(url.searchParams.get('limit') || 500);
+      try {
+        const result = await buildComplianceArchiveExport(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv dışa aktarma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/compliance/legal-hold' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await setLegalHold(DATA_DIR, tenantId, {
+          messageIds: data?.messageIds,
+          hold: data?.hold !== false,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Legal hold hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/marketing/campaigns' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaMarketingCampaigns(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kampanya listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/marketing/campaigns' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaMarketingCampaign(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kampanya kaydı hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/marketing/campaigns/run' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      const campaignId = String(data?.campaignId ?? url.searchParams.get('id') ?? '').trim();
+      if (!campaignId) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'campaignId gerekli' }));
+        return;
+      }
+      try {
+        const result = await runPostaMarketingCampaign(DATA_DIR, tenantId, campaignId, {
+          limit: Number(data?.limit || 200),
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kampanya çalıştırma hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/posta/caldav-lite/principal' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(getPostaCalDavLitePrincipal()));
@@ -3619,6 +3771,7 @@ const server = createServer(async (req, res) => {
       const data = await readRequestBody(req);
       try {
         await saveTenantMailConfig(DATA_DIR, tenantId, data ?? {});
+        await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
         const hub = await getTenantMailConfigHub(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(hub));
