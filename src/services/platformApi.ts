@@ -1390,9 +1390,17 @@ export async function createPlatformSupportCaseFromQueue(payload: {
   businessName?: string;
   subject?: string;
   customerName?: string;
-}): Promise<{ ok: boolean; error?: string }> {
-  const result = await platformSecurityPost('/api/platform/support/cases/from-queue', payload);
-  return { ok: result.ok, error: result.error };
+}): Promise<{ ok: boolean; case?: PlatformSupportCase; duplicate?: boolean; error?: string }> {
+  const result = await platformSecurityPost<{ case?: PlatformSupportCase; duplicate?: boolean }>(
+    '/api/platform/support/cases/from-queue',
+    payload,
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    case: result.data?.case,
+    duplicate: Boolean(result.data?.duplicate),
+  };
 }
 
 export async function fetchPlatformSupportCaseDetail(

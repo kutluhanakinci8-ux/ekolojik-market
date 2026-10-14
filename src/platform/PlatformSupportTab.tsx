@@ -247,7 +247,10 @@ export function PlatformSupportTab() {
     priority: 'normal',
     kind: 'request',
     assignee: '',
+    tags: '',
   });
+  const [inboxFilter, setInboxFilter] = useState<'all' | 'unread' | 'attachments'>('all');
+  const [inboxSearch, setInboxSearch] = useState('');
   const [caseMetaSaving, setCaseMetaSaving] = useState(false);
   const [zendeskIdDraft, setZendeskIdDraft] = useState('');
   const [zendeskApiReady, setZendeskApiReady] = useState(false);
@@ -339,9 +342,18 @@ export function PlatformSupportTab() {
       priority: selectedCase.priority,
       kind: selectedCase.kind,
       assignee: selectedCase.assignee ?? '',
+      tags: (selectedCase.tags ?? []).join(', '),
     });
     setCaseNotesDraft(selectedCase.notes ?? '');
-  }, [selectedCase?.id, selectedCase?.status, selectedCase?.priority, selectedCase?.kind, selectedCase?.assignee, selectedCase?.notes]);
+  }, [
+    selectedCase?.id,
+    selectedCase?.status,
+    selectedCase?.priority,
+    selectedCase?.kind,
+    selectedCase?.assignee,
+    selectedCase?.tags,
+    selectedCase?.notes,
+  ]);
 
   useEffect(() => {
     if (!selectedCaseId) {
@@ -500,6 +512,35 @@ export function PlatformSupportTab() {
     return threads;
   }, [inboxMessages]);
 
+  const filteredInboxThreads = useMemo(() => {
+    const q = inboxSearch.trim().toLowerCase();
+    return inboxThreads.filter(({ head, messages }) => {
+      if (inboxFilter === 'unread' && head.readAt) return false;
+      if (inboxFilter === 'attachments') {
+        const has = messages.some((m) => (m.attachments?.length ?? 0) > 0);
+        if (!has) return false;
+      }
+      if (!q) return true;
+      const blob = [head.subject, head.from, head.snippet, head.bodyText, ...messages.map((m) => m.bodyText)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [inboxThreads, inboxFilter, inboxSearch]);
+
+  const caseByMessagingThread = useMemo(() => {
+    const map = new Map<string, PlatformSupportCase>();
+    for (const c of caseRows) {
+      const tenantId = c.links?.tenantId ?? c.tenantId;
+      const threadId = c.links?.threadId;
+      if (!tenantId || !threadId) continue;
+      if (c.status === 'closed' || c.status === 'solved') continue;
+      map.set(`${tenantId}:${threadId}`, c);
+    }
+    return map;
+  }, [caseRows]);
+
   const selectedThreadMessages = useMemo(() => {
     if (!selectedMail) return [];
     const key = inboxThreadKey(selectedMail);
@@ -539,6 +580,13 @@ export function PlatformSupportTab() {
   };
 
   const openCaseFromQueue = async (q: PlatformSupportPayload['queue'][0]) => {
+    const existing = caseByMessagingThread.get(`${q.tenantId}:${q.threadId}`);
+    if (existing) {
+      setSelectedCaseId(existing.id);
+      setSection('cases');
+      setPolicyMsg(`Mevcut kayıt #${existing.number}`);
+      return;
+    }
     const result = await createPlatformSupportCaseFromQueue({
       tenantId: q.tenantId,
       threadId: q.threadId,
@@ -546,11 +594,16 @@ export function PlatformSupportTab() {
       subject: q.subject,
       customerName: q.customerName,
     });
-    if (!result.ok) {
+    if (!result.ok || !result.case) {
       setPolicyMsg(userMessage(result.error, 'Talep oluşturulamadı'));
       return;
     }
-    setPolicyMsg('Talep kaydı oluşturuldu');
+    setPolicyMsg(
+      result.duplicate
+        ? `Mevcut kayıt #${result.case.number}`
+        : `Talep kaydı #${result.case.number} oluşturuldu`,
+    );
+    setSelectedCaseId(result.case.id);
     setSection('cases');
     void load();
   };
@@ -727,11 +780,16 @@ export function PlatformSupportTab() {
   const saveCaseMeta = async () => {
     if (!selectedCaseId) return;
     setCaseMetaSaving(true);
+    const tags = caseMetaDraft.tags
+      .split(/[,;]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
     const result = await updatePlatformSupportCase(selectedCaseId, {
       status: caseMetaDraft.status as PlatformSupportCase['status'],
       priority: caseMetaDraft.priority,
       kind: caseMetaDraft.kind as PlatformSupportCase['kind'],
       assignee: caseMetaDraft.assignee.trim() || null,
+      tags,
     });
     setCaseMetaSaving(false);
     if (!result.ok) {
@@ -1167,6 +1225,15 @@ export function PlatformSupportTab() {
                       placeholder="operatör kullanıcı adı"
                     />
                   </label>
+                  <label className="platform-support-field platform-support-field--wide">
+                    <span className="platform-support-field-label">Etiketler</span>
+                    <input
+                      className="platform-support-control"
+                      value={caseMetaDraft.tags}
+                      onChange={(e) => setCaseMetaDraft((d) => ({ ...d, tags: e.target.value }))}
+                      placeholder="messaging, vip (virgülle)"
+                    />
+                  </label>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
@@ -1560,6 +1627,27 @@ export function PlatformSupportTab() {
                 {inboxSyncing ? 'Senkron…' : mailboxConfigured ? 'IMAP + outbox' : 'Güncelle'}
               </button>
             </div>
+            <div className="platform-support-inbox-filters">
+              <PlatformFilterSelect
+                label="Filtre"
+                icon="role"
+                value={inboxFilter}
+                onChange={(v) => setInboxFilter(v as typeof inboxFilter)}
+              >
+                <option value="all">Tümü</option>
+                <option value="unread">Okunmamış</option>
+                <option value="attachments">Ekli</option>
+              </PlatformFilterSelect>
+              <label className="platform-support-field platform-support-inbox-search">
+                <span className="visually-hidden">Ara</span>
+                <input
+                  className="platform-support-control"
+                  value={inboxSearch}
+                  onChange={(e) => setInboxSearch(e.target.value)}
+                  placeholder="Konu, gönderen, metin…"
+                />
+              </label>
+            </div>
             {!mailboxConfigured ? (
               <p className="platform-support-hint">
                 Mağaza <strong>Posta</strong> üzerinden <code>destek@ekolojikmarket.com.tr</code> adresine yazılanlar burada listelenir
@@ -1577,8 +1665,10 @@ export function PlatformSupportTab() {
                 <li className="platform-support-inbox-empty">
                   Henüz kayıt yok — yöneticiden destek@ gönderin veya Güncelle’ye basın.
                 </li>
+              ) : filteredInboxThreads.length === 0 ? (
+                <li className="platform-support-inbox-empty">Filtreye uyan mail yok.</li>
               ) : (
-                inboxThreads.map(({ head, count, key }) => (
+                filteredInboxThreads.map(({ head, count, key }) => (
                   <li key={key}>
                     <button
                       type="button"
@@ -1860,7 +1950,9 @@ export function PlatformSupportTab() {
                   <td colSpan={6}>Kuyruk boş</td>
                 </tr>
               ) : (
-                filteredQueue.map((q) => (
+                filteredQueue.map((q) => {
+                  const linkedCase = caseByMessagingThread.get(`${q.tenantId}:${q.threadId}`);
+                  return (
                   <tr key={q.id} className={`platform-support-row platform-support-row--${q.severity}`}>
                     <td>
                       <span className={`platform-support-badge platform-support-badge--${q.severity}`}>
@@ -1885,12 +1977,23 @@ export function PlatformSupportTab() {
                     <td>{formatDurationMs(q.waitMs)}</td>
                     <td>{formatDateTime(q.updatedAt)}</td>
                     <td>
-                      <button type="button" className="btn btn-text" onClick={() => void openCaseFromQueue(q)}>
-                        Talep
-                      </button>
+                      {linkedCase ? (
+                        <button
+                          type="button"
+                          className="btn btn-text"
+                          onClick={() => void openCaseFromQueue(q)}
+                        >
+                          #{linkedCase.number}
+                        </button>
+                      ) : (
+                        <button type="button" className="btn btn-text" onClick={() => void openCaseFromQueue(q)}>
+                          Talep
+                        </button>
+                      )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

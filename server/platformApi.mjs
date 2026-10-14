@@ -479,6 +479,11 @@ export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorU
   if (patch.notes != null && before && after && before.notes !== after.notes) {
     changes.push('iç notlar güncellendi');
   }
+  if (patch.tags != null && before && after) {
+    const a = (before.tags ?? []).join(',');
+    const b = (after.tags ?? []).join(',');
+    if (a !== b) changes.push(`etiketler: ${(after.tags ?? []).join(', ') || '—'}`);
+  }
   if (changes.length) {
     await appendCaseActivity(
       dataDir,
