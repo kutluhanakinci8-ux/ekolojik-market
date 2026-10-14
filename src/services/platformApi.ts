@@ -1556,6 +1556,48 @@ export async function fetchPlatformSupportSmokeFilters(): Promise<{
   }
 }
 
+export type PlatformSupportSmokePreview = {
+  hideSmoke: boolean;
+  hiddenTotal: number;
+  visibleTotal: number;
+  samples: Array<{
+    tenantId: string;
+    businessName: string;
+    threadId: string;
+    subject: string;
+    customerName: string;
+    reason: string;
+    reasonCode: string;
+  }>;
+};
+
+export async function previewPlatformSupportSmokeFilters(
+  filters?: PlatformSupportSmokeFilters,
+): Promise<{ ok: boolean; data?: PlatformSupportSmokePreview; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/support/smoke-filters/preview', {
+      method: 'POST',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters, sampleLimit: 30 }),
+    });
+    const data = (await res.json()) as PlatformSupportSmokePreview & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Önizleme başarısız' };
+    }
+    return {
+      ok: true,
+      data: {
+        hideSmoke: data.hideSmoke,
+        hiddenTotal: data.hiddenTotal,
+        visibleTotal: data.visibleTotal,
+        samples: data.samples ?? [],
+      },
+    };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function savePlatformSupportSmokeFilters(
   filters: PlatformSupportSmokeFilters,
 ): Promise<{ ok: boolean; filters?: PlatformSupportSmokeFilters; error?: string }> {

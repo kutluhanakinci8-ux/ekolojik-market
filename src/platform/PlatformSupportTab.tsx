@@ -21,6 +21,8 @@ import {
   fetchPlatformSupportContactQueue,
   fetchPlatformSupportSmokeFilters,
   savePlatformSupportSmokeFilters,
+  previewPlatformSupportSmokeFilters,
+  type PlatformSupportSmokePreview,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
   fetchPlatformSupportZendeskBridge,
@@ -291,6 +293,8 @@ export function PlatformSupportTab() {
   const [smokeFilterDraft, setSmokeFilterDraft] = useState<PlatformSupportSmokeFilters | null>(null);
   const [smokeFilterSaving, setSmokeFilterSaving] = useState(false);
   const [smokeFilterOpen, setSmokeFilterOpen] = useState(false);
+  const [smokePreview, setSmokePreview] = useState<PlatformSupportSmokePreview | null>(null);
+  const [smokePreviewLoading, setSmokePreviewLoading] = useState(false);
   const [contextTenantId, setContextTenantId] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
@@ -789,6 +793,21 @@ export function PlatformSupportTab() {
     setSelectedCaseId(result.case.id);
     setSection('cases');
     void load();
+  };
+
+  const runSmokePreview = async () => {
+    setSmokePreviewLoading(true);
+    setSmokePreview(null);
+    const result = await previewPlatformSupportSmokeFilters(smokeFilterDraft ?? undefined);
+    setSmokePreviewLoading(false);
+    if (!result.ok || !result.data) {
+      setPolicyMsg(userMessage(result.error, 'Smoke önizleme başarısız'));
+      return;
+    }
+    setSmokePreview(result.data);
+    setPolicyMsg(
+      `Smoke önizleme: ${result.data.hiddenTotal} gizli, ${result.data.visibleTotal} görünür thread`,
+    );
   };
 
   const saveSmokeFilters = async () => {
@@ -1843,7 +1862,17 @@ export function PlatformSupportTab() {
                       <span className="platform-support-inbox-item-subject">
                         {head.subject || '(konu yok)'}
                         {threadCase ? (
-                          <span className="platform-support-inbox-case-badge">#{threadCase.number}</span>
+                          <button
+                            type="button"
+                            className="platform-support-inbox-case-badge"
+                            title="Kaydı aç"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openLinkedCase(threadCase);
+                            }}
+                          >
+                            #{threadCase.number}
+                          </button>
                         ) : null}
                         {count > 1 ? <span className="platform-support-thread-count">{count} mesaj</span> : null}
                         {(head.attachments?.length ?? 0) > 0 ? (
@@ -1865,6 +1894,26 @@ export function PlatformSupportTab() {
           <section className="platform-panel platform-panel--premium platform-support-inbox-detail">
             {selectedMail ? (
               <>
+                <div className="platform-support-inbox-detail-actions">
+                  {selectedMailCase ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => openLinkedCase(selectedMailCase)}
+                    >
+                      Kayıt #{selectedMailCase.number} aç
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={inboxCaseCreating}
+                      onClick={() => void openCaseFromInbox()}
+                    >
+                      {inboxCaseCreating ? 'Oluşturuluyor…' : 'Talep oluştur'}
+                    </button>
+                  )}
+                </div>
                 <h3>{selectedMail.subject}</h3>
                 <p className="platform-table-muted">{selectedMail.from}</p>
                 <dl className="platform-support-mail-meta">
@@ -2322,6 +2371,14 @@ export function PlatformSupportTab() {
           <button
             type="button"
             className="btn btn-outline btn-sm"
+            disabled={smokePreviewLoading}
+            onClick={() => void runSmokePreview()}
+          >
+            {smokePreviewLoading ? '…' : 'Önizle / test'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
             onClick={() => setSmokeFilterOpen((v) => !v)}
           >
             {smokeFilterOpen ? 'Gizle' : 'Düzenle'}
@@ -2414,6 +2471,41 @@ export function PlatformSupportTab() {
             desen
           </p>
         )}
+        {smokePreview ? (
+          <div className="platform-support-smoke-preview">
+            <p className="platform-support-hint">
+              Önizleme: <strong>{smokePreview.hiddenTotal}</strong> gizlenecek,{' '}
+              <strong>{smokePreview.visibleTotal}</strong> operasyon kuyruğunda kalacak (son 200 thread / kiracı).
+            </p>
+            {smokePreview.samples.length === 0 ? (
+              <p className="platform-table-muted">Örnek gizli thread yok.</p>
+            ) : (
+              <table className="platform-table platform-table--scroll">
+                <thead>
+                  <tr>
+                    <th>Kiracı</th>
+                    <th>Müşteri</th>
+                    <th>Konu</th>
+                    <th>Neden</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {smokePreview.samples.map((row) => (
+                    <tr key={`${row.tenantId}:${row.threadId}`}>
+                      <td>
+                        {row.businessName}
+                        <span className="platform-table-muted">{row.tenantId}</span>
+                      </td>
+                      <td>{row.customerName}</td>
+                      <td>{row.subject}</td>
+                      <td>{row.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <section className="platform-panel platform-panel--premium">

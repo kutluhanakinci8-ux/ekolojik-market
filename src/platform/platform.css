@@ -3360,6 +3360,24 @@
   background: rgba(15, 118, 110, 0.15);
   color: #0f766e;
   vertical-align: middle;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.platform-support-inbox-case-badge:hover {
+  background: rgba(15, 118, 110, 0.28);
+}
+
+.platform-support-inbox-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.platform-support-smoke-preview {
+  margin-top: 1rem;
 }
 
 .platform-support-field--inline {

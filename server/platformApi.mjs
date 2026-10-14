@@ -661,6 +661,13 @@ export async function updatePlatformSupportSmokeFilters(dataDir, body) {
   return writeSupportFilterDocument(dataDir, body?.filters ?? body);
 }
 
+export async function previewPlatformSupportSmokeFilters(dataDir, body) {
+  const { previewSmokeMessagingFilter } = await import('./platformSupportFilters.mjs');
+  const filters = body?.filters ?? body;
+  const sampleLimit = Number(body?.sampleLimit) || 25;
+  return previewSmokeMessagingFilter(dataDir, filters, { sampleLimit });
+}
+
 export async function getPlatformSupportTenant360(dataDir, tenantId) {
   const { buildPlatformSupportTenant360 } = await import('./platformSupportTenant360.mjs');
   return buildPlatformSupportTenant360(dataDir, tenantId);
