@@ -1584,14 +1584,6 @@ export function PlatformSupportTab() {
                     </button>
                   ) : null}
                 </div>
-                {caseDetail?.aiCapabilities ? (
-                  <p className="platform-support-hint platform-support-ai-hint">
-                    AI:{' '}
-                    {caseDetail.aiCapabilities.externalEnabled
-                      ? `harici (${caseDetail.aiCapabilities.model})`
-                      : 'yerel şablon (EKOLOJIK_POSTA_AI=1 + URL/key)'}
-                  </p>
-                ) : null}
                 {aiSummary ? (
                   <pre className="platform-support-ai-summary">{aiSummary}</pre>
                 ) : null}
