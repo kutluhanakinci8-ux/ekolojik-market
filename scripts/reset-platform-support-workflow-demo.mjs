@@ -9,24 +9,22 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const LOGIN_MESSAGE = `Merhaba,
+const LOGIN_MESSAGE = `Merhaba Ekolojik Destek,
 
-Greenleaf Market (main) mağaza hesabımızla POS'a giriş yapamıyoruz.
+Greenleaf Market (main) mağazasından yazıyoruz.
 
-- Kullanıcı: kasiyer (ve bazen yonetici)
-- Şifreyi doğru girdiğimizden eminiz; "Geçersiz kullanıcı adı veya şifre" hatası alıyoruz.
-- Kiracı panelinde son 30 günde çok sayıda başarısız giriş uyarısı görünüyor (güvenlik skoru düşük).
+İlk giriş denemesinde kasiyer kullanıcımız POS'a giriş yapamıyor; "Geçersiz kullanıcı adı veya şifre" uyarısı alıyoruz. Şifreyi doğru girdiğimizden eminiz.
 
-Şifre sıfırlama veya hesap kilidi kontrolü için yardım rica ediyoruz.
+Hesap kilidi veya şifre sıfırlama konusunda yardım rica ederiz.
 
 Teşekkürler,
-Greenleaf Mağaza Ekibi`;
+Greenleaf Market`;
 
 const DEMO = {
   tenantId: 'main',
   businessName: 'Greenleaf Market',
-  subject: 'POS giriş yapılamıyor — şifre / hesap kilidi',
-  requesterName: 'Greenleaf Mağaza Yöneticisi',
+  subject: 'İlk giriş: kullanıcı POS\'a giremiyor',
+  requesterName: 'Greenleaf Market',
   requesterEmail: process.env.DEMO_SUPPORT_REQUESTER_EMAIL || 'magaza@greenleaf-demo.local',
   kind: 'incident',
   priority: 'high',
