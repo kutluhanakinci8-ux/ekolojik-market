@@ -1202,6 +1202,54 @@ export async function updatePlatformSupportCase(
   }
 }
 
+export type PlatformSupportZendeskBridge = {
+  ok?: boolean;
+  subdomain: string;
+  webhookConfigured: boolean;
+  apiConfigured: boolean;
+  ticketUrlBase: string | null;
+};
+
+export async function fetchPlatformSupportZendeskBridge(): Promise<{
+  ok: boolean;
+  data?: PlatformSupportZendeskBridge;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/zendesk/bridge', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSupportZendeskBridge & { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Zendesk yapılandırması alınamadı' };
+    }
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function pushPlatformSupportCaseZendesk(
+  caseId: string,
+): Promise<{ ok: boolean; ticketId?: string; url?: string | null; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/support/cases/${encodeURIComponent(caseId)}/zendesk/push`, {
+      method: 'POST',
+      headers: posApiAuthHeaders(),
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      ticketId?: string;
+      url?: string | null;
+      error?: string;
+    };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Zendesk gönderimi başarısız' };
+    }
+    return { ok: true, ticketId: data.ticketId, url: data.url };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function createPlatformSupportCaseFromQueue(payload: {
   tenantId: string;
   threadId: string;

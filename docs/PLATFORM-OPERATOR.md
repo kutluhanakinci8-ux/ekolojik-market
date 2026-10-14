@@ -58,6 +58,9 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | AI | `POST` | `/api/platform/support/cases/:id/ai` (`kind`: `summary` \| `draft_reply`) |
 | Aktivite dışa aktarma | `GET` | `/api/platform/support/cases/:id/activity/export.csv`, `.../export.html` — `?filter=all\|email_inbound\|email_outbound\|note` |
 | Kiracı 360 | `GET` | `/api/platform/support/tenant-360?tenantId=` |
+| Zendesk köprü | `GET` | `/api/platform/support/zendesk/bridge` |
+| Zendesk webhook | `POST` | `/api/platform/support/zendesk/webhook` (secret header; ticket_id + status) |
+| Zendesk push | `POST` | `/api/platform/support/cases/:id/zendesk/push` (iç not, API token gerekir) |
 
 ### Ortam değişkenleri (destek@)
 

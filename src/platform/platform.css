@@ -3267,6 +3267,19 @@
   line-height: 1.45;
 }
 
+.platform-support-zendesk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.platform-support-zendesk-row .platform-support-reply-label {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
 .platform-panel-head {
   display: flex;
   flex-wrap: wrap;

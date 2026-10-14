@@ -66,6 +66,20 @@ export async function getPlatformCase(dataDir, caseId) {
   return cases.find((c) => c.id === caseId) ?? null;
 }
 
+export async function findCaseByExternalTicket(dataDir, provider, ticketId) {
+  const id = String(ticketId ?? '').trim();
+  const prov = String(provider ?? 'zendesk').trim().toLowerCase();
+  if (!id) return null;
+  const cases = await readPlatformCases(dataDir);
+  return (
+    cases.find(
+      (c) =>
+        String(c.externalTicketRef?.provider ?? '').toLowerCase() === prov
+        && String(c.externalTicketRef?.id ?? '').trim() === id,
+    ) ?? null
+  );
+}
+
 export async function findCaseByLink(dataDir, link) {
   const cases = await readPlatformCases(dataDir);
   if (link.contactMessageId) {
