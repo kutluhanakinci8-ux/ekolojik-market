@@ -238,8 +238,10 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
 }
 
 export function buildPlatformSupportCsv(overview) {
+  const contactFormTotal = overview.contactForm?.total ?? '';
+  const contactFormWithoutCase = overview.contactForm?.withoutCase ?? '';
   const lines = [
-    'tenantId,businessName,open,waiting,pendingFirstResponse,medianFirstResponseMs,queueItems,slaBreaches,onboardingStatus',
+    'tenantId,businessName,open,waiting,pendingFirstResponse,medianFirstResponseMs,queueItems,slaBreaches,onboardingStatus,contactFormTotal,contactFormWithoutCase',
   ];
   for (const t of overview.tenants ?? []) {
     lines.push(
@@ -253,6 +255,8 @@ export function buildPlatformSupportCsv(overview) {
         t.queueItems,
         t.slaBreaches,
         t.onboardingStatus,
+        contactFormTotal,
+        contactFormWithoutCase,
       ]
         .map(csvEscape)
         .join(','),

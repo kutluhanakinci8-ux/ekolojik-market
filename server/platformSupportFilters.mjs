@@ -44,19 +44,40 @@ function haystack(thread) {
   return `${thread?.subject ?? ''} ${thread?.customerName ?? ''} ${thread?.lastMessagePreview ?? ''} ${thread?.customerEmail ?? ''}`;
 }
 
-export function isSmokeMessagingThread(thread, tenantId, config) {
-  if (!config?.hideSmoke) return false;
+export function configFromFilterDocument(doc) {
+  const tenantIds = Array.isArray(doc?.tenantIds)
+    ? doc.tenantIds.map((t) => String(t).trim().toLowerCase()).filter(Boolean)
+    : [...DEFAULT_TENANT_IDS];
+  return {
+    hideSmoke: doc?.hideSmoke !== false,
+    subjectPatterns: Array.isArray(doc?.subjectPatterns)
+      ? doc.subjectPatterns.map((p) => new RegExp(String(p), 'i'))
+      : DEFAULT_PATTERNS,
+    customerNamePatterns: Array.isArray(doc?.customerNamePatterns)
+      ? doc.customerNamePatterns.map((p) => new RegExp(String(p), 'i'))
+      : DEFAULT_PATTERNS,
+    tenantIds: new Set(tenantIds),
+  };
+}
+
+export function smokeMessagingThreadReason(thread, tenantId, config) {
+  if (!config?.hideSmoke) return null;
   const tid = String(tenantId ?? '').trim().toLowerCase();
-  if (config.tenantIds?.has(tid)) return true;
+  if (config.tenantIds?.has(tid)) return { code: 'tenant', label: `Kiracı: ${tenantId}` };
   const text = haystack(thread);
   for (const re of config.subjectPatterns ?? []) {
-    if (re.test(text)) return true;
+    if (re.test(text)) return { code: 'subject', label: `Konu deseni: ${re}` };
   }
   for (const re of config.customerNamePatterns ?? []) {
-    if (re.test(text)) return true;
+    if (re.test(text)) return { code: 'customer', label: `Müşteri deseni: ${re}` };
   }
-  if (thread?.tags?.includes?.('smoke') || thread?.tags?.includes?.('qa')) return true;
-  return false;
+  if (thread?.tags?.includes?.('smoke')) return { code: 'tag', label: 'Etiket: smoke' };
+  if (thread?.tags?.includes?.('qa')) return { code: 'tag', label: 'Etiket: qa' };
+  return null;
+}
+
+export function isSmokeMessagingThread(thread, tenantId, config) {
+  return Boolean(smokeMessagingThreadReason(thread, tenantId, config));
 }
 
 export function filterProductionMessagingThreads(threads, tenantId, config) {
@@ -126,4 +147,62 @@ export async function writeSupportFilterDocument(dataDir, input) {
   await mkdir(dir, { recursive: true });
   await writeFile(FILTER_PATH(dataDir), `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
   return { ok: true, filters: doc };
+}
+
+export async function previewSmokeMessagingFilter(dataDir, draftDocument, { sampleLimit = 25 } = {}) {
+  const doc = draftDocument ?? (await readSupportFilterDocument(dataDir));
+  let config;
+  try {
+    config = configFromFilterDocument(doc);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Filtre geçersiz',
+    };
+  }
+
+  const { listTenantIds, readTenantStore } = await import('./tenantAuth.mjs');
+  const { listMessagingThreads } = await import('./messaging/store.mjs');
+  const ids = ['main', ...(await listTenantIds(dataDir))];
+  const tenantIds = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
+
+  const hiddenSamples = [];
+  let hiddenTotal = 0;
+  let visibleTotal = 0;
+
+  for (const tenantId of tenantIds) {
+    const store = await readTenantStore(dataDir, tenantId);
+    const businessName =
+      String(store?.settings?.businessName ?? '').trim()
+      || (tenantId === 'main' ? 'Greenleaf Market' : tenantId);
+    const listed = await listMessagingThreads(dataDir, tenantId, { limit: 200, includeArchived: false });
+    for (const thread of listed.threads ?? []) {
+      const reason = smokeMessagingThreadReason(thread, tenantId, config);
+      if (reason) {
+        hiddenTotal += 1;
+        if (hiddenSamples.length < sampleLimit) {
+          hiddenSamples.push({
+            tenantId,
+            businessName,
+            threadId: thread.id,
+            subject: thread.subject ?? '—',
+            customerName: thread.customerName ?? '—',
+            reason: reason.label,
+            reasonCode: reason.code,
+          });
+        }
+      } else {
+        visibleTotal += 1;
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    hideSmoke: config.hideSmoke,
+    hiddenTotal,
+    visibleTotal,
+    samples: hiddenSamples,
+    filters: doc,
+  };
 }

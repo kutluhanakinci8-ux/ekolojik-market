@@ -74,6 +74,8 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | İletişim kuyruğu | `GET` | `/api/platform/support/contact-queue?limit=` · `GET .../contact-queue/export.csv` · `POST .../cases/from-contact` |
 | İletişim özet | `GET` | `/api/platform/support` → `contactForm.total` / `withoutCase` |
 | Smoke / QA filtresi | `GET` / `PUT` | `/api/platform/support/smoke-filters` → `data/platform/support-filters.json` |
+| Smoke önizleme | `POST` | `/api/platform/support/smoke-filters/preview` — taslak veya kayıtlı filtreyle gizlenecek thread örnekleri |
+| SLA CSV | `GET` | `/api/platform/support/export.csv` — `contactFormTotal`, `contactFormWithoutCase` sütunları (platform geneli) |
 | Talep CSV | `GET` | `/api/platform/support/cases/export.csv` — `tags` sütunu (`;` ile ayrılmış) |
 | Mağaza sohbet | URL | `/app?tenant=&view=posta&threadId=` (platform kuyruktan **Sohbet**) |
 | Aktivite filtre | `GET` | `.../activity/export.csv?filter=` — `zendesk`, `case_meta`, `messaging` dahil |
