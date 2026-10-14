@@ -27,6 +27,8 @@ export async function createCaseFromInboxMessage(dataDir, messageId, operatorUse
   const msg = await getPlatformSupportInboxMessage(dataDir, messageId);
   if (!msg) return { ok: false, error: 'Gelen kutusu mesajı bulunamadı' };
 
+  const inboxRootId = msg.threadRootId || msg.id;
+
   return createPlatformCase(
     dataDir,
     {
@@ -35,7 +37,7 @@ export async function createCaseFromInboxMessage(dataDir, messageId, operatorUse
       subject: msg.subject || 'E-posta destek',
       requesterEmail: extractEmail(msg.from),
       requesterName: String(msg.from ?? '').replace(/<[^>]+>/g, '').trim() || null,
-      links: { inboxMessageId: msg.id },
+      links: { inboxMessageId: inboxRootId },
       tags: ['destek-mail'],
     },
     operatorUsername,

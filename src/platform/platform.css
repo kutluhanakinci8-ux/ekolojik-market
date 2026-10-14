@@ -3836,6 +3836,13 @@
   margin-bottom: 0.5rem;
 }
 
+.platform-support-case-notes {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .platform-support-inbox-attach-badge {
   font-size: 0.68rem;
   font-weight: 600;

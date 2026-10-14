@@ -10,9 +10,17 @@ const SEV_LABELS: Record<string, string> = {
 
 type Props = {
   windowDays: number;
+  onOpenCase?: (caseId: string) => void;
+  onFocusQueueTenant?: (tenantId: string) => void;
 };
 
-export function PlatformSupportSlaLive({ windowDays }: Props) {
+function formatOverdue(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  if (ms < 3600_000) return `${Math.round(ms / 60_000)} dk`;
+  return `${(ms / 3600_000).toFixed(1)} sa`;
+}
+
+export function PlatformSupportSlaLive({ windowDays, onOpenCase, onFocusQueueTenant }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PlatformSupportSlaLivePayload | null>(null);
 
@@ -83,6 +91,40 @@ export function PlatformSupportSlaLive({ windowDays }: Props) {
         </div>
       </section>
 
+      {data.overdueCases?.length ? (
+        <section className="platform-panel">
+          <h3>SLA süresi geçen kayıtlar</h3>
+          <table className="platform-table platform-table--scroll">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Konu</th>
+                <th>Kiracı</th>
+                <th>Gecikme</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.overdueCases.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    {onOpenCase ? (
+                      <button type="button" className="btn btn-text" onClick={() => onOpenCase(c.id)}>
+                        {c.number}
+                      </button>
+                    ) : (
+                      c.number
+                    )}
+                  </td>
+                  <td>{c.subject}</td>
+                  <td>{c.businessName ?? c.tenantId ?? '—'}</td>
+                  <td>{formatOverdue(c.overdueMs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
       <section className="platform-panel">
         <h3>Öncelikli kuyruk (canlı)</h3>
         <table className="platform-table platform-table--scroll">
@@ -103,7 +145,15 @@ export function PlatformSupportSlaLive({ windowDays }: Props) {
               data.topQueue.map((q) => (
                 <tr key={q.id}>
                   <td>{SEV_LABELS[q.severity] ?? q.severity}</td>
-                  <td>{q.businessName}</td>
+                  <td>
+                    {q.tenantId && onFocusQueueTenant ? (
+                      <button type="button" className="btn btn-text" onClick={() => onFocusQueueTenant(q.tenantId!)}>
+                        {q.businessName}
+                      </button>
+                    ) : (
+                      q.businessName
+                    )}
+                  </td>
                   <td>{q.subject}</td>
                   <td>{Math.round((q.waitMs ?? 0) / 60_000)} dk</td>
                 </tr>

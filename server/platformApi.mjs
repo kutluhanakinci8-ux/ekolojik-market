@@ -476,6 +476,9 @@ export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorU
   if (patch.assignee !== undefined && before && after && before.assignee !== after.assignee) {
     changes.push(`atanan: ${before.assignee ?? '—'} → ${after.assignee ?? '—'}`);
   }
+  if (patch.notes != null && before && after && before.notes !== after.notes) {
+    changes.push('iç notlar güncellendi');
+  }
   if (changes.length) {
     await appendCaseActivity(
       dataDir,

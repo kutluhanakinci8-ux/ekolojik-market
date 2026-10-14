@@ -67,9 +67,22 @@ export async function buildPlatformSupportSlaLive(dataDir, { days = 7 } = {}) {
 
   const cases = await readPlatformCases(dataDir);
   const now = Date.now();
-  const caseOverdue = cases.filter(
-    (c) => !['solved', 'closed'].includes(c.status) && c.slaDueAt && Date.parse(c.slaDueAt) < now,
-  ).length;
+  const overdueAll = cases
+    .filter((c) => !['solved', 'closed'].includes(c.status) && c.slaDueAt && Date.parse(c.slaDueAt) < now)
+    .sort((a, b) => Date.parse(a.slaDueAt) - Date.parse(b.slaDueAt));
+
+  const caseOverdue = overdueAll.length;
+
+  const overdueCases = overdueAll.slice(0, 15).map((c) => ({
+    id: c.id,
+    number: c.number,
+    subject: c.subject,
+    status: c.status,
+    tenantId: c.tenantId,
+    businessName: c.businessName,
+    slaDueAt: c.slaDueAt,
+    overdueMs: now - Date.parse(c.slaDueAt),
+  }));
 
   const daily = await buildDailyFirstResponseSeries(dataDir, windowDays);
 
@@ -87,6 +100,7 @@ export async function buildPlatformSupportSlaLive(dataDir, { days = 7 } = {}) {
     },
     queueBySeverity,
     caseOverdue,
+    overdueCases,
     daily,
     topQueue: (overview.queue ?? []).slice(0, 12),
   };

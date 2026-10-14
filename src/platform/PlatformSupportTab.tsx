@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createPlatformSupportCaseFromContact,
+  createPlatformSupportCaseFromInbox,
   createPlatformSupportCaseFromQueue,
   createPlatformSupportCaseManual,
   fetchPlatformSupportCommands,
@@ -260,6 +261,9 @@ export function PlatformSupportTab() {
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
   const [inboxSyncing, setInboxSyncing] = useState(false);
+  const [inboxCaseCreating, setInboxCaseCreating] = useState(false);
+  const [caseNotesDraft, setCaseNotesDraft] = useState('');
+  const [caseNotesSaving, setCaseNotesSaving] = useState(false);
   const [caseDetail, setCaseDetail] = useState<PlatformSupportCaseDetail | null>(null);
   const [replyChannel, setReplyChannel] = useState<'note' | 'email' | 'messaging'>('email');
   const [actionDraft, setActionDraft] = useState('');
@@ -336,7 +340,8 @@ export function PlatformSupportTab() {
       kind: selectedCase.kind,
       assignee: selectedCase.assignee ?? '',
     });
-  }, [selectedCase?.id, selectedCase?.status, selectedCase?.priority, selectedCase?.kind, selectedCase?.assignee]);
+    setCaseNotesDraft(selectedCase.notes ?? '');
+  }, [selectedCase?.id, selectedCase?.status, selectedCase?.priority, selectedCase?.kind, selectedCase?.assignee, selectedCase?.notes]);
 
   useEffect(() => {
     if (!selectedCaseId) {
@@ -684,6 +689,39 @@ export function PlatformSupportTab() {
       setMacroDraft(res.macros.map((m) => ({ ...m })));
     }
     setMacroEditorOpen(true);
+  };
+
+  const saveCaseNotes = async () => {
+    if (!selectedCaseId) return;
+    setCaseNotesSaving(true);
+    const result = await updatePlatformSupportCase(selectedCaseId, { notes: caseNotesDraft });
+    setCaseNotesSaving(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Notlar kaydedilemedi'));
+      return;
+    }
+    setPolicyMsg('İç notlar kaydedildi');
+    void refreshCaseDetail();
+  };
+
+  const openCaseFromInbox = async () => {
+    if (!selectedMail) return;
+    const rootId = selectedMail.threadRootId || selectedMail.id;
+    setInboxCaseCreating(true);
+    const result = await createPlatformSupportCaseFromInbox(rootId);
+    setInboxCaseCreating(false);
+    if (!result.ok || !result.case) {
+      setPolicyMsg(userMessage(result.error, 'Talep oluşturulamadı'));
+      return;
+    }
+    setPolicyMsg(
+      result.duplicate
+        ? `Mevcut kayıt #${result.case.number} bağlandı`
+        : `Kayıt #${result.case.number} oluşturuldu`,
+    );
+    setSection('cases');
+    setSelectedCaseId(result.case.id);
+    void load();
   };
 
   const saveCaseMeta = async () => {
@@ -1469,9 +1507,26 @@ export function PlatformSupportTab() {
                       <p className="platform-support-hint">Henüz aktivite yok; dışa aktarma boş bir tablo üretir.</p>
                     )}
                   </div>
-                ) : selectedCase.notes ? (
-                  <p className="platform-support-inbox-body">{selectedCase.notes}</p>
-                ) : null}
+                ) : (
+                  <p className="platform-support-hint">Aktivite yükleniyor…</p>
+                )}
+                <label className="platform-support-reply-label platform-support-case-notes">
+                  <span>Operasyon notları (iç)</span>
+                  <textarea
+                    rows={4}
+                    value={caseNotesDraft}
+                    onChange={(e) => setCaseNotesDraft(e.target.value)}
+                    placeholder="Ekip içi özet, müşteriye gitmez"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={caseNotesSaving}
+                    onClick={() => void saveCaseNotes()}
+                  >
+                    {caseNotesSaving ? 'Kaydediliyor…' : 'Notları kaydet'}
+                  </button>
+                </label>
               </>
             ) : (
               <p className="platform-support-hint">Soldan bir kayıt seçin.</p>
@@ -1483,7 +1538,17 @@ export function PlatformSupportTab() {
       ) : null}
 
       {section === 'sla' ? (
-        <PlatformSupportSlaLive windowDays={windowDays} />
+        <PlatformSupportSlaLive
+          windowDays={windowDays}
+          onOpenCase={(caseId) => {
+            setSection('cases');
+            setSelectedCaseId(caseId);
+          }}
+          onFocusQueueTenant={(tenantId) => {
+            setContextTenantId(tenantId);
+            setSection('queue');
+          }}
+        />
       ) : null}
 
       {section === 'inbox' ? (
@@ -1577,7 +1642,22 @@ export function PlatformSupportTab() {
                         </button>
                       </dd>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div>
+                      <dt>Destek kaydı</dt>
+                      <dd>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          disabled={inboxCaseCreating}
+                          onClick={() => void openCaseFromInbox()}
+                        >
+                          {inboxCaseCreating ? 'Oluşturuluyor…' : 'Talep oluştur'}
+                        </button>
+                        <span className="platform-support-hint"> Thread kökü ile e-posta zinciri bağlanır.</span>
+                      </dd>
+                    </div>
+                  )}
                   {selectedMail.messageId ? (
                     <div>
                       <dt>E-posta Message-ID</dt>

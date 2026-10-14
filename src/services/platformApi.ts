@@ -1450,6 +1450,22 @@ export async function fetchPlatformSupportContactQueue(): Promise<{
   }
 }
 
+export async function createPlatformSupportCaseFromInbox(
+  messageId: string,
+): Promise<{ ok: boolean; case?: PlatformSupportCase; duplicate?: boolean; error?: string }> {
+  const result = await platformSecurityPost<{ case?: PlatformSupportCase; duplicate?: boolean }>(
+    '/api/platform/support/cases/from-inbox',
+    { messageId },
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  const caseRow = result.data?.case;
+  return {
+    ok: true,
+    case: caseRow,
+    duplicate: Boolean(result.data?.duplicate),
+  };
+}
+
 export async function createPlatformSupportCaseFromContact(
   contactId: string,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -1576,9 +1592,21 @@ export type PlatformSupportSlaLivePayload = {
   };
   queueBySeverity: { critical: number; warning: number; info: number };
   caseOverdue: number;
+  overdueCases?: Array<{
+    id: string;
+    number: number;
+    subject: string;
+    status: string;
+    tenantId: string | null;
+    businessName: string | null;
+    slaDueAt: string;
+    overdueMs: number;
+  }>;
   daily: Array<{ dateKey: string; met: number; breached: number; samples: number }>;
   topQueue: Array<{
     id: string;
+    tenantId?: string;
+    threadId?: string;
     severity: string;
     businessName: string;
     subject: string;
