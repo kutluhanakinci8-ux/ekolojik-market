@@ -10,6 +10,8 @@ import {
   fetchPlatformSupportContactQueue,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
+  fetchPlatformSupportZendeskBridge,
+  pushPlatformSupportCaseZendesk,
   fetchPlatformSupportCaseAi,
   postPlatformSupportCaseAction,
   replyPlatformSupportInbox,
@@ -122,6 +124,8 @@ export function PlatformSupportTab() {
   const [caseRows, setCaseRows] = useState<PlatformSupportCase[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [zendeskIdDraft, setZendeskIdDraft] = useState('');
+  const [zendeskApiReady, setZendeskApiReady] = useState(false);
+  const [zendeskPushing, setZendeskPushing] = useState(false);
   const [inboxMessages, setInboxMessages] = useState<PlatformSupportInboxMessage[]>([]);
   const [inboxUnread, setInboxUnread] = useState(0);
   const [mailboxConfigured, setMailboxConfigured] = useState(false);
@@ -171,6 +175,8 @@ export function PlatformSupportTab() {
     if (contactRes.ok && contactRes.data) {
       setContactQueue(contactRes.data.items);
     }
+    const zendeskRes = await fetchPlatformSupportZendeskBridge();
+    setZendeskApiReady(Boolean(zendeskRes.ok && zendeskRes.data?.apiConfigured));
     setLoading(false);
   }, [windowDays]);
 
@@ -226,6 +232,8 @@ export function PlatformSupportTab() {
       email_outbound: 'Giden e-posta',
       email_out: 'Giden e-posta',
       case_spawned: 'Yeni kayıt (politika)',
+      zendesk_webhook: 'Zendesk (webhook)',
+      zendesk_push: 'Zendesk (platform →)',
       note: 'İç not',
     };
     return map[type] ?? type;
@@ -386,7 +394,6 @@ export function PlatformSupportTab() {
     const id = zendeskIdDraft.trim();
     const result = await updatePlatformSupportCase(selectedCaseId, {
       externalTicketRef: id ? { provider: 'zendesk', id, url: null } : null,
-      status: 'open',
     });
     if (!result.ok) {
       setPolicyMsg(userMessage(result.error, 'Kaydedilemedi'));
@@ -394,6 +401,23 @@ export function PlatformSupportTab() {
     }
     setPolicyMsg('Zendesk referansı kaydedildi');
     void load();
+  };
+
+  const pushCaseToZendesk = async () => {
+    if (!selectedCaseId) return;
+    setZendeskPushing(true);
+    const result = await pushPlatformSupportCaseZendesk(selectedCaseId);
+    setZendeskPushing(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Zendesk gönderimi başarısız'));
+      return;
+    }
+    setPolicyMsg(`Zendesk #${result.ticketId ?? zendeskIdDraft} güncellendi`);
+    void load();
+    if (selectedCaseId) {
+      const detail = await fetchPlatformSupportCaseDetail(selectedCaseId);
+      if (detail.ok && detail.data) setCaseDetail(detail.data);
+    }
   };
 
   const onExport = async () => {
@@ -560,7 +584,7 @@ export function PlatformSupportTab() {
           <section className="platform-panel platform-panel--premium">
             <h3>Operasyon kayıtları (Case)</h3>
             <p className="platform-support-hint">
-              E-posta senkronunda otomatik talep; Zendesk ID ileride köprü için. Dosya:{' '}
+              E-posta senkronunda otomatik talep; Zendesk webhook ve API köprüsü (env). Dosya:{' '}
               <code>data/platform/support-cases.json</code>
             </p>
             <table className="platform-table platform-table--scroll">
@@ -606,7 +630,15 @@ export function PlatformSupportTab() {
                           c.businessName ?? '—'
                         )}
                       </td>
-                      <td>{c.externalTicketRef?.id ?? '—'}</td>
+                      <td>
+                        {c.externalTicketRef?.url ? (
+                          <a href={c.externalTicketRef.url} target="_blank" rel="noopener noreferrer">
+                            #{c.externalTicketRef.id}
+                          </a>
+                        ) : (
+                          c.externalTicketRef?.id ?? '—'
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -727,13 +759,39 @@ export function PlatformSupportTab() {
                 <button type="button" className="btn btn-primary" onClick={() => void sendCaseAction()} disabled={!actionDraft.trim()}>
                   Gönder
                 </button>
-                <label className="platform-support-reply-label">
-                  Zendesk ticket ID
-                  <input value={zendeskIdDraft} onChange={(e) => setZendeskIdDraft(e.target.value)} placeholder="örn. 12345" />
-                </label>
-                <button type="button" className="btn btn-secondary" onClick={() => void saveCaseZendesk()}>
-                  Zendesk kaydet
-                </button>
+                <div className="platform-support-zendesk-row">
+                  <label className="platform-support-reply-label">
+                    Zendesk ticket ID
+                    <input
+                      value={zendeskIdDraft}
+                      onChange={(e) => setZendeskIdDraft(e.target.value)}
+                      placeholder="örn. 12345"
+                    />
+                  </label>
+                  <button type="button" className="btn btn-secondary" onClick={() => void saveCaseZendesk()}>
+                    Zendesk kaydet
+                  </button>
+                  {selectedCase.externalTicketRef?.url ? (
+                    <a
+                      className="btn btn-outline btn-sm"
+                      href={selectedCase.externalTicketRef.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Zendesk&apos;te aç
+                    </a>
+                  ) : null}
+                  {zendeskApiReady && zendeskIdDraft.trim() ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={zendeskPushing}
+                      onClick={() => void pushCaseToZendesk()}
+                    >
+                      {zendeskPushing ? 'Gönderiliyor…' : 'Özeti Zendesk’e gönder'}
+                    </button>
+                  ) : null}
+                </div>
                 {caseDetail ? (
                   <div className="platform-support-case-activity">
                     <div className="platform-support-activity-head">

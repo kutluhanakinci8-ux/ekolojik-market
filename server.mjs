@@ -1128,6 +1128,42 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/zendesk/webhook' && req.method === 'POST') {
+      try {
+        const { verifyZendeskWebhookSecret } = await import('./server/platformSupportZendesk.mjs');
+        const auth = verifyZendeskWebhookSecret(req);
+        if (!auth.ok) {
+          res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: auth.error }));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { postPlatformSupportZendeskWebhook } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportZendeskWebhook(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Webhook işlenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/zendesk/bridge' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportZendeskBridge } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportZendeskBridge(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk yapılandırması alınamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/inbox/sync' && req.method === 'POST') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -1408,6 +1444,29 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Dışa aktarma başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseZendeskPushMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/zendesk\/push$/,
+    );
+    if (platformSupportCaseZendeskPushMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const { postPlatformSupportCaseZendeskPush } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseZendeskPush(
+          DATA_DIR,
+          platformSupportCaseZendeskPushMatch[1],
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk gönderimi başarısız' }));
       }
       return;
     }

@@ -453,7 +453,29 @@ export async function getPlatformSupportCases(dataDir, query = {}) {
 
 export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorUsername) {
   const { updatePlatformCase } = await import('./platformCaseStore.mjs');
-  return updatePlatformCase(dataDir, caseId, patch, operatorUsername);
+  const next = { ...patch };
+  if (next.externalTicketRef != null && next.externalTicketRef !== false) {
+    const { enrichExternalTicketRef } = await import('./platformSupportZendesk.mjs');
+    next.externalTicketRef = enrichExternalTicketRef(next.externalTicketRef);
+  }
+  return updatePlatformCase(dataDir, caseId, next, operatorUsername);
+}
+
+export async function getPlatformSupportZendeskBridge(dataDir) {
+  const { getZendeskBridgeConfig } = await import('./platformSupportZendesk.mjs');
+  return { ok: true, ...getZendeskBridgeConfig() };
+}
+
+export async function postPlatformSupportZendeskWebhook(dataDir, body) {
+  const { processZendeskWebhook } = await import('./platformSupportZendesk.mjs');
+  return processZendeskWebhook(dataDir, body);
+}
+
+export async function postPlatformSupportCaseZendeskPush(dataDir, caseId, operatorUsername) {
+  const { pushPlatformCaseSummaryToZendesk } = await import('./platformSupportZendesk.mjs');
+  const result = await pushPlatformCaseSummaryToZendesk(dataDir, caseId);
+  if (result.ok) return result;
+  return { ok: false, status: result.status ?? 400, error: result.error };
 }
 
 export async function createPlatformSupportCase(dataDir, input, operatorUsername) {
