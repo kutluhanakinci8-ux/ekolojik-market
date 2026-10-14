@@ -12,6 +12,8 @@ type Props = {
   windowDays: number;
   onOpenCase?: (caseId: string) => void;
   onFocusQueueTenant?: (tenantId: string) => void;
+  onSendSlaApology?: (caseId: string) => void;
+  slaApologyBusyId?: string | null;
 };
 
 function formatOverdue(ms: number): string {
@@ -20,7 +22,13 @@ function formatOverdue(ms: number): string {
   return `${(ms / 3600_000).toFixed(1)} sa`;
 }
 
-export function PlatformSupportSlaLive({ windowDays, onOpenCase, onFocusQueueTenant }: Props) {
+export function PlatformSupportSlaLive({
+  windowDays,
+  onOpenCase,
+  onFocusQueueTenant,
+  onSendSlaApology,
+  slaApologyBusyId,
+}: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PlatformSupportSlaLivePayload | null>(null);
 
@@ -101,6 +109,7 @@ export function PlatformSupportSlaLive({ windowDays, onOpenCase, onFocusQueueTen
                 <th>Konu</th>
                 <th>Kiracı</th>
                 <th>Gecikme</th>
+                {onSendSlaApology ? <th /> : null}
               </tr>
             </thead>
             <tbody>
@@ -118,6 +127,18 @@ export function PlatformSupportSlaLive({ windowDays, onOpenCase, onFocusQueueTen
                   <td>{c.subject}</td>
                   <td>{c.businessName ?? c.tenantId ?? '—'}</td>
                   <td>{formatOverdue(c.overdueMs)}</td>
+                  {onSendSlaApology ? (
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        disabled={slaApologyBusyId === c.id}
+                        onClick={() => onSendSlaApology(c.id)}
+                      >
+                        {slaApologyBusyId === c.id ? '…' : 'Özür maili'}
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

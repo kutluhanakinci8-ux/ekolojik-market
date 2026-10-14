@@ -98,3 +98,19 @@ Deploy (root) kurar: `/etc/cron.d/ekolojik-support-inbox-sync` → `scripts/plat
 Manuel: `MARKET_POS_DATA_DIR=/var/www/market-pos/data node scripts/platform-support-inbox-sync.mjs`
 
 Detaylı ürün notları: `docs/PLATFORM-DESTEK-KOMUTA-MERKEZI.md`.
+
+### Teslim öncesi (posta + mesaj + destek)
+
+```bash
+npm run test:ci
+node scripts/pre-release-qa.mjs https://<VPS>:5180
+MARKET_POS_DATA_DIR=/var/www/market-pos/data node scripts/ops-outbox-health.mjs
+# İsteğe bağlı: failed temizlik
+MARKET_POS_DATA_DIR=/var/www/market-pos/data node scripts/ops-outbox-health.mjs --requeue-all --process
+```
+
+| Değişken | Açıklama |
+|----------|----------|
+| `EKOLOJIK_CONTACT_AUTOREPLY=1` | İletişim formu müşteri alındı maili |
+| `EKOLOJIK_ENABLE_CONTACT_AUTOREPLY=1` | Deploy sırasında `.env` içine otomatik ekleme |
+| `PLATFORM_OPERATOR_PASSWORD` | `pre-release-qa` platform destek API kapısı (kutluhan08) |

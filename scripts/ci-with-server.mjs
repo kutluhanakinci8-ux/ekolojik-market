@@ -16,7 +16,23 @@ const env = {
   HOST: '127.0.0.1',
   EKOLOJIK_MESSAGING_BOT: '1',
   EKOLOJIK_PUBLIC_ORIGIN: BASE,
+  EKOLOJIK_CONTACT_AUTOREPLY: process.env.EKOLOJIK_CONTACT_AUTOREPLY || '1',
 };
+
+if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+  env.PLATFORM_OPERATOR_PASSWORD =
+    process.env.PLATFORM_OPERATOR_PASSWORD?.trim() || 'ci-qa-platform-1a04';
+  const boot = spawn(
+    process.execPath,
+    ['scripts/ensure-platform-operator.mjs', '--data-dir', join(REPO, 'data')],
+    { cwd: REPO, env, stdio: 'inherit' },
+  );
+  const bootCode = await new Promise((resolve) => boot.on('exit', resolve));
+  if (bootCode !== 0) {
+    console.error('Platform operator bootstrap failed');
+    process.exit(bootCode ?? 1);
+  }
+}
 
 const server = spawn(process.execPath, ['server.mjs'], {
   cwd: REPO,
@@ -64,7 +80,7 @@ if (!up) {
 
 const qa = spawn(process.execPath, ['scripts/pre-release-qa.mjs', BASE], {
   cwd: REPO,
-  env: { ...env, EKOLOJIK_QA_BASE_URL: BASE },
+  env: { ...env, EKOLOJIK_QA_BASE_URL: BASE, PLATFORM_OPERATOR_PASSWORD: env.PLATFORM_OPERATOR_PASSWORD },
   stdio: 'inherit',
 });
 

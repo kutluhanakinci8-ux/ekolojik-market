@@ -1,24 +1,23 @@
 # Platform Destek — Komuta Merkezi (ürün planı)
 
-**Durum:** Planlama (2026-10-13)  
+**Durum:** Operasyonel (2026-10-14) — çekirdek D1–D6 canlı; aşağıdaki gap tablosu tarihsel referans + kalan işler.  
 **Hedef kullanıcı:** `kutluhan08` ve platform operatörleri  
 **Vizyon:** Destek sekmesi yalnızca SLA tablosu değil; **omnichannel operasyon + kiracı 360° + sistem geneli üst düzey yönetim** merkezi.
 
 ---
 
-## 1. Bugünkü durum (gap analizi)
+## 1. Durum özeti (2026-10-14)
 
-| Alan | Şu an | Eksik |
-|------|--------|--------|
-| Gelen kutusu | Yok | `destek@ekolojikmarket.com.tr` yok; operatör bu sekmeden mail okuyamaz/yazamaz |
-| Kanallar | Sadece kiracı **messaging** thread’leri | E-posta, iletişim formu, outbox hataları, güvenlik uyarıları ayrı sekmelerde |
-| SLA | Metrik + kuyruk listesi | QA/smoke thread’leri kuyruğu dolduruyor; “100% uyum” yanıltıcı olabilir |
-| Yanıt | POS’ta kiracı Posta/Mesaj | Platformdan **tek tık yanıt** (mail + mesaj + not) yok |
-| Otomasyon | Kiracı bazlı posta matrisi | Platform operatörü için **makrolar**, SLA ihlalinde otomatik mail |
-| Sistem yönetimi | Dağınık sekmeler (Gelir, Güvenlik, …) | Destek içinde **bağlamlı kısayollar + birleşik “sorun” kaydı** yok |
-| Muhasebe / stok / demo | Genel bakış uyarıları | Destek kaydına bağlı **eylem** (POS aç, askıya al, hatırlatma gönder) yok |
+| Alan | Canlı | Kalan / risk |
+|------|--------|----------------|
+| Gelen kutusu | destek@ IMAP/outbox köprüsü, thread UI, ekler, okundu toplu | Harici DNS/alias VPS doğrulaması (`sunucu-ekolojik-support-imap-dogrula.sh`) |
+| Kanallar | Case + e-posta + mesaj (thread bağlı) + iletişim formu kuyruğu | Outbox/güvenlik uyarıları hâlâ ayrı sekmelerde özet |
+| SLA / kuyruk | Smoke filtresi (UI + önizleme), prod kuyruk, SLA canlı panel | Otomatik müşteri SLA özür maili yok — **SLA canlı → özür maili** (makro `sla_sorry`, onaylı gönder) |
+| Yanıt | Case detay: not / e-posta / mesaj; makrolar; AI taslak | Mesaj yanıtı thread bağlantısı olmadan çalışmaz |
+| Operasyon | Komut paleti, kiracı 360, Zendesk köprüsü, CSV export | Zendesk canlı webhook testi ortam bağımlı |
+| Outbox | Kiracı Posta + platform komut `/requeue_outbox` | Prod **failed/pending** triage: `scripts/ops-outbox-health.mjs` |
 
-Ekran görüntülerinde görülen **“QA Bot / Akış smoke”** konuşmaları operasyon kuyruğunu kirletiyor → plana **test thread filtresi** ve **prod-only kuyruk** dahil edilmeli.
+Teslim öncesi: `npm run test:ci`, `node scripts/pre-release-qa.mjs https://…`, `node scripts/ops-outbox-health.mjs` (VPS data dir).
 
 ---
 

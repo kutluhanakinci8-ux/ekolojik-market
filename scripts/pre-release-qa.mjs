@@ -141,6 +141,10 @@ async function securityGate() {
   const anonPortal = await http('GET', '/api/public/messaging/v1/portal/session?token=invalid');
   if (anonPortal.status === 401) pass('security', 'GET portal/session geçersiz token → 401');
   else warn('security', 'GET portal/session geçersiz token', `HTTP ${anonPortal.status}`);
+
+  const anonPlatformSupport = await http('GET', '/api/platform/support');
+  if (anonPlatformSupport.status === 401) pass('security', 'GET /api/platform/support anonim → 401');
+  else fail('security', 'GET /api/platform/support anonim', `HTTP ${anonPlatformSupport.status}`);
 }
 
 async function authAndDataGate() {
@@ -309,6 +313,45 @@ async function postaMessagingGate(token) {
   }
 }
 
+async function platformSupportGate() {
+  console.log('\n=== 5b. Platform destek API ===\n');
+
+  const platformPassword =
+    process.env.PLATFORM_OPERATOR_PASSWORD?.trim() || process.env.GREENLEAF_OWNER_PASSWORD?.trim();
+  if (!platformPassword) {
+    warn('platform', 'PLATFORM_OPERATOR_PASSWORD yok — destek API atlandı');
+    return;
+  }
+
+  const login = await http('POST', '/api/auth/pos-token', {
+    body: { username: 'kutluhan08', password: platformPassword },
+  });
+  if (!login.ok || !login.json?.token) {
+    warn('platform', 'kutluhan08 girişi başarısız', `HTTP ${login.status}`);
+    return;
+  }
+  const authH = { Authorization: `Bearer ${login.json.token}` };
+
+  const paths = [
+    '/api/platform/support?days=7',
+    '/api/platform/support/contact-queue?limit=5',
+    '/api/platform/support/smoke-filters',
+    '/api/platform/support/cases/tags',
+  ];
+  for (const path of paths) {
+    const r = await http('GET', path, { headers: authH });
+    if (r.ok) pass('platform', `GET ${path.split('?')[0]}`);
+    else warn('platform', `GET ${path}`, `HTTP ${r.status}`);
+  }
+
+  const preview = await http('POST', '/api/platform/support/smoke-filters/preview', {
+    headers: authH,
+    body: {},
+  });
+  if (preview.ok && preview.json?.ok) pass('platform', 'POST smoke-filters/preview');
+  else warn('platform', 'POST smoke-filters/preview', `HTTP ${preview.status}`);
+}
+
 async function widgetStaticGate() {
   console.log('\n=== 6. Widget statik ===\n');
   try {
@@ -334,7 +377,24 @@ async function integrationGate() {
   else warn('integration', 'ekolojik-isolation', `HTTP ${iso.status}`);
 
   const health = await http('GET', '/api/email/health');
-  if (health.json?.counts) pass('integration', 'email outbox counts', JSON.stringify(health.json.counts));
+  if (health.json?.counts) {
+    pass('integration', 'email outbox counts', JSON.stringify(health.json.counts));
+    const failed = Number(health.json.counts.failed ?? 0);
+    const pending = Number(health.json.counts.pending ?? 0);
+    if (failed > 0) {
+      warn(
+        'ops',
+        'outbox failed > 0',
+        `${failed} kayıt — node scripts/ops-outbox-health.mjs [--requeue-all] [--process]`,
+      );
+    }
+    if (pending > 20) {
+      warn('ops', 'outbox pending yüksek', `${pending} bekleyen`);
+    }
+  }
+  if (health.json?.contactAutoreply === false) {
+    warn('ops', 'contactAutoreply kapalı', 'EKOLOJIK_CONTACT_AUTOREPLY=1 (müşteri alındı maili)');
+  }
 
   const contact = await http('POST', '/api/contact', {
     body: { name: 'QA Bot', email: 'qa@test.local', subject: 'genel', message: 'pre-release probe' },
@@ -348,6 +408,9 @@ async function waveModuleSmokeGate() {
   const scripts = [
     'scripts/faz49-bot-sla-smoke.mjs',
     'scripts/faz50-portal-smoke.mjs',
+    'scripts/faz52-closure-smoke.mjs',
+    'scripts/platform-support-api-smoke.mjs',
+    'scripts/platform-support-zendesk-smoke.mjs',
   ];
   for (const rel of scripts) {
     const r = await run('node', [rel]);
@@ -393,6 +456,7 @@ async function main() {
     await securityGate();
     const token = await authAndDataGate();
     await postaMessagingGate(token);
+    await platformSupportGate();
     await widgetStaticGate();
     await integrationGate();
   } else {

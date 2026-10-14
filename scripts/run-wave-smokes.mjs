@@ -11,6 +11,7 @@ const SCRIPTS = [
   'scripts/faz48-omnichannel-smoke.mjs',
   'scripts/faz49-bot-sla-smoke.mjs',
   'scripts/faz50-portal-smoke.mjs',
+  'scripts/faz52-closure-smoke.mjs',
 ];
 
 function run(script) {
