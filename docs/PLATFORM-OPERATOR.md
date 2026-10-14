@@ -68,6 +68,7 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | Kayıt meta | `PUT` | `/api/platform/support/cases/:id` (durum/öncelik/tür/atanan; aktivite + isteğe bağlı Zendesk durum senkronu) |
 | Manuel kayıt | `POST` | `/api/platform/support/cases` (`channel: manual`) |
 | Gelen → kayıt | `POST` | `/api/platform/support/cases/from-inbox` (`messageId` = thread kökü) |
+| Kayıt etiketleri | `PUT` | `/api/platform/support/cases/:id` — `tags` dizisi |
 | Aktivite filtre | `GET` | `.../activity/export.csv?filter=` — `zendesk`, `case_meta`, `messaging` dahil |
 
 ### Ortam değişkenleri (destek@)

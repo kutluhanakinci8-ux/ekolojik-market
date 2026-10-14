@@ -3843,6 +3843,23 @@
   gap: 0.35rem;
 }
 
+.platform-support-inbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  align-items: flex-end;
+}
+
+.platform-support-inbox-search {
+  flex: 1;
+  min-width: 140px;
+}
+
+.platform-support-field--wide {
+  grid-column: 1 / -1;
+}
+
 .platform-support-inbox-attach-badge {
   font-size: 0.68rem;
   font-weight: 600;
