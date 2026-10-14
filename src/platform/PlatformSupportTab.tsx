@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { saveTenantId } from '../storage/tenantSession';
+import { syncPosApiTokenToCurrentTenant } from '../services/posApiAuth';
 import {
   createPlatformSupportCaseFromContact,
   createPlatformSupportCaseFromInbox,
@@ -13,6 +15,8 @@ import {
   fetchPlatformSupportMacros,
   savePlatformSupportMacros,
   fetchPlatformSupportCases,
+  fetchPlatformSupportCaseTags,
+  markPlatformSupportInboxRead,
   fetchPlatformSupportContactQueue,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
@@ -242,6 +246,9 @@ export function PlatformSupportTab() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [caseListStatus, setCaseListStatus] = useState<string>('all');
   const [caseListKind, setCaseListKind] = useState<string>('all');
+  const [caseListTag, setCaseListTag] = useState<string>('all');
+  const [caseTagOptions, setCaseTagOptions] = useState<string[]>([]);
+  const [inboxMarkingRead, setInboxMarkingRead] = useState(false);
   const [caseMetaDraft, setCaseMetaDraft] = useState({
     status: 'open',
     priority: 'normal',
@@ -304,10 +311,12 @@ export function PlatformSupportTab() {
       staleWaitingHours: result.data.policy.staleWaitingHours,
       closedCaseInbound: result.data.policy.closedCaseInbound ?? 'reopen',
     });
-    const casesRes = await fetchPlatformSupportCases(caseListStatus, caseListKind);
+    const casesRes = await fetchPlatformSupportCases(caseListStatus, caseListKind, caseListTag);
     if (casesRes.ok && casesRes.data) {
       setCaseRows(casesRes.data.cases);
     }
+    const tagsRes = await fetchPlatformSupportCaseTags();
+    if (tagsRes.ok && tagsRes.tags) setCaseTagOptions(tagsRes.tags);
     const contactRes = await fetchPlatformSupportContactQueue();
     if (contactRes.ok && contactRes.data) {
       setContactQueue(contactRes.data.items);
@@ -317,7 +326,7 @@ export function PlatformSupportTab() {
     const cmdRes = await fetchPlatformSupportCommands();
     if (cmdRes.ok && cmdRes.commands?.length) setCommandHelp(cmdRes.commands);
     setLoading(false);
-  }, [windowDays, caseListStatus, caseListKind]);
+  }, [windowDays, caseListStatus, caseListKind, caseListTag]);
 
   useEffect(() => {
     void load();
@@ -576,6 +585,27 @@ export function PlatformSupportTab() {
     }
     setReplyDraft('');
     setPolicyMsg('Yanıt destek@ üzerinden gönderildi');
+    void load();
+  };
+
+  const openQueueMessaging = (q: PlatformSupportPayload['queue'][0]) => {
+    saveTenantId(q.tenantId);
+    syncPosApiTokenToCurrentTenant();
+    const url = `/app?tenant=${encodeURIComponent(q.tenantId)}&view=posta&threadId=${encodeURIComponent(q.threadId)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const markVisibleInboxRead = async () => {
+    const ids = filteredInboxThreads.map((t) => t.head.id);
+    if (!ids.length) return;
+    setInboxMarkingRead(true);
+    const result = await markPlatformSupportInboxRead(ids);
+    setInboxMarkingRead(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Okundu işaretlenemedi'));
+      return;
+    }
+    setPolicyMsg(`${result.marked ?? 0} mail okundu olarak işaretlendi`);
     void load();
   };
 
@@ -1116,6 +1146,17 @@ export function PlatformSupportTab() {
                 <option value="incident">Sorun</option>
                 <option value="system">Sistem</option>
               </PlatformFilterSelect>
+              <PlatformFilterSelect
+                label="Etiket"
+                icon="role"
+                value={caseListTag}
+                onChange={(v) => setCaseListTag(v)}
+              >
+                <option value="all">Tümü</option>
+                {caseTagOptions.map((tag) => (
+                  <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </PlatformFilterSelect>
             </div>
             <table className="platform-table platform-table--scroll">
               <thead>
@@ -1626,6 +1667,14 @@ export function PlatformSupportTab() {
               <button type="button" className="btn btn-secondary" onClick={() => void onInboxSync()} disabled={inboxSyncing}>
                 {inboxSyncing ? 'Senkron…' : mailboxConfigured ? 'IMAP + outbox' : 'Güncelle'}
               </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={inboxMarkingRead || filteredInboxThreads.length === 0}
+                onClick={() => void markVisibleInboxRead()}
+              >
+                {inboxMarkingRead ? '…' : 'Görünenleri okundu'}
+              </button>
             </div>
             <div className="platform-support-inbox-filters">
               <PlatformFilterSelect
@@ -1941,13 +1990,14 @@ export function PlatformSupportTab() {
                 <th>Müşteri / konu</th>
                 <th>Bekleme</th>
                 <th>Güncelleme</th>
+                <th>Kayıt</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {filteredQueue.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>Kuyruk boş</td>
+                  <td colSpan={7}>Kuyruk boş</td>
                 </tr>
               ) : (
                 filteredQueue.map((q) => {
@@ -1990,6 +2040,11 @@ export function PlatformSupportTab() {
                           Talep
                         </button>
                       )}
+                    </td>
+                    <td>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => openQueueMessaging(q)}>
+                        Sohbet
+                      </button>
                     </td>
                   </tr>
                   );

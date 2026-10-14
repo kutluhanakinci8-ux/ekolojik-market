@@ -1223,6 +1223,37 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/inbox/mark-read' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { markPlatformSupportInboxRead } = await import('./server/platformApi.mjs');
+        const result = await markPlatformSupportInboxRead(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu işaretlenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/tags' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCaseTags } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseTags(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Etiketler alınamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/inbox/sync' && req.method === 'POST') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -1247,6 +1278,7 @@ const server = createServer(async (req, res) => {
         const payload = await getPlatformSupportCases(DATA_DIR, {
           status: url.searchParams.get('status') || undefined,
           kind: url.searchParams.get('kind') || undefined,
+          tag: url.searchParams.get('tag') || undefined,
         });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, ...payload }));

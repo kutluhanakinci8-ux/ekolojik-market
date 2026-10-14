@@ -6,7 +6,7 @@ function extractEmail(from) {
   return String(from ?? '').match(/[\w.+-]+@[\w.-]+/)?.[0] ?? null;
 }
 
-export async function listPlatformSupportCases(dataDir, { status, kind, limit = 80 } = {}) {
+export async function listPlatformSupportCases(dataDir, { status, kind, tag, limit = 80 } = {}) {
   let cases = await readPlatformCases(dataDir);
   if (status && status !== 'all') {
     cases = cases.filter((c) => c.status === status);
@@ -14,12 +14,28 @@ export async function listPlatformSupportCases(dataDir, { status, kind, limit = 
   if (kind && kind !== 'all') {
     cases = cases.filter((c) => c.kind === kind);
   }
+  if (tag && tag !== 'all') {
+    const needle = String(tag).trim();
+    cases = cases.filter((c) => (c.tags ?? []).includes(needle));
+  }
   cases.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   return {
     generatedAt: new Date().toISOString(),
     totals: summarizeCases(await readPlatformCases(dataDir)),
     cases: cases.slice(0, Math.min(limit, 200)),
   };
+}
+
+export async function listPlatformSupportCaseTags(dataDir) {
+  const cases = await readPlatformCases(dataDir);
+  const tags = new Set();
+  for (const c of cases) {
+    for (const t of c.tags ?? []) {
+      const v = String(t).trim();
+      if (v) tags.add(v);
+    }
+  }
+  return { ok: true, tags: [...tags].sort((a, b) => a.localeCompare(b, 'tr')) };
 }
 
 export async function createCaseFromInboxMessage(dataDir, messageId, operatorUsername) {

@@ -479,6 +479,27 @@ export async function listSupportInboxThreadMessages(dataDir, rootInboxId) {
     .sort((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt));
 }
 
+export async function markPlatformSupportInboxMessagesRead(dataDir, messageIds = []) {
+  const ids = new Set(
+    (Array.isArray(messageIds) ? messageIds : [])
+      .map((id) => String(id ?? '').trim())
+      .filter(Boolean),
+  );
+  if (!ids.size) return { ok: false, error: 'messageIds gerekli' };
+
+  const messages = await readMessages(dataDir);
+  let marked = 0;
+  const now = new Date().toISOString();
+  for (const row of messages) {
+    if (ids.has(row.id) && !row.readAt) {
+      row.readAt = now;
+      marked += 1;
+    }
+  }
+  if (marked > 0) await writeMessages(dataDir, messages);
+  return { ok: true, marked };
+}
+
 export async function getPlatformSupportInboxMessage(dataDir, id) {
   const messages = await readMessages(dataDir);
   const row = messages.find((m) => m.id === id);

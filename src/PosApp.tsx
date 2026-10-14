@@ -38,7 +38,11 @@ import { DEFAULT_ZYWELL_RECEIPT_PRINTER } from './types/receiptPrinter';
 function renderPage(
   page: AppPage,
   store: ReturnType<typeof useStore>,
-  postaDeepLink?: { customerId: string | null; onConsumed: () => void },
+  postaDeepLink?: {
+    customerId: string | null;
+    threadId: string | null;
+    onConsumed: () => void;
+  },
 ) {
   switch (page) {
     case 'dashboard':
@@ -67,9 +71,10 @@ function renderPage(
     case 'posta':
       return (
         <EkolojikPostaHubScreen
-          key={`${page}-${postaDeepLink?.customerId ?? ''}`}
+          key={`${page}-${postaDeepLink?.customerId ?? ''}-${postaDeepLink?.threadId ?? ''}`}
           store={store}
           deepLinkCustomerId={postaDeepLink?.customerId ?? null}
+          deepLinkThreadId={postaDeepLink?.threadId ?? null}
           onDeepLinkConsumed={postaDeepLink?.onConsumed}
         />
       );
@@ -102,12 +107,17 @@ export function PosApp() {
   const [postaUnread, setPostaUnread] = useState(0);
   const [postaOnboardingOpen, setPostaOnboardingOpen] = useState(false);
   const deepLinkCustomerId = searchParams.get('customerId')?.trim() || null;
-  const viewPosta = searchParams.get('view') === 'posta' || Boolean(deepLinkCustomerId);
+  const deepLinkThreadId = searchParams.get('threadId')?.trim() || null;
+  const viewPosta =
+    searchParams.get('view') === 'posta' || Boolean(deepLinkCustomerId) || Boolean(deepLinkThreadId);
 
   const clearPostaDeepLink = () => {
-    if (!searchParams.get('customerId') && searchParams.get('view') !== 'posta') return;
+    if (!searchParams.get('customerId') && !searchParams.get('threadId') && searchParams.get('view') !== 'posta') {
+      return;
+    }
     const next = new URLSearchParams(searchParams);
     next.delete('customerId');
+    next.delete('threadId');
     next.delete('view');
     setSearchParams(next, { replace: true });
   };
@@ -267,6 +277,7 @@ export function PosApp() {
     >
       {renderPage(page, store, {
         customerId: page === 'posta' ? deepLinkCustomerId : null,
+        threadId: page === 'posta' ? deepLinkThreadId : null,
         onConsumed: clearPostaDeepLink,
       })}
     </AppShell>
