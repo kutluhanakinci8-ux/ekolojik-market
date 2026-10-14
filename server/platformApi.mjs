@@ -484,7 +484,7 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
   return detail(dataDir, caseId);
 }
 
-export async function getPlatformSupportCaseActivityExport(dataDir, caseId, format) {
+export async function getPlatformSupportCaseActivityExport(dataDir, caseId, format, { filter } = {}) {
   const { getPlatformCase } = await import('./platformCaseStore.mjs');
   const caseRow = await getPlatformCase(dataDir, caseId);
   if (!caseRow) return { ok: false, error: 'Kayıt bulunamadı' };
@@ -493,22 +493,28 @@ export async function getPlatformSupportCaseActivityExport(dataDir, caseId, form
     buildCaseActivityCsv,
     buildCaseActivityPrintHtml,
     caseActivityExportFilename,
+    CASE_ACTIVITY_EXPORT_FILTERS,
   } = await import('./platformSupportCaseExport.mjs');
+
+  const normalizedFilter = String(filter ?? 'all').trim();
+  if (!CASE_ACTIVITY_EXPORT_FILTERS.has(normalizedFilter)) {
+    return { ok: false, error: 'Geçersiz filtre' };
+  }
 
   if (format === 'csv') {
     return {
       ok: true,
-      body: buildCaseActivityCsv(caseRow),
+      body: buildCaseActivityCsv(caseRow, { filter: normalizedFilter }),
       contentType: 'text/csv; charset=utf-8',
-      filename: caseActivityExportFilename(caseRow, 'csv'),
+      filename: caseActivityExportFilename(caseRow, 'csv', normalizedFilter),
     };
   }
   if (format === 'html') {
     return {
       ok: true,
-      body: buildCaseActivityPrintHtml(caseRow),
+      body: buildCaseActivityPrintHtml(caseRow, { filter: normalizedFilter }),
       contentType: 'text/html; charset=utf-8',
-      filename: caseActivityExportFilename(caseRow, 'html'),
+      filename: caseActivityExportFilename(caseRow, 'html', normalizedFilter),
     };
   }
   return { ok: false, error: 'Geçersiz format' };

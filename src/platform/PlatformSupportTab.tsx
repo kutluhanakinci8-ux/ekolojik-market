@@ -385,10 +385,11 @@ export function PlatformSupportTab() {
   const onExportCaseActivity = async (format: 'csv' | 'html') => {
     if (!selectedCaseId) return;
     setActivityExporting(format);
+    const exportFilter = activityFilter === 'all' ? 'all' : activityFilter;
     const result =
       format === 'csv'
-        ? await downloadPlatformSupportCaseActivityCsv(selectedCaseId)
-        : await openPlatformSupportCaseActivityPrint(selectedCaseId);
+        ? await downloadPlatformSupportCaseActivityCsv(selectedCaseId, exportFilter)
+        : await openPlatformSupportCaseActivityPrint(selectedCaseId, exportFilter);
     setActivityExporting(null);
     if (!result.ok) setPolicyMsg(userMessage(result.error, 'Aktivite dışa aktarılamadı'));
   };
@@ -722,6 +723,11 @@ export function PlatformSupportTab() {
                           className="btn btn-outline btn-sm"
                           disabled={activityExporting !== null}
                           onClick={() => void onExportCaseActivity('csv')}
+                          title={
+                            activityFilter === 'all'
+                              ? 'Tüm aktiviteler'
+                              : `Seçili filtre: ${activityTypeLabel(activityFilter)}`
+                          }
                         >
                           {activityExporting === 'csv' ? 'İndiriliyor…' : 'CSV'}
                         </button>

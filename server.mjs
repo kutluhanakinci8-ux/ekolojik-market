@@ -1353,11 +1353,14 @@ const server = createServer(async (req, res) => {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
       try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const activityFilter = url.searchParams.get('filter') || 'all';
         const { getPlatformSupportCaseActivityExport } = await import('./server/platformApi.mjs');
         const result = await getPlatformSupportCaseActivityExport(
           DATA_DIR,
           platformSupportCaseActivityCsvMatch[1],
           'csv',
+          { filter: activityFilter },
         );
         if (!result.ok) {
           res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1383,11 +1386,14 @@ const server = createServer(async (req, res) => {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
       try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const activityFilter = url.searchParams.get('filter') || 'all';
         const { getPlatformSupportCaseActivityExport } = await import('./server/platformApi.mjs');
         const result = await getPlatformSupportCaseActivityExport(
           DATA_DIR,
           platformSupportCaseActivityHtmlMatch[1],
           'html',
+          { filter: activityFilter },
         );
         if (!result.ok) {
           res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -4184,7 +4190,7 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ ok: false, error: writePolicy.error }));
         return;
       }
-      const data = await readRequestBody(req);
+      let data = await readRequestBody(req);
       if (!data || typeof data !== 'object') {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, message: 'Geçersiz veri' }));
@@ -4280,7 +4286,10 @@ const server = createServer(async (req, res) => {
     }
 
     await serveFile(join(DIST, 'index.html'), res);
-  } catch {
+  } catch (error) {
+    if (process.env.EKOLOJIK_DEBUG_REQUEST_ERRORS === '1') {
+      console.error('request handler error:', error);
+    }
     res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Sunucu hatası');
   }
