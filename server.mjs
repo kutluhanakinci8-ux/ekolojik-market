@@ -1275,10 +1275,13 @@ const server = createServer(async (req, res) => {
       try {
         const url = new URL(req.url ?? '', 'http://local');
         const { getPlatformSupportCases } = await import('./server/platformApi.mjs');
+        const limitRaw = url.searchParams.get('limit');
+        const limit = limitRaw ? Number(limitRaw) : undefined;
         const payload = await getPlatformSupportCases(DATA_DIR, {
           status: url.searchParams.get('status') || undefined,
           kind: url.searchParams.get('kind') || undefined,
           tag: url.searchParams.get('tag') || undefined,
+          limit: limit && Number.isFinite(limit) ? limit : undefined,
         });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, ...payload }));

@@ -69,7 +69,8 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | Manuel kayıt | `POST` | `/api/platform/support/cases` (`channel: manual`) |
 | Gelen → kayıt | `POST` | `/api/platform/support/cases/from-inbox` (`messageId` = thread kökü) |
 | Kayıt etiketleri | `PUT` / `GET` | `tags` alanı · `GET /api/platform/support/cases/tags` · `?tag=` listesi |
-| Gelen okundu | `POST` | `/api/platform/support/inbox/mark-read` — `{ messageIds: [] }` |
+| Gelen okundu | `POST` | `/api/platform/support/inbox/mark-read` — `{ messageIds: [] }` (filtredeki thread’lerdeki tüm okunmamışlar) |
+| Kayıt listesi limit | `GET` | `/api/platform/support/cases?limit=` (en fazla 200; kuyruk bağlantısı için UI 500 ister) |
 | Mağaza sohbet | URL | `/app?tenant=&view=posta&threadId=` (platform kuyruktan **Sohbet**) |
 | Aktivite filtre | `GET` | `.../activity/export.csv?filter=` — `zendesk`, `case_meta`, `messaging` dahil |
 

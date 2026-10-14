@@ -243,6 +243,8 @@ export function PlatformSupportTab() {
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
   const [section, setSection] = useState<'inbox' | 'queue' | 'cases' | 'sla'>('cases');
   const [caseRows, setCaseRows] = useState<PlatformSupportCase[]>([]);
+  /** Tüm kayıtlar (filtre dışı) — kuyruk ↔ mesaj thread bağlantısı */
+  const [caseLinkRows, setCaseLinkRows] = useState<PlatformSupportCase[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [caseListStatus, setCaseListStatus] = useState<string>('all');
   const [caseListKind, setCaseListKind] = useState<string>('all');
@@ -314,6 +316,10 @@ export function PlatformSupportTab() {
     const casesRes = await fetchPlatformSupportCases(caseListStatus, caseListKind, caseListTag);
     if (casesRes.ok && casesRes.data) {
       setCaseRows(casesRes.data.cases);
+    }
+    const linkCasesRes = await fetchPlatformSupportCases('all', 'all', 'all', 500);
+    if (linkCasesRes.ok && linkCasesRes.data) {
+      setCaseLinkRows(linkCasesRes.data.cases);
     }
     const tagsRes = await fetchPlatformSupportCaseTags();
     if (tagsRes.ok && tagsRes.tags) setCaseTagOptions(tagsRes.tags);
@@ -540,15 +546,24 @@ export function PlatformSupportTab() {
 
   const caseByMessagingThread = useMemo(() => {
     const map = new Map<string, PlatformSupportCase>();
-    for (const c of caseRows) {
+    const rank = (c: PlatformSupportCase) => {
+      if (c.status !== 'closed' && c.status !== 'solved') return 2;
+      return 1;
+    };
+    const sorted = [...caseLinkRows].sort((a, b) => {
+      const dr = rank(b) - rank(a);
+      if (dr !== 0) return dr;
+      return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+    });
+    for (const c of sorted) {
       const tenantId = c.links?.tenantId ?? c.tenantId;
       const threadId = c.links?.threadId;
       if (!tenantId || !threadId) continue;
-      if (c.status === 'closed' || c.status === 'solved') continue;
-      map.set(`${tenantId}:${threadId}`, c);
+      const key = `${tenantId}:${threadId}`;
+      if (!map.has(key)) map.set(key, c);
     }
     return map;
-  }, [caseRows]);
+  }, [caseLinkRows]);
 
   const selectedThreadMessages = useMemo(() => {
     if (!selectedMail) return [];
@@ -596,7 +611,9 @@ export function PlatformSupportTab() {
   };
 
   const markVisibleInboxRead = async () => {
-    const ids = filteredInboxThreads.map((t) => t.head.id);
+    const ids = filteredInboxThreads.flatMap((t) =>
+      t.messages.filter((m) => !m.readAt).map((m) => m.id),
+    );
     if (!ids.length) return;
     setInboxMarkingRead(true);
     const result = await markPlatformSupportInboxRead(ids);
@@ -609,12 +626,18 @@ export function PlatformSupportTab() {
     void load();
   };
 
+  const openLinkedCase = (c: PlatformSupportCase) => {
+    setSelectedCaseId(c.id);
+    setZendeskIdDraft(c.externalTicketRef?.id ?? '');
+    setSection('cases');
+    const closed = c.status === 'closed' || c.status === 'solved';
+    setPolicyMsg(closed ? `Kayıt #${c.number} (${c.status})` : `Kayıt #${c.number}`);
+  };
+
   const openCaseFromQueue = async (q: PlatformSupportPayload['queue'][0]) => {
     const existing = caseByMessagingThread.get(`${q.tenantId}:${q.threadId}`);
     if (existing) {
-      setSelectedCaseId(existing.id);
-      setSection('cases');
-      setPolicyMsg(`Mevcut kayıt #${existing.number}`);
+      openLinkedCase(existing);
       return;
     }
     const result = await createPlatformSupportCaseFromQueue({
@@ -1165,6 +1188,7 @@ export function PlatformSupportTab() {
                   <th>Tür</th>
                   <th>Durum</th>
                   <th>Konu</th>
+                  <th>Etiketler</th>
                   <th>Kiracı</th>
                   <th>Zendesk</th>
                 </tr>
@@ -1172,7 +1196,7 @@ export function PlatformSupportTab() {
               <tbody>
                 {caseRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>Henüz kayıt yok</td>
+                    <td colSpan={7}>Henüz kayıt yok</td>
                   </tr>
                 ) : (
                   caseRows.map((c) => (
@@ -1188,6 +1212,20 @@ export function PlatformSupportTab() {
                       <td>{c.kind}</td>
                       <td>{c.status}</td>
                       <td>{c.subject}</td>
+                      <td>
+                        {(c.tags ?? []).length === 0 ? (
+                          <span className="platform-table-muted">—</span>
+                        ) : (
+                          <span className="platform-support-tag-chips">
+                            {(c.tags ?? []).slice(0, 4).map((tag) => (
+                              <span key={tag} className="platform-support-tag-chip">{tag}</span>
+                            ))}
+                            {(c.tags ?? []).length > 4 ? (
+                              <span className="platform-table-muted">+{(c.tags ?? []).length - 4}</span>
+                            ) : null}
+                          </span>
+                        )}
+                      </td>
                       <td>
                         {c.tenantId ? (
                           <button
@@ -2031,13 +2069,16 @@ export function PlatformSupportTab() {
                         <button
                           type="button"
                           className="btn btn-text"
-                          onClick={() => void openCaseFromQueue(q)}
+                          onClick={() => openLinkedCase(linkedCase)}
                         >
-                          #{linkedCase.number}
+                          Aç #{linkedCase.number}
+                          {linkedCase.status === 'closed' || linkedCase.status === 'solved'
+                            ? ` (${linkedCase.status})`
+                            : ''}
                         </button>
                       ) : (
                         <button type="button" className="btn btn-text" onClick={() => void openCaseFromQueue(q)}>
-                          Talep
+                          Talep oluştur
                         </button>
                       )}
                     </td>

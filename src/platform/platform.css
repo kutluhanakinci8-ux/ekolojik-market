@@ -3317,6 +3317,23 @@
   color: #b45309;
 }
 
+.platform-support-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-width: 14rem;
+}
+
+.platform-support-tag-chip {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+  white-space: nowrap;
+}
+
 .platform-support-badge--info {
   background: #e0f2fe;
   color: #0369a1;
