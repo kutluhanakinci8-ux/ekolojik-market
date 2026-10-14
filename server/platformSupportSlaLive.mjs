@@ -3,7 +3,11 @@
 import { readTenantStore, listTenantIds } from './tenantAuth.mjs';
 import { listMessagingThreads } from './messaging/store.mjs';
 import { readSupportSlaPolicy } from './platformSupportPolicy.mjs';
-import { readSupportFilterConfig, filterProductionMessagingThreads } from './platformSupportFilters.mjs';
+import {
+  readSupportFilterConfig,
+  filterProductionMessagingThreads,
+  threadEligibleForSlaHuman,
+} from './platformSupportFilters.mjs';
 import { readPlatformCases } from './platformCaseStore.mjs';
 import { buildPlatformSupportOverview } from './platformSupportMetrics.mjs';
 
@@ -38,6 +42,13 @@ async function buildDailyFirstResponseSeries(dataDir, days) {
     const threads = filterProductionMessagingThreads(listed.threads ?? [], tenantId, smokeFilter);
     for (const t of threads) {
       if (!t.firstCustomerMessageAt || !t.firstStaffResponseAt) continue;
+      const humanOk = await threadEligibleForSlaHuman(
+        dataDir,
+        tenantId,
+        t,
+        smokeFilter.slaHumanOnly === true,
+      );
+      if (!humanOk) continue;
       const custAt = Date.parse(t.firstCustomerMessageAt);
       if (!Number.isFinite(custAt) || custAt < start) continue;
       const key = dateKeyTr(custAt);

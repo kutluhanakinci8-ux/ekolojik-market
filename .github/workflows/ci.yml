@@ -36,8 +36,26 @@ jobs:
       - name: Pre-release QA (local server)
         run: npm run test:ci
 
+  nb-ui-visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
       - name: Posta NB UI smoke (Playwright)
-        continue-on-error: true
         run: |
           source scripts/lib/ensure-playwright.sh
           ensure_playwright "$PWD"

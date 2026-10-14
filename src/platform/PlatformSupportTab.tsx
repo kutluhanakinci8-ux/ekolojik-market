@@ -51,6 +51,7 @@ import {
 import { KpiIcon, PlatformFilterSelect, RingProgress } from './platformUserUi';
 import { PlatformSupportTenant360 } from './PlatformSupportTenant360';
 import { PlatformSupportSlaLive } from './PlatformSupportSlaLive';
+import { usePlatformNav } from './PlatformNavContext';
 import { buildCaseUnifiedTimeline, type CaseTimelineEntry } from './platformSupportCaseTimeline';
 import {
   filterCaseActivities,
@@ -225,6 +226,7 @@ function SupportSkeleton() {
 }
 
 export function PlatformSupportTab() {
+  const platformNav = usePlatformNav();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PlatformSupportPayload | null>(null);
@@ -1049,17 +1051,27 @@ export function PlatformSupportTab() {
             {(data.opsSignals?.outboxFailed ?? 0) > 0 ? (
               <>
                 <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
-                <span className="is-warn" title="Kiracı outbox başarısız (Altyapı sekmesi)">
+                <button
+                  type="button"
+                  className="platform-support-hero-link is-warn"
+                  title="Altyapı → outbox kiracı"
+                  onClick={() => platformNav?.goToTab('infrastructure')}
+                >
                   {data.opsSignals?.outboxFailed} outbox fail
-                </span>
+                </button>
               </>
             ) : null}
             {(data.opsSignals?.platformAlertsCritical ?? 0) > 0 ? (
               <>
                 <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
-                <span className="is-warn" title="Platform uyarıları (Genel bakış)">
+                <button
+                  type="button"
+                  className="platform-support-hero-link is-warn"
+                  title="Genel bakış → kiracı uyarıları"
+                  onClick={() => platformNav?.goToTab('overview')}
+                >
                   {data.opsSignals?.platformAlertsCritical} kritik uyarı
-                </span>
+                </button>
               </>
             ) : null}
           </p>
@@ -2500,6 +2512,39 @@ export function PlatformSupportTab() {
                 }
               />
             </label>
+            <label className="platform-support-field platform-support-field--inline">
+              <input
+                type="checkbox"
+                checked={Boolean(smokeFilterDraft.slaHumanOnly)}
+                onChange={(e) =>
+                  setSmokeFilterDraft((d) => (d ? { ...d, slaHumanOnly: e.target.checked } : d))
+                }
+              />
+              <span>SLA uyumu: yalnızca insan (bot ilk yanıt sayılmaz)</span>
+            </label>
+            <label className="platform-support-field">
+              <span className="platform-support-field-label">
+                Mesaj kanalları (boş = tümü; satır başına: web, platform, …)
+              </span>
+              <textarea
+                className="platform-support-control"
+                rows={2}
+                value={(smokeFilterDraft.messagingChannels ?? []).join('\n')}
+                onChange={(e) =>
+                  setSmokeFilterDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          messagingChannels: e.target.value
+                            .split('\n')
+                            .map((s) => s.trim().toLowerCase())
+                            .filter(Boolean),
+                        }
+                      : d,
+                  )
+                }
+              />
+            </label>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -2515,6 +2560,10 @@ export function PlatformSupportTab() {
             {smokeFilterDraft?.tenantIds.length ?? 0} kiracı ·{' '}
             {(smokeFilterDraft?.subjectPatterns.length ?? 0) + (smokeFilterDraft?.customerNamePatterns.length ?? 0)}{' '}
             desen
+            {smokeFilterDraft?.slaHumanOnly ? ' · SLA insan' : ''}
+            {(smokeFilterDraft?.messagingChannels?.length ?? 0) > 0
+              ? ` · ${smokeFilterDraft?.messagingChannels?.length} kanal`
+              : ''}
           </p>
         )}
         {smokePreview ? (

@@ -1243,6 +1243,8 @@ export type PlatformSupportSmokeFilters = {
   tenantIds: string[];
   subjectPatterns: string[];
   customerNamePatterns: string[];
+  slaHumanOnly?: boolean;
+  messagingChannels?: string[];
 };
 
 export type PlatformSupportCasesPayload = {

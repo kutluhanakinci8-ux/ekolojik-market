@@ -2,6 +2,7 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { listMessagingMessages } from './messaging/store.mjs';
 
 const DEFAULT_PATTERNS = [
   /\bqa\s*bot\b/i,
@@ -90,6 +91,16 @@ export function isSmokeMessagingThread(thread, tenantId, config) {
   return Boolean(smokeMessagingThreadReason(thread, tenantId, config));
 }
 
+/** slaHumanOnly: ilk personel yanıtı bot ise SLA uyum örneklerine dahil etme */
+export async function threadEligibleForSlaHuman(dataDir, tenantId, thread, slaHumanOnly) {
+  if (!slaHumanOnly) return true;
+  if (!thread?.firstStaffResponseAt) return true;
+  const listed = await listMessagingMessages(dataDir, tenantId, thread.id, { limit: 100 });
+  const firstStaff = (listed.messages ?? []).find((m) => m.direction === 'staff');
+  if (!firstStaff) return false;
+  return firstStaff.messageKind !== 'bot';
+}
+
 export function filterProductionMessagingThreads(threads, tenantId, config) {
   return (threads ?? []).filter((t) => {
     if (isSmokeMessagingThread(t, tenantId, config)) return false;
@@ -110,6 +121,8 @@ function defaultFilterDocument() {
     tenantIds: ['test-magaza', 'demo-store'],
     subjectPatterns: ['qa\\s*bot', 'smoke', 'botiletisim', 'e2e', 'faz\\d+', 'akis\\s*a\\s*smoke'],
     customerNamePatterns: ['qa\\s*bot', 'smoke', 'akis\\s*a\\s*smoke'],
+    slaHumanOnly: false,
+    messagingChannels: [],
   };
 }
 
@@ -127,6 +140,10 @@ export async function readSupportFilterDocument(dataDir) {
       customerNamePatterns: Array.isArray(raw.customerNamePatterns)
         ? raw.customerNamePatterns.map((p) => String(p).trim()).filter(Boolean)
         : defaultFilterDocument().customerNamePatterns,
+      slaHumanOnly: raw.slaHumanOnly === true,
+      messagingChannels: Array.isArray(raw.messagingChannels)
+        ? raw.messagingChannels.map((c) => String(c).trim().toLowerCase()).filter(Boolean)
+        : [],
     };
   } catch {
     return defaultFilterDocument();
