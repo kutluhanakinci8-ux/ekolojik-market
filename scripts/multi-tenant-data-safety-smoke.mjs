@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:net';
 
 import {
   guardIsolatedTenantStoreWrite,
@@ -23,7 +24,20 @@ import {
 } from '../server/tenantStoreGuard.mjs';
 
 const REPO = join(import.meta.dirname, '..');
-const PORT = Number(process.env.EKOLOJIK_MT_PORT || 59123);
+
+async function pickEphemeralPort() {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const addr = srv.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+      srv.close((err) => (err ? reject(err) : resolve(port)));
+    });
+    srv.on('error', reject);
+  });
+}
+
+const PORT = Number(process.env.EKOLOJIK_MT_PORT) || (await pickEphemeralPort());
 const BASE = `http://127.0.0.1:${PORT}`;
 
 function hashPassword(password) {
@@ -64,7 +78,7 @@ function minimalStore(businessName, marker) {
     priceType: 'retail',
     users: businessName.includes('Lima')
       ? [adminUser('limaadmin', 'Lima Admin')]
-      : [adminUser('kutluhan08', 'Kutluhan'), adminUser('yonetici', 'Platform')],
+      : [adminUser('greenleafadmin', 'Greenleaf Admin')],
   };
 }
 
@@ -123,6 +137,16 @@ const server = spawn(process.execPath, ['server.mjs'], {
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
+function stopServer() {
+  if (!server.killed) server.kill('SIGTERM');
+}
+
+process.on('exit', stopServer);
+process.on('SIGINT', () => {
+  stopServer();
+  process.exit(130);
+});
+
 async function waitHealth() {
   for (let i = 0; i < 60; i++) {
     try {
@@ -148,12 +172,14 @@ async function posToken(tenant, username, password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  assert.equal(res.status, 200, `login ${tenant}/${username}`);
-  const j = await res.json();
+  const bodyText = await res.text();
+  assert.equal(res.status, 200, `login ${tenant}/${username}: ${bodyText}`);
+  const j = JSON.parse(bodyText);
   return j.token;
 }
 
-const mainToken = await posToken('main', 'kutluhan08', 'TestPass123!');
+// Platform operatörleri (kutluhan08 vb.) credential-vault gerektirir — smoke mağaza kullanıcısı
+const mainToken = await posToken('main', 'greenleafadmin', 'TestPass123!');
 const limaToken = await posToken('lima-market', 'limaadmin', 'TestPass123!');
 
 async function getStore(tenant, token) {
@@ -192,7 +218,8 @@ async function putStore(tenant, token, snapshot) {
     },
     body: JSON.stringify(snapshot),
   });
-  return res.status;
+  const bodyText = await res.text();
+  return { status: res.status, body: bodyText };
 }
 
 const mainMarker = `Greenleaf smoke ${Date.now()}`;
@@ -201,7 +228,8 @@ const mainSnap = {
   updatedAt: new Date().toISOString(),
   settings: { ...mainDisk.settings, businessName: mainMarker },
 };
-assert.equal(await putStore('main', mainToken, mainSnap), 200, 'kutluhan main PUT');
+const mainPut = await putStore('main', mainToken, mainSnap);
+assert.equal(mainPut.status, 200, `greenleafadmin main PUT: ${mainPut.body}`);
 
 const limaMarker = `Lima smoke ${Date.now()}`;
 const limaSnap = {
@@ -209,10 +237,11 @@ const limaSnap = {
   updatedAt: new Date().toISOString(),
   products: [{ id: 1001, name: limaMarker, stock: 77, productCode: 'T-1001' }],
 };
-assert.equal(await putStore('lima-market', limaToken, limaSnap), 200, 'limaadmin lima PUT');
+const limaPut = await putStore('lima-market', limaToken, limaSnap);
+assert.equal(limaPut.status, 200, `limaadmin lima PUT: ${limaPut.body}`);
 
-const kutluhanLimaPut = await putStore('lima-market', mainToken, limaSnap);
-assert.equal(kutluhanLimaPut, 403, 'kutluhan08 lima PUT engelli');
+const mainTenantLimaPut = await putStore('lima-market', mainToken, limaSnap);
+assert.equal(mainTenantLimaPut.status, 403, `main token lima PUT engelli: ${mainTenantLimaPut.body}`);
 
 const gMainAfter = await getStore('main', mainToken);
 assert.equal(gMainAfter.json.settings.businessName, mainMarker, 'main ayar sunucuya yazıldı (GET)');
@@ -223,7 +252,7 @@ const autoDir = join(dataDir, 'backups', 'auto-tenant', 'lima-market');
 const autoFiles = await readdir(autoDir);
 assert.ok(autoFiles.some((f) => f.startsWith('store-') && f.endsWith('.json')), 'sunucu otomatik tenant yedek');
 
-console.log('OK    HTTP tenant izolasyonu + ayrı PUT + kutluhan lima engeli + auto-backup');
+console.log('OK    HTTP tenant izolasyonu + ayrı PUT + main→lima engeli + auto-backup');
 
-server.kill();
+stopServer();
 console.log('\nmulti-tenant data safety smoke: PASS');

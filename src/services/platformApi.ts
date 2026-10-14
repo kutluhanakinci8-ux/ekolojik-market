@@ -1407,13 +1407,24 @@ export async function fetchPlatformSupportCaseAi(
   return { ok: result.ok, text, provider, error: result.error };
 }
 
+export type PlatformSupportCaseActivityExportFilter =
+  | 'all'
+  | 'email_inbound'
+  | 'email_outbound'
+  | 'note';
+
 export async function downloadPlatformSupportCaseActivityCsv(
   caseId: string,
+  filter: PlatformSupportCaseActivityExportFilter = 'all',
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/platform/support/cases/${encodeURIComponent(caseId)}/activity/export.csv`, {
-      headers: posApiAuthHeaders(),
-    });
+    const q = filter && filter !== 'all' ? `?filter=${encodeURIComponent(filter)}` : '';
+    const res = await fetch(
+      `/api/platform/support/cases/${encodeURIComponent(caseId)}/activity/export.csv${q}`,
+      {
+        headers: posApiAuthHeaders(),
+      },
+    );
     if (!res.ok) {
       const err = (await res.json().catch(() => ({}))) as { error?: string };
       return { ok: false, error: err.error ?? 'CSV indirilemedi' };
@@ -1435,11 +1446,16 @@ export async function downloadPlatformSupportCaseActivityCsv(
 
 export async function openPlatformSupportCaseActivityPrint(
   caseId: string,
+  filter: PlatformSupportCaseActivityExportFilter = 'all',
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/platform/support/cases/${encodeURIComponent(caseId)}/activity/export.html`, {
-      headers: posApiAuthHeaders(),
-    });
+    const q = filter && filter !== 'all' ? `?filter=${encodeURIComponent(filter)}` : '';
+    const res = await fetch(
+      `/api/platform/support/cases/${encodeURIComponent(caseId)}/activity/export.html${q}`,
+      {
+        headers: posApiAuthHeaders(),
+      },
+    );
     if (!res.ok) {
       const err = (await res.json().catch(() => ({}))) as { error?: string };
       return { ok: false, error: err.error ?? 'Dışa aktarma açılamadı' };
