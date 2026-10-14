@@ -77,6 +77,7 @@ async function readCronSnippets() {
   const paths = [
     '/etc/cron.d/ekolojik-outbox-failed-archive',
     '/etc/cron.d/ekolojik-data-yedek',
+    '/etc/cron.d/ekolojik-support-inbox-sync',
   ];
   const jobs = [];
   for (const path of paths) {
