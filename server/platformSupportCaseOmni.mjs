@@ -13,9 +13,24 @@ import { clipEmailActivityText, clipEmailActivityHtml } from './platformSupportA
 const MACROS_PATH = (dataDir) => join(dataDir, 'platform', 'support-macros.json');
 
 const DEFAULT_MACROS = [
-  { id: 'first_reply', label: 'İlk yanıt', body: 'Merhaba,\n\nTalebiniz için teşekkürler. İnceliyoruz; en kısa sürede bilgi vereceğiz.\n\nSaygılarımızla,' },
-  { id: 'sla_sorry', label: 'SLA özür', body: 'Merhaba,\n\nYanıtımızın geciktiği için özür dileriz. Konuyu önceliklendirdik.\n\nSaygılarımızla,' },
-  { id: 'resolved', label: 'Çözüldü', body: 'Merhaba,\n\nKaydınızı çözüldü olarak işaretledik. Başka bir sorunuz olursa yazabilirsiniz.\n\nSaygılarımızla,' },
+  {
+    id: 'first_reply',
+    label: 'İlk yanıt',
+    body:
+      'Merhaba {{requesterFirstName}},\n\n“{{subject}}” konulu talebiniz (#{{caseNumber}}) için teşekkürler. İnceliyoruz; en kısa sürede bilgi vereceğiz.\n\nSaygılarımızla,\nEkolojik Destek',
+  },
+  {
+    id: 'sla_sorry',
+    label: 'SLA özür',
+    body:
+      'Merhaba {{requesterFirstName}},\n\nYanıtımızın geciktiği için özür dileriz. “{{subject}}” kaydını önceliklendirdik.\n\nSaygılarımızla,\nEkolojik Destek',
+  },
+  {
+    id: 'resolved',
+    label: 'Çözüldü',
+    body:
+      'Merhaba {{requesterFirstName}},\n\n#{{caseNumber}} kaydınızı çözüldü olarak işaretledik. Başka bir sorunuz olursa yazabilirsiniz.\n\nSaygılarımızla,\nEkolojik Destek',
+  },
 ];
 
 export async function listPlatformSupportMacros(dataDir) {
@@ -89,6 +104,9 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
     };
   }
 
+  const { isPostaAiEnabled, getPostaAiRuntimeConfig } = await import('./messaging/aiConfig.mjs');
+  const aiRuntime = getPostaAiRuntimeConfig();
+
   return {
     ok: true,
     case: caseRow,
@@ -96,6 +114,11 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
     inboxSnippet,
     emailPreview,
     macros: await listPlatformSupportMacros(dataDir),
+    aiCapabilities: {
+      externalEnabled: isPostaAiEnabled() && aiRuntime.hasApiKey && Boolean(aiRuntime.apiUrl),
+      provider: aiRuntime.provider,
+      model: aiRuntime.model,
+    },
   };
 }
 

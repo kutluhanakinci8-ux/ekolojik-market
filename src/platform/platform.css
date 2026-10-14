@@ -3267,6 +3267,11 @@
   line-height: 1.45;
 }
 
+.platform-support-ai-hint {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.78rem;
+}
+
 .platform-support-zendesk-row {
   display: flex;
   flex-wrap: wrap;
