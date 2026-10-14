@@ -438,9 +438,15 @@ export function PlatformSupportTab() {
   }, []);
 
   useEffect(() => {
+    if (section !== 'cases') return;
+    if (selectedCaseId && !caseRows.some((row) => row.id === selectedCaseId)) {
+      setSelectedCaseId(null);
+    }
+  }, [section, selectedCaseId, caseRows]);
+
+  useEffect(() => {
     const c = caseRows.find((row) => row.id === selectedCaseId);
-    const tid = resolveCaseTenantId(c ?? null);
-    if (tid) setContextTenantId(tid);
+    setContextTenantId(resolveCaseTenantId(c ?? null));
   }, [selectedCaseId, caseRows]);
 
   useEffect(() => {
@@ -1919,7 +1925,7 @@ export function PlatformSupportTab() {
             )}
           </section>
           <PlatformSupportTenant360
-            tenantId={contextTenantId}
+            tenantId={selectedCase ? resolveCaseTenantId(selectedCase) : null}
             casePreview={
               selectedCase
                 ? {
