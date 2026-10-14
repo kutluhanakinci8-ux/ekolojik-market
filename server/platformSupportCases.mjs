@@ -6,10 +6,16 @@ function extractEmail(from) {
   return String(from ?? '').match(/[\w.+-]+@[\w.-]+/)?.[0] ?? null;
 }
 
+const ACTIVE_CASE_STATUSES = new Set(['new', 'open', 'pending']);
+
 export async function listPlatformSupportCases(dataDir, { status, kind, tag, limit = 80 } = {}) {
   let cases = await readPlatformCases(dataDir);
   if (status && status !== 'all') {
-    cases = cases.filter((c) => c.status === status);
+    if (status === 'active') {
+      cases = cases.filter((c) => ACTIVE_CASE_STATUSES.has(c.status));
+    } else {
+      cases = cases.filter((c) => c.status === status);
+    }
   }
   if (kind && kind !== 'all') {
     cases = cases.filter((c) => c.kind === kind);

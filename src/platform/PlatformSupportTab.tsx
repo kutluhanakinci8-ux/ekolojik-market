@@ -83,6 +83,25 @@ const CASE_KIND_LABELS: Record<string, string> = {
   system: 'Sistem',
 };
 
+type CaseListMailbox = 'active' | 'solved' | 'closed' | 'all';
+
+function caseListStatusQuery(mailbox: CaseListMailbox, activeSubStatus: string): string {
+  if (mailbox === 'solved') return 'solved';
+  if (mailbox === 'closed') return 'closed';
+  if (mailbox === 'all') return 'all';
+  if (activeSubStatus === 'new' || activeSubStatus === 'open' || activeSubStatus === 'pending') {
+    return activeSubStatus;
+  }
+  return 'active';
+}
+
+const CASE_MAILBOX_LABELS: Record<CaseListMailbox, string> = {
+  active: 'Açık kutu',
+  solved: 'Çözüldü',
+  closed: 'Kapalı',
+  all: 'Tümü',
+};
+
 function resolveCaseTenantId(c: PlatformSupportCase | null | undefined): string | null {
   if (!c) return null;
   const direct = c.tenantId ?? c.links?.tenantId ?? null;
@@ -299,7 +318,8 @@ export function PlatformSupportTab() {
   /** Tüm kayıtlar (filtre dışı) — kuyruk ↔ mesaj thread bağlantısı */
   const [caseLinkRows, setCaseLinkRows] = useState<PlatformSupportCase[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [caseListStatus, setCaseListStatus] = useState<string>('all');
+  const [caseListMailbox, setCaseListMailbox] = useState<CaseListMailbox>('active');
+  const [caseListActiveSub, setCaseListActiveSub] = useState<string>('active');
   const [caseListKind, setCaseListKind] = useState<string>('all');
   const [caseListTag, setCaseListTag] = useState<string>('all');
   const [caseTagOptions, setCaseTagOptions] = useState<string[]>([]);
@@ -385,7 +405,11 @@ export function PlatformSupportTab() {
       staleWaitingHours: result.data.policy.staleWaitingHours,
       closedCaseInbound: result.data.policy.closedCaseInbound ?? 'reopen',
     });
-    const casesRes = await fetchPlatformSupportCases(caseListStatus, caseListKind, caseListTag);
+    const casesRes = await fetchPlatformSupportCases(
+      caseListStatusQuery(caseListMailbox, caseListActiveSub),
+      caseListKind,
+      caseListTag,
+    );
     if (casesRes.ok && casesRes.data) {
       setCaseRows(casesRes.data.cases);
     }
@@ -424,7 +448,7 @@ export function PlatformSupportTab() {
     const mentionInbox = await fetchPlatformSupportMentionInbox();
     if (mentionInbox.ok) setMentionUnread(mentionInbox.unread ?? 0);
     setLoading(false);
-  }, [windowDays, caseListStatus, caseListKind, caseListTag]);
+  }, [windowDays, caseListMailbox, caseListActiveSub, caseListKind, caseListTag]);
 
   useEffect(() => {
     void load();
@@ -1382,20 +1406,39 @@ export function PlatformSupportTab() {
               </div>
             ) : null}
             </div>
+            <nav className="platform-support-case-mailbox" aria-label="Kayıt klasörleri">
+              {(['active', 'solved', 'closed', 'all'] as CaseListMailbox[]).map((box) => (
+                <button
+                  key={box}
+                  type="button"
+                  className={`platform-support-case-mailbox-btn${caseListMailbox === box ? ' is-active' : ''}`}
+                  aria-current={caseListMailbox === box ? 'true' : undefined}
+                  onClick={() => {
+                    setCaseListMailbox(box);
+                    setSelectedCaseId(null);
+                  }}
+                >
+                  {CASE_MAILBOX_LABELS[box]}
+                </button>
+              ))}
+            </nav>
             <div className="platform-support-case-filters">
-              <PlatformFilterSelect
-                label="Durum"
-                icon="role"
-                value={caseListStatus}
-                onChange={(v) => setCaseListStatus(v)}
-              >
-                <option value="all">Tümü</option>
-                <option value="new">Yeni</option>
-                <option value="open">Açık</option>
-                <option value="pending">Beklemede</option>
-                <option value="solved">Çözüldü</option>
-                <option value="closed">Kapalı</option>
-              </PlatformFilterSelect>
+              {caseListMailbox === 'active' ? (
+                <PlatformFilterSelect
+                  label="Açık durum"
+                  icon="role"
+                  value={caseListActiveSub}
+                  onChange={(v) => {
+                    setCaseListActiveSub(v);
+                    setSelectedCaseId(null);
+                  }}
+                >
+                  <option value="active">Tüm açıklar</option>
+                  <option value="new">Yeni</option>
+                  <option value="open">Açık</option>
+                  <option value="pending">Beklemede</option>
+                </PlatformFilterSelect>
+              ) : null}
               <PlatformFilterSelect
                 label="Tür"
                 icon="role"
