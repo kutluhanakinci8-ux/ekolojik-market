@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Customer } from '../../types/business';
 import type { Store } from '../../store/useStore';
 import { buildCustomerTimeline } from '../../utils/crm/timeline';
@@ -10,6 +10,7 @@ import { SponsorTreePanel } from './SponsorTreePanel';
 import { CustomerTagPicker } from './CustomerTagPicker';
 import { CrmDocumentAttachments } from './CrmDocumentAttachments';
 import { buildSmsContext, phoneToSmsHref, renderSmsTemplate } from '../../utils/crm/smsTemplates';
+import { fetchCrmSmsConfigured, sendCrmSmsApi } from '../../services/crmOutreachService';
 import { getCustomerBalance } from '../../utils/accountingAnalytics';
 
 interface CustomerCrmSectionProps {
@@ -28,6 +29,10 @@ const STATUS_OPTIONS: { value: CustomerCrmStatus; label: string }[] = [
 export function CustomerCrmSection({ store, customer }: CustomerCrmSectionProps) {
   const crm = getCustomerCrmProfile(customer, store.crmSettings);
   const [note, setNote] = useState('');
+  const [smsApiReady, setSmsApiReady] = useState(false);
+  useEffect(() => {
+    void fetchCrmSmsConfigured().then((r) => setSmsApiReady(Boolean(r.configured)));
+  }, []);
   const [commSummary, setCommSummary] = useState('');
   const [smsTemplateId, setSmsTemplateId] = useState('');
   const [smsStatus, setSmsStatus] = useState<string | null>(null);
@@ -163,17 +168,28 @@ export function CustomerCrmSection({ store, customer }: CustomerCrmSectionProps)
               template.body,
               buildSmsContext(customer, store.settings.businessName, ledgerBalance, crm.loyaltyPoints),
             );
-            if (customer.phone) {
-              window.location.href = phoneToSmsHref(customer.phone, text);
-              store.addCrmCommunication(customer.id, 'sms', `SMS: ${template.name}`);
-              setSmsStatus('SMS uygulaması açıldı.');
-            } else {
+            if (!customer.phone) {
               void navigator.clipboard.writeText(text);
               setSmsStatus('Telefon yok — metin panoya kopyalandı.');
+              return;
             }
+            if (smsApiReady) {
+              void sendCrmSmsApi({ to: customer.phone, body: text }).then((res) => {
+                if (res.ok) {
+                  store.addCrmCommunication(customer.id, 'sms', `SMS API: ${template.name}`);
+                  setSmsStatus('SMS operatör API ile gönderildi.');
+                } else {
+                  setSmsStatus(res.error ?? 'SMS gönderilemedi');
+                }
+              });
+              return;
+            }
+            window.location.href = phoneToSmsHref(customer.phone, text);
+            store.addCrmCommunication(customer.id, 'sms', `SMS: ${template.name}`);
+            setSmsStatus('SMS uygulaması açıldı.');
           }}
         >
-          SMS gönder
+          {smsApiReady ? 'SMS API gönder' : 'SMS gönder'}
         </button>
         {smsStatus && <span className="crm-sms-status">{smsStatus}</span>}
       </div>

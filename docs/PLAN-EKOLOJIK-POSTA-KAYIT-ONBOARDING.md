@@ -8,9 +8,9 @@ Bu belge, ürün tarafındaki eksikleri **faz faz** kapatmak için net mimari, v
 
 | Konu | Bugün kodda ne var? | Eksik |
 |------|---------------------|--------|
-| Kayıt | `POST /api/auth/register` → `registerTenant` (`server/tenantAuth.mjs`) | Kayıt **Posta sekmesi**, **IMAP testi** veya **messaging widget** tetiklemez |
-| İlk admin sekmeleri | `allowedTabs` içinde `posta` **yok** (satır ~114) | Yeni tenant admin Posta menüsünü göremez |
-| Kayıt UI | `LandingRegister.tsx` → `/giris` + `registered: true` | İlk girişte kurulum sihirbazı yok |
+| Kayıt | `POST /api/auth/register` → `registerTenant` | Kayıt sonrası otomatik IMAP testi yok (sihirbaz adım 1) |
+| İlk admin sekmeleri | `allowedTabs` içinde `posta` (full profil) | POS Lite hariç |
+| Kayıt UI | `LandingRegister.tsx` → giriş; `PostaOnboardingWizard` ilk admin girişinde | Landing’de inline sihirbaz yok (bilinçli) |
 | E-posta | Platform `.env` + `data/tenant-mail/{tenantId}.json` (Faz 6a–c); sunum `getEffectiveMailPresentation(dataDir, tenantId)` | Çok kiracılı tam izolasyon (CRM/contact notify) sürekli iyileştirme |
 | Mesajlaşma site | `GET/POST /api/messaging/public-config` + tenant `data/messaging/{tenantId}/public-config.json` | Widget snippet sihirbazda; POST rotate yönetici token ile korumalı |
 | Posta kuralları | `data/posta-rules/{tenantId}/rules.json` + varsayılan fatura kuralı | `siparis@` / `fatura@` için hazır kural şablonu onboarding’de önerilmiyor |

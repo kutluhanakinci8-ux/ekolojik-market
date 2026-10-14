@@ -14,7 +14,7 @@
 | Kanallar | Case + e-posta + mesaj (thread otomatik bağlanır) + iletişim formu kuyruğu | Derin omnichannel (routing, @mention) backlog |
 | SLA / kuyruk | Smoke filtresi (UI + önizleme), prod kuyruk, SLA canlı panel, **özür kuyruğu + toplu gönder** (`sla-apology` API) | Tam otomatik cron özür (onaysız) yok — operatör onayı gerekli |
 | Yanıt | Case detay: not / e-posta / mesaj (thread yoksa oluştur); makrolar; AI taslak | — |
-| Operasyon | Komut paleti, kiracı 360, Zendesk köprüsü, CSV export; güvenlik eşik → case (`EKOLOJIK_SUPPORT_ALERT_CASE=1`) | Zendesk canlı webhook testi ortam bağımlı |
+| Operasyon | Komut paleti, kiracı 360, Zendesk köprüsü + `platform-support-zendesk-e2e.mjs`, CSV; güvenlik → case; iç not **@mention** | Zendesk prod ticket senkronu ortam bağımlı |
 | Outbox | Kiracı Posta + platform komut `/requeue_outbox`; Destek hero **opsSignals** (failed + kritik uyarı) | Prod **failed/pending** triage: `scripts/ops-outbox-health.mjs` |
 
 Teslim öncesi: `npm run test:ci`, `node scripts/pre-release-qa.mjs https://…`, `node scripts/ops-outbox-health.mjs` (VPS data dir).

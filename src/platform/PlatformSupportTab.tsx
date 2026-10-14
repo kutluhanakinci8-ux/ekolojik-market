@@ -1630,7 +1630,7 @@ export function PlatformSupportTab() {
                   </div>
                 ) : null}
                 <label className="platform-support-reply-label">
-                  {replyChannel === 'note' ? 'İç not' : 'Yanıt metni'}
+                  {replyChannel === 'note' ? 'İç not (@operatör ile bildirim)' : 'Yanıt metni'}
                   <textarea rows={5} value={actionDraft} onChange={(e) => setActionDraft(e.target.value)} />
                 </label>
                 <button type="button" className="btn btn-primary" onClick={() => void sendCaseAction()} disabled={!actionDraft.trim()}>
