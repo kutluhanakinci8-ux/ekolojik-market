@@ -637,6 +637,14 @@ export async function getPlatformSupportContactQueue(dataDir, query = {}) {
   return listPlatformSupportContactQueue(dataDir, query);
 }
 
+export async function getPlatformSupportContactQueueExportCsv(dataDir, query = {}) {
+  const payload = await getPlatformSupportContactQueue(dataDir, { ...query, limit: 500 });
+  const { buildPlatformContactQueueCsv } = await import('./platformSupportCases.mjs');
+  const csv = buildPlatformContactQueueCsv(payload);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { csv, filename: `platform-iletisim-formu-${stamp}.csv` };
+}
+
 export async function createPlatformSupportCaseFromContact(dataDir, contactId, operatorUsername) {
   const { createCaseFromContactMessage } = await import('./platformSupportCases.mjs');
   return createCaseFromContactMessage(dataDir, contactId, operatorUsername);

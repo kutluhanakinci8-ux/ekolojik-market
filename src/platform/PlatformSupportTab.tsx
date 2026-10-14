@@ -8,6 +8,7 @@ import {
   createPlatformSupportCaseManual,
   fetchPlatformSupportCommands,
   downloadPlatformSupportCsv,
+  downloadPlatformSupportContactQueueCsv,
   downloadPlatformSupportCaseActivityCsv,
   downloadPlatformSupportInboxAttachment,
   openPlatformSupportCaseActivityPrint,
@@ -286,6 +287,7 @@ export function PlatformSupportTab() {
   const [contactFilter, setContactFilter] = useState<'all' | 'pending' | 'linked'>('pending');
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contactCaseSaving, setContactCaseSaving] = useState(false);
+  const [contactExporting, setContactExporting] = useState(false);
   const [smokeFilterDraft, setSmokeFilterDraft] = useState<PlatformSupportSmokeFilters | null>(null);
   const [smokeFilterSaving, setSmokeFilterSaving] = useState(false);
   const [smokeFilterOpen, setSmokeFilterOpen] = useState(false);
@@ -517,9 +519,22 @@ export function PlatformSupportTab() {
 
   const selectedMail = inboxMessages.find((m) => m.id === selectedMailId) ?? null;
   const selectedMailThreadRootId = selectedMail?.threadRootId || selectedMail?.id;
+  const caseByInboxRoot = useMemo(() => {
+    const map = new Map<string, PlatformSupportCase>();
+    for (const c of caseLinkRows) {
+      const rootId = c.links?.inboxMessageId;
+      if (!rootId) continue;
+      const prev = map.get(rootId);
+      if (!prev || Date.parse(c.updatedAt) > Date.parse(prev.updatedAt)) {
+        map.set(rootId, c);
+      }
+    }
+    return map;
+  }, [caseLinkRows]);
+
   const selectedMailCase =
-    selectedMail
-      ? caseRows.find((c) => c.links?.inboxMessageId === selectedMailThreadRootId) ?? null
+    selectedMail && selectedMailThreadRootId
+      ? caseByInboxRoot.get(selectedMailThreadRootId) ?? null
       : null;
 
   const inboxThreadKey = (m: PlatformSupportInboxMessage) => m.threadRootId || m.id;
@@ -729,9 +744,16 @@ export function PlatformSupportTab() {
   };
 
   const contactWithoutCase = useMemo(
-    () => contactQueue.filter((c) => !c.hasCase).length,
-    [contactQueue],
+    () => data?.contactForm?.withoutCase ?? contactQueue.filter((c) => !c.hasCase).length,
+    [contactQueue, data?.contactForm?.withoutCase],
   );
+
+  const onExportContactQueue = async () => {
+    setContactExporting(true);
+    const result = await downloadPlatformSupportContactQueueCsv();
+    setContactExporting(false);
+    if (!result.ok) setPolicyMsg(userMessage(result.error, 'CSV indirilemedi'));
+  };
 
   const filteredContactQueue = useMemo(() => {
     if (contactFilter === 'pending') return contactQueue.filter((c) => !c.hasCase);
@@ -982,6 +1004,14 @@ export function PlatformSupportTab() {
             <span className={(data.cases?.open ?? 0) > 0 ? 'is-warn' : ''}>{data.cases?.open ?? 0} talep</span>
             <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
             <span className={inboxUnread > 0 ? 'is-warn' : ''}>{inboxUnread} mail</span>
+            <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
+            <button
+              type="button"
+              className={`platform-support-hero-link ${contactWithoutCase > 0 ? 'is-warn' : ''}`}
+              onClick={() => setSection('contact')}
+            >
+              {contactWithoutCase} form
+            </button>
           </p>
         </div>
         <div className="platform-support-compact-hero-toolbar">
@@ -1800,7 +1830,10 @@ export function PlatformSupportTab() {
               ) : filteredInboxThreads.length === 0 ? (
                 <li className="platform-support-inbox-empty">Filtreye uyan mail yok.</li>
               ) : (
-                filteredInboxThreads.map(({ head, count, key }) => (
+                filteredInboxThreads.map(({ head, count, key }) => {
+                  const threadRootId = inboxThreadKey(head);
+                  const threadCase = caseByInboxRoot.get(threadRootId);
+                  return (
                   <li key={key}>
                     <button
                       type="button"
@@ -1809,6 +1842,9 @@ export function PlatformSupportTab() {
                     >
                       <span className="platform-support-inbox-item-subject">
                         {head.subject || '(konu yok)'}
+                        {threadCase ? (
+                          <span className="platform-support-inbox-case-badge">#{threadCase.number}</span>
+                        ) : null}
                         {count > 1 ? <span className="platform-support-thread-count">{count} mesaj</span> : null}
                         {(head.attachments?.length ?? 0) > 0 ? (
                           <span className="platform-support-inbox-attach-badge">Ek {head.attachments!.length}</span>
@@ -1821,7 +1857,8 @@ export function PlatformSupportTab() {
                       <span className="platform-support-inbox-item-date">{formatDateTime(head.receivedAt)}</span>
                     </button>
                   </li>
-                ))
+                  );
+                })
               )}
             </ul>
           </section>
@@ -1942,6 +1979,14 @@ export function PlatformSupportTab() {
               <span className="platform-table-muted">
                 {contactWithoutCase} talep bekliyor · {contactQueue.length} kayıt
               </span>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={contactExporting}
+                onClick={() => void onExportContactQueue()}
+              >
+                {contactExporting ? '…' : 'CSV'}
+              </button>
             </div>
             <p className="platform-support-hint">
               Yeni formlar otomatik talep oluşturur (<code>contact-form</code> etiketi). Eski kayıtlar için manuel

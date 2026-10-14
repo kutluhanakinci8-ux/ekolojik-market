@@ -71,7 +71,8 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | Kayıt etiketleri | `PUT` / `GET` | `tags` alanı · `GET /api/platform/support/cases/tags` · `?tag=` listesi |
 | Gelen okundu | `POST` | `/api/platform/support/inbox/mark-read` — `{ messageIds: [] }` (filtredeki thread’lerdeki tüm okunmamışlar) |
 | Kayıt listesi limit | `GET` | `/api/platform/support/cases?limit=` (en fazla 200; kuyruk bağlantısı için UI 500 ister) |
-| İletişim kuyruğu | `GET` | `/api/platform/support/contact-queue?limit=` · `POST .../cases/from-contact` |
+| İletişim kuyruğu | `GET` | `/api/platform/support/contact-queue?limit=` · `GET .../contact-queue/export.csv` · `POST .../cases/from-contact` |
+| İletişim özet | `GET` | `/api/platform/support` → `contactForm.total` / `withoutCase` |
 | Smoke / QA filtresi | `GET` / `PUT` | `/api/platform/support/smoke-filters` → `data/platform/support-filters.json` |
 | Talep CSV | `GET` | `/api/platform/support/cases/export.csv` — `tags` sütunu (`;` ile ayrılmış) |
 | Mağaza sohbet | URL | `/app?tenant=&view=posta&threadId=` (platform kuyruktan **Sohbet**) |

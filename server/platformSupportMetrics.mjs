@@ -183,6 +183,8 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
 
   const inbox = await listPlatformSupportInbox(dataDir, { limit: 8 });
   const caseTotals = summarizeCases(await readPlatformCases(dataDir));
+  const { listPlatformSupportContactQueue } = await import('./platformSupportCases.mjs');
+  const contactQueue = await listPlatformSupportContactQueue(dataDir, { limit: 200 });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -198,6 +200,10 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
       supportMailboxAddress: inbox.mailbox?.address ?? null,
     },
     cases: caseTotals,
+    contactForm: {
+      total: contactQueue.total,
+      withoutCase: contactQueue.withoutCase,
+    },
     inbox: {
       unread: inbox.unread,
       total: inbox.total,
