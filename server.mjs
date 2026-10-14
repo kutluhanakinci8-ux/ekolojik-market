@@ -4632,7 +4632,7 @@ const server = createServer(async (req, res) => {
       const data = await readRequestBody(req);
       try {
         const tenantId = resolveTenantId(url);
-        const result = await saveContactMessage(DATA_DIR, data ?? {});
+        const result = await saveContactMessage(DATA_DIR, data ?? {}, { tenantId });
         if (result.ok && result.contact) {
           try {
             const { autoCreateCaseForContactRow } = await import('./server/platformSupportCases.mjs');

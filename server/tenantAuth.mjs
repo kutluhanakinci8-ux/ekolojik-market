@@ -303,11 +303,12 @@ export async function registerTenant(dataDir, payload) {
   };
 }
 
-export async function saveContactMessage(dataDir, payload) {
+export async function saveContactMessage(dataDir, payload, options = {}) {
   const name = String(payload.name ?? '').trim();
   const email = String(payload.email ?? '').trim();
   const subject = String(payload.subject ?? 'genel').trim();
   const message = String(payload.message ?? '').trim();
+  const tenantId = String(payload.tenantId ?? options.tenantId ?? '').trim() || null;
 
   if (!name || !email || !message) {
     return { ok: false, message: 'Ad, e-posta ve mesaj zorunludur.' };
@@ -327,6 +328,7 @@ export async function saveContactMessage(dataDir, payload) {
     phone: String(payload.phone ?? '').trim(),
     subject,
     message,
+    tenantId,
     createdAt: new Date().toISOString(),
   };
   items.unshift(item);

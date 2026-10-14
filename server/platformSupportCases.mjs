@@ -78,11 +78,37 @@ export async function createCaseFromMessagingQueue(dataDir, { tenantId, threadId
   );
 }
 
+function shouldSkipAutoCaseForContact(contact) {
+  const email = String(contact.email ?? '').trim().toLowerCase();
+  const subject = String(contact.subject ?? '').trim();
+  const message = String(contact.message ?? '').trim();
+  if (email === 'qa@test.local') return true;
+  if (subject.startsWith('[qa') || subject === 'qa-probe') return true;
+  if (message === 'pre-release probe') return true;
+  return false;
+}
+
+async function tenantContextForContact(dataDir, contact) {
+  const tenantId = String(contact.tenantId ?? '').trim();
+  if (!tenantId) return { tenantId: null, businessName: null };
+  const { readTenantStore } = await import('./tenantAuth.mjs');
+  const store = await readTenantStore(dataDir, tenantId);
+  const businessName =
+    String(store?.settings?.businessName ?? '').trim()
+    || (tenantId === 'main' ? 'Greenleaf Market' : tenantId);
+  return { tenantId, businessName };
+}
+
 export async function autoCreateCaseForContactRow(dataDir, contact) {
+  if (shouldSkipAutoCaseForContact(contact)) {
+    return { skipped: true, reason: 'qa_or_internal_probe' };
+  }
   const existing = await import('./platformCaseStore.mjs').then((m) =>
     m.findCaseByLink(dataDir, { contactMessageId: contact.id }),
   );
   if (existing) return { skipped: true, case: existing };
+  const tenantCtx = await tenantContextForContact(dataDir, contact);
+  const formBody = String(contact.message ?? '').trim();
   return createPlatformCase(
     dataDir,
     {
@@ -92,8 +118,11 @@ export async function autoCreateCaseForContactRow(dataDir, contact) {
       subject: contact.subject || 'İletişim formu',
       requesterName: contact.name,
       requesterEmail: contact.email,
-      links: { contactMessageId: contact.id },
+      tenantId: tenantCtx.tenantId,
+      businessName: tenantCtx.businessName,
+      links: { contactMessageId: contact.id, tenantId: tenantCtx.tenantId },
       tags: ['contact-form', 'auto'],
+      notes: formBody ? `Form mesajı:\n${formBody}` : '',
     },
     'system',
   );

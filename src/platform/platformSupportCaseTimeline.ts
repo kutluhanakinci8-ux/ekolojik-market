@@ -28,11 +28,32 @@ export type CaseTimelineEntry =
       direction: string;
       authorName?: string;
       bodyText: string;
+    }
+  | {
+      kind: 'contact_form';
+      at: string;
+      key: string;
+      name: string;
+      email: string;
+      subject: string;
+      bodyText: string;
     };
 
 export function buildCaseUnifiedTimeline(detail: PlatformSupportCaseDetail | null): CaseTimelineEntry[] {
   if (!detail) return [];
   const items: CaseTimelineEntry[] = [];
+  const cf = detail.contactFormPreview;
+  if (cf) {
+    items.push({
+      kind: 'contact_form',
+      at: cf.createdAt,
+      key: `contact-${cf.id}`,
+      name: cf.name,
+      email: cf.email,
+      subject: cf.subject,
+      bodyText: cf.message,
+    });
+  }
   const ep = detail.emailPreview;
   if (ep) {
     for (const m of ep.messages) {
