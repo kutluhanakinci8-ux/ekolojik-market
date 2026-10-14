@@ -52,7 +52,7 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
   const tenantId = caseRow.links?.tenantId ?? caseRow.tenantId;
   const threadId = caseRow.links?.threadId;
   if (tenantId && threadId) {
-    const thread = await listMessagingMessages(dataDir, tenantId, threadId, { limit: 8 });
+    const thread = await listMessagingMessages(dataDir, tenantId, threadId, { limit: 80 });
     if (thread.ok) {
       messagingPreview = {
         thread: thread.thread,
@@ -92,6 +92,7 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
         bodyHtml: m.bodyHtml ? clipEmailActivityHtml(m.bodyHtml) : null,
         receivedAt: m.receivedAt,
         isReply: Boolean(m.threadRootId && m.threadRootId !== m.id),
+        attachments: Array.isArray(m.attachments) ? m.attachments : [],
       })),
       outboundEvents: outboundEvents.slice(0, 20).map((e) => ({
         at: e.at,

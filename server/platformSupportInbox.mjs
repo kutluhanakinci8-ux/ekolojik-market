@@ -29,6 +29,7 @@ import {
   resolveInboxThreadRoot,
 } from './platformSupportEmailThread.mjs';
 import { clipEmailActivityText, clipEmailActivityHtml } from './platformSupportActivityContent.mjs';
+import { persistPlatformSupportAttachments, readPlatformSupportAttachmentFile } from './platformSupportInboxAttachments.mjs';
 
 const INBOX_DIR = (dataDir) => join(dataDir, 'platform', 'support-inbox');
 const SUPPORT_LOCAL = () => getPlatformSupportMailAddress().toLowerCase();
@@ -318,10 +319,18 @@ export async function importSupportInboxFromImap(
         prior.subject = repairUtf8Mojibake(msg.subject ?? prior.subject);
         refreshed += 1;
       }
+      if (!(prior.attachments?.length) && raw) {
+        const attachments = await persistPlatformSupportAttachments(dataDir, raw);
+        if (attachments.length) {
+          prior.attachments = attachments;
+          refreshed += 1;
+        }
+      }
       await applyAutoreplyIfNeeded(dataDir, prior, autoreplies);
       continue;
     }
 
+    const attachments = raw ? await persistPlatformSupportAttachments(dataDir, raw) : [];
     const row = {
       id: `ps-${randomUUID()}`,
       dedupeKey: dedupe,
@@ -338,6 +347,7 @@ export async function importSupportInboxFromImap(
       snippet: repairUtf8Mojibake(parsed.snippet || msg.snippet || ''),
       bodyText: repairUtf8Mojibake(parsed.text ?? ''),
       bodyHtml: repairUtf8Mojibake(parsed.html ?? ''),
+      attachments,
       readAt: null,
       autoreplySentAt: null,
       externalTicketRef: null,
@@ -538,4 +548,17 @@ export async function replyPlatformSupportInbox(dataDir, { messageId, body, oper
   row.repliedBy = operatorUsername ?? null;
   await writeMessages(dataDir, messages);
   return { ok: true, to, result };
+}
+
+export async function loadPlatformSupportInboxAttachment(dataDir, inboxMessageId, attachmentId) {
+  const messages = await readMessages(dataDir);
+  const row = messages.find((m) => m.id === inboxMessageId);
+  const meta = row?.attachments?.find((a) => a.id === attachmentId);
+  if (!meta) return { ok: false, error: 'Ek bulunamadı' };
+  try {
+    const data = await readPlatformSupportAttachmentFile(dataDir, attachmentId);
+    return { ok: true, meta, data };
+  } catch {
+    return { ok: false, error: 'Ek dosyası okunamadı' };
+  }
 }
