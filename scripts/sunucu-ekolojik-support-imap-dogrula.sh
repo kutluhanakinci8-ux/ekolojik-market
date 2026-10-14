@@ -24,9 +24,20 @@ if [[ -z "${EKOLOJIK_SUPPORT_IMAP_PASS:-}" ]]; then
   exit 2
 fi
 
-postmap -q "destek@ekolojikmarket.com.tr" "hash:/etc/postfix/ekolojik-inbound-virtual-destek" >/dev/null \
-  && echo "OK   Postfix virtual destek@" \
-  || echo "UYARI: Postfix virtual destek@ yok — sunucu-ekolojik-destek-mailbox.sh --apply"
+DESTEK_ADDR="${EKOLOJIK_SUPPORT_INBOX:-destek@ekolojikmarket.com.tr}"
+postmap -q "${DESTEK_ADDR}" "hash:/etc/postfix/ekolojik-inbound-virtual-destek" >/dev/null \
+  && echo "OK   Postfix virtual ${DESTEK_ADDR}" \
+  || echo "UYARI: Postfix virtual ${DESTEK_ADDR} yok — sunucu-ekolojik-destek-mailbox.sh --apply"
+
+if [[ "$(id -u)" == "0" ]] && command -v sendmail >/dev/null 2>&1; then
+  OUT="$(sendmail -bv "${DESTEK_ADDR}" 2>&1 || true)"
+  if grep -qiE 'unknown|reject|unavailable|undeliverable|550' <<<"${OUT}"; then
+    echo "UYARI: sendmail -bv ${DESTEK_ADDR} — Postfix teslim etmiyor (outbox 550)"
+    echo "       bash ${REPO_ROOT}/scripts/sunucu-ekolojik-destek-mailbox.sh --apply"
+  else
+    echo "OK   sendmail -bv ${DESTEK_ADDR}"
+  fi
+fi
 
 cd "${ROOT}"
 node --input-type=module -e "

@@ -239,10 +239,19 @@ if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
   if [[ "$(id -u)" == "0" ]]; then
     bash "${REPO_ROOT}/scripts/sunucu-ekolojik-outbox-failed-cron-kur.sh" || true
     bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-inbox-sync-cron-kur.sh" || true
+    if [[ "${EKOLOJIK_AUTO_DESTEK_MAILBOX:-0}" == "1" ]] && [[ -x "${REPO_ROOT}/scripts/sunucu-ekolojik-destek-mailbox.sh" ]]; then
+      if ! bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-smtp-recipient-dogrula.sh" "${INSTALL_DIR}" 2>/dev/null; then
+        echo "==> destek@ Postfix kutusu otomatik kurulum (--apply)..."
+        bash "${REPO_ROOT}/scripts/sunucu-ekolojik-destek-mailbox.sh" --apply || \
+          echo "UYARI: destek-mailbox --apply başarısız"
+      fi
+    fi
     if [[ -x "${REPO_ROOT}/scripts/sunucu-ekolojik-support-imap-dogrula.sh" ]]; then
       bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-imap-dogrula.sh" "${INSTALL_DIR}" || \
         echo "UYARI: destek@ IMAP — bash ${REPO_ROOT}/scripts/sunucu-ekolojik-destek-mailbox.sh --apply"
     fi
+    bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-smtp-recipient-dogrula.sh" "${INSTALL_DIR}" || \
+      echo "UYARI: destek@ SMTP alıcı — bash ${REPO_ROOT}/scripts/sunucu-ekolojik-destek-mailbox.sh --apply"
     if [[ "${EKOLOJIK_ENABLE_CONTACT_AUTOREPLY:-0}" == "1" ]] && [[ -f "${INSTALL_DIR}/.env" ]]; then
       if ! grep -q '^EKOLOJIK_CONTACT_AUTOREPLY=' "${INSTALL_DIR}/.env" 2>/dev/null; then
         echo 'EKOLOJIK_CONTACT_AUTOREPLY=1' >> "${INSTALL_DIR}/.env"
@@ -252,4 +261,8 @@ if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
   fi
   bash "${REPO_ROOT}/scripts/sunucu-ekolojik-smtp-ops-recipient-dogrula.sh" "${INSTALL_DIR}" || \
     echo "UYARI: ops SMTP alıcı — bash ${REPO_ROOT}/scripts/sunucu-ekolojik-imap-vps-alias-fix.sh"
+  if [[ "${EKOLOJIK_POST_DEPLOY_OUTBOX_PROCESS:-0}" == "1" ]] && [[ -d "${INSTALL_DIR}/data" ]]; then
+    echo "==> Outbox işleme (post-deploy)..."
+    MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${REPO_ROOT}/scripts/ops-outbox-health.mjs" --process || true
+  fi
 fi

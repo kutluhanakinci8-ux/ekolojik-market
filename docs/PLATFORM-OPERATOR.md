@@ -113,4 +113,6 @@ MARKET_POS_DATA_DIR=/var/www/market-pos/data node scripts/ops-outbox-health.mjs 
 |----------|----------|
 | `EKOLOJIK_CONTACT_AUTOREPLY=1` | İletişim formu müşteri alındı maili |
 | `EKOLOJIK_ENABLE_CONTACT_AUTOREPLY=1` | Deploy sırasında `.env` içine otomatik ekleme |
+| `EKOLOJIK_AUTO_DESTEK_MAILBOX=1` | Deploy: destek@ Postfix 550 ise `destek-mailbox.sh --apply` |
+| `EKOLOJIK_POST_DEPLOY_OUTBOX_PROCESS=1` | Deploy sonrası `ops-outbox-health.mjs --process` (bekleyen kuyruk) |
 | `PLATFORM_OPERATOR_PASSWORD` | `pre-release-qa` platform destek API kapısı (kutluhan08) |

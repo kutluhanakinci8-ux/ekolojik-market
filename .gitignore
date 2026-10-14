@@ -8,6 +8,9 @@ tsconfig.tsbuildinfo
 .DS_Store
 data/*.json
 !data/.gitkeep
+data/credential-vault/
+data/pos-api-secret
+data/outbox/
 data/tenants/**/store.json
 !data/tenants/.gitkeep
 data/messaging/

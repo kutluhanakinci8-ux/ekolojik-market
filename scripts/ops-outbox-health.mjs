@@ -10,6 +10,7 @@ import {
   bulkRequeueFailedOutbox,
   getOutboxCounts,
   listFailedOutboxMessages,
+  listRecentOutbox,
   processPendingOutbox,
 } from '../server/emailOutbox.mjs';
 
@@ -23,6 +24,18 @@ const processPending = process.argv.includes('--process');
 const counts = await getOutboxCounts(dataDir);
 console.log('Outbox sayıları:', counts);
 
+const { pending: pendingRows } = await listRecentOutbox(dataDir, 30);
+const pendingOnly = pendingRows.filter((m) => m.status === 'pending' || !m.status);
+if (pendingOnly.length) {
+  console.log(`\nBekleyen (örnek ${Math.min(pendingOnly.length, 15)}):`);
+  for (const row of pendingOnly.slice(0, 15)) {
+    console.log(
+      `  - ${row.id} tenant=${row.tenantId ?? '—'} to=${row.to} subject=${String(row.subject ?? '').slice(0, 50)}`,
+    );
+  }
+  if (pendingOnly.length > 15) console.log(`  ... +${pendingOnly.length - 15} daha`);
+}
+
 const failed = await listFailedOutboxMessages(dataDir, { limit: 50 });
 if (!failed.length) {
   console.log('Başarısız kayıt yok.');
@@ -33,6 +46,18 @@ if (!failed.length) {
       `  - ${row.id} tenant=${row.tenantId ?? '—'} class=${row.errorClass} to=${row.to} subject=${String(row.subject ?? '').slice(0, 60)}`,
     );
     if (row.lastError) console.log(`      err: ${String(row.lastError).slice(0, 120)}`);
+  }
+  const destek550 = failed.filter(
+    (row) =>
+      String(row.to ?? '').includes('destek@') &&
+      /550|recipient rejected|unknown in virtual/i.test(String(row.lastError ?? '')),
+  );
+  if (destek550.length) {
+    console.log(
+      `\nİpucu: ${destek550.length} kayıt destek@ + 550 — VPS root:\n` +
+        '  bash scripts/sunucu-ekolojik-destek-mailbox.sh --apply\n' +
+        '  bash scripts/sunucu-ekolojik-support-smtp-recipient-dogrula.sh /var/www/market-pos',
+    );
   }
 }
 
