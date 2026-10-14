@@ -18,6 +18,8 @@ import {
   fetchPlatformSupportCaseTags,
   markPlatformSupportInboxRead,
   fetchPlatformSupportContactQueue,
+  fetchPlatformSupportSmokeFilters,
+  savePlatformSupportSmokeFilters,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
   fetchPlatformSupportZendeskBridge,
@@ -35,6 +37,7 @@ import {
   type PlatformSupportCaseDetail,
   type PlatformSupportCommandHelp,
   type PlatformSupportContactQueueItem,
+  type PlatformSupportSmokeFilters,
   type PlatformSupportInboxAttachment,
   type PlatformSupportInboxMessage,
   type PlatformSupportPayload,
@@ -241,7 +244,7 @@ export function PlatformSupportTab() {
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
-  const [section, setSection] = useState<'inbox' | 'queue' | 'cases' | 'sla'>('cases');
+  const [section, setSection] = useState<'inbox' | 'queue' | 'cases' | 'sla' | 'contact'>('cases');
   const [caseRows, setCaseRows] = useState<PlatformSupportCase[]>([]);
   /** Tüm kayıtlar (filtre dışı) — kuyruk ↔ mesaj thread bağlantısı */
   const [caseLinkRows, setCaseLinkRows] = useState<PlatformSupportCase[]>([]);
@@ -280,6 +283,12 @@ export function PlatformSupportTab() {
   const [replyChannel, setReplyChannel] = useState<'note' | 'email' | 'messaging'>('email');
   const [actionDraft, setActionDraft] = useState('');
   const [contactQueue, setContactQueue] = useState<PlatformSupportContactQueueItem[]>([]);
+  const [contactFilter, setContactFilter] = useState<'all' | 'pending' | 'linked'>('pending');
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [contactCaseSaving, setContactCaseSaving] = useState(false);
+  const [smokeFilterDraft, setSmokeFilterDraft] = useState<PlatformSupportSmokeFilters | null>(null);
+  const [smokeFilterSaving, setSmokeFilterSaving] = useState(false);
+  const [smokeFilterOpen, setSmokeFilterOpen] = useState(false);
   const [contextTenantId, setContextTenantId] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
@@ -323,9 +332,13 @@ export function PlatformSupportTab() {
     }
     const tagsRes = await fetchPlatformSupportCaseTags();
     if (tagsRes.ok && tagsRes.tags) setCaseTagOptions(tagsRes.tags);
-    const contactRes = await fetchPlatformSupportContactQueue();
+    const contactRes = await fetchPlatformSupportContactQueue(80);
     if (contactRes.ok && contactRes.data) {
       setContactQueue(contactRes.data.items);
+    }
+    const smokeRes = await fetchPlatformSupportSmokeFilters();
+    if (smokeRes.ok && smokeRes.filters) {
+      setSmokeFilterDraft(smokeRes.filters);
     }
     const zendeskRes = await fetchPlatformSupportZendeskBridge();
     setZendeskApiReady(Boolean(zendeskRes.ok && zendeskRes.data?.apiConfigured));
@@ -715,14 +728,58 @@ export function PlatformSupportTab() {
     if (detail.ok && detail.data) setCaseDetail(detail.data);
   };
 
+  const contactWithoutCase = useMemo(
+    () => contactQueue.filter((c) => !c.hasCase).length,
+    [contactQueue],
+  );
+
+  const filteredContactQueue = useMemo(() => {
+    if (contactFilter === 'pending') return contactQueue.filter((c) => !c.hasCase);
+    if (contactFilter === 'linked') return contactQueue.filter((c) => c.hasCase);
+    return contactQueue;
+  }, [contactQueue, contactFilter]);
+
+  const selectedContact = useMemo(
+    () => contactQueue.find((c) => c.id === selectedContactId) ?? null,
+    [contactQueue, selectedContactId],
+  );
+
+  const openContactLinkedCase = (c: PlatformSupportContactQueueItem) => {
+    if (!c.caseId) return;
+    setSelectedCaseId(c.caseId);
+    setSection('cases');
+    setPolicyMsg(`Kayıt #${c.caseNumber ?? '?'}`);
+  };
+
   const openCaseFromContact = async (contactId: string) => {
+    setContactCaseSaving(true);
     const result = await createPlatformSupportCaseFromContact(contactId);
-    if (!result.ok) {
+    setContactCaseSaving(false);
+    if (!result.ok || !result.case) {
       setPolicyMsg(userMessage(result.error, 'Talep oluşturulamadı'));
       return;
     }
-    setPolicyMsg('İletişim formundan talep oluşturuldu');
+    setPolicyMsg(
+      result.duplicate
+        ? `Mevcut kayıt #${result.case.number}`
+        : `İletişim formundan kayıt #${result.case.number} oluşturuldu`,
+    );
+    setSelectedCaseId(result.case.id);
     setSection('cases');
+    void load();
+  };
+
+  const saveSmokeFilters = async () => {
+    if (!smokeFilterDraft) return;
+    setSmokeFilterSaving(true);
+    const result = await savePlatformSupportSmokeFilters(smokeFilterDraft);
+    setSmokeFilterSaving(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Smoke filtresi kaydedilemedi'));
+      return;
+    }
+    if (result.filters) setSmokeFilterDraft(result.filters);
+    setPolicyMsg('Smoke/QA filtresi kaydedildi — kuyruk yenilendi');
     void load();
   };
 
@@ -1015,6 +1072,16 @@ export function PlatformSupportTab() {
         </button>
         <button
           type="button"
+          className={`platform-support-subnav-btn ${section === 'contact' ? 'platform-support-subnav-btn--active' : ''}`}
+          onClick={() => setSection('contact')}
+        >
+          İletişim formu
+          {contactWithoutCase > 0 ? (
+            <span className="platform-support-subnav-count">{contactWithoutCase}</span>
+          ) : null}
+        </button>
+        <button
+          type="button"
           className={`platform-support-subnav-btn ${section === 'queue' ? 'platform-support-subnav-btn--active' : ''}`}
           onClick={() => setSection('queue')}
         >
@@ -1038,28 +1105,6 @@ export function PlatformSupportTab() {
       {section === 'cases' ? (
         <div className="platform-support-command-layout">
         <div className="platform-support-inbox-layout platform-support-command-main">
-          {contactQueue.some((c) => !c.hasCase) ? (
-            <section className="platform-panel platform-panel--premium platform-support-contact-queue">
-              <h3>İletişim formu kuyruğu</h3>
-              <p className="platform-support-hint">
-                Yeni formlar otomatik talep oluşturur; eski kayıtlar için &quot;Talep&quot; kullanın.
-              </p>
-              <ul className="platform-support-inbox-items">
-                {contactQueue
-                  .filter((c) => !c.hasCase)
-                  .slice(0, 8)
-                  .map((c) => (
-                    <li key={c.id}>
-                      <button type="button" className="platform-support-inbox-item" onClick={() => void openCaseFromContact(c.id)}>
-                        <span className="platform-support-inbox-item-subject">{c.subject}</span>
-                        <span className="platform-support-inbox-item-from">{c.name} · {c.email}</span>
-                        <span className="platform-support-inbox-item-date">{formatDateTime(c.createdAt)}</span>
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          ) : null}
           <section className="platform-panel platform-panel--premium">
             <h3>Operasyon kayıtları (Case)</h3>
             <p className="platform-support-hint">
@@ -1889,6 +1934,136 @@ export function PlatformSupportTab() {
         </div>
       ) : null}
 
+      {section === 'contact' ? (
+        <div className="platform-support-inbox-layout">
+          <section className="platform-panel platform-panel--premium platform-support-inbox-list">
+            <div className="platform-panel-head">
+              <h3>İletişim formu kuyruğu</h3>
+              <span className="platform-table-muted">
+                {contactWithoutCase} talep bekliyor · {contactQueue.length} kayıt
+              </span>
+            </div>
+            <p className="platform-support-hint">
+              Yeni formlar otomatik talep oluşturur (<code>contact-form</code> etiketi). Eski kayıtlar için manuel
+              &quot;Talep oluştur&quot; kullanın.
+            </p>
+            <div className="platform-support-inbox-filters">
+              <PlatformFilterSelect
+                label="Durum"
+                icon="role"
+                value={contactFilter}
+                onChange={(v) => setContactFilter(v as typeof contactFilter)}
+              >
+                <option value="pending">Talep bekliyor</option>
+                <option value="all">Tümü</option>
+                <option value="linked">Bağlı kayıt</option>
+              </PlatformFilterSelect>
+            </div>
+            <table className="platform-table platform-table--scroll">
+              <thead>
+                <tr>
+                  <th>Tarih</th>
+                  <th>Konu</th>
+                  <th>Gönderen</th>
+                  <th>Kayıt</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredContactQueue.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>Kayıt yok</td>
+                  </tr>
+                ) : (
+                  filteredContactQueue.map((c) => (
+                    <tr
+                      key={c.id}
+                      className={c.id === selectedContactId ? 'platform-support-row--selected' : undefined}
+                    >
+                      <td>{formatDateTime(c.createdAt)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-text"
+                          onClick={() => setSelectedContactId(c.id)}
+                        >
+                          {c.subject}
+                        </button>
+                      </td>
+                      <td>
+                        {c.name}
+                        <span className="platform-table-muted">{c.email}</span>
+                      </td>
+                      <td>
+                        {c.hasCase ? (
+                          <button type="button" className="btn btn-text" onClick={() => openContactLinkedCase(c)}>
+                            #{c.caseNumber}
+                          </button>
+                        ) : (
+                          <span className="platform-table-muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {c.hasCase ? (
+                          <button type="button" className="btn btn-outline btn-sm" onClick={() => openContactLinkedCase(c)}>
+                            Aç
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={contactCaseSaving}
+                            onClick={() => void openCaseFromContact(c.id)}
+                          >
+                            Talep oluştur
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </section>
+          <section className="platform-panel platform-panel--premium platform-support-inbox-read">
+            <h3>Form detayı</h3>
+            {selectedContact ? (
+              <>
+                <p className="platform-support-inbox-meta">
+                  <strong>{selectedContact.name}</strong> · {selectedContact.email}
+                  <br />
+                  {formatDateTime(selectedContact.createdAt)}
+                </p>
+                <h4>{selectedContact.subject}</h4>
+                <div className="platform-support-inbox-body">
+                  {selectedContact.message || selectedContact.messagePreview || '—'}
+                </div>
+                {selectedContact.hasCase ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => openContactLinkedCase(selectedContact)}
+                  >
+                    Kayıt #{selectedContact.caseNumber} aç
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={contactCaseSaving}
+                    onClick={() => void openCaseFromContact(selectedContact.id)}
+                  >
+                    {contactCaseSaving ? 'Oluşturuluyor…' : 'Talep oluştur'}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="platform-support-hint">Soldan bir form seçin.</p>
+            )}
+          </section>
+        </div>
+      ) : null}
+
       {section === 'queue' ? (
         <div className="platform-support-command-layout">
         <div className="platform-support-command-main">
@@ -2095,6 +2270,106 @@ export function PlatformSupportTab() {
           </table>
         </section>
       </div>
+
+      <section className="platform-panel platform-panel--premium platform-support-smoke-filters">
+        <div className="platform-panel-head">
+          <h3>Smoke / QA filtresi</h3>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => setSmokeFilterOpen((v) => !v)}
+          >
+            {smokeFilterOpen ? 'Gizle' : 'Düzenle'}
+          </button>
+        </div>
+        <p className="platform-support-hint">
+          Test ve smoke mesaj thread’leri operasyon kuyruğundan gizlenir. Dosya:{' '}
+          <code>data/platform/support-filters.json</code>
+        </p>
+        {smokeFilterOpen && smokeFilterDraft ? (
+          <div className="platform-support-smoke-form">
+            <label className="platform-support-field platform-support-field--inline">
+              <input
+                type="checkbox"
+                checked={smokeFilterDraft.hideSmoke}
+                onChange={(e) =>
+                  setSmokeFilterDraft((d) => (d ? { ...d, hideSmoke: e.target.checked } : d))
+                }
+              />
+              <span>Smoke/QA gizle (kuyruk + SLA metrikleri)</span>
+            </label>
+            <label className="platform-support-field">
+              <span className="platform-support-field-label">Kiracı ID (satır başına)</span>
+              <textarea
+                className="platform-support-control"
+                rows={3}
+                value={smokeFilterDraft.tenantIds.join('\n')}
+                onChange={(e) =>
+                  setSmokeFilterDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          tenantIds: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
+                        }
+                      : d,
+                  )
+                }
+              />
+            </label>
+            <label className="platform-support-field">
+              <span className="platform-support-field-label">Konu / önizleme regex (satır başına, i)</span>
+              <textarea
+                className="platform-support-control"
+                rows={4}
+                value={smokeFilterDraft.subjectPatterns.join('\n')}
+                onChange={(e) =>
+                  setSmokeFilterDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          subjectPatterns: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
+                        }
+                      : d,
+                  )
+                }
+              />
+            </label>
+            <label className="platform-support-field">
+              <span className="platform-support-field-label">Müşteri adı regex (satır başına, i)</span>
+              <textarea
+                className="platform-support-control"
+                rows={3}
+                value={smokeFilterDraft.customerNamePatterns.join('\n')}
+                onChange={(e) =>
+                  setSmokeFilterDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          customerNamePatterns: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
+                        }
+                      : d,
+                  )
+                }
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={smokeFilterSaving}
+              onClick={() => void saveSmokeFilters()}
+            >
+              {smokeFilterSaving ? 'Kaydediliyor…' : 'Filtreyi kaydet'}
+            </button>
+          </div>
+        ) : (
+          <p className="platform-table-muted">
+            {smokeFilterDraft?.hideSmoke ? 'Aktif' : 'Kapalı'} ·{' '}
+            {smokeFilterDraft?.tenantIds.length ?? 0} kiracı ·{' '}
+            {(smokeFilterDraft?.subjectPatterns.length ?? 0) + (smokeFilterDraft?.customerNamePatterns.length ?? 0)}{' '}
+            desen
+          </p>
+        )}
+      </section>
 
       <section className="platform-panel platform-panel--premium">
         <h3>Kiracı SLA özeti</h3>

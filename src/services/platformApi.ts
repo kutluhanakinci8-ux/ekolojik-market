@@ -1221,10 +1221,18 @@ export type PlatformSupportContactQueueItem = {
   email: string;
   subject: string;
   messagePreview: string;
+  message?: string;
   createdAt: string;
   hasCase: boolean;
   caseId: string | null;
   caseNumber: number | null;
+};
+
+export type PlatformSupportSmokeFilters = {
+  hideSmoke: boolean;
+  tenantIds: string[];
+  subjectPatterns: string[];
+  customerNamePatterns: string[];
 };
 
 export type PlatformSupportCasesPayload = {
@@ -1467,13 +1475,14 @@ export async function postPlatformSupportCaseAction(
   return { ok: result.ok, error: result.error };
 }
 
-export async function fetchPlatformSupportContactQueue(): Promise<{
+export async function fetchPlatformSupportContactQueue(limit = 80): Promise<{
   ok: boolean;
-  data?: { items: PlatformSupportContactQueueItem[]; withoutCase: number };
+  data?: { items: PlatformSupportContactQueueItem[]; withoutCase: number; total?: number };
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/platform/support/contact-queue', { headers: posApiAuthHeaders() });
+    const q = limit > 0 ? `?limit=${limit}` : '';
+    const res = await fetch(`/api/platform/support/contact-queue${q}`, { headers: posApiAuthHeaders() });
     const data = (await res.json()) as {
       ok?: boolean;
       items?: PlatformSupportContactQueueItem[];
@@ -1507,9 +1516,59 @@ export async function createPlatformSupportCaseFromInbox(
 
 export async function createPlatformSupportCaseFromContact(
   contactId: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const result = await platformSecurityPost('/api/platform/support/cases/from-contact', { contactId });
-  return { ok: result.ok, error: result.error };
+): Promise<{ ok: boolean; case?: PlatformSupportCase; duplicate?: boolean; error?: string }> {
+  const result = await platformSecurityPost<{ case?: PlatformSupportCase; duplicate?: boolean }>(
+    '/api/platform/support/cases/from-contact',
+    { contactId },
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    case: result.data?.case,
+    duplicate: Boolean(result.data?.duplicate),
+  };
+}
+
+export async function fetchPlatformSupportSmokeFilters(): Promise<{
+  ok: boolean;
+  filters?: PlatformSupportSmokeFilters;
+  path?: string;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/smoke-filters', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      filters?: PlatformSupportSmokeFilters;
+      path?: string;
+      error?: string;
+    };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Smoke filtreleri yüklenemedi' };
+    }
+    return { ok: true, filters: data.filters, path: data.path };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function savePlatformSupportSmokeFilters(
+  filters: PlatformSupportSmokeFilters,
+): Promise<{ ok: boolean; filters?: PlatformSupportSmokeFilters; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/support/smoke-filters', {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters }),
+    });
+    const data = (await res.json()) as { ok?: boolean; filters?: PlatformSupportSmokeFilters; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Filtre kaydedilemedi' };
+    }
+    return { ok: true, filters: data.filters };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
 }
 
 export type PlatformSupportTenant360Payload = {

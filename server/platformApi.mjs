@@ -642,6 +642,17 @@ export async function createPlatformSupportCaseFromContact(dataDir, contactId, o
   return createCaseFromContactMessage(dataDir, contactId, operatorUsername);
 }
 
+export async function getPlatformSupportSmokeFilters(dataDir) {
+  const { readSupportFilterDocument } = await import('./platformSupportFilters.mjs');
+  const filters = await readSupportFilterDocument(dataDir);
+  return { ok: true, filters, path: 'data/platform/support-filters.json' };
+}
+
+export async function updatePlatformSupportSmokeFilters(dataDir, body) {
+  const { writeSupportFilterDocument } = await import('./platformSupportFilters.mjs');
+  return writeSupportFilterDocument(dataDir, body?.filters ?? body);
+}
+
 export async function getPlatformSupportTenant360(dataDir, tenantId) {
   const { buildPlatformSupportTenant360 } = await import('./platformSupportTenant360.mjs');
   return buildPlatformSupportTenant360(dataDir, tenantId);
