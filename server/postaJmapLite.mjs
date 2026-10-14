@@ -58,11 +58,11 @@ export function getPostaJmapLiteSession() {
     ok: true,
     capabilities: {
       'urn:ietf:params:jmap:core': {},
-      'urn:ietf:params:jmap:mail': { maxSizeUpload: 10_485_760, readOnly: true },
+      'urn:ietf:params:jmap:mail': { maxSizeUpload: 10_485_760, readOnly: false },
       'ekolojik:posta:lite': {
-        version: 2,
-        note: 'IMAP hub REST köprüsü; tam Dovecot JMAP değil',
-        methods: ['Mailbox/query', 'Email/query', 'Email/get'],
+        version: 3,
+        note: 'IMAP hub REST köprüsü + Email/set (okundu/taşıma)',
+        methods: ['Mailbox/query', 'Email/query', 'Email/get', 'Email/set'],
       },
     },
     apiUrl: '/api/posta/jmap-lite',
@@ -104,6 +104,28 @@ export async function queryPostaJmapLiteMailbox(dataDir, tenantId, { folder = 'g
     list: emails.map((e) => e.id),
     emails,
     total: emails.length,
+  };
+}
+
+export async function setPostaJmapLiteEmails(dataDir, tenantId, updates = []) {
+  const { patchPostaInboxFlags } = await import('./postaInboxFlags.mjs');
+  const results = [];
+  for (const row of updates) {
+    const id = String(row?.id ?? '').trim();
+    if (!id) continue;
+    const flags = {};
+    if (row.unread === false || row.keywords?.includes('$seen')) flags.read = true;
+    if (row.keywords?.includes('$flagged')) flags.starred = true;
+    if (row.mailboxId === 'cop' || row.mailboxId === 'trash') flags.trashed = true;
+    if (row.mailboxId === 'spam' || row.mailboxId === 'junk') flags.spam = true;
+    const patched = await patchPostaInboxFlags(dataDir, tenantId, id, flags);
+    results.push({ id, ok: patched.ok, flags });
+  }
+  return {
+    ok: true,
+    method: 'Email/set',
+    updated: results.filter((r) => r.ok).length,
+    results,
   };
 }
 

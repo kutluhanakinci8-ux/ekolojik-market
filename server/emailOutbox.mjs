@@ -175,6 +175,12 @@ export async function enqueueEkolojikMail(
     return { ok: true, duplicate: true, message: existing };
   }
 
+  const { scanOutboundDlp } = await import('./postaCompliance.mjs');
+  const dlp = scanOutboundDlp({ subject, body: text, html });
+  if (!dlp.ok) {
+    return { ok: false, duplicate: false, error: dlp.error, dlp: dlp.hits };
+  }
+
   const id = randomUUID();
   const tag = hashIdempotency(key);
   const message = {

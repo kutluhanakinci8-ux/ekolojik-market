@@ -17668,3 +17668,97 @@ input {
 .login-tenant-advanced-panel {
   margin-bottom: 0.5rem;
 }
+
+.posta-webmail-lite-grid {
+  display: grid;
+  grid-template-columns: 180px minmax(220px, 1fr) minmax(280px, 1.2fr);
+  gap: 12px;
+  min-height: 60vh;
+  margin-top: 12px;
+}
+.posta-webmail-lite-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid var(--posta-border-soft, rgba(45, 107, 40, 0.14));
+  padding-right: 8px;
+}
+.posta-webmail-folder {
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+.posta-webmail-folder.is-active {
+  background: var(--posta-surface-muted, #f6faf5);
+  font-weight: 600;
+}
+.posta-webmail-lite-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border-right: 1px solid var(--posta-border-soft, rgba(45, 107, 40, 0.14));
+}
+.posta-webmail-lite-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.posta-webmail-lite-row.is-selected {
+  background: #eef7ec;
+}
+.posta-webmail-lite-row.is-unread .posta-webmail-lite-subject {
+  font-weight: 700;
+}
+.posta-webmail-lite-subject {
+  display: block;
+  font-size: 0.92rem;
+}
+.posta-webmail-lite-meta {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.posta-webmail-lite-preview {
+  overflow: auto;
+  padding: 8px 12px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--posta-shadow, 0 4px 14px rgba(27, 61, 26, 0.04));
+}
+.posta-webmail-lite-preview-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+}
+.posta-webmail-lite-body pre {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+.posta-webmail-lite-empty {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+@media (max-width: 900px) {
+  .posta-webmail-lite-grid {
+    grid-template-columns: 1fr;
+  }
+  .posta-webmail-lite-folders {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    padding-right: 0;
+  }
+}
