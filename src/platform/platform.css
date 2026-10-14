@@ -4350,6 +4350,16 @@
   box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.25);
 }
 
+.platform-support-inbox-mailbox {
+  margin-bottom: 0.5rem;
+}
+
+.platform-support-inbox-item--sent {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
 .platform-support-case-rail-list {
   list-style: none;
   margin: 0.5rem 0 0;

@@ -1131,7 +1131,9 @@ const server = createServer(async (req, res) => {
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
       try {
         const { getPlatformSupportInbox } = await import('./server/platformApi.mjs');
-        const payload = await getPlatformSupportInbox(DATA_DIR, {});
+        const folder = String(url.searchParams.get('folder') ?? 'inbound').trim().toLowerCase();
+        const limit = Number(url.searchParams.get('limit')) || undefined;
+        const payload = await getPlatformSupportInbox(DATA_DIR, { folder, limit });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, ...payload }));
       } catch (error) {

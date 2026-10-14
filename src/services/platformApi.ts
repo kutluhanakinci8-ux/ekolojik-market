@@ -1050,20 +1050,48 @@ export type PlatformSupportInboxPayload = {
   messages: PlatformSupportInboxMessage[];
   unread: number;
   total: number;
+  folder?: 'inbound' | 'sent';
 };
 
-export async function fetchPlatformSupportInbox(): Promise<{
+export type PlatformSupportSentReply = {
+  id: string;
+  sentAt: string;
+  kind: string;
+  kindLabel: string;
+  to: string | null;
+  subject: string | null;
+  preview: string | null;
+  htmlPreview?: string | null;
+  messageId?: string | null;
+  caseNumber?: number | null;
+  caseId?: string | null;
+  inboxMessageId?: string | null;
+  repliedBy?: string | null;
+};
+
+export async function fetchPlatformSupportInbox(
+  folder: 'inbound' | 'sent' = 'inbound',
+): Promise<{
   ok: boolean;
   data?: PlatformSupportInboxPayload;
+  sent?: PlatformSupportSentReply[];
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/platform/support/inbox', { headers: posApiAuthHeaders() });
+    const params = folder === 'sent' ? '?folder=sent' : '';
+    const res = await fetch(`/api/platform/support/inbox${params}`, { headers: posApiAuthHeaders() });
     const data = (await res.json()) as PlatformSupportInboxPayload & { ok?: boolean; error?: string };
     if (!res.ok || !data.ok) {
       return { ok: false, error: data.error ?? 'Gelen kutusu yüklenemedi' };
     }
     const { ok: _ok, error: _err, ...payload } = data;
+    if (folder === 'sent') {
+      return {
+        ok: true,
+        data: payload as PlatformSupportInboxPayload,
+        sent: (payload.messages ?? []) as unknown as PlatformSupportSentReply[],
+      };
+    }
     return { ok: true, data: payload as PlatformSupportInboxPayload };
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };

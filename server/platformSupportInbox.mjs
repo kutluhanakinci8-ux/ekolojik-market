@@ -567,6 +567,8 @@ export async function replyPlatformSupportInbox(dataDir, { messageId, body, oper
   }
   row.repliedAt = new Date().toISOString();
   row.repliedBy = operatorUsername ?? null;
+  row.lastOutboundPreview = clipEmailActivityText(text);
+  row.lastOutboundHtml = replyHtml ? clipEmailActivityHtml(replyHtml) : null;
   await writeMessages(dataDir, messages);
   return { ok: true, to, result };
 }

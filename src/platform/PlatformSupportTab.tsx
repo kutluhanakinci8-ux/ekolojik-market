@@ -45,6 +45,7 @@ import {
   updatePlatformSupportCase,
   type PlatformSupportCase,
   type PlatformSupportCaseDetail,
+  type PlatformSupportSentReply,
   type PlatformSupportCommandHelp,
   type PlatformSupportContactQueueItem,
   type PlatformSupportSmokeFilters,
@@ -333,8 +334,11 @@ export function PlatformSupportTab() {
     tenantId: '',
     businessName: '',
   });
+  const [inboxMailbox, setInboxMailbox] = useState<'inbound' | 'sent'>('inbound');
   const [inboxFilter, setInboxFilter] = useState<'all' | 'unread' | 'attachments'>('all');
   const [inboxSearch, setInboxSearch] = useState('');
+  const [inboxSentMessages, setInboxSentMessages] = useState<PlatformSupportSentReply[]>([]);
+  const [selectedSentId, setSelectedSentId] = useState<string | null>(null);
   const [caseMetaSaving, setCaseMetaSaving] = useState(false);
   const [zendeskIdDraft, setZendeskIdDraft] = useState('');
   const [zendeskApiReady, setZendeskApiReady] = useState(false);
@@ -393,12 +397,16 @@ export function PlatformSupportTab() {
     setInboxUnread(result.data.inbox?.unread ?? 0);
     setMailboxConfigured(result.data.capabilities.supportMailboxConfigured === true);
     setMailboxAddress(result.data.capabilities.supportMailboxAddress ?? null);
-    const inboxRes = await fetchPlatformSupportInbox();
+    const inboxRes = await fetchPlatformSupportInbox('inbound');
     if (inboxRes.ok && inboxRes.data) {
       setInboxMessages(inboxRes.data.messages);
       setInboxUnread(inboxRes.data.unread);
       setMailboxConfigured(inboxRes.data.mailbox.configured);
       setMailboxAddress(inboxRes.data.mailbox.address);
+    }
+    const sentRes = await fetchPlatformSupportInbox('sent');
+    if (sentRes.ok && sentRes.sent) {
+      setInboxSentMessages(sentRes.sent);
     }
     setPolicyDraft({
       firstResponseTargetMinutes: result.data.policy.firstResponseTargetMinutes,
@@ -677,6 +685,20 @@ export function PlatformSupportTab() {
     threads.sort((a, b) => Date.parse(b.head.receivedAt) - Date.parse(a.head.receivedAt));
     return threads;
   }, [inboxMessages]);
+
+  const filteredInboxSent = useMemo(() => {
+    const q = inboxSearch.trim().toLowerCase();
+    return inboxSentMessages.filter((row) => {
+      if (!q) return true;
+      const blob = [row.subject, row.to, row.preview, row.kindLabel, String(row.caseNumber ?? '')]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [inboxSentMessages, inboxSearch]);
+
+  const selectedSent = inboxSentMessages.find((m) => m.id === selectedSentId) ?? null;
 
   const filteredInboxThreads = useMemo(() => {
     const q = inboxSearch.trim().toLowerCase();
@@ -2020,30 +2042,58 @@ export function PlatformSupportTab() {
         <div className="platform-support-inbox-layout">
           <section className="platform-panel platform-panel--premium platform-support-inbox-list">
             <div className="platform-panel-head">
-              <h3>destek@ gelen</h3>
+              <h3>{inboxMailbox === 'sent' ? 'destek@ giden yanıtlar' : 'destek@ gelen'}</h3>
               <button type="button" className="btn btn-secondary" onClick={() => void onInboxSync()} disabled={inboxSyncing}>
                 {inboxSyncing ? 'Senkron…' : mailboxConfigured ? 'IMAP + outbox' : 'Güncelle'}
               </button>
+              {inboxMailbox === 'inbound' ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  disabled={inboxMarkingRead || filteredInboxThreads.length === 0}
+                  onClick={() => void markVisibleInboxRead()}
+                >
+                  {inboxMarkingRead ? '…' : 'Görünenleri okundu'}
+                </button>
+              ) : null}
+            </div>
+            <nav className="platform-support-case-mailbox platform-support-inbox-mailbox" aria-label="Posta klasörleri">
               <button
                 type="button"
-                className="btn btn-outline btn-sm"
-                disabled={inboxMarkingRead || filteredInboxThreads.length === 0}
-                onClick={() => void markVisibleInboxRead()}
+                className={`platform-support-case-mailbox-btn${inboxMailbox === 'inbound' ? ' is-active' : ''}`}
+                aria-current={inboxMailbox === 'inbound' ? 'true' : undefined}
+                onClick={() => {
+                  setInboxMailbox('inbound');
+                  setSelectedSentId(null);
+                }}
               >
-                {inboxMarkingRead ? '…' : 'Görünenleri okundu'}
+                Gelen
               </button>
-            </div>
-            <div className="platform-support-inbox-filters">
-              <PlatformFilterSelect
-                label="Filtre"
-                icon="role"
-                value={inboxFilter}
-                onChange={(v) => setInboxFilter(v as typeof inboxFilter)}
+              <button
+                type="button"
+                className={`platform-support-case-mailbox-btn${inboxMailbox === 'sent' ? ' is-active' : ''}`}
+                aria-current={inboxMailbox === 'sent' ? 'true' : undefined}
+                onClick={() => {
+                  setInboxMailbox('sent');
+                  setSelectedMailId(null);
+                }}
               >
-                <option value="all">Tümü</option>
-                <option value="unread">Okunmamış</option>
-                <option value="attachments">Ekli</option>
-              </PlatformFilterSelect>
+                Giden yanıtlar
+              </button>
+            </nav>
+            <div className="platform-support-inbox-filters">
+              {inboxMailbox === 'inbound' ? (
+                <PlatformFilterSelect
+                  label="Filtre"
+                  icon="role"
+                  value={inboxFilter}
+                  onChange={(v) => setInboxFilter(v as typeof inboxFilter)}
+                >
+                  <option value="all">Tümü</option>
+                  <option value="unread">Okunmamış</option>
+                  <option value="attachments">Ekli</option>
+                </PlatformFilterSelect>
+              ) : null}
               <label className="platform-support-field platform-support-inbox-search">
                 <span className="visually-hidden">Ara</span>
                 <input
@@ -2054,20 +2104,50 @@ export function PlatformSupportTab() {
                 />
               </label>
             </div>
-            {!mailboxConfigured ? (
+            {inboxMailbox === 'inbound' && !mailboxConfigured ? (
               <p className="platform-support-hint">
                 Mağaza <strong>Posta</strong> üzerinden <code>destek@ekolojikmarket.com.tr</code> adresine yazılanlar burada listelenir
                 (outbox köprüsü). Gönderim <strong>PENDING</strong> ise SMTP henüz çıkmamış olabilir; yine de gelen kutusunda görünür.
                 Harici posta ve IMAP için VPS’te <code>EKOLOJIK_SUPPORT_IMAP_*</code> —{' '}
                 <code>scripts/sunucu-ekolojik-destek-mailbox.sh</code>
               </p>
-            ) : (
+            ) : inboxMailbox === 'inbound' ? (
               <p className="platform-support-hint platform-table-muted">
                 IMAP ile dış mail + mağaza outbox birlikte senkronlanır.
               </p>
+            ) : (
+              <p className="platform-support-hint platform-table-muted">
+                Operatör yanıtları, otomatik alındılar ve talep e-posta thread kayıtları. Gönderim SMTP/outbox üzerinden yapılır.
+              </p>
             )}
             <ul className="platform-support-inbox-items">
-              {inboxMessages.length === 0 ? (
+              {inboxMailbox === 'sent' ? (
+                inboxSentMessages.length === 0 ? (
+                  <li className="platform-support-inbox-empty">Henüz giden yanıt kaydı yok.</li>
+                ) : filteredInboxSent.length === 0 ? (
+                  <li className="platform-support-inbox-empty">Aramaya uyan giden yanıt yok.</li>
+                ) : (
+                  filteredInboxSent.map((row) => (
+                    <li key={row.id}>
+                      <button
+                        type="button"
+                        className={`platform-support-inbox-item platform-support-inbox-item--sent ${selectedSentId === row.id ? 'is-selected' : ''}`}
+                        onClick={() => setSelectedSentId(row.id)}
+                      >
+                        <span className="platform-support-inbox-item-subject">
+                          {row.subject || '(konu yok)'}
+                          {row.caseNumber ? (
+                            <span className="platform-support-inbox-case-badge">#{row.caseNumber}</span>
+                          ) : null}
+                        </span>
+                        <span className="platform-comms-folder platform-comms-folder--sent">{row.kindLabel}</span>
+                        <span className="platform-support-inbox-item-from">Kime: {row.to ?? '—'}</span>
+                        <span className="platform-support-inbox-item-date">{formatDateTime(row.sentAt)}</span>
+                      </button>
+                    </li>
+                  ))
+                )
+              ) : inboxMessages.length === 0 ? (
                 <li className="platform-support-inbox-empty">
                   Henüz kayıt yok — yöneticiden destek@ gönderin veya Güncelle’ye basın.
                 </li>
@@ -2117,7 +2197,59 @@ export function PlatformSupportTab() {
             </ul>
           </section>
           <section className="platform-panel platform-panel--premium platform-support-inbox-detail">
-            {selectedMail ? (
+            {inboxMailbox === 'sent' && selectedSent ? (
+              <>
+                <h3>{selectedSent.subject || 'Giden yanıt'}</h3>
+                <p className="platform-table-muted">
+                  Kime: {selectedSent.to ?? '—'} · {selectedSent.kindLabel}
+                  {selectedSent.repliedBy ? ` · ${selectedSent.repliedBy}` : ''}
+                </p>
+                <p className="platform-table-muted">{formatDateTime(selectedSent.sentAt)}</p>
+                <div className="platform-support-inbox-detail-actions">
+                  {selectedSent.caseId ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        setSection('cases');
+                        setSelectedCaseId(selectedSent.caseId!);
+                      }}
+                    >
+                      Talep #{selectedSent.caseNumber} aç
+                    </button>
+                  ) : null}
+                  {selectedSent.inboxMessageId ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => {
+                        setInboxMailbox('inbound');
+                        setSelectedMailId(selectedSent.inboxMessageId!);
+                        setSelectedSentId(null);
+                      }}
+                    >
+                      İlgili gelen mail
+                    </button>
+                  ) : null}
+                </div>
+                <div className="platform-support-inbox-body">
+                  {selectedSent.preview ?? '(önizleme yok)'}
+                </div>
+                {selectedSent.htmlPreview ? (
+                  <details className="platform-support-email-html-details">
+                    <summary>HTML önizleme</summary>
+                    <SupportEmailHtmlFrame html={selectedSent.htmlPreview} title="Giden yanıt" />
+                  </details>
+                ) : null}
+                {selectedSent.messageId ? (
+                  <p className="platform-table-muted">
+                    Message-ID: <code className="platform-support-mono-truncate">{selectedSent.messageId}</code>
+                  </p>
+                ) : null}
+              </>
+            ) : inboxMailbox === 'sent' ? (
+              <p className="platform-support-hint">Listeden bir giden yanıt seçin.</p>
+            ) : selectedMail ? (
               <>
                 <div className="platform-support-inbox-detail-actions">
                   {selectedMailCase ? (
