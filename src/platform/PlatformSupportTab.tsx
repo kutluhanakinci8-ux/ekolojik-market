@@ -1504,7 +1504,7 @@ export function PlatformSupportTab() {
                       list="platform-support-assignee-options"
                     />
                   </label>
-                  <label className="platform-support-field platform-support-field--wide">
+                  <label className="platform-support-field">
                     <span className="platform-support-field-label">Etiketler</span>
                     <input
                       className="platform-support-control"
