@@ -4431,6 +4431,19 @@
   font-size: 0.72rem;
 }
 
+.platform-support-360-card--alert {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fff5f5 0%, #fff 100%);
+}
+
+.platform-support-360-card--alert h4 {
+  color: #b91c1c;
+}
+
+.platform-support-360-login-list--alerts {
+  max-height: 160px;
+}
+
 .platform-support-360-ops {
   margin-top: 0.65rem;
   padding-top: 0.65rem;

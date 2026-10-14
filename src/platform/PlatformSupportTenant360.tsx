@@ -164,6 +164,7 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
 
   const roster = data.userRoster ?? [];
   const logins = data.loginActivity ?? [];
+  const alerts = data.loginAlerts ?? logins.filter((e) => !e.success).slice(0, 8);
   const summary = data.loginSummary;
 
   return (
@@ -196,6 +197,31 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
           {summary.activeCount}/{summary.totalUsers} aktif kullanıcı · 30g: {summary.loginSuccess30d} başarılı,{' '}
           {summary.loginFailed30d} başarısız giriş
         </p>
+      ) : null}
+
+      {alerts.length > 0 ? (
+        <article className="platform-support-360-card platform-support-360-card--alert">
+          <h4>Son giriş uyarıları</h4>
+          <p className="platform-support-hint">Sunucu kaydı — hatalı şifre ve benzeri denemeler (Yenile ile güncellenir).</p>
+          <ul className="platform-support-360-login-list platform-support-360-login-list--alerts">
+            {alerts.map((entry, idx) => (
+              <li
+                key={entry.id ?? `alert-${entry.createdAt}-${idx}`}
+                className="is-failed"
+              >
+                <span className="platform-support-360-login-time">{formatDateTime(entry.createdAt)}</span>
+                <span className="platform-support-360-login-user">
+                  <strong>{entry.username || entry.displayName || '—'}</strong>
+                  {entry.displayName && entry.username ? ` (${entry.username})` : ''}
+                </span>
+                <span className="platform-support-360-login-result">
+                  {entry.failureReason || 'Başarısız giriş'}
+                  {entry.clientIp ? ` · IP ${entry.clientIp}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </article>
       ) : null}
 
       <article className="platform-support-360-card platform-support-360-card--accent">

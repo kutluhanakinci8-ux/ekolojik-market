@@ -1826,6 +1826,7 @@ export type PlatformSupportTenant360Payload = {
     readOnly: boolean;
   } | null;
   userRoster?: PlatformSupportTenant360UserRow[];
+  loginAlerts?: PlatformSupportTenant360LoginRow[];
   loginActivity?: PlatformSupportTenant360LoginRow[];
   loginSummary?: {
     totalUsers: number;
@@ -1885,6 +1886,7 @@ export async function fetchPlatformSupportTenant360(
         demo: data.demo,
         lifecycle: data.lifecycle,
         userRoster: data.userRoster ?? [],
+        loginAlerts: data.loginAlerts ?? [],
         loginActivity: data.loginActivity ?? [],
         loginSummary: data.loginSummary ?? null,
         accounting: data.accounting,

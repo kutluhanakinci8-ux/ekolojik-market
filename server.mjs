@@ -2116,10 +2116,16 @@ const server = createServer(async (req, res) => {
       if (!resolvedTenant) return;
       const data = await readRequestBody(req);
       try {
+        const clientIp =
+          String(req.headers['x-forwarded-for'] ?? '')
+            .split(',')[0]
+            .trim() || req.socket?.remoteAddress || '';
         const result = await issuePosApiTokenFromCredentials(DATA_DIR, resolvedTenant, {
           username: data?.username,
           password: data?.password,
           pin: data?.pin,
+          clientIp,
+          userAgent: req.headers['user-agent'],
         });
         res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
