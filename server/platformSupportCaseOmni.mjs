@@ -2,8 +2,8 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { appendMessagingMessage, listMessagingMessages } from './messaging/store.mjs';
-import { getPlatformCase, appendCaseActivity } from './platformCaseStore.mjs';
+import { appendMessagingMessage, createMessagingThread, listMessagingMessages } from './messaging/store.mjs';
+import { getPlatformCase, appendCaseActivity, updatePlatformCase } from './platformCaseStore.mjs';
 import { replyPlatformSupportInbox } from './platformSupportInbox.mjs';
 import { getPlatformSupportMailPresentation } from './platformSupportMailConfig.mjs';
 import { sendViaEkolojikSmtp } from './ekolojikSmtp.mjs';
@@ -224,9 +224,32 @@ export async function performPlatformCaseAction(dataDir, caseId, { channel, body
 
   if (ch === 'messaging') {
     const tenantId = caseRow.links?.tenantId ?? caseRow.tenantId;
-    const threadId = caseRow.links?.threadId;
-    if (!tenantId || !threadId) {
-      return { ok: false, error: 'Mesajlaşma yanıtı için thread bağlantısı gerekli (kuyruktan talep oluşturun)' };
+    if (!tenantId) {
+      return { ok: false, error: 'Mesajlaşma yanıtı için kiracı gerekli' };
+    }
+    let threadId = caseRow.links?.threadId;
+    if (!threadId) {
+      const customerId = caseRow.requesterEmail
+        ? `email:${String(caseRow.requesterEmail).trim().toLowerCase()}`
+        : `case:${caseRow.id}`;
+      const created = await createMessagingThread(dataDir, tenantId, {
+        customerId,
+        customerName: caseRow.requesterName || caseRow.requesterEmail || 'Müşteri',
+        customerEmail: caseRow.requesterEmail,
+        subject: caseRow.subject || 'Destek',
+        channel: 'platform',
+      });
+      if (!created.ok || !created.thread?.id) {
+        return { ok: false, error: created.error ?? 'Mesaj thread oluşturulamadı' };
+      }
+      threadId = created.thread.id;
+      await updatePlatformCase(
+        dataDir,
+        caseRow.id,
+        { links: { tenantId, threadId } },
+        operatorUsername,
+      );
+      caseRow.links = { ...(caseRow.links ?? {}), tenantId, threadId };
     }
     const msg = await appendMessagingMessage(dataDir, tenantId, threadId, {
       direction: 'staff',

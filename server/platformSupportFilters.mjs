@@ -29,6 +29,10 @@ export async function readSupportFilterConfig(dataDir) {
       tenantIds: new Set(
         Array.isArray(raw.tenantIds) ? raw.tenantIds.map((t) => String(t).trim().toLowerCase()) : [...DEFAULT_TENANT_IDS],
       ),
+      slaHumanOnly: raw.slaHumanOnly === true,
+      messagingChannels: Array.isArray(raw.messagingChannels)
+        ? raw.messagingChannels.map((c) => String(c).trim().toLowerCase()).filter(Boolean)
+        : null,
     };
   } catch {
     return {
@@ -36,6 +40,8 @@ export async function readSupportFilterConfig(dataDir) {
       subjectPatterns: DEFAULT_PATTERNS,
       customerNamePatterns: DEFAULT_PATTERNS,
       tenantIds: DEFAULT_TENANT_IDS,
+      slaHumanOnly: false,
+      messagingChannels: null,
     };
   }
 }
@@ -57,6 +63,10 @@ export function configFromFilterDocument(doc) {
       ? doc.customerNamePatterns.map((p) => new RegExp(String(p), 'i'))
       : DEFAULT_PATTERNS,
     tenantIds: new Set(tenantIds),
+    slaHumanOnly: doc?.slaHumanOnly === true,
+    messagingChannels: Array.isArray(doc?.messagingChannels)
+      ? doc.messagingChannels.map((c) => String(c).trim().toLowerCase()).filter(Boolean)
+      : null,
   };
 }
 
@@ -81,7 +91,15 @@ export function isSmokeMessagingThread(thread, tenantId, config) {
 }
 
 export function filterProductionMessagingThreads(threads, tenantId, config) {
-  return (threads ?? []).filter((t) => !isSmokeMessagingThread(t, tenantId, config));
+  return (threads ?? []).filter((t) => {
+    if (isSmokeMessagingThread(t, tenantId, config)) return false;
+    const allow = config?.messagingChannels;
+    if (allow?.length) {
+      const ch = String(t.channel ?? 'web').trim().toLowerCase();
+      if (!allow.includes(ch)) return false;
+    }
+    return true;
+  });
 }
 
 const FILTER_PATH = (dataDir) => join(dataDir, 'platform', 'support-filters.json');
@@ -138,6 +156,10 @@ export async function writeSupportFilterDocument(dataDir, input) {
       : [],
     customerNamePatterns: Array.isArray(input?.customerNamePatterns)
       ? input.customerNamePatterns.map((p) => String(p).trim()).filter(Boolean)
+      : [],
+    slaHumanOnly: input?.slaHumanOnly === true,
+    messagingChannels: Array.isArray(input?.messagingChannels)
+      ? input.messagingChannels.map((c) => String(c).trim().toLowerCase()).filter(Boolean)
       : [],
   };
   compilePatternList(doc.subjectPatterns, 'Konu deseni');

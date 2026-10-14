@@ -4,27 +4,37 @@
  * Kullanım: node scripts/ci-with-server.mjs
  */
 import { spawn } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const REPO = join(import.meta.dirname, '..');
 const PORT = Number(process.env.EKOLOJIK_CI_PORT || 5199);
 const BASE = `http://127.0.0.1:${PORT}`;
+
+const ciDataDir =
+  process.env.MARKET_POS_DATA_DIR?.trim()
+  || (await mkdtemp(join(tmpdir(), 'ekolojik-ci-data-')));
+
 const env = {
   ...process.env,
   PORT: String(PORT),
   HOST: '127.0.0.1',
+  MARKET_POS_DATA_DIR: ciDataDir,
   EKOLOJIK_MESSAGING_BOT: '1',
   EKOLOJIK_PUBLIC_ORIGIN: BASE,
   EKOLOJIK_CONTACT_AUTOREPLY: process.env.EKOLOJIK_CONTACT_AUTOREPLY || '1',
 };
+
+const cleanupData = !process.env.MARKET_POS_DATA_DIR?.trim();
 
 if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
   env.PLATFORM_OPERATOR_PASSWORD =
     process.env.PLATFORM_OPERATOR_PASSWORD?.trim() || 'ci-qa-platform-1a04';
   const boot = spawn(
     process.execPath,
-    ['scripts/ensure-platform-operator.mjs', '--data-dir', join(REPO, 'data')],
+    ['scripts/ensure-platform-operator.mjs', '--data-dir', ciDataDir],
     { cwd: REPO, env, stdio: 'inherit' },
   );
   const bootCode = await new Promise((resolve) => boot.on('exit', resolve));
@@ -84,7 +94,10 @@ const qa = spawn(process.execPath, ['scripts/pre-release-qa.mjs', BASE], {
   stdio: 'inherit',
 });
 
-qa.on('exit', (code) => {
+qa.on('exit', async (code) => {
   killServer();
+  if (cleanupData) {
+    await rm(ciDataDir, { recursive: true, force: true }).catch(() => {});
+  }
   process.exit(code ?? 1);
 });

@@ -31,6 +31,7 @@ import {
   syncPlatformSupportCaseZendeskStatus,
   fetchPlatformSupportCaseAi,
   postPlatformSupportCaseAction,
+  postPlatformSupportSlaApologyBatch,
   postPlatformSupportCommand,
   replyPlatformSupportInbox,
   savePlatformSupportSlaPolicy,
@@ -296,6 +297,7 @@ export function PlatformSupportTab() {
   const [smokePreview, setSmokePreview] = useState<PlatformSupportSmokePreview | null>(null);
   const [smokePreviewLoading, setSmokePreviewLoading] = useState(false);
   const [slaApologyBusyId, setSlaApologyBusyId] = useState<string | null>(null);
+  const [slaApologyBatchBusy, setSlaApologyBatchBusy] = useState(false);
   const [contextTenantId, setContextTenantId] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
@@ -798,19 +800,10 @@ export function PlatformSupportTab() {
 
   const sendSlaApologyEmail = async (caseId: string) => {
     setSlaApologyBusyId(caseId);
-    const macro = await fetchPlatformSupportCaseAi(caseId, 'apply_macro', { macroId: 'sla_sorry' });
-    if (!macro.ok || !macro.text?.trim()) {
-      setSlaApologyBusyId(null);
-      setPolicyMsg(userMessage(macro.error, 'SLA makrosu yüklenemedi'));
-      return;
-    }
-    const action = await postPlatformSupportCaseAction(caseId, {
-      channel: 'email',
-      body: macro.text.trim(),
-    });
+    const batch = await postPlatformSupportSlaApologyBatch([caseId]);
     setSlaApologyBusyId(null);
-    if (!action.ok) {
-      setPolicyMsg(userMessage(action.error, 'Özür maili gönderilemedi'));
+    if (!batch.ok) {
+      setPolicyMsg(userMessage(batch.error, 'Özür maili gönderilemedi'));
       return;
     }
     setPolicyMsg('SLA özür maili gönderildi (destek@ / talep e-posta zinciri)');
@@ -1053,6 +1046,22 @@ export function PlatformSupportTab() {
             >
               {contactWithoutCase} form
             </button>
+            {(data.opsSignals?.outboxFailed ?? 0) > 0 ? (
+              <>
+                <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
+                <span className="is-warn" title="Kiracı outbox başarısız (Altyapı sekmesi)">
+                  {data.opsSignals?.outboxFailed} outbox fail
+                </span>
+              </>
+            ) : null}
+            {(data.opsSignals?.platformAlertsCritical ?? 0) > 0 ? (
+              <>
+                <span className="platform-support-compact-hero-dot" aria-hidden>·</span>
+                <span className="is-warn" title="Platform uyarıları (Genel bakış)">
+                  {data.opsSignals?.platformAlertsCritical} kritik uyarı
+                </span>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="platform-support-compact-hero-toolbar">
@@ -1812,6 +1821,19 @@ export function PlatformSupportTab() {
           }}
           onSendSlaApology={(caseId) => void sendSlaApologyEmail(caseId)}
           slaApologyBusyId={slaApologyBusyId}
+          onSendSlaApologyBatch={(caseIds) => {
+            setSlaApologyBatchBusy(true);
+            void postPlatformSupportSlaApologyBatch(caseIds).then((batch) => {
+              setSlaApologyBatchBusy(false);
+              if (!batch.ok) {
+                setPolicyMsg(userMessage(batch.error, 'Toplu özür maili başarısız'));
+                return;
+              }
+              setPolicyMsg(`SLA özür: ${batch.sent ?? 0} gönderildi, ${batch.failed ?? 0} hata`);
+              void load();
+            });
+          }}
+          slaApologyBatchBusy={slaApologyBatchBusy}
         />
       ) : null}
 

@@ -700,6 +700,12 @@ export type PlatformSupportPayload = {
     total: number;
     withoutCase: number;
   };
+  opsSignals?: {
+    outboxFailed: number;
+    outboxPending: number;
+    platformAlertsCritical: number;
+    platformAlertsWarning: number;
+  };
   inbox?: {
     unread: number;
     total: number;
@@ -1756,7 +1762,41 @@ export type PlatformSupportSlaLivePayload = {
     subject: string;
     waitMs: number;
   }>;
+  apologyQueue?: {
+    generatedAt: string;
+    count: number;
+    items: Array<{
+      id: string;
+      number: number;
+      subject: string;
+      tenantId: string | null;
+      businessName: string | null;
+      requesterEmail: string;
+      slaDueAt: string;
+      overdueMs: number;
+    }>;
+  };
 };
+
+export async function postPlatformSupportSlaApologyBatch(caseIds: string[]): Promise<{
+  ok: boolean;
+  sent?: number;
+  failed?: number;
+  results?: Array<{ caseId: string; ok: boolean; error?: string }>;
+  error?: string;
+}> {
+  const result = await platformSecurityPost<{ sent?: number; failed?: number; results?: Array<{ caseId: string; ok: boolean; error?: string }> }>(
+    '/api/platform/support/sla-apology',
+    { caseIds },
+  );
+  return {
+    ok: result.ok,
+    sent: result.data?.sent,
+    failed: result.data?.failed,
+    results: result.data?.results,
+    error: result.error,
+  };
+}
 
 export async function fetchPlatformSupportSlaLive(
   days?: number,

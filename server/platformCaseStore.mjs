@@ -183,6 +183,9 @@ export async function updatePlatformCase(dataDir, caseId, patch, operatorUsernam
     }
   }
   if (patch.slaDueAt != null) row.slaDueAt = patch.slaDueAt;
+  if (patch.links != null && typeof patch.links === 'object') {
+    row.links = { ...(row.links ?? {}), ...patch.links };
+  }
   row.updatedAt = new Date().toISOString();
   row.updatedBy = operatorUsername ?? row.updatedBy;
 

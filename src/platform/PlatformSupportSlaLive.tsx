@@ -14,6 +14,8 @@ type Props = {
   onFocusQueueTenant?: (tenantId: string) => void;
   onSendSlaApology?: (caseId: string) => void;
   slaApologyBusyId?: string | null;
+  onSendSlaApologyBatch?: (caseIds: string[]) => void;
+  slaApologyBatchBusy?: boolean;
 };
 
 function formatOverdue(ms: number): string {
@@ -28,6 +30,8 @@ export function PlatformSupportSlaLive({
   onFocusQueueTenant,
   onSendSlaApology,
   slaApologyBusyId,
+  onSendSlaApologyBatch,
+  slaApologyBatchBusy,
 }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PlatformSupportSlaLivePayload | null>(null);
@@ -98,6 +102,37 @@ export function PlatformSupportSlaLive({
           })}
         </div>
       </section>
+
+      {data.apologyQueue?.count ? (
+        <section className="platform-panel">
+          <div className="platform-users-panel-head">
+            <h3>SLA özür kuyruğu</h3>
+            {onSendSlaApologyBatch ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={slaApologyBatchBusy}
+                onClick={() =>
+                  onSendSlaApologyBatch((data.apologyQueue?.items ?? []).map((i) => i.id))
+                }
+              >
+                {slaApologyBatchBusy ? 'Gönderiliyor…' : `Tümünü gönder (${data.apologyQueue.count})`}
+              </button>
+            ) : null}
+          </div>
+          <p className="platform-support-hint">
+            E-postası olan, SLA süresi geçmiş ve daha önce özür gönderilmemiş kayıtlar.
+          </p>
+          <ul className="platform-support-apology-queue">
+            {(data.apologyQueue.items ?? []).map((item) => (
+              <li key={item.id}>
+                <strong>#{item.number}</strong> {item.subject}
+                <span className="platform-muted"> — {item.requesterEmail}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {data.overdueCases?.length ? (
         <section className="platform-panel">
