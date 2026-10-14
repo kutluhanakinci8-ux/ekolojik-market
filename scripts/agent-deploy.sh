@@ -32,7 +32,7 @@ deploy_via_ssh() {
 
   ssh -i "$key_file" -p "$PORT" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
     "${USER}@${HOST}" \
-    "export REPO_ROOT=${VPS_REPO} BRANCH=${BRANCH} && bash ${VPS_REPO}/scripts/sunucu-market-pos-deploy.sh"
+    "export REPO_ROOT=${VPS_REPO} BRANCH=${BRANCH} EKOLOJIK_ENABLE_CONTACT_AUTOREPLY=${EKOLOJIK_ENABLE_CONTACT_AUTOREPLY:-1} && bash ${VPS_REPO}/scripts/sunucu-market-pos-deploy.sh"
 }
 
 deploy_via_password() {
@@ -46,7 +46,7 @@ deploy_via_password() {
   SSHPASS="${VPS_SSH_PASS}" sshpass -e ssh -p "$PORT" -o StrictHostKeyChecking=accept-new \
     -o PreferredAuthentications=password -o PubkeyAuthentication=no \
     "${USER}@${HOST}" \
-    "export REPO_ROOT=${VPS_REPO} BRANCH=${BRANCH} GIT_REMOTE=origin && bash ${VPS_REPO}/scripts/sunucu-market-pos-deploy.sh"
+    "export REPO_ROOT=${VPS_REPO} BRANCH=${BRANCH} GIT_REMOTE=origin EKOLOJIK_ENABLE_CONTACT_AUTOREPLY=${EKOLOJIK_ENABLE_CONTACT_AUTOREPLY:-1} && bash ${VPS_REPO}/scripts/sunucu-market-pos-deploy.sh"
 }
 
 if deploy_via_ssh; then

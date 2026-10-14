@@ -239,6 +239,16 @@ if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
   if [[ "$(id -u)" == "0" ]]; then
     bash "${REPO_ROOT}/scripts/sunucu-ekolojik-outbox-failed-cron-kur.sh" || true
     bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-inbox-sync-cron-kur.sh" || true
+    if [[ -x "${REPO_ROOT}/scripts/sunucu-ekolojik-support-imap-dogrula.sh" ]]; then
+      bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-imap-dogrula.sh" "${INSTALL_DIR}" || \
+        echo "UYARI: destek@ IMAP — bash ${REPO_ROOT}/scripts/sunucu-ekolojik-destek-mailbox.sh --apply"
+    fi
+    if [[ "${EKOLOJIK_ENABLE_CONTACT_AUTOREPLY:-0}" == "1" ]] && [[ -f "${INSTALL_DIR}/.env" ]]; then
+      if ! grep -q '^EKOLOJIK_CONTACT_AUTOREPLY=' "${INSTALL_DIR}/.env" 2>/dev/null; then
+        echo 'EKOLOJIK_CONTACT_AUTOREPLY=1' >> "${INSTALL_DIR}/.env"
+        echo "    EKOLOJIK_CONTACT_AUTOREPLY=1 eklendi (.env)"
+      fi
+    fi
   fi
   bash "${REPO_ROOT}/scripts/sunucu-ekolojik-smtp-ops-recipient-dogrula.sh" "${INSTALL_DIR}" || \
     echo "UYARI: ops SMTP alıcı — bash ${REPO_ROOT}/scripts/sunucu-ekolojik-imap-vps-alias-fix.sh"

@@ -295,6 +295,7 @@ export function PlatformSupportTab() {
   const [smokeFilterOpen, setSmokeFilterOpen] = useState(false);
   const [smokePreview, setSmokePreview] = useState<PlatformSupportSmokePreview | null>(null);
   const [smokePreviewLoading, setSmokePreviewLoading] = useState(false);
+  const [slaApologyBusyId, setSlaApologyBusyId] = useState<string | null>(null);
   const [contextTenantId, setContextTenantId] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
@@ -792,6 +793,27 @@ export function PlatformSupportTab() {
     );
     setSelectedCaseId(result.case.id);
     setSection('cases');
+    void load();
+  };
+
+  const sendSlaApologyEmail = async (caseId: string) => {
+    setSlaApologyBusyId(caseId);
+    const macro = await fetchPlatformSupportCaseAi(caseId, 'apply_macro', { macroId: 'sla_sorry' });
+    if (!macro.ok || !macro.text?.trim()) {
+      setSlaApologyBusyId(null);
+      setPolicyMsg(userMessage(macro.error, 'SLA makrosu yüklenemedi'));
+      return;
+    }
+    const action = await postPlatformSupportCaseAction(caseId, {
+      channel: 'email',
+      body: macro.text.trim(),
+    });
+    setSlaApologyBusyId(null);
+    if (!action.ok) {
+      setPolicyMsg(userMessage(action.error, 'Özür maili gönderilemedi'));
+      return;
+    }
+    setPolicyMsg('SLA özür maili gönderildi (destek@ / talep e-posta zinciri)');
     void load();
   };
 
@@ -1788,6 +1810,8 @@ export function PlatformSupportTab() {
             setContextTenantId(tenantId);
             setSection('queue');
           }}
+          onSendSlaApology={(caseId) => void sendSlaApologyEmail(caseId)}
+          slaApologyBusyId={slaApologyBusyId}
         />
       ) : null}
 
