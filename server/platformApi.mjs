@@ -701,6 +701,21 @@ export async function getPlatformSupportMentionOperators(dataDir) {
   return { ok: true, operators: await listMentionableOperators(dataDir) };
 }
 
+export async function getPlatformSupportAssigneeOptions(dataDir) {
+  const { listSupportAssigneeOptions } = await import('./platformSupportAssign.mjs');
+  return { ok: true, operators: await listSupportAssigneeOptions(dataDir) };
+}
+
+export async function getPlatformSupportMentionInbox(dataDir, operatorUsername) {
+  const { listMentionInboxForUser } = await import('./platformSupportMentionInbox.mjs');
+  return listMentionInboxForUser(dataDir, operatorUsername);
+}
+
+export async function postPlatformSupportMentionInboxRead(dataDir, operatorUsername, body) {
+  const { markMentionInboxRead } = await import('./platformSupportMentionInbox.mjs');
+  return markMentionInboxRead(dataDir, operatorUsername, body ?? {});
+}
+
 export async function suggestPlatformSupportCaseAi(dataDir, caseId, body = {}) {
   const { suggestPlatformSupportCaseAi: suggest } = await import('./platformSupportAi.mjs');
   return suggest(dataDir, caseId, body);

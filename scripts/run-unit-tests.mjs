@@ -21,4 +21,5 @@ await run(join(REPO, 'scripts/platform-support-email-thread-smoke.mjs'));
 await run(join(REPO, 'scripts/platform-support-zendesk-smoke.mjs'));
 await run(join(REPO, 'scripts/platform-support-zendesk-e2e.mjs'));
 await run(join(REPO, 'scripts/crm-sms-smoke.mjs'));
+await run(join(REPO, 'scripts/platform-support-backlog-smoke.mjs'));
 await run(join(REPO, 'scripts/multi-tenant-data-safety-smoke.mjs'));

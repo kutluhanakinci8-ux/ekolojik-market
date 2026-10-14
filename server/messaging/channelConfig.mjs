@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { isCrmSmsConfigured } from '../crmSms.mjs';
 
 function configPath(dataDir, tenantId = 'main') {
   return join(dataDir, 'messaging', tenantId, 'channels.json');
@@ -37,12 +38,24 @@ export async function getMessagingChannelsHub(dataDir, tenantId = 'main') {
       webhookPath: '/api/webhooks/messaging/whatsapp',
       webhookUrlHint: `?tenant=${encodeURIComponent(tenantId)}`,
     },
+    sms: {
+      enabled: Boolean(raw.sms?.enabled) && isCrmSmsConfigured(),
+      configured: isCrmSmsConfigured(),
+      webhookPath: '/api/webhooks/messaging/sms',
+      webhookUrlHint: `?tenant=${encodeURIComponent(tenantId)}`,
+      inboundSecretSet: Boolean(process.env.EKOLOJIK_SMS_INBOUND_SECRET?.trim()),
+    },
     channels: [
       { id: 'web', label: 'Web widget', status: 'active' },
       {
         id: 'whatsapp',
         label: 'WhatsApp Cloud',
         status: wa.enabled && envOk ? 'active' : envOk ? 'disabled' : 'needs_env',
+      },
+      {
+        id: 'sms',
+        label: 'SMS (v2)',
+        status: raw.sms?.enabled && isCrmSmsConfigured() ? 'active' : isCrmSmsConfigured() ? 'disabled' : 'needs_env',
       },
     ],
   };
@@ -61,7 +74,10 @@ export async function saveMessagingChannelsHub(dataDir, tenantId, patch = {}) {
     }
   }
   wa.updatedAt = new Date().toISOString();
-  const next = { ...current, whatsapp: wa };
+  const sms = { ...(current.sms ?? {}) };
+  if (patch.sms && patch.sms.enabled != null) sms.enabled = Boolean(patch.sms.enabled);
+  sms.updatedAt = new Date().toISOString();
+  const next = { ...current, whatsapp: wa, sms };
   await mkdir(join(dataDir, 'messaging', tenantId), { recursive: true });
   await writeFile(configPath(dataDir, tenantId), JSON.stringify(next, null, 2), 'utf8');
   return getMessagingChannelsHub(dataDir, tenantId);

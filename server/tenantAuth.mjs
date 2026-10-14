@@ -283,6 +283,13 @@ export async function registerTenant(dataDir, payload) {
   });
   await writeFile(registrationsPath, JSON.stringify(registrations, null, 2), 'utf8');
 
+  try {
+    const { scheduleRegisterMailHealthProbe } = await import('./registerMailHealthProbe.mjs');
+    scheduleRegisterMailHealthProbe(dataDir, tenantId);
+  } catch {
+    /* kayıt sonrası probe opsiyonel */
+  }
+
   return {
     ok: true,
     tenantId,

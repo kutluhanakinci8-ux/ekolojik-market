@@ -99,9 +99,9 @@ NB `NotificationEventCode` içine `ekolojik.*` olayları (sipariş, stok az, irs
 
 - [x] `server/lertaPlatformBridge.mjs`
 - [x] `crmOutreach.mjs` bridge entegrasyonu
-- [ ] `server.mjs` messaging proxy route’ları
-- [ ] CRM UI: “Mesajlar” sekmesi (thread id ↔ müşteri)
-- [ ] Contact form → mail outbox event (NB) + mevcut JSON yedek
+- [x] `server.mjs` messaging proxy route’ları (`/api/lerta/messaging/*`, bridge kapalıysa 503)
+- [x] CRM UI: yerel `MessagingPanel` (Ekolojik `data/messaging/` — müşteri thread)
+- [x] Contact form → Ekolojik outbox + case; NB dual-write yalnızca `LERTA_PLATFORM_BRIDGE` açıkken `sendMailViaLertaPlatform` (CRM e-posta fallback)
 
 ## Test
 

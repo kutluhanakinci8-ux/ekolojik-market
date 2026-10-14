@@ -11,10 +11,10 @@
 | Alan | Canlı | Kalan / risk |
 |------|--------|----------------|
 | Gelen kutusu | destek@ IMAP/outbox köprüsü, thread UI, ekler, okundu toplu | Harici DNS/alias VPS doğrulaması (`sunucu-ekolojik-support-imap-dogrula.sh`) |
-| Kanallar | Case + e-posta + mesaj (thread otomatik bağlanır) + iletişim formu kuyruğu | Derin omnichannel (routing, @mention) backlog |
-| SLA / kuyruk | Smoke filtresi (UI + önizleme), prod kuyruk, SLA canlı panel, **özür kuyruğu + toplu gönder** (`sla-apology` API) | Tam otomatik cron özür (onaysız) yok — operatör onayı gerekli |
-| Yanıt | Case detay: not / e-posta / mesaj (thread yoksa oluştur); makrolar; AI taslak | — |
-| Operasyon | Komut paleti, kiracı 360, Zendesk köprüsü + `platform-support-zendesk-e2e.mjs`, CSV; güvenlik → case; iç not **@mention** | Zendesk prod ticket senkronu ortam bağımlı |
+| Kanallar | Case + e-posta + mesaj + **SMS v2** (omni webhook) + iletişim formu | Skills routing / kapasite (ileri faz) |
+| SLA / kuyruk | Smoke filtresi, SLA canlı, özür kuyruğu + toplu gönder; **cron** `EKOLOJIK_SUPPORT_SLA_AUTO_APOLOGY=1` | — |
+| Yanıt | Not / e-posta / mesaj; makrolar; AI; **@mention** e-posta + uygulama içi kutu | — |
+| Operasyon | Komut paleti, 360, Zendesk (webhook + **yanıt → ticket yorum**), round-robin **assignee**, kiracı alert → case | Zendesk prod env + trigger kurulumu |
 | Outbox | Kiracı Posta + platform komut `/requeue_outbox`; Destek hero **opsSignals** (failed + kritik uyarı) | Prod **failed/pending** triage: `scripts/ops-outbox-health.mjs` |
 
 Teslim öncesi: `npm run test:ci`, `node scripts/pre-release-qa.mjs https://…`, `node scripts/ops-outbox-health.mjs` (VPS data dir).

@@ -1,5 +1,6 @@
 import { appendMessagingMessage, createMessagingThread } from './store.mjs';
 import { sendWhatsAppText } from '../integrations/whatsappCloud.mjs';
+import { sendCrmSms } from '../crmSms.mjs';
 
 async function readAllThreads(dataDir, tenantId) {
   const { listMessagingThreads } = await import('./store.mjs');
@@ -62,7 +63,7 @@ export async function ingestInboundChannelMessage(
     externalId,
     customerId,
     customerName,
-    subject: `${channel === 'whatsapp' ? 'WhatsApp' : channel} — ${customerName}`,
+    subject: `${channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : channel} — ${customerName}`,
   });
   if (!ensured.ok || !ensured.thread) return ensured;
 
@@ -78,6 +79,15 @@ export async function dispatchStaffMessageToExternalChannel(dataDir, tenantId, t
   if (thread.channel === 'whatsapp' && thread.externalId?.startsWith('wa:')) {
     const waId = thread.externalId.slice(3);
     return sendWhatsAppText(waId, message.bodyText);
+  }
+  if (thread.channel === 'sms' && thread.externalId?.startsWith('sms:')) {
+    const phone = thread.externalId.slice(4);
+    return sendCrmSms({
+      to: phone,
+      body: message.bodyText,
+      dataDir,
+      tenantId,
+    });
   }
   return { skipped: true, reason: 'unsupported_channel' };
 }

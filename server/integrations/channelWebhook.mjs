@@ -1,4 +1,5 @@
 import { handleWhatsAppWebhook } from './whatsappCloud.mjs';
+import { handleSmsInboundWebhook } from './smsInbound.mjs';
 
 /** @type {Map<string, (ctx: object) => Promise<object>>} */
 const adapters = new Map();
@@ -10,6 +11,13 @@ function registerDefaults() {
       method: ctx.method,
       query: ctx.query,
       body: ctx.body,
+    }),
+  );
+  adapters.set('sms', async (ctx) =>
+    handleSmsInboundWebhook(ctx.dataDir, ctx.tenantId, {
+      method: ctx.method,
+      body: ctx.body,
+      req: ctx.req,
     }),
   );
 }

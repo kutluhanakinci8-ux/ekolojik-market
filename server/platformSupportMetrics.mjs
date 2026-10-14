@@ -203,14 +203,24 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
   const asOf = todayKey();
   let platformAlertsCritical = 0;
   let platformAlertsWarning = 0;
+  const tenantAlertRows = [];
   for (const tenantId of await allTenantIds(dataDir)) {
     const store = await readTenantStore(dataDir, tenantId);
     if (!store) continue;
     const businessName = businessNameFor(store, tenantId);
-    for (const a of buildTenantPlatformAlerts(tenantId, businessName, store, asOf)) {
+    const alerts = buildTenantPlatformAlerts(tenantId, businessName, store, asOf);
+    tenantAlertRows.push({ tenantId, businessName, alerts });
+    for (const a of alerts) {
       if (a.severity === 'critical') platformAlertsCritical += 1;
       else if (a.severity === 'warning') platformAlertsWarning += 1;
     }
+  }
+
+  try {
+    const { maybeSpawnCasesForTenantAlerts } = await import('./platformSupportTenantAlertCases.mjs');
+    await maybeSpawnCasesForTenantAlerts(dataDir, tenantAlertRows);
+  } catch {
+    /* opsiyonel */
   }
 
   return {

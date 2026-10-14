@@ -1316,6 +1316,79 @@ export type PlatformSupportZendeskBridge = {
   ticketUrlBase: string | null;
 };
 
+export type PlatformMentionOperator = {
+  username: string;
+  displayName: string;
+  recoveryEmail: string | null;
+};
+
+export async function fetchPlatformSupportMentionOperators(): Promise<{
+  ok: boolean;
+  operators?: PlatformMentionOperator[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/mention-operators', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as { ok?: boolean; operators?: PlatformMentionOperator[]; error?: string };
+    if (!res.ok || !data.ok) return { ok: false, error: data.error ?? 'Operatör listesi alınamadı' };
+    return { ok: true, operators: data.operators ?? [] };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function fetchPlatformSupportAssigneeOptions(): Promise<{
+  ok: boolean;
+  operators?: Array<{ username: string; displayName: string }>;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/assignee-options', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      operators?: Array<{ username: string; displayName: string }>;
+      error?: string;
+    };
+    if (!res.ok || !data.ok) return { ok: false, error: data.error ?? 'Atama listesi alınamadı' };
+    return { ok: true, operators: data.operators ?? [] };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export type PlatformMentionInboxItem = {
+  id: string;
+  username: string;
+  caseId: string;
+  caseNumber: number;
+  subject: string;
+  authorUsername: string;
+  preview: string;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export async function fetchPlatformSupportMentionInbox(): Promise<{
+  ok: boolean;
+  items?: PlatformMentionInboxItem[];
+  unread?: number;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/mention-inbox', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      items?: PlatformMentionInboxItem[];
+      unread?: number;
+      error?: string;
+    };
+    if (!res.ok || !data.ok) return { ok: false, error: data.error ?? 'Mention kutusu alınamadı' };
+    return { ok: true, items: data.items ?? [], unread: data.unread ?? 0 };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function fetchPlatformSupportZendeskBridge(): Promise<{
   ok: boolean;
   data?: PlatformSupportZendeskBridge;
