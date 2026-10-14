@@ -157,6 +157,20 @@ function CaseTimelineItem({ entry }: { entry: CaseTimelineEntry }) {
       </li>
     );
   }
+  if (entry.kind === 'contact_form') {
+    return (
+      <li className="is-contact-form">
+        <header>
+          <span>İletişim formu · {entry.subject}</span>
+          <span>{formatDateTime(entry.at)}</span>
+        </header>
+        <p className="platform-table-muted">
+          {entry.name} · {entry.email}
+        </p>
+        <p className="platform-support-case-email-body">{entry.bodyText}</p>
+      </li>
+    );
+  }
   if (entry.kind === 'email_out') {
     return (
       <li className="is-email-out">

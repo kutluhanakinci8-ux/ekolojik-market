@@ -1217,6 +1217,14 @@ export type PlatformSupportCaseDetail = {
       htmlPreview?: string | null;
     }>;
   } | null;
+  contactFormPreview?: {
+    id: string;
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+    createdAt: string;
+  } | null;
   macros: Array<{ id: string; label: string; body: string }>;
   aiCapabilities?: {
     externalEnabled: boolean;
@@ -1543,6 +1551,7 @@ export async function fetchPlatformSupportCaseDetail(
         messagingPreview: data.messagingPreview ?? null,
         inboxSnippet: data.inboxSnippet ?? null,
         emailPreview: data.emailPreview ?? null,
+        contactFormPreview: data.contactFormPreview ?? null,
         macros: data.macros ?? [],
         aiCapabilities: data.aiCapabilities,
       },

@@ -409,7 +409,12 @@ async function integrationGate() {
   }
 
   const contact = await http('POST', '/api/contact', {
-    body: { name: 'QA Bot', email: 'qa@test.local', subject: 'genel', message: 'pre-release probe' },
+    body: {
+      name: 'QA Bot',
+      email: 'qa@test.local',
+      subject: '[qa-internal] contact probe',
+      message: 'pre-release probe',
+    },
   });
   if (contact.ok) pass('integration', 'POST /api/contact (public form)');
   else warn('integration', 'POST /api/contact', `HTTP ${contact.status}`);

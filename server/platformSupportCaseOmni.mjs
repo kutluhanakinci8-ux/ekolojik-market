@@ -131,6 +131,23 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
     };
   }
 
+  let contactFormPreview = null;
+  if (caseRow.links?.contactMessageId) {
+    const { listContactMessages } = await import('./tenantAuth.mjs');
+    const items = await listContactMessages(dataDir, 500);
+    const cm = items.find((c) => c.id === caseRow.links.contactMessageId);
+    if (cm) {
+      contactFormPreview = {
+        id: cm.id,
+        name: cm.name,
+        email: cm.email,
+        subject: cm.subject,
+        message: cm.message,
+        createdAt: cm.createdAt,
+      };
+    }
+  }
+
   const { isPostaAiEnabled, getPostaAiRuntimeConfig } = await import('./messaging/aiConfig.mjs');
   const aiRuntime = getPostaAiRuntimeConfig();
 
@@ -140,6 +157,7 @@ export async function getPlatformSupportCaseDetail(dataDir, caseId) {
     messagingPreview,
     inboxSnippet,
     emailPreview,
+    contactFormPreview,
     macros: await listPlatformSupportMacros(dataDir),
     aiCapabilities: {
       externalEnabled: isPostaAiEnabled() && aiRuntime.hasApiKey && Boolean(aiRuntime.apiUrl),
