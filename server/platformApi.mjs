@@ -451,6 +451,16 @@ export async function getPlatformSupportCases(dataDir, query = {}) {
   return listPlatformSupportCases(dataDir, query);
 }
 
+export async function getPlatformSupportCaseTags(dataDir) {
+  const { listPlatformSupportCaseTags } = await import('./platformSupportCases.mjs');
+  return listPlatformSupportCaseTags(dataDir);
+}
+
+export async function markPlatformSupportInboxRead(dataDir, body) {
+  const { markPlatformSupportInboxMessagesRead } = await import('./platformSupportInbox.mjs');
+  return markPlatformSupportInboxMessagesRead(dataDir, body?.messageIds ?? []);
+}
+
 export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorUsername) {
   const { getPlatformCase, updatePlatformCase, appendCaseActivity } = await import('./platformCaseStore.mjs');
   const before = await getPlatformCase(dataDir, caseId);

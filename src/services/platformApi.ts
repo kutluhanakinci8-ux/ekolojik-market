@@ -1070,6 +1070,33 @@ export async function syncPlatformSupportInbox(): Promise<{
   return { ok: true, message: result.data?.message };
 }
 
+export async function fetchPlatformSupportCaseTags(): Promise<{
+  ok: boolean;
+  tags?: string[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/cases/tags', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as { ok?: boolean; tags?: string[]; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Etiketler yüklenemedi' };
+    }
+    return { ok: true, tags: data.tags ?? [] };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function markPlatformSupportInboxRead(
+  messageIds: string[],
+): Promise<{ ok: boolean; marked?: number; error?: string }> {
+  const result = await platformSecurityPost<{ marked?: number }>('/api/platform/support/inbox/mark-read', {
+    messageIds,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, marked: result.data?.marked };
+}
+
 export async function replyPlatformSupportInbox(
   messageId: string,
   body: string,
@@ -1209,11 +1236,13 @@ export type PlatformSupportCasesPayload = {
 export async function fetchPlatformSupportCases(
   status?: string,
   kind?: string,
+  tag?: string,
 ): Promise<{ ok: boolean; data?: PlatformSupportCasesPayload; error?: string }> {
   try {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (kind) params.set('kind', kind);
+    if (tag && tag !== 'all') params.set('tag', tag);
     const q = params.toString() ? `?${params}` : '';
     const res = await fetch(`/api/platform/support/cases${q}`, { headers: posApiAuthHeaders() });
     const data = (await res.json()) as PlatformSupportCasesPayload & { ok?: boolean; error?: string };

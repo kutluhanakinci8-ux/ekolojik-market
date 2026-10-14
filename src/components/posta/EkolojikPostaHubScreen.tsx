@@ -209,10 +209,12 @@ function billDueToIso(due?: string | null): string {
 export function EkolojikPostaHubScreen({
   store,
   deepLinkCustomerId = null,
+  deepLinkThreadId = null,
   onDeepLinkConsumed,
 }: {
   store: Store;
   deepLinkCustomerId?: string | null;
+  deepLinkThreadId?: string | null;
   onDeepLinkConsumed?: () => void;
 }) {
   const [folder, setFolder] = useState<PostaFolder>('gelen');
@@ -457,6 +459,18 @@ export function EkolojikPostaHubScreen({
       onDeepLinkConsumed?.();
     })();
   }, [deepLinkCustomerId, onDeepLinkConsumed]);
+
+  useEffect(() => {
+    if (!deepLinkThreadId) return;
+    setHubLayout('sohbet');
+    setFolder('mesajlar');
+    setSelectedThreadId(deepLinkThreadId);
+    void (async () => {
+      const result = await fetchMessagingThreads({ limit: 80 });
+      if (result.ok && result.threads) setThreads(result.threads);
+      onDeepLinkConsumed?.();
+    })();
+  }, [deepLinkThreadId, onDeepLinkConsumed]);
 
   const refreshStorage = useCallback(async () => {
     const r = await fetchPostaStorage();
