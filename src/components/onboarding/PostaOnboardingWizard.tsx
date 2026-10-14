@@ -162,6 +162,7 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
   const handleFinish = async () => {
     setBusy(true);
     setFlash(null);
+    await seedPostaOnboardingAliasRules();
     const result = await completePostaOnboarding({ primaryOnly: true, skipIncompleteSteps: true });
     if (!result.ok) {
       setBusy(false);

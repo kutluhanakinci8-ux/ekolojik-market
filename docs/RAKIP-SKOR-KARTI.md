@@ -13,7 +13,7 @@
 | Tenant / deliverability | 50% | **100%** | Faz 43–44 DNS + E2E mail |
 | Protokol (JMAP lite, IMAP MOVE, CalDAV) | 45% | **100%** | Faz 45–46 |
 | Engagement & uyumluluk | 60% | **100%** | Faz 47 KVKK strip |
-| Omnichannel | 20% | **100%** | Faz 48 WhatsApp (SMS v2 backlog) |
+| Omnichannel | 20% | **100%** | Faz 48 WA + SMS v2 + Instagram webhook (lite) |
 | Bot, SLA, atama | 15% | **100%** | Faz 49 |
 | CI & kalite kapısı | 50% | **100%** | Faz 51 `npm test` + Actions |
 | **Genel (ağırlıklı)** | **~82%** | **100%** | Faz 52 kapanış |

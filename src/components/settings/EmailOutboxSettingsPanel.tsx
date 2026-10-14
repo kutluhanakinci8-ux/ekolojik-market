@@ -61,6 +61,7 @@ import {
   saveMessagingChannelsHub,
   type MessagingChannelsHub,
 } from '../../services/messagingChannelsService';
+import { PostaEnterpriseSettingsPanel } from '../posta/PostaEnterpriseSettingsPanel';
 
 type OutboxRow = {
   id: string;
@@ -1045,6 +1046,78 @@ export function EmailOutboxSettingsPanel() {
         Durum: {channelsHub?.whatsapp?.configured ? 'Graph API hazır' : 'env eksik'} ·{' '}
         {channelsHub?.whatsapp?.enabled ? 'kanal açık' : 'kanal kapalı'}
       </p>
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>Omnichannel — SMS (v2)</h3>
+          <p>
+            Webhook: <code>{channelsHub?.sms?.webhookPath ?? '/api/webhooks/messaging/sms'}</code>
+            {channelsHub?.sms?.webhookUrlHint ?? ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={loading || !channelsHub?.sms?.configured}
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const result = await saveMessagingChannelsHub({ sms: { enabled: true } });
+              if (result.ok) {
+                setChannelsHub(result);
+                setFlash('SMS kanalı etkinleştirildi');
+              } else setFlash(result.error ?? 'Kayıt başarısız');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          SMS’i etkinleştir
+        </button>
+      </div>
+      <p className="settings-hint">
+        Env: <code>EKOLOJIK_SMS_PROVIDER</code>, <code>EKOLOJIK_SMS_INBOUND_SECRET</code>, CRM SMS ayarları. Gelen
+        mesajlar Posta → Müşteri mesajlarında <strong>sms</strong> kanalı olarak görünür.
+      </p>
+      <p className="settings-hint">
+        Durum: {channelsHub?.sms?.configured ? 'SMS sağlayıcı hazır' : 'env eksik'} ·{' '}
+        {channelsHub?.sms?.enabled ? 'kanal açık' : 'kanal kapalı'}
+      </p>
+
+      <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
+        <div>
+          <h3>Omnichannel — Instagram DM (lite)</h3>
+          <p>
+            Webhook: <code>{channelsHub?.instagram?.webhookPath ?? '/api/webhooks/messaging/instagram'}</code>
+            {channelsHub?.instagram?.webhookUrlHint ?? ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={loading}
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const result = await saveMessagingChannelsHub({ instagram: { enabled: true } });
+              if (result.ok) {
+                setChannelsHub(result);
+                setFlash('Instagram kanalı etkinleştirildi');
+              } else setFlash(result.error ?? 'Kayıt başarısız');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          Instagram’ı etkinleştir
+        </button>
+      </div>
+      <p className="settings-hint">
+        Header: <code>x-ekolojik-instagram-secret</code> veya <code>EKOLOJIK_INSTAGRAM_INBOUND_SECRET</code>. Meta
+        webhook doğrulaması GET <code>hub.challenge</code> desteklenir.
+      </p>
+
+      <PostaEnterpriseSettingsPanel onFlash={setFlash} />
 
       <div className="settings-panel-head" style={{ marginTop: '1rem' }}>
         <div>

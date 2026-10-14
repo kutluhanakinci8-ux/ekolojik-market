@@ -706,6 +706,17 @@ export async function getPlatformSupportAssigneeOptions(dataDir) {
   return { ok: true, operators: await listSupportAssigneeOptions(dataDir) };
 }
 
+export async function getPlatformSupportSkills(dataDir) {
+  const { readSupportSkillsDocument } = await import('./platformSupportSkills.mjs');
+  const doc = await readSupportSkillsDocument(dataDir);
+  return { ok: true, ...doc, path: 'data/platform/support-skills.json' };
+}
+
+export async function updatePlatformSupportSkills(dataDir, body) {
+  const { writeSupportSkillsDocument } = await import('./platformSupportSkills.mjs');
+  return writeSupportSkillsDocument(dataDir, body ?? {});
+}
+
 export async function getPlatformSupportMentionInbox(dataDir, operatorUsername) {
   const { listMentionInboxForUser } = await import('./platformSupportMentionInbox.mjs');
   return listMentionInboxForUser(dataDir, operatorUsername);

@@ -63,7 +63,15 @@ export async function ingestInboundChannelMessage(
     externalId,
     customerId,
     customerName,
-    subject: `${channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : channel} — ${customerName}`,
+    subject: `${
+      channel === 'whatsapp'
+        ? 'WhatsApp'
+        : channel === 'sms'
+          ? 'SMS'
+          : channel === 'instagram'
+            ? 'Instagram'
+            : channel
+    } — ${customerName}`,
   });
   if (!ensured.ok || !ensured.thread) return ensured;
 

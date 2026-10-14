@@ -17,6 +17,19 @@ export async function probeTenantMailHealthAfterRegister(dataDir, tenantId) {
     summary.imap = false;
   }
 
+  try {
+    const { mergePostaOnboardingAliasRules } = await import('./postaRules.mjs');
+    await mergePostaOnboardingAliasRules(dataDir, tenantId);
+  } catch {
+    /* opsiyonel */
+  }
+  try {
+    const { seedTenantPostaAliases } = await import('./postaDeliverability.mjs');
+    await seedTenantPostaAliases(dataDir, tenantId);
+  } catch {
+    /* opsiyonel */
+  }
+
   if (email?.includes('@')) {
     try {
       const { enqueueEkolojikMail } = await import('./emailOutbox.mjs');

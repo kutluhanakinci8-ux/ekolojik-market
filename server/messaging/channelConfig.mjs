@@ -45,6 +45,13 @@ export async function getMessagingChannelsHub(dataDir, tenantId = 'main') {
       webhookUrlHint: `?tenant=${encodeURIComponent(tenantId)}`,
       inboundSecretSet: Boolean(process.env.EKOLOJIK_SMS_INBOUND_SECRET?.trim()),
     },
+    instagram: {
+      enabled: Boolean(raw.instagram?.enabled),
+      configured: Boolean(process.env.EKOLOJIK_INSTAGRAM_INBOUND_SECRET?.trim()),
+      webhookPath: '/api/webhooks/messaging/instagram',
+      webhookUrlHint: `?tenant=${encodeURIComponent(tenantId)}`,
+      inboundSecretSet: Boolean(process.env.EKOLOJIK_INSTAGRAM_INBOUND_SECRET?.trim()),
+    },
     channels: [
       { id: 'web', label: 'Web widget', status: 'active' },
       {
@@ -56,6 +63,11 @@ export async function getMessagingChannelsHub(dataDir, tenantId = 'main') {
         id: 'sms',
         label: 'SMS (v2)',
         status: raw.sms?.enabled && isCrmSmsConfigured() ? 'active' : isCrmSmsConfigured() ? 'disabled' : 'needs_env',
+      },
+      {
+        id: 'instagram',
+        label: 'Instagram DM',
+        status: raw.instagram?.enabled ? 'active' : 'disabled',
       },
     ],
   };
@@ -77,7 +89,12 @@ export async function saveMessagingChannelsHub(dataDir, tenantId, patch = {}) {
   const sms = { ...(current.sms ?? {}) };
   if (patch.sms && patch.sms.enabled != null) sms.enabled = Boolean(patch.sms.enabled);
   sms.updatedAt = new Date().toISOString();
-  const next = { ...current, whatsapp: wa, sms };
+  const instagram = { ...(current.instagram ?? {}) };
+  if (patch.instagram && patch.instagram.enabled != null) {
+    instagram.enabled = Boolean(patch.instagram.enabled);
+  }
+  instagram.updatedAt = new Date().toISOString();
+  const next = { ...current, whatsapp: wa, sms, instagram };
   await mkdir(join(dataDir, 'messaging', tenantId), { recursive: true });
   await writeFile(configPath(dataDir, tenantId), JSON.stringify(next, null, 2), 'utf8');
   return getMessagingChannelsHub(dataDir, tenantId);

@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pickSupportAssignee, isSupportAutoAssignEnabled } from '../server/platformSupportAssign.mjs';
+import { writeSupportSkillsDocument, pickAssigneeForSkill } from '../server/platformSupportSkills.mjs';
 import { maybeSpawnCasesForTenantAlerts, isTenantAlertCaseSpawnEnabled } from '../server/platformSupportTenantAlertCases.mjs';
 import { pushZendeskCommentForCaseReply } from '../server/platformSupportZendesk.mjs';
 import { ingestInboundChannelMessage } from '../server/messaging/omnichannel.mjs';
@@ -15,6 +16,13 @@ try {
   const a1 = await pickSupportAssignee(dir);
   const a2 = await pickSupportAssignee(dir);
   assert(a1 === null || typeof a1 === 'string', 'assignee pick');
+
+  await writeSupportSkillsDocument(dir, {
+    skills: [{ id: 'billing', label: 'Fatura', assignees: ['ops-a', 'ops-b'], maxOpenCases: 0 }],
+    tagMap: { fatura: 'billing' },
+  });
+  const skilled = await pickAssigneeForSkill(dir, { tags: ['fatura'], channel: 'email' });
+  assert(skilled.assignee === 'ops-a' || skilled.assignee === 'ops-b', 'skill assign');
 
   assert(isTenantAlertCaseSpawnEnabled() === false, 'tenant alert default off');
   process.env.EKOLOJIK_SUPPORT_TENANT_ALERT_CASE = '1';

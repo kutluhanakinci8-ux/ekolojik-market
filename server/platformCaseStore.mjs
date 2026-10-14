@@ -123,7 +123,10 @@ export async function createPlatformCase(dataDir, input, operatorUsername) {
   if (!assignee) {
     try {
       const { pickSupportAssignee } = await import('./platformSupportAssign.mjs');
-      assignee = await pickSupportAssignee(dataDir);
+      assignee = await pickSupportAssignee(dataDir, {
+        tags: Array.isArray(input.tags) ? input.tags : [],
+        channel: input.channel,
+      });
     } catch {
       assignee = null;
     }

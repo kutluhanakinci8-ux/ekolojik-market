@@ -1679,6 +1679,64 @@ export async function previewPlatformSupportSmokeFilters(
   }
 }
 
+export type PlatformSupportSkillRow = {
+  id: string;
+  label: string;
+  assignees: string[];
+  maxOpenCases: number;
+};
+
+export type PlatformSupportSkillsHub = {
+  skills: PlatformSupportSkillRow[];
+  channelMap: Record<string, string>;
+  tagMap: Record<string, string>;
+};
+
+export async function fetchPlatformSupportSkills(): Promise<{
+  ok: boolean;
+  skills?: PlatformSupportSkillRow[];
+  channelMap?: Record<string, string>;
+  tagMap?: Record<string, string>;
+  path?: string;
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/skills', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as PlatformSupportSkillsHub & { ok?: boolean; error?: string; path?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Skill yüklenemedi' };
+    }
+    return {
+      ok: true,
+      skills: data.skills,
+      channelMap: data.channelMap,
+      tagMap: data.tagMap,
+      path: data.path,
+    };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function savePlatformSupportSkills(
+  hub: PlatformSupportSkillsHub,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/support/skills', {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(hub),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Skill kaydedilemedi' };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function savePlatformSupportSmokeFilters(
   filters: PlatformSupportSmokeFilters,
 ): Promise<{ ok: boolean; filters?: PlatformSupportSmokeFilters; error?: string }> {
