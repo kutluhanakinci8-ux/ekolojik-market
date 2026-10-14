@@ -202,7 +202,25 @@ export async function performPlatformCaseAction(dataDir, caseId, { channel, body
   const ch = String(channel ?? 'note').trim().toLowerCase();
 
   if (ch === 'note') {
-    return appendCaseActivity(dataDir, caseId, { type: 'note', body: text, channel: 'internal' }, operatorUsername);
+    const logged = await appendCaseActivity(
+      dataDir,
+      caseId,
+      { type: 'note', body: text, channel: 'internal' },
+      operatorUsername,
+    );
+    if (logged.ok) {
+      try {
+        const { notifyCaseNoteMentions } = await import('./platformSupportMentions.mjs');
+        await notifyCaseNoteMentions(dataDir, {
+          caseRow: logged.case ?? caseRow,
+          noteBody: text,
+          authorUsername: operatorUsername,
+        });
+      } catch {
+        /* mention bildirimi opsiyonel */
+      }
+    }
+    return logged;
   }
 
   if (ch === 'email') {

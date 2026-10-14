@@ -239,6 +239,7 @@ if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
   if [[ "$(id -u)" == "0" ]]; then
     bash "${REPO_ROOT}/scripts/sunucu-ekolojik-outbox-failed-cron-kur.sh" || true
     bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-inbox-sync-cron-kur.sh" || true
+    bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-sla-apology-cron-kur.sh" || true
     if [[ "${EKOLOJIK_AUTO_DESTEK_MAILBOX:-0}" == "1" ]] && [[ -x "${REPO_ROOT}/scripts/sunucu-ekolojik-destek-mailbox.sh" ]]; then
       if ! bash "${REPO_ROOT}/scripts/sunucu-ekolojik-support-smtp-recipient-dogrula.sh" "${INSTALL_DIR}" 2>/dev/null; then
         echo "==> destek@ Postfix kutusu otomatik kurulum (--apply)..."

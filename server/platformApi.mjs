@@ -696,6 +696,11 @@ export async function postPlatformSupportSlaApologyBatch(dataDir, body, operator
   return sendSlaApologyBatch(dataDir, body ?? {}, operatorUsername);
 }
 
+export async function getPlatformSupportMentionOperators(dataDir) {
+  const { listMentionableOperators } = await import('./platformSupportMentions.mjs');
+  return { ok: true, operators: await listMentionableOperators(dataDir) };
+}
+
 export async function suggestPlatformSupportCaseAi(dataDir, caseId, body = {}) {
   const { suggestPlatformSupportCaseAi: suggest } = await import('./platformSupportAi.mjs');
   return suggest(dataDir, caseId, body);

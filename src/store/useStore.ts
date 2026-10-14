@@ -212,7 +212,7 @@ import { computeDueDateKey } from '../utils/crm/credit';
 import { mergeCustomersData } from '../utils/crm/merge';
 import { parseCustomerCsv, rowsToCustomers } from '../utils/crm/importExport';
 import { runDailyAutomation } from '../utils/crm/automation';
-import { sendCrmEmailApi } from '../services/crmOutreachService';
+import { sendCrmEmailApi, sendCrmSmsApi } from '../services/crmOutreachService';
 import {
   crmAttachmentKey,
   readFileAsDataUrl,
@@ -5208,9 +5208,20 @@ export function usePosStoreState() {
           skipped += 1;
           continue;
         }
-        item.status = 'skipped';
-        item.error = 'SMS operatör API yapılandırılmadı — müşteri kartından manuel gönderin';
-        skipped += 1;
+        const res = await sendCrmSmsApi({
+          to: customer.phone,
+          body: item.body,
+        });
+        if (res.ok) {
+          item.status = 'sent';
+          item.sentAt = new Date().toISOString();
+          sent += 1;
+          addCrmCommunication(customer.id, 'sms', `Otomatik SMS: ${item.body.slice(0, 80)}`);
+        } else {
+          item.status = 'failed';
+          item.error = res.error ?? 'SMS gönderim hatası';
+          failed += 1;
+        }
       }
     }
 

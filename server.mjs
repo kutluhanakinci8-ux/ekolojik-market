@@ -24,7 +24,7 @@ import { checkRateLimit } from './server/rateLimit.mjs';
 import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
 import { supportInboxStatus } from './server/platformSupportMailConfig.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
-import { sendCrmEmail } from './server/crmOutreach.mjs';
+import { sendCrmEmail, sendCrmSmsOutreach, isCrmSmsConfigured } from './server/crmOutreach.mjs';
 import {
   getEkolojikMailConfig,
   getEkolojikOpsEmail,
@@ -1349,6 +1349,21 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/mention-operators' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportMentionOperators } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportMentionOperators(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Operatör listesi alınamadı' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/sla-apology' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -2149,6 +2164,36 @@ const server = createServer(async (req, res) => {
           error: error instanceof Error ? error.message : 'E-posta hatası',
         }));
       }
+      return;
+    }
+
+    if (pathname === '/api/crm/send-sms' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await sendCrmSmsOutreach(DATA_DIR, {
+          to: data?.to,
+          body: data?.body ?? data?.message ?? '',
+          tenantId,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : 'SMS hatası',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/crm/sms-configured' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, configured: isCrmSmsConfigured() }));
       return;
     }
 
