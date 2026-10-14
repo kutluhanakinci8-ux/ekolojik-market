@@ -64,6 +64,8 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | Zendesk create | `POST` | `/api/platform/support/cases/:id/zendesk/create` (yeni ticket + `platform_case_N` etiketi) |
 | Zendesk durum | `POST` | `/api/platform/support/cases/:id/zendesk/sync-status` (platform → Zendesk); `PUT` kayıt durumu da senkron dener |
 | Makrolar | `GET` / `PUT` | `/api/platform/support/macros` → `data/platform/support-macros.json` |
+| Komut paleti | `GET` | `/api/platform/support/commands` · `POST` `/api/platform/support/command` |
+| Kayıt meta | `PUT` | `/api/platform/support/cases/:id` (durum/öncelik/tür/atanan; aktivite + isteğe bağlı Zendesk durum senkronu) |
 
 ### Ortam değişkenleri (destek@)
 

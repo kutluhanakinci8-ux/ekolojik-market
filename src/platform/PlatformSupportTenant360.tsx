@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  fetchPlatformSupportCommands,
   fetchPlatformSupportTenant360,
   postPlatformSupportCommand,
+  runPlatformInfrastructureProbe,
+  type PlatformSupportCommandHelp,
   type PlatformSupportTenant360Payload,
 } from '../services/platformApi';
 import { saveTenantId } from '../storage/tenantSession';
@@ -23,6 +26,9 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<PlatformSupportTenant360Payload | null>(null);
   const [commandLine, setCommandLine] = useState('');
+  const [commandHelp, setCommandHelp] = useState<PlatformSupportCommandHelp[]>([]);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const [probeSummary, setProbeSummary] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) {
@@ -40,6 +46,29 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    void (async () => {
+      const res = await fetchPlatformSupportCommands();
+      if (res.ok && res.commands?.length) setCommandHelp(res.commands);
+    })();
+  }, []);
+
+  const runInfraProbe = async () => {
+    setProbeBusy(true);
+    setProbeSummary(null);
+    const res = await runPlatformInfrastructureProbe();
+    setProbeBusy(false);
+    if (!res.ok || !res.probes) {
+      onMessage?.(res.error ?? 'Probe başarısız');
+      return;
+    }
+    const smtp = res.probes.smtp?.ok ? 'SMTP OK' : `SMTP: ${res.probes.smtp?.error ?? 'hata'}`;
+    const imap = res.probes.imap?.ok
+      ? `IMAP OK${res.probes.imap.message ? ` (${res.probes.imap.message})` : ''}`
+      : `IMAP: ${res.probes.imap?.error ?? 'hata'}`;
+    setProbeSummary(`${smtp} · ${imap}`);
+  };
+
   const openPos = () => {
     if (!tenantId) return;
     saveTenantId(tenantId);
@@ -51,7 +80,8 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
     if (!tenantId || !commandLine.trim()) return;
     const res = await postPlatformSupportCommand({ tenantId, line: commandLine.trim() });
     if (!res.ok) {
-      onMessage?.(res.error ?? 'Komut başarısız');
+      const hint = res.hints?.length ? ` (${res.hints.join(', ')})` : '';
+      onMessage?.(`${res.error ?? 'Komut başarısız'}${hint}`);
       return;
     }
     onMessage?.('Komut uygulandı');
@@ -163,7 +193,11 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
         <button type="button" className="btn btn-text" onClick={() => void load()}>
           Yenile
         </button>
+        <button type="button" className="btn btn-outline btn-sm" disabled={probeBusy} onClick={() => void runInfraProbe()}>
+          {probeBusy ? 'Probe…' : 'SMTP/IMAP probe'}
+        </button>
       </div>
+      {probeSummary ? <p className="platform-support-hint">{probeSummary}</p> : null}
 
       <label className="platform-support-reply-label">
         Komut paleti
@@ -171,17 +205,36 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
           value={commandLine}
           onChange={(e) => setCommandLine(e.target.value)}
           placeholder="/suspend veya requeue_outbox"
+          list="platform-support-command-suggestions"
           onKeyDown={(e) => {
             if (e.key === 'Enter') void runCommand();
           }}
         />
       </label>
+      <datalist id="platform-support-command-suggestions">
+        {commandHelp.map((c) => (
+          <option key={c.id} value={`/${c.id}`}>{c.label}</option>
+        ))}
+      </datalist>
       <button type="button" className="btn btn-secondary" onClick={() => void runCommand()} disabled={!commandLine.trim()}>
         Çalıştır
       </button>
-      <p className="platform-support-hint platform-support-360-hints">
-        Örnek: <code>askıya</code>, <code>/unsuspend</code>, <code>/requeue_outbox</code>
-      </p>
+      {commandHelp.length ? (
+        <ul className="platform-support-360-command-help">
+          {commandHelp.map((c) => (
+            <li key={c.id}>
+              <button type="button" className="platform-support-inline-link" onClick={() => setCommandLine(`/${c.id}`)}>
+                {c.label}
+              </button>
+              <span className="platform-table-muted"> — {c.example}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="platform-support-hint platform-support-360-hints">
+          Örnek: <code>askıya</code>, <code>/unsuspend</code>, <code>/requeue_outbox</code>
+        </p>
+      )}
     </aside>
   );
 }

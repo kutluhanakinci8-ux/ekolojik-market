@@ -452,7 +452,7 @@ export async function getPlatformSupportCases(dataDir, query = {}) {
 }
 
 export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorUsername) {
-  const { getPlatformCase, updatePlatformCase } = await import('./platformCaseStore.mjs');
+  const { getPlatformCase, updatePlatformCase, appendCaseActivity } = await import('./platformCaseStore.mjs');
   const before = await getPlatformCase(dataDir, caseId);
   const next = { ...patch };
   if (next.externalTicketRef != null && next.externalTicketRef !== false) {
@@ -462,14 +462,42 @@ export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorU
   const result = await updatePlatformCase(dataDir, caseId, next, operatorUsername);
   if (!result.ok) return result;
 
+  const after = result.case;
+  const changes = [];
+  if (patch.status != null && before && after && before.status !== after.status) {
+    changes.push(`durum: ${before.status} → ${after.status}`);
+  }
+  if (patch.priority != null && before && after && before.priority !== after.priority) {
+    changes.push(`öncelik: ${before.priority} → ${after.priority}`);
+  }
+  if (patch.kind != null && before && after && before.kind !== after.kind) {
+    changes.push(`tür: ${before.kind} → ${after.kind}`);
+  }
+  if (patch.assignee !== undefined && before && after && before.assignee !== after.assignee) {
+    changes.push(`atanan: ${before.assignee ?? '—'} → ${after.assignee ?? '—'}`);
+  }
+  if (changes.length) {
+    await appendCaseActivity(
+      dataDir,
+      caseId,
+      { type: 'case_updated', body: changes.join(' · '), channel: 'internal' },
+      operatorUsername ?? 'platform',
+    );
+  }
+
   let zendeskSync = null;
-  if (patch.status != null && before && before.status !== result.case?.status) {
+  if (patch.status != null && before && before.status !== after?.status) {
     const { syncPlatformCaseStatusToZendesk } = await import('./platformSupportZendesk.mjs');
     const sync = await syncPlatformCaseStatusToZendesk(dataDir, caseId);
     zendeskSync = sync.ok ? { ok: true, zendeskStatus: sync.zendeskStatus } : { ok: false, error: sync.error };
   }
 
   return zendeskSync ? { ...result, zendeskSync } : result;
+}
+
+export async function getPlatformSupportCommands() {
+  const { listPlatformSupportCommands } = await import('./platformSupportCommands.mjs');
+  return { ok: true, commands: listPlatformSupportCommands() };
 }
 
 export async function getPlatformSupportZendeskBridge(dataDir) {
