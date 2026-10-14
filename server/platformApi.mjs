@@ -432,6 +432,11 @@ export async function getPlatformTenantsLifecycle(dataDir) {
 }
 
 export async function getPlatformSupportInbox(dataDir, options = {}) {
+  const folder = String(options.folder ?? 'inbound').trim().toLowerCase();
+  if (folder === 'sent') {
+    const { listPlatformSupportSentReplies } = await import('./platformSupportInboxSent.mjs');
+    return listPlatformSupportSentReplies(dataDir, options);
+  }
   const { listPlatformSupportInbox } = await import('./platformSupportInbox.mjs');
   return listPlatformSupportInbox(dataDir, options);
 }
