@@ -43,6 +43,7 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
   const load = useCallback(async () => {
     if (!tenantId) {
       setData(null);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -53,8 +54,12 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
   }, [tenantId]);
 
   useEffect(() => {
+    if (!tenantId) {
+      setData(null);
+      setLoading(false);
+    }
     void load();
-  }, [load]);
+  }, [load, tenantId]);
 
   useEffect(() => {
     void (async () => {
