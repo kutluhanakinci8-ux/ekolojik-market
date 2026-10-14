@@ -2,6 +2,7 @@
 /** destek@ IMAP + outbox köprüsü — cron / manuel senkron */
 import { syncPlatformSupportInbox } from '../server/platformSupportInbox.mjs';
 import { notifyOpsSupportImapSyncFailure } from '../server/platformSupportOpsNotify.mjs';
+import { evaluateAndNotifyOpsSupportSla } from '../server/platformSupportOpsSlaNotify.mjs';
 
 const dataDir =
   process.env.MARKET_POS_DATA_DIR?.trim()
@@ -21,4 +22,14 @@ if (!result.ok) {
 
 const summary = result.message ?? `ok scanned=${result.scanned ?? 0} added=${result.added ?? 0}`;
 console.log(`platform-support-inbox-sync: ${summary}`);
+
+const sla = await evaluateAndNotifyOpsSupportSla(dataDir);
+if (sla.sent) {
+  console.log(
+    `platform-support-ops-sla: ops bildirimi gönderildi (geciken=${sla.caseOverdue}, kritik=${sla.critical})`,
+  );
+} else if (sla.skipped) {
+  console.log(`platform-support-ops-sla: atlandı (${sla.reason})`);
+}
+
 process.exit(0);
