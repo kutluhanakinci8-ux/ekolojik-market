@@ -1230,18 +1230,28 @@ export async function fetchPlatformSupportCases(
 export async function updatePlatformSupportCase(
   caseId: string,
   patch: Partial<PlatformSupportCase> & { externalTicketRef?: PlatformSupportCase['externalTicketRef'] | null },
-): Promise<{ ok: boolean; case?: PlatformSupportCase; error?: string }> {
+): Promise<{
+  ok: boolean;
+  case?: PlatformSupportCase;
+  zendeskSync?: { ok: boolean; zendeskStatus?: string; error?: string };
+  error?: string;
+}> {
   try {
     const res = await fetch(`/api/platform/support/cases/${caseId}`, {
       method: 'PUT',
       headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
-    const data = (await res.json()) as { ok?: boolean; case?: PlatformSupportCase; error?: string };
+    const data = (await res.json()) as {
+      ok?: boolean;
+      case?: PlatformSupportCase;
+      zendeskSync?: { ok: boolean; zendeskStatus?: string; error?: string };
+      error?: string;
+    };
     if (!res.ok || !data.ok) {
       return { ok: false, error: data.error ?? 'Kayıt güncellenemedi' };
     }
-    return { ok: true, case: data.case };
+    return { ok: true, case: data.case, zendeskSync: data.zendeskSync };
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };
   }
@@ -1528,6 +1538,29 @@ export async function postPlatformSupportCommand(payload: {
   const result = await platformSecurityPost('/api/platform/support/command', payload);
   const hints = (result as { hints?: string[] }).hints;
   return { ok: result.ok, error: result.error, hints };
+}
+
+export type PlatformSupportCommandHelp = { id: string; label: string; example: string };
+
+export async function fetchPlatformSupportCommands(): Promise<{
+  ok: boolean;
+  commands?: PlatformSupportCommandHelp[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/commands', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      commands?: PlatformSupportCommandHelp[];
+      error?: string;
+    };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Komut listesi alınamadı' };
+    }
+    return { ok: true, commands: data.commands ?? [] };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
 }
 
 export type PlatformSupportSlaLivePayload = {

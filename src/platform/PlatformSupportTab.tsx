@@ -219,6 +219,15 @@ export function PlatformSupportTab() {
   const [section, setSection] = useState<'inbox' | 'queue' | 'cases' | 'sla'>('cases');
   const [caseRows, setCaseRows] = useState<PlatformSupportCase[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [caseListStatus, setCaseListStatus] = useState<string>('all');
+  const [caseListKind, setCaseListKind] = useState<string>('all');
+  const [caseMetaDraft, setCaseMetaDraft] = useState({
+    status: 'open',
+    priority: 'normal',
+    kind: 'request',
+    assignee: '',
+  });
+  const [caseMetaSaving, setCaseMetaSaving] = useState(false);
   const [zendeskIdDraft, setZendeskIdDraft] = useState('');
   const [zendeskApiReady, setZendeskApiReady] = useState(false);
   const [zendeskPushing, setZendeskPushing] = useState(false);
@@ -268,7 +277,7 @@ export function PlatformSupportTab() {
       staleWaitingHours: result.data.policy.staleWaitingHours,
       closedCaseInbound: result.data.policy.closedCaseInbound ?? 'reopen',
     });
-    const casesRes = await fetchPlatformSupportCases('all', 'all');
+    const casesRes = await fetchPlatformSupportCases(caseListStatus, caseListKind);
     if (casesRes.ok && casesRes.data) {
       setCaseRows(casesRes.data.cases);
     }
@@ -279,7 +288,7 @@ export function PlatformSupportTab() {
     const zendeskRes = await fetchPlatformSupportZendeskBridge();
     setZendeskApiReady(Boolean(zendeskRes.ok && zendeskRes.data?.apiConfigured));
     setLoading(false);
-  }, [windowDays]);
+  }, [windowDays, caseListStatus, caseListKind]);
 
   useEffect(() => {
     void load();
@@ -294,6 +303,18 @@ export function PlatformSupportTab() {
   useEffect(() => {
     setShowAllActivity(false);
   }, [selectedCaseId, activityFilter]);
+
+  const selectedCase = caseRows.find((c) => c.id === selectedCaseId) ?? null;
+
+  useEffect(() => {
+    if (!selectedCase) return;
+    setCaseMetaDraft({
+      status: selectedCase.status,
+      priority: selectedCase.priority,
+      kind: selectedCase.kind,
+      assignee: selectedCase.assignee ?? '',
+    });
+  }, [selectedCase?.id, selectedCase?.status, selectedCase?.priority, selectedCase?.kind, selectedCase?.assignee]);
 
   useEffect(() => {
     if (!selectedCaseId) {
@@ -342,6 +363,7 @@ export function PlatformSupportTab() {
       email_outbound: 'Giden e-posta',
       email_out: 'Giden e-posta',
       case_spawned: 'Yeni kayıt (politika)',
+      case_updated: 'Kayıt güncelleme',
       zendesk_webhook: 'Zendesk (webhook)',
       zendesk_push: 'Zendesk (platform →)',
       note: 'İç not',
@@ -436,8 +458,6 @@ export function PlatformSupportTab() {
     setPolicyMsg('Yanıt destek@ üzerinden gönderildi');
     void load();
   };
-
-  const selectedCase = caseRows.find((c) => c.id === selectedCaseId) ?? null;
 
   const openCaseFromQueue = async (q: PlatformSupportPayload['queue'][0]) => {
     const result = await createPlatformSupportCaseFromQueue({
@@ -590,6 +610,30 @@ export function PlatformSupportTab() {
       setMacroDraft(res.macros.map((m) => ({ ...m })));
     }
     setMacroEditorOpen(true);
+  };
+
+  const saveCaseMeta = async () => {
+    if (!selectedCaseId) return;
+    setCaseMetaSaving(true);
+    const result = await updatePlatformSupportCase(selectedCaseId, {
+      status: caseMetaDraft.status as PlatformSupportCase['status'],
+      priority: caseMetaDraft.priority,
+      kind: caseMetaDraft.kind as PlatformSupportCase['kind'],
+      assignee: caseMetaDraft.assignee.trim() || null,
+    });
+    setCaseMetaSaving(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Kayıt güncellenemedi'));
+      return;
+    }
+    let msg = 'Kayıt alanları güncellendi';
+    if (result.zendeskSync?.ok) {
+      msg += ` · Zendesk: ${result.zendeskSync.zendeskStatus ?? 'senkron'}`;
+    } else if (result.zendeskSync && !result.zendeskSync.ok) {
+      msg += ` · Zendesk senkron atlandı: ${result.zendeskSync.error ?? 'hata'}`;
+    }
+    setPolicyMsg(msg);
+    void refreshCaseDetail();
   };
 
   const saveMacroEditor = async () => {
@@ -772,6 +816,32 @@ export function PlatformSupportTab() {
               E-posta senkronunda otomatik talep; Zendesk webhook ve API köprüsü (env). Dosya:{' '}
               <code>data/platform/support-cases.json</code>
             </p>
+            <div className="platform-support-case-filters">
+              <PlatformFilterSelect
+                label="Durum"
+                icon="role"
+                value={caseListStatus}
+                onChange={(v) => setCaseListStatus(v)}
+              >
+                <option value="all">Tümü</option>
+                <option value="new">Yeni</option>
+                <option value="open">Açık</option>
+                <option value="pending">Beklemede</option>
+                <option value="solved">Çözüldü</option>
+                <option value="closed">Kapalı</option>
+              </PlatformFilterSelect>
+              <PlatformFilterSelect
+                label="Tür"
+                icon="role"
+                value={caseListKind}
+                onChange={(v) => setCaseListKind(v)}
+              >
+                <option value="all">Tümü</option>
+                <option value="request">Talep</option>
+                <option value="incident">Sorun</option>
+                <option value="system">Sistem</option>
+              </PlatformFilterSelect>
+            </div>
             <table className="platform-table platform-table--scroll">
               <thead>
                 <tr>
@@ -837,6 +907,58 @@ export function PlatformSupportTab() {
                 <p className="platform-table-muted">
                   {selectedCase.channel} · {selectedCase.requesterEmail ?? selectedCase.requesterName ?? '—'}
                 </p>
+                <div className="platform-support-policy-form platform-support-case-meta">
+                  <PlatformFilterSelect
+                    label="Durum"
+                    icon="role"
+                    value={caseMetaDraft.status}
+                    onChange={(v) => setCaseMetaDraft((d) => ({ ...d, status: v }))}
+                  >
+                    <option value="new">Yeni</option>
+                    <option value="open">Açık</option>
+                    <option value="pending">Beklemede</option>
+                    <option value="solved">Çözüldü</option>
+                    <option value="closed">Kapalı</option>
+                  </PlatformFilterSelect>
+                  <PlatformFilterSelect
+                    label="Öncelik"
+                    icon="role"
+                    value={caseMetaDraft.priority}
+                    onChange={(v) => setCaseMetaDraft((d) => ({ ...d, priority: v }))}
+                  >
+                    <option value="low">Düşük</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">Yüksek</option>
+                    <option value="urgent">Acil</option>
+                  </PlatformFilterSelect>
+                  <PlatformFilterSelect
+                    label="Tür"
+                    icon="role"
+                    value={caseMetaDraft.kind}
+                    onChange={(v) => setCaseMetaDraft((d) => ({ ...d, kind: v }))}
+                  >
+                    <option value="request">Talep</option>
+                    <option value="incident">Sorun</option>
+                    <option value="system">Sistem</option>
+                  </PlatformFilterSelect>
+                  <label className="platform-support-field">
+                    <span className="platform-support-field-label">Atanan</span>
+                    <input
+                      className="platform-support-control"
+                      value={caseMetaDraft.assignee}
+                      onChange={(e) => setCaseMetaDraft((d) => ({ ...d, assignee: e.target.value }))}
+                      placeholder="operatör kullanıcı adı"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={caseMetaSaving}
+                    onClick={() => void saveCaseMeta()}
+                  >
+                    {caseMetaSaving ? 'Kaydediliyor…' : 'Kaydı güncelle'}
+                  </button>
+                </div>
                 {caseUnifiedTimeline.length > 0 ? (
                   <div className="platform-support-case-email-chain platform-support-unified-timeline">
                     <h4>Zaman çizelgesi</h4>
