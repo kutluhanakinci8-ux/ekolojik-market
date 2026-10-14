@@ -1458,39 +1458,42 @@ export function PlatformSupportTab() {
                   </div>
                 </header>
                 <div className="platform-support-policy-form platform-support-case-meta">
-                  <PlatformFilterSelect
-                    label="Durum"
-                    icon="role"
-                    value={caseMetaDraft.status}
-                    onChange={(v) => setCaseMetaDraft((d) => ({ ...d, status: v }))}
-                  >
-                    <option value="new">Yeni</option>
-                    <option value="open">Açık</option>
-                    <option value="pending">Beklemede</option>
-                    <option value="solved">Çözüldü</option>
-                    <option value="closed">Kapalı</option>
-                  </PlatformFilterSelect>
-                  <PlatformFilterSelect
-                    label="Öncelik"
-                    icon="role"
-                    value={caseMetaDraft.priority}
-                    onChange={(v) => setCaseMetaDraft((d) => ({ ...d, priority: v }))}
-                  >
-                    <option value="low">Düşük</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">Yüksek</option>
-                    <option value="urgent">Acil</option>
-                  </PlatformFilterSelect>
-                  <PlatformFilterSelect
-                    label="Tür"
-                    icon="role"
-                    value={caseMetaDraft.kind}
-                    onChange={(v) => setCaseMetaDraft((d) => ({ ...d, kind: v }))}
-                  >
-                    <option value="request">Talep</option>
-                    <option value="incident">Sorun</option>
-                    <option value="system">Sistem</option>
-                  </PlatformFilterSelect>
+                  <div className="platform-support-case-meta-selects">
+                    <PlatformFilterSelect
+                      label="Durum"
+                      icon="role"
+                      value={caseMetaDraft.status}
+                      onChange={(v) => setCaseMetaDraft((d) => ({ ...d, status: v }))}
+                    >
+                      <option value="new">Yeni</option>
+                      <option value="open">Açık</option>
+                      <option value="pending">Beklemede</option>
+                      <option value="solved">Çözüldü</option>
+                      <option value="closed">Kapalı</option>
+                    </PlatformFilterSelect>
+                    <PlatformFilterSelect
+                      label="Öncelik"
+                      icon="role"
+                      value={caseMetaDraft.priority}
+                      onChange={(v) => setCaseMetaDraft((d) => ({ ...d, priority: v }))}
+                    >
+                      <option value="low">Düşük</option>
+                      <option value="normal">Normal</option>
+                      <option value="high">Yüksek</option>
+                      <option value="urgent">Acil</option>
+                    </PlatformFilterSelect>
+                    <PlatformFilterSelect
+                      label="Tür"
+                      icon="role"
+                      value={caseMetaDraft.kind}
+                      onChange={(v) => setCaseMetaDraft((d) => ({ ...d, kind: v }))}
+                    >
+                      <option value="request">Talep</option>
+                      <option value="incident">Sorun</option>
+                      <option value="system">Sistem</option>
+                    </PlatformFilterSelect>
+                  </div>
+                  <div className="platform-support-case-meta-fields">
                   <label className="platform-support-field">
                     <span className="platform-support-field-label">Atanan</span>
                     <input
@@ -1539,6 +1542,7 @@ export function PlatformSupportTab() {
                   >
                     {caseMetaSaving ? 'Kaydediliyor…' : 'Kaydı güncelle'}
                   </button>
+                  </div>
                 </div>
                 {caseUnifiedTimeline.length > 0 ? (
                   <div className="platform-support-case-email-chain platform-support-unified-timeline">
