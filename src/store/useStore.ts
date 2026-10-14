@@ -173,6 +173,11 @@ import { saveLastQuickUser } from '../storage/quickLogin';
 import type { LoginAuditEntry, LoginLockoutRecord } from '../types/security';
 import { MAX_LOGIN_AUDIT_ENTRIES } from '../types/security';
 import type { LoginMethod } from '../types/security';
+import {
+  inferLoginAuditKind,
+  reportLoginAuditToServer,
+  type LoginAuditFailureKind,
+} from '../services/loginAuditReport';
 import type { ActivityAction, ActivityAuditEntry } from '../utils/activityAudit';
 import { getPageLabel, MAX_ACTIVITY_AUDIT_ENTRIES } from '../utils/activityAudit';
 import type { AppPage } from '../components/AppShell';
@@ -3334,6 +3339,7 @@ export function usePosStoreState() {
       deviceInfo?: string;
       clientIp?: string;
     },
+    options?: { skipServerSync?: boolean; failureKind?: LoginAuditFailureKind },
   ) => {
     const clientIp = entry.clientIp ?? await getClientIp();
     const record: LoginAuditEntry = {
@@ -3344,6 +3350,18 @@ export function usePosStoreState() {
       ...entry,
     };
     setLoginAuditLog((prev) => [record, ...prev].slice(0, MAX_LOGIN_AUDIT_ENTRIES));
+    if (!record.success && !options?.skipServerSync && record.username) {
+      const kind = options?.failureKind
+        ?? inferLoginAuditKind(record.failureReason, record.method);
+      void reportLoginAuditToServer(loadTenantId(), {
+        username: record.username,
+        failureKind: kind,
+        failureReason: record.failureReason ?? 'Başarısız giriş',
+        method: record.method,
+        displayName: record.displayName,
+        userId: record.userId,
+      });
+    }
   }, []);
 
   const finalizeLogin = useCallback(
@@ -3586,6 +3604,12 @@ export function usePosStoreState() {
         clearLoginLockout(normalized);
       } else if (!lockCheck.allowed) {
         if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
+          void reportLoginAuditToServer(authTenant, {
+            username: normalized,
+            failureKind: 'browser_lockout',
+            failureReason: lockCheck.message ?? 'Tarayıcı giriş kilidi',
+            method: 'password',
+          });
           return {
             status: 'locked',
             message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
@@ -3665,19 +3689,30 @@ export function usePosStoreState() {
       } else {
         const credRejected = remoteAuth.httpStatus === 401
           || (remoteAuth.error ?? '').toLowerCase().includes('hatalı');
+        const serverAudited = remoteAuth.httpStatus === 401
+          || remoteAuth.httpStatus === 403
+          || remoteAuth.httpStatus === 404;
         if (credRejected) {
           recordFailedLogin(normalized);
         }
+        const failureReason = remoteAuth.error ?? 'Sunucu girişi reddetti';
         await appendLoginAudit({
           username: normalized,
           success: false,
           method: 'password',
-          failureReason: remoteAuth.error ?? 'Sunucu girişi reddetti',
+          failureReason,
+        }, {
+          skipServerSync: serverAudited,
+          failureKind: credRejected
+            ? undefined
+            : (remoteAuth.httpStatus ? 'server_rejected' : 'network_error'),
         });
         return {
           status: 'error',
           message: credRejected
-            ? 'Kullanıcı adı veya şifre hatalı.'
+            ? (remoteAuth.error?.includes('kilitlendi')
+              ? remoteAuth.error
+              : 'Kullanıcı adı veya şifre hatalı.')
             : (remoteAuth.error ?? 'Sunucuya bağlanılamadı. Tekrar deneyin.'),
         };
       }
@@ -3690,7 +3725,7 @@ export function usePosStoreState() {
           success: false,
           method: 'password',
           failureReason: 'Hesap kilitli (yönetici)',
-        });
+        }, { failureKind: 'account_disabled' });
         return {
           status: 'locked',
           message: 'Hesabınız yönetici tarafından kilitlendi. Giriş yapamazsınız.',
@@ -3704,7 +3739,7 @@ export function usePosStoreState() {
           success: false,
           method: 'password',
           failureReason: 'Kullanıcı adı veya şifre hatalı',
-        });
+        }, { skipServerSync: true });
         return { status: 'error', message: 'Kullanıcı adı veya şifre hatalı.' };
       }
 
@@ -3721,7 +3756,7 @@ export function usePosStoreState() {
             success: false,
             method: 'password',
             failureReason: '2FA kodu hatalı',
-          });
+          }, { failureKind: 'wrong_2fa' });
           return { status: 'error', message: 'Doğrulama kodu hatalı.' };
         }
       }
@@ -3756,6 +3791,12 @@ export function usePosStoreState() {
         clearLoginLockout(normalized);
       } else if (!lockCheck.allowed) {
         if (lockCheck.retryAfterMs && lockCheck.retryAfterMs > 0) {
+          void reportLoginAuditToServer(authTenant, {
+            username: normalized,
+            failureKind: 'browser_lockout',
+            failureReason: lockCheck.message ?? 'Tarayıcı giriş kilidi',
+            method: 'pin',
+          });
           return {
             status: 'locked',
             message: lockCheck.message ?? 'Giriş geçici olarak kilitli.',
@@ -3817,19 +3858,30 @@ export function usePosStoreState() {
       } else {
         const credRejected = remoteAuth.httpStatus === 401
           || (remoteAuth.error ?? '').toLowerCase().includes('hatalı');
+        const serverAudited = remoteAuth.httpStatus === 401
+          || remoteAuth.httpStatus === 403
+          || remoteAuth.httpStatus === 404;
         if (credRejected) {
           recordFailedLogin(normalized);
         }
+        const failureReason = remoteAuth.error ?? 'Sunucu PIN reddetti';
         await appendLoginAudit({
           username: normalized,
           success: false,
           method: 'pin',
-          failureReason: remoteAuth.error ?? 'Sunucu PIN reddetti',
+          failureReason,
+        }, {
+          skipServerSync: serverAudited,
+          failureKind: credRejected
+            ? 'wrong_pin'
+            : (remoteAuth.httpStatus ? 'server_rejected' : 'network_error'),
         });
         return {
           status: 'error',
           message: credRejected
-            ? 'Kullanıcı adı veya PIN hatalı.'
+            ? (remoteAuth.error?.includes('kilitlendi')
+              ? remoteAuth.error
+              : 'Kullanıcı adı veya PIN hatalı.')
             : (remoteAuth.error ?? 'Sunucuya bağlanılamadı. Tekrar deneyin.'),
         };
       }
@@ -3842,7 +3894,7 @@ export function usePosStoreState() {
           success: false,
           method: 'pin',
           failureReason: 'Hesap kilitli (yönetici)',
-        });
+        }, { failureKind: 'account_disabled' });
         return {
           status: 'locked',
           message: 'Hesabınız yönetici tarafından kilitlendi. Giriş yapamazsınız.',
@@ -3856,7 +3908,7 @@ export function usePosStoreState() {
           success: false,
           method: 'pin',
           failureReason: 'PIN hatalı',
-        });
+        }, { skipServerSync: true });
         return { status: 'error', message: 'Kullanıcı adı veya PIN hatalı.' };
       }
 

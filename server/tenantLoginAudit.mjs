@@ -1,6 +1,7 @@
 /** Kiracı store.json — sunucu tarafı giriş denetim kaydı (platform 360) */
 
 import { randomUUID } from 'node:crypto';
+import { CLIENT_REPORTABLE_KINDS } from './loginAuditKinds.mjs';
 import { readTenantStore, writeTenantStore } from './tenantAuth.mjs';
 
 const MAX_ENTRIES = 200;
@@ -19,7 +20,40 @@ export function buildLoginAuditRecord(partial) {
     clientIp: partial.clientIp ? String(partial.clientIp).trim() : undefined,
     createdAt: partial.createdAt ?? new Date().toISOString(),
     failureReason: partial.failureReason ? String(partial.failureReason).slice(0, 240) : undefined,
+    failureKind: partial.failureKind ? String(partial.failureKind).slice(0, 48) : undefined,
   };
+}
+
+export async function recordClientLoginAuditFailure(
+  dataDir,
+  tenantId,
+  body,
+  { clientIp, userAgent } = {},
+) {
+  const kind = String(body?.failureKind ?? '').trim();
+  if (!CLIENT_REPORTABLE_KINDS.has(kind)) {
+    return { ok: false, status: 400, error: 'invalid_kind' };
+  }
+  const username = String(body?.username ?? '').trim().toLowerCase();
+  if (!username || username.length > 64) {
+    return { ok: false, status: 400, error: 'invalid_username' };
+  }
+  const failureReason = String(body?.failureReason ?? '').trim();
+  if (!failureReason || failureReason.length > 240) {
+    return { ok: false, status: 400, error: 'invalid_reason' };
+  }
+
+  return appendTenantLoginAudit(dataDir, tenantId, {
+    username,
+    displayName: body?.displayName,
+    userId: body?.userId,
+    success: false,
+    method: body?.method === 'pin' ? 'pin' : 'password',
+    failureKind: kind,
+    failureReason,
+    clientIp,
+    deviceInfo: userAgent ? String(userAgent).slice(0, 160) : 'web',
+  });
 }
 
 export async function appendTenantLoginAudit(dataDir, tenantId, partial) {

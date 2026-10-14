@@ -38,7 +38,7 @@ export async function buildPlatformSupportTenant360(dataDir, tenantId) {
     ? tenantSecuritySnapshots([userAnalytics])[0] ?? null
     : null;
   const recentLogins = store
-    ? mergeRecentLogins([{ store, tenantId: id, businessName }], 25)
+    ? mergeRecentLogins([{ store, tenantId: id, businessName }], 40)
     : [];
 
   const cases = (await readPlatformCases(dataDir))
@@ -57,7 +57,7 @@ export async function buildPlatformSupportTenant360(dataDir, tenantId) {
       stock: Number(p.stock) || 0,
     }));
 
-  const loginAlerts = recentLogins.filter((e) => !e.success).slice(0, 8);
+  const loginAlerts = recentLogins.filter((e) => !e.success).slice(0, 15);
 
   const userRoster = (userAnalytics?.roster ?? []).map((u) => ({
     id: u.id,

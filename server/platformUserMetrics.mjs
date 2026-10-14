@@ -151,6 +151,7 @@ export function mergeRecentLogins(storesByTenant, limit = 40) {
         method: entry.method,
         createdAt: entry.createdAt,
         failureReason: entry.failureReason,
+        failureKind: entry.failureKind,
         clientIp: entry.clientIp,
       });
     }

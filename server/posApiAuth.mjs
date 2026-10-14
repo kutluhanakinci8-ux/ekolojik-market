@@ -200,6 +200,16 @@ async function auditPosLoginAttempt(dataDir, tenantId, partial) {
   }
 }
 
+async function denyPosLogin(dataDir, tenant, auditMeta, auditBody, httpStatus, message) {
+  await auditPosLoginAttempt(dataDir, tenant, {
+    ...auditMeta,
+    success: false,
+    ...auditBody,
+    failureReason: auditBody.failureReason ?? message,
+  });
+  return { ok: false, status: httpStatus, message };
+}
+
 export async function issuePosApiTokenFromCredentials(
   dataDir,
   tenantId,
@@ -212,6 +222,25 @@ export async function issuePosApiTokenFromCredentials(
     deviceInfo: userAgent ? String(userAgent).slice(0, 160) : 'web',
     method: pin ? 'pin' : 'password',
   };
+  const { LOGIN_AUDIT_KINDS, lifecycleKindFromMessage } = await import('./loginAuditKinds.mjs');
+  const wrongSecretMsg = pin ? 'Kullanıcı adı veya PIN hatalı' : 'Kullanıcı adı veya şifre hatalı';
+  const wrongSecretKind = pin ? LOGIN_AUDIT_KINDS.WRONG_PIN : LOGIN_AUDIT_KINDS.WRONG_CREDENTIALS;
+
+  if (!password && !pin) {
+    return denyPosLogin(
+      dataDir,
+      tenant,
+      auditMeta,
+      {
+        username: normalized,
+        failureKind: LOGIN_AUDIT_KINDS.MISSING_CREDENTIALS,
+        failureReason: 'Kullanıcı adı ve şifre girin',
+      },
+      401,
+      'Kullanıcı adı veya şifre hatalı',
+    );
+  }
+
   const {
     isPlatformOperatorUsername,
     normalizePlatformOperatorUsername,
@@ -223,7 +252,18 @@ export async function issuePosApiTokenFromCredentials(
     if (platformResult.ok) return platformResult;
     if (platformResult.status !== 401) return platformResult;
     if (isDedicatedPlatformOnlyUsername(normalized)) {
-      return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
+      return denyPosLogin(
+        dataDir,
+        tenant,
+        auditMeta,
+        {
+          username: normalized,
+          failureKind: LOGIN_AUDIT_KINDS.PLATFORM_ONLY,
+          failureReason: 'Kullanıcı adı veya şifre hatalı',
+        },
+        401,
+        'Kullanıcı adı veya şifre hatalı',
+      );
     }
   }
   if (tenant === 'main' && GREENLEAF_LOGIN_ALIASES.has(normalized)) {
@@ -231,35 +271,90 @@ export async function issuePosApiTokenFromCredentials(
   }
   normalized = normalizePlatformOperatorUsername(normalized);
   if (isDedicatedPlatformOnlyUsername(normalized)) {
-    return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
+    return denyPosLogin(
+      dataDir,
+      tenant,
+      auditMeta,
+      {
+        username: normalized,
+        failureKind: LOGIN_AUDIT_KINDS.PLATFORM_ONLY,
+        failureReason: 'Kullanıcı adı veya şifre hatalı',
+      },
+      401,
+      'Kullanıcı adı veya şifre hatalı',
+    );
   }
   const tenantAffinity = assertUserBelongsToTenant(normalized, tenantId);
   if (!tenantAffinity.ok) {
-    return { ok: false, status: tenantAffinity.status ?? 403, message: tenantAffinity.message };
+    return denyPosLogin(
+      dataDir,
+      tenant,
+      auditMeta,
+      {
+        username: normalized,
+        failureKind: LOGIN_AUDIT_KINDS.TENANT_AFFINITY,
+        failureReason: tenantAffinity.message,
+      },
+      tenantAffinity.status ?? 403,
+      tenantAffinity.message,
+    );
   }
 
   const { assertTenantLoginAllowed } = await import('./platformTenantLifecycle.mjs');
   const loginGate = await assertTenantLoginAllowed(dataDir, tenantId);
   if (!loginGate.ok) {
-    return { ok: false, status: 403, message: loginGate.message };
+    return denyPosLogin(
+      dataDir,
+      tenant,
+      auditMeta,
+      {
+        username: normalized,
+        failureKind: lifecycleKindFromMessage(loginGate.message),
+        failureReason: loginGate.message,
+      },
+      403,
+      loginGate.message,
+    );
   }
 
   const rawStore = await readTenantStore(dataDir, tenantId);
   const { hydrateStoreWithCredentialVault } = await import('./credentialVault.mjs');
   const { store } = await hydrateStoreWithCredentialVault(dataDir, tenantId, rawStore);
   if (!store?.users?.length) {
-    return { ok: false, status: 404, message: 'Mağaza bulunamadı' };
+    return denyPosLogin(
+      dataDir,
+      tenant,
+      auditMeta,
+      {
+        username: normalized,
+        failureKind: LOGIN_AUDIT_KINDS.STORE_MISSING,
+        failureReason: 'Mağaza bulunamadı',
+      },
+      404,
+      'Mağaza bulunamadı',
+    );
   }
-  const user = store.users.find((u) => u.username === normalized && u.isActive !== false);
-  if (!user) {
-    await auditPosLoginAttempt(dataDir, tenant, {
-      ...auditMeta,
-      username: normalized,
-      success: false,
-      failureReason: 'Kullanıcı adı veya şifre hatalı',
-    });
-    return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
+  const matched = store.users.find((u) => u.username === normalized);
+  if (!matched || matched.isActive === false) {
+    const disabled = matched && matched.isActive === false;
+    return denyPosLogin(
+      dataDir,
+      tenant,
+      auditMeta,
+      {
+        username: normalized,
+        userId: disabled ? matched.id : undefined,
+        displayName: disabled ? matched.displayName : undefined,
+        failureKind: disabled ? LOGIN_AUDIT_KINDS.ACCOUNT_DISABLED : LOGIN_AUDIT_KINDS.UNKNOWN_USER,
+        failureReason: disabled
+          ? 'Hesap kilitli (yönetici)'
+          : 'Kullanıcı adı veya şifre hatalı',
+      },
+      401,
+      disabled ? 'Hesabınız yönetici tarafından kilitlendi. Giriş yapamazsınız.' : 'Kullanıcı adı veya şifre hatalı',
+    );
   }
+  const user = matched;
 
   let authed = false;
   if (password) {
@@ -268,15 +363,20 @@ export async function issuePosApiTokenFromCredentials(
     authed = verifyPin(String(pin), user.pinHash);
   }
   if (!authed) {
-    await auditPosLoginAttempt(dataDir, tenant, {
-      ...auditMeta,
-      userId: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      success: false,
-      failureReason: 'Kullanıcı adı veya şifre hatalı',
-    });
-    return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
+    return denyPosLogin(
+      dataDir,
+      tenant,
+      auditMeta,
+      {
+        userId: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        failureKind: wrongSecretKind,
+        failureReason: wrongSecretMsg,
+      },
+      401,
+      wrongSecretMsg,
+    );
   }
 
   await auditPosLoginAttempt(dataDir, tenant, {

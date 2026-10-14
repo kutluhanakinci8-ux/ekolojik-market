@@ -2139,6 +2139,34 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/auth/login-audit' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const data = await readRequestBody(req);
+      const clientIp =
+        String(req.headers['x-forwarded-for'] ?? '')
+          .split(',')[0]
+          .trim() || req.socket?.remoteAddress || '';
+      try {
+        const { recordClientLoginAuditFailure } = await import('./server/tenantLoginAudit.mjs');
+        const result = await recordClientLoginAuditFailure(DATA_DIR, resolvedTenant, data, {
+          clientIp,
+          userAgent: req.headers['user-agent'],
+        });
+        const status = result.ok ? 200 : result.status ?? 400;
+        res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result.ok ? { ok: true } : { ok: false, error: result.error }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : 'Kayıt alınamadı',
+        }));
+      }
+      return;
+    }
+
     if (pathname === '/api/auth/pos-token/refresh' && req.method === 'POST') {
       const tenantId = resolveTenantId(url);
       const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
