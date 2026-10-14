@@ -321,7 +321,7 @@ export function PostaOnboardingWizard({ store, onFinished }: Props) {
               </ul>
               <p className="posta-onboarding-lead" style={{ fontSize: '0.9rem' }}>
                 Önerilen alias’lar (mağaza ayarı, <code>EKOLOJIK_MAIL_ALIASES</code> veya domain):{' '}
-                {mailAliases.length ? mailAliases.join(', ') : 'siparis@, fatura@ → aynı IMAP kutusu'}
+                {mailAliases.length ? mailAliases.join(', ') : 'siparis@, fatura@, destek@ → aynı IMAP / platform kutusu'}
               </p>
               <div className="posta-onboarding-actions">
                 <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleSeedAliasRules()}>

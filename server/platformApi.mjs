@@ -686,6 +686,16 @@ export async function getPlatformSupportSlaLive(dataDir, query = {}) {
   return buildPlatformSupportSlaLive(dataDir, query);
 }
 
+export async function getPlatformSupportSlaApologyQueue(dataDir) {
+  const { buildSlaApologyQueue } = await import('./platformSupportSlaApology.mjs');
+  return buildSlaApologyQueue(dataDir);
+}
+
+export async function postPlatformSupportSlaApologyBatch(dataDir, body, operatorUsername) {
+  const { sendSlaApologyBatch } = await import('./platformSupportSlaApology.mjs');
+  return sendSlaApologyBatch(dataDir, body ?? {}, operatorUsername);
+}
+
 export async function suggestPlatformSupportCaseAi(dataDir, caseId, body = {}) {
   const { suggestPlatformSupportCaseAi: suggest } = await import('./platformSupportAi.mjs');
   return suggest(dataDir, caseId, body);

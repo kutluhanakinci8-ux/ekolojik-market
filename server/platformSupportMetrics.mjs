@@ -1,6 +1,7 @@
 /** Platform — müşteri mesajlaşma SLA, kuyruk ve kiracı hazırlığı */
 
 import { readTenantStore, listTenantIds } from './tenantAuth.mjs';
+import { buildTenantPlatformAlerts, todayKey } from './platformTenantMetrics.mjs';
 import { listMessagingThreads } from './messaging/store.mjs';
 import { ensurePostaOnboarding } from './postaOnboarding.mjs';
 import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
@@ -9,6 +10,7 @@ import { readSupportFilterConfig, filterProductionMessagingThreads } from './pla
 import { listPlatformSupportInbox } from './platformSupportInbox.mjs';
 import { readPlatformCases, summarizeCases } from './platformCaseStore.mjs';
 import { computeMessagingSlaFromThreads } from './messaging/sla.mjs';
+import { getOutboxCounts } from './emailOutbox.mjs';
 
 async function allTenantIds(dataDir) {
   const ids = ['main', ...(await listTenantIds(dataDir))];
@@ -186,6 +188,20 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
   const { listPlatformSupportContactQueue } = await import('./platformSupportCases.mjs');
   const contactQueue = await listPlatformSupportContactQueue(dataDir, { limit: 200 });
 
+  const outboxCounts = await getOutboxCounts(dataDir);
+  const asOf = todayKey();
+  let platformAlertsCritical = 0;
+  let platformAlertsWarning = 0;
+  for (const tenantId of await allTenantIds(dataDir)) {
+    const store = await readTenantStore(dataDir, tenantId);
+    if (!store) continue;
+    const businessName = businessNameFor(store, tenantId);
+    for (const a of buildTenantPlatformAlerts(tenantId, businessName, store, asOf)) {
+      if (a.severity === 'critical') platformAlertsCritical += 1;
+      else if (a.severity === 'warning') platformAlertsWarning += 1;
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     windowDays,
@@ -203,6 +219,12 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
     contactForm: {
       total: contactQueue.total,
       withoutCase: contactQueue.withoutCase,
+    },
+    opsSignals: {
+      outboxFailed: outboxCounts.failed ?? 0,
+      outboxPending: outboxCounts.pending ?? 0,
+      platformAlertsCritical,
+      platformAlertsWarning,
     },
     inbox: {
       unread: inbox.unread,

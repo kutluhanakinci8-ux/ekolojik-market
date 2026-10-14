@@ -85,6 +85,8 @@ export async function buildPlatformSupportSlaLive(dataDir, { days = 7 } = {}) {
   }));
 
   const daily = await buildDailyFirstResponseSeries(dataDir, windowDays);
+  const { buildSlaApologyQueue } = await import('./platformSupportSlaApology.mjs');
+  const apologyQueue = await buildSlaApologyQueue(dataDir, { limit: 20 });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -103,5 +105,6 @@ export async function buildPlatformSupportSlaLive(dataDir, { days = 7 } = {}) {
     overdueCases,
     daily,
     topQueue: (overview.queue ?? []).slice(0, 12),
+    apologyQueue,
   };
 }

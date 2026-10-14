@@ -35,3 +35,10 @@ jobs:
 
       - name: Pre-release QA (local server)
         run: npm run test:ci
+
+      - name: Posta NB UI smoke (Playwright)
+        continue-on-error: true
+        run: |
+          source scripts/lib/ensure-playwright.sh
+          ensure_playwright "$PWD"
+          npm run test:nb-ui-visual

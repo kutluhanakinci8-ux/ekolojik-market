@@ -61,7 +61,13 @@ function normalizeAliasList(raw) {
 export function defaultAliasesForDomain(domain) {
   const d = String(domain ?? '').trim().toLowerCase();
   if (!d) return [];
-  return [`siparis@${d}`, `fatura@${d}`];
+  const support =
+    process.env.EKOLOJIK_SUPPORT_INBOX?.trim().toLowerCase()
+    || process.env.EKOLOJIK_SUPPORT_MAIL_FROM?.trim().toLowerCase()
+    || `destek@${d}`;
+  const aliases = [`siparis@${d}`, `fatura@${d}`];
+  if (support.includes('@') && !aliases.includes(support)) aliases.push(support);
+  return aliases;
 }
 
 function domainFromEmail(email) {

@@ -12,10 +12,10 @@
 |------|--------|----------------|
 | Gelen kutusu | destek@ IMAP/outbox köprüsü, thread UI, ekler, okundu toplu | Harici DNS/alias VPS doğrulaması (`sunucu-ekolojik-support-imap-dogrula.sh`) |
 | Kanallar | Case + e-posta + mesaj (thread bağlı) + iletişim formu kuyruğu | Outbox/güvenlik uyarıları hâlâ ayrı sekmelerde özet |
-| SLA / kuyruk | Smoke filtresi (UI + önizleme), prod kuyruk, SLA canlı panel | Otomatik müşteri SLA özür maili yok — **SLA canlı → özür maili** (makro `sla_sorry`, onaylı gönder) |
+| SLA / kuyruk | Smoke filtresi (UI + önizleme), prod kuyruk, SLA canlı panel, **özür kuyruğu + toplu gönder** (`sla-apology` API) | Tam otomatik cron özür (onaysız) yok — operatör onayı gerekli |
 | Yanıt | Case detay: not / e-posta / mesaj; makrolar; AI taslak | Mesaj yanıtı thread bağlantısı olmadan çalışmaz |
 | Operasyon | Komut paleti, kiracı 360, Zendesk köprüsü, CSV export | Zendesk canlı webhook testi ortam bağımlı |
-| Outbox | Kiracı Posta + platform komut `/requeue_outbox` | Prod **failed/pending** triage: `scripts/ops-outbox-health.mjs` |
+| Outbox | Kiracı Posta + platform komut `/requeue_outbox`; Destek hero **opsSignals** (failed + kritik uyarı) | Prod **failed/pending** triage: `scripts/ops-outbox-health.mjs` |
 
 Teslim öncesi: `npm run test:ci`, `node scripts/pre-release-qa.mjs https://…`, `node scripts/ops-outbox-health.mjs` (VPS data dir).
 

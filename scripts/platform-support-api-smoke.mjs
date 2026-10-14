@@ -38,7 +38,12 @@ try {
 
   const overview = await buildPlatformSupportOverview(tmp, { days: 7 });
   assert(overview.contactForm != null, 'contactForm in overview');
+  assert(overview.opsSignals != null, 'opsSignals in overview');
   assert(Array.isArray(overview.queue), 'queue array');
+
+  const { buildSlaApologyQueue } = await import('../server/platformSupportSlaApology.mjs');
+  const apology = await buildSlaApologyQueue(tmp);
+  assert(apology && Array.isArray(apology.items), 'sla apology queue');
 
   const preview = await previewSmokeMessagingFilter(tmp, { hideSmoke: true, tenantIds: [], subjectPatterns: [], customerNamePatterns: [] });
   assert(preview.ok, 'smoke preview');
