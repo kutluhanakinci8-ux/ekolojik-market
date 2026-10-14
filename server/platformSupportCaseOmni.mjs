@@ -1,6 +1,6 @@
 /** Destek D4 — case üzerinden e-posta, mesajlaşma ve iç not */
 
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { appendMessagingMessage, listMessagingMessages } from './messaging/store.mjs';
 import { getPlatformCase, appendCaseActivity } from './platformCaseStore.mjs';
@@ -42,6 +42,32 @@ export async function listPlatformSupportMacros(dataDir) {
     /* varsayılan */
   }
   return DEFAULT_MACROS;
+}
+
+function normalizeMacroRow(raw) {
+  const id = String(raw?.id ?? '').trim().replace(/\s+/g, '_');
+  const label = String(raw?.label ?? '').trim();
+  const body = String(raw?.body ?? '');
+  if (!id || !label) return null;
+  return { id, label, body };
+}
+
+export async function savePlatformSupportMacros(dataDir, macrosInput) {
+  const list = Array.isArray(macrosInput) ? macrosInput : [];
+  const macros = [];
+  const seen = new Set();
+  for (const raw of list) {
+    const row = normalizeMacroRow(raw);
+    if (!row || seen.has(row.id)) continue;
+    seen.add(row.id);
+    macros.push(row);
+  }
+  if (!macros.length) {
+    return { ok: false, error: 'En az bir geçerli makro gerekli (id + etiket)' };
+  }
+  await mkdir(join(dataDir, 'platform'), { recursive: true });
+  await writeFile(MACROS_PATH(dataDir), JSON.stringify(macros, null, 2), 'utf8');
+  return { ok: true, macros };
 }
 
 export async function getPlatformSupportCaseDetail(dataDir, caseId) {

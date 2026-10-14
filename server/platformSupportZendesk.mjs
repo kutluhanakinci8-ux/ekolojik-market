@@ -1,6 +1,12 @@
 /** Zendesk ↔ platform destek kaydı köprüsü (webhook + isteğe bağlı API push) */
 
-import { findCaseByExternalTicket, updatePlatformCase, appendCaseActivity, getPlatformCase } from './platformCaseStore.mjs';
+import {
+  findCaseByExternalTicket,
+  findCaseByNumber,
+  updatePlatformCase,
+  appendCaseActivity,
+  getPlatformCase,
+} from './platformCaseStore.mjs';
 
 export function getZendeskBridgeConfig() {
   const subdomain = process.env.EKOLOJIK_ZENDESK_SUBDOMAIN?.trim() || '';
@@ -47,6 +53,77 @@ const ZENDESK_TO_CASE_STATUS = {
 export function mapZendeskStatusToCase(status) {
   const key = String(status ?? '').trim().toLowerCase();
   return ZENDESK_TO_CASE_STATUS[key] ?? null;
+}
+
+const CASE_TO_ZENDESK_STATUS = {
+  new: 'new',
+  open: 'open',
+  pending: 'pending',
+  solved: 'solved',
+  closed: 'closed',
+};
+
+export function mapCaseStatusToZendesk(status) {
+  const key = String(status ?? '').trim().toLowerCase();
+  return CASE_TO_ZENDESK_STATUS[key] ?? null;
+}
+
+export function platformCaseZendeskTag(caseNumber) {
+  const n = Number(caseNumber);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `platform_case_${n}`;
+}
+
+/** Webhook’ta externalTicketRef yoksa etiket / external_id / özel alan ile kayıt bul */
+export function inferCaseNumberFromZendeskWebhook(body) {
+  if (!body || typeof body !== 'object') return null;
+  const ticket = body.ticket && typeof body.ticket === 'object' ? body.ticket : null;
+  const detail = body.detail && typeof body.detail === 'object' ? body.detail : null;
+  const tags = [];
+  for (const src of [ticket?.tags, detail?.tags, body.tags]) {
+    if (Array.isArray(src)) tags.push(...src);
+  }
+  for (const t of tags) {
+    const m = String(t).match(/^platform_case_(\d+)$/i);
+    if (m) return Number(m[1]);
+  }
+  for (const ext of [ticket?.external_id, detail?.external_id, body.external_id]) {
+    if (!ext) continue;
+    const m = String(ext).match(/^platform-?case-?(\d+)$/i);
+    if (m) return Number(m[1]);
+  }
+  const fieldId = process.env.EKOLOJIK_ZENDESK_CASE_NUMBER_FIELD_ID?.trim();
+  const customFields = ticket?.custom_fields ?? detail?.custom_fields;
+  if (fieldId && Array.isArray(customFields)) {
+    const hit = customFields.find((f) => String(f.id) === fieldId);
+    const val = Number(hit?.value);
+    if (Number.isFinite(val) && val > 0) return val;
+  }
+  const comment = extractWebhookPayload(body).comment ?? '';
+  const m2 = comment.match(/(?:destek|platform)\s*#?\s*(\d{1,8})/i);
+  if (m2) return Number(m2[1]);
+  return null;
+}
+
+async function resolveCaseForZendeskWebhook(dataDir, ticketId, body) {
+  const linked = await findCaseByExternalTicket(dataDir, 'zendesk', ticketId);
+  if (linked) return { caseRow: linked, linked: true };
+
+  const caseNumber = inferCaseNumberFromZendeskWebhook(body);
+  if (!caseNumber) return { caseRow: null, linked: false };
+
+  const byNumber = await findCaseByNumber(dataDir, caseNumber);
+  if (!byNumber) return { caseRow: null, linked: false };
+
+  const existingRef = String(byNumber.externalTicketRef?.id ?? '').trim();
+  if (existingRef && existingRef !== String(ticketId)) {
+    return { caseRow: null, linked: false, conflict: true, caseNumber };
+  }
+
+  const ref = enrichExternalTicketRef({ provider: 'zendesk', id: ticketId, url: null });
+  await updatePlatformCase(dataDir, byNumber.id, { externalTicketRef: ref }, 'zendesk');
+  const fresh = await getPlatformCase(dataDir, byNumber.id);
+  return { caseRow: fresh ?? byNumber, linked: true, autoLinked: true };
 }
 
 function extractWebhookPayload(body) {
@@ -102,9 +179,17 @@ export async function processZendeskWebhook(dataDir, body) {
     return { ok: false, status: 400, error: 'ticket_id bulunamadı' };
   }
 
-  const caseRow = await findCaseByExternalTicket(dataDir, 'zendesk', ticketId);
+  const resolved = await resolveCaseForZendeskWebhook(dataDir, ticketId, body);
+  const caseRow = resolved.caseRow;
   if (!caseRow) {
-    return { ok: true, matched: false, ticketId, message: 'Bağlı platform kaydı yok' };
+    return {
+      ok: true,
+      matched: false,
+      ticketId,
+      message: resolved.conflict
+        ? `Kayıt #${resolved.caseNumber} başka bir Zendesk ticket’a bağlı`
+        : 'Bağlı platform kaydı yok (platform_case_N etiketi veya ticket ID kaydı gerekir)',
+    };
   }
 
   const mapped = mapZendeskStatusToCase(status);
@@ -133,6 +218,7 @@ export async function processZendeskWebhook(dataDir, body) {
   return {
     ok: true,
     matched: true,
+    autoLinked: Boolean(resolved.autoLinked),
     ticketId,
     caseId: caseRow.id,
     caseNumber: fresh?.number ?? caseRow.number,
@@ -220,4 +306,106 @@ export async function pushPlatformCaseSummaryToZendesk(dataDir, caseId) {
   }
 
   return { ok: true, ticketId: ref.id, url: ref.url };
+}
+
+export async function syncPlatformCaseStatusToZendesk(dataDir, caseId) {
+  const cfg = getZendeskBridgeConfig();
+  if (!cfg.apiConfigured) {
+    return { ok: false, status: 503, error: 'Zendesk API yapılandırılmadı' };
+  }
+
+  const caseRow = await getPlatformCase(dataDir, caseId);
+  if (!caseRow) return { ok: false, status: 404, error: 'Kayıt bulunamadı' };
+
+  const ref = enrichExternalTicketRef(caseRow.externalTicketRef);
+  if (!ref?.id) {
+    return { ok: false, status: 400, error: 'Zendesk ticket ID kayıtlı değil' };
+  }
+
+  const zStatus = mapCaseStatusToZendesk(caseRow.status);
+  if (!zStatus) {
+    return { ok: false, status: 400, error: 'Platform durumu Zendesk ile uyumlu değil' };
+  }
+
+  const api = await zendeskApiJson(cfg, `/tickets/${ref.id}.json`, {
+    method: 'PUT',
+    body: { ticket: { status: zStatus } },
+  });
+  if (!api.ok) return api;
+
+  await appendCaseActivity(
+    dataDir,
+    caseId,
+    {
+      type: 'zendesk_push',
+      body: `Platform durumu Zendesk #${ref.id} üzerinde "${zStatus}" olarak güncellendi.`,
+      channel: 'zendesk',
+    },
+    'platform',
+  );
+
+  return { ok: true, ticketId: ref.id, zendeskStatus: zStatus };
+}
+
+export async function createZendeskTicketFromPlatformCase(dataDir, caseId, operatorUsername) {
+  const cfg = getZendeskBridgeConfig();
+  if (!cfg.apiConfigured) {
+    return { ok: false, status: 503, error: 'Zendesk API yapılandırılmadı (subdomain, e-posta, token)' };
+  }
+
+  const caseRow = await getPlatformCase(dataDir, caseId);
+  if (!caseRow) return { ok: false, status: 404, error: 'Kayıt bulunamadı' };
+
+  if (caseRow.externalTicketRef?.id) {
+    return { ok: false, status: 409, error: 'Kayıt zaten bir Zendesk ticket’a bağlı' };
+  }
+
+  const email = String(caseRow.requesterEmail ?? '').trim();
+  if (!email.includes('@')) {
+    return { ok: false, status: 400, error: 'Zendesk ticket için talep eden e-posta gerekli' };
+  }
+
+  const tag = platformCaseZendeskTag(caseRow.number);
+  const baseSubject = String(caseRow.subject ?? 'Destek').trim() || 'Destek';
+  const subject = baseSubject.includes(`#${caseRow.number}`)
+    ? baseSubject
+    : `[Destek #${caseRow.number}] ${baseSubject}`;
+
+  const zStatus = mapCaseStatusToZendesk(caseRow.status) ?? 'open';
+  const api = await zendeskApiJson(cfg, '/tickets.json', {
+    method: 'POST',
+    body: {
+      ticket: {
+        subject,
+        comment: { body: buildCaseSummaryForZendesk(caseRow) },
+        requester: { name: String(caseRow.requesterName ?? email).trim() || email, email },
+        tags: ['platform_case', 'ekolojik_platform', ...(tag ? [tag] : [])],
+        external_id: `platform-case-${caseRow.number}`,
+        status: zStatus,
+      },
+    },
+  });
+
+  if (!api.ok) return api;
+
+  const ticketId = String(api.json?.ticket?.id ?? '').trim();
+  if (!ticketId) {
+    return { ok: false, status: 502, error: 'Zendesk ticket ID alınamadı' };
+  }
+
+  const ref = enrichExternalTicketRef({ provider: 'zendesk', id: ticketId, url: null });
+  await updatePlatformCase(dataDir, caseId, { externalTicketRef: ref }, operatorUsername ?? 'platform');
+
+  await appendCaseActivity(
+    dataDir,
+    caseId,
+    {
+      type: 'zendesk_push',
+      body: `Zendesk ticket #${ticketId} oluşturuldu ve kayda bağlandı.`,
+      channel: 'zendesk',
+    },
+    operatorUsername ?? 'platform',
+  );
+
+  return { ok: true, ticketId, url: ref.url };
 }

@@ -1192,6 +1192,37 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/macros' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportMacros } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportMacros(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Makrolar alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/macros' && req.method === 'PUT') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { putPlatformSupportMacros } = await import('./server/platformApi.mjs');
+        const result = await putPlatformSupportMacros(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Makrolar kaydedilemedi' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/inbox/sync' && req.method === 'POST') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -1495,6 +1526,50 @@ const server = createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk gönderimi başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseZendeskCreateMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/zendesk\/create$/,
+    );
+    if (platformSupportCaseZendeskCreateMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const { postPlatformSupportCaseZendeskCreate } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseZendeskCreate(
+          DATA_DIR,
+          platformSupportCaseZendeskCreateMatch[1],
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk oluşturma başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseZendeskSyncMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/zendesk\/sync-status$/,
+    );
+    if (platformSupportCaseZendeskSyncMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { postPlatformSupportCaseZendeskSyncStatus } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseZendeskSyncStatus(
+          DATA_DIR,
+          platformSupportCaseZendeskSyncMatch[1],
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk durum senkronu başarısız' }));
       }
       return;
     }

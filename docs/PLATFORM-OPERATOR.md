@@ -61,6 +61,9 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | Zendesk köprü | `GET` | `/api/platform/support/zendesk/bridge` |
 | Zendesk webhook | `POST` | `/api/platform/support/zendesk/webhook` (secret header; ticket_id + status) |
 | Zendesk push | `POST` | `/api/platform/support/cases/:id/zendesk/push` (iç not, API token gerekir) |
+| Zendesk create | `POST` | `/api/platform/support/cases/:id/zendesk/create` (yeni ticket + `platform_case_N` etiketi) |
+| Zendesk durum | `POST` | `/api/platform/support/cases/:id/zendesk/sync-status` (platform → Zendesk); `PUT` kayıt durumu da senkron dener |
+| Makrolar | `GET` / `PUT` | `/api/platform/support/macros` → `data/platform/support-macros.json` |
 
 ### Ortam değişkenleri (destek@)
 
