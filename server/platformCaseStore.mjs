@@ -182,6 +182,13 @@ export async function updatePlatformCase(dataDir, caseId, patch, operatorUsernam
   if (patch.priority != null) row.priority = normalizePriority(patch.priority);
   if (patch.kind != null) row.kind = normalizeKind(patch.kind);
   if (patch.assignee !== undefined) row.assignee = patch.assignee ? String(patch.assignee).trim() : null;
+  if (patch.tenantId !== undefined) {
+    row.tenantId = patch.tenantId ? String(patch.tenantId).trim() : null;
+    if (row.links) row.links.tenantId = row.tenantId;
+  }
+  if (patch.businessName !== undefined) {
+    row.businessName = patch.businessName ? String(patch.businessName).trim() : null;
+  }
   if (patch.subject != null) row.subject = String(patch.subject).trim() || row.subject;
   if (patch.notes != null) row.notes = String(patch.notes);
   if (patch.tags != null && Array.isArray(patch.tags)) {

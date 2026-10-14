@@ -16,12 +16,22 @@ function formatTry(n: number | undefined): string {
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n);
 }
 
+export type PlatformSupportCasePreview = {
+  number: number;
+  subject: string;
+  requesterEmail?: string | null;
+  requesterName?: string | null;
+  channel: string;
+  tenantHint?: string | null;
+};
+
 type Props = {
   tenantId: string | null;
+  casePreview?: PlatformSupportCasePreview | null;
   onMessage?: (msg: string) => void;
 };
 
-export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
+export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: Props) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<PlatformSupportTenant360Payload | null>(null);
@@ -91,16 +101,40 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
 
   if (!tenantId) {
     return (
-      <aside className="platform-panel platform-panel--premium platform-support-360">
-        <h3>Kiracı 360</h3>
-        <p className="platform-support-hint">Talep veya kuyruk satırından kiracı seçildiğinde özet burada görünür.</p>
+      <aside className="platform-panel platform-panel--premium platform-support-360 platform-support-360--empty">
+        <div className="platform-support-360-empty-head">
+          <h3>Kiracı 360</h3>
+          <span className="platform-support-360-kicker">Özet panel</span>
+        </div>
+        {casePreview ? (
+          <article className="platform-support-360-card platform-support-360-card--accent">
+            <h4>Seçili talep #{casePreview.number}</h4>
+            <p className="platform-support-360-case-title">{casePreview.subject}</p>
+            <p className="platform-table-muted">
+              {casePreview.channel} · {casePreview.requesterEmail ?? casePreview.requesterName ?? '—'}
+            </p>
+            {casePreview.tenantHint ? (
+              <p className="platform-support-hint">
+                Önerilen kiracı: <code>{casePreview.tenantHint}</code> — kayıt meta alanından bağlayın veya kaydı
+                güncelleyin.
+              </p>
+            ) : (
+              <p className="platform-support-hint">
+                Bu kayıtta kiracı atanmamış. Orta panelde <strong>Kiracı ID</strong> girin (ör. <code>main</code>) ve
+                kaydedin.
+              </p>
+            )}
+          </article>
+        ) : (
+          <p className="platform-support-hint">Talep veya kuyruk satırından kiracı seçildiğinde özet burada görünür.</p>
+        )}
       </aside>
     );
   }
 
   if (loading && !data) {
     return (
-      <aside className="platform-panel platform-support-360" aria-busy="true">
+      <aside className="platform-panel platform-panel--premium platform-support-360" aria-busy="true">
         <h3>Kiracı 360</h3>
         <p className="platform-support-hint">Yükleniyor…</p>
       </aside>
@@ -112,17 +146,25 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
       <aside className="platform-panel platform-panel--premium platform-support-360">
         <h3>Kiracı 360</h3>
         <p className="platform-support-hint">Özet alınamadı.</p>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => void load()}>Yenile</button>
       </aside>
     );
   }
 
   return (
-    <aside className="platform-panel platform-support-360">
-      <div className="platform-panel-head">
-        <h3>{data.businessName}</h3>
+    <aside className="platform-panel platform-panel--premium platform-support-360">
+      <div className="platform-support-360-empty-head">
+        <div>
+          <h3>{data.businessName}</h3>
+          <p className="platform-table-muted">{data.tenantId}</p>
+        </div>
         {data.demo ? <span className="platform-support-badge platform-support-badge--info">Demo</span> : null}
       </div>
-      <p className="platform-table-muted">{data.tenantId}</p>
+      {casePreview ? (
+        <p className="platform-support-360-linked-case">
+          Talep <strong>#{casePreview.number}</strong> · {casePreview.subject}
+        </p>
+      ) : null}
       {data.lifecycle ? (
         <p className="platform-support-hint">
           {data.lifecycle.statusLabel}
@@ -134,7 +176,7 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
       <div className="platform-support-360-widgets">
         <article className="platform-support-360-card">
           <h4>Muhasebe</h4>
-          <p>Cari: {formatTry(data.accounting.receivablesTotalTry)}</p>
+          <p>{formatTry(data.accounting.receivablesTotalTry)}</p>
           <p className="platform-table-muted">
             Gecikmiş: {data.accounting.overduePaymentCount} ({formatTry(data.accounting.overduePaymentAmountTry)})
           </p>
@@ -158,9 +200,7 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
           <article className="platform-support-360-card">
             <h4>Güvenlik</h4>
             <p>Skor: {data.security.securityScore}</p>
-            <p className="platform-table-muted">
-              Başarısız giriş (30g): {data.security.loginFailed30d}
-            </p>
+            <p className="platform-table-muted">Başarısız giriş (30g): {data.security.loginFailed30d}</p>
           </article>
         ) : null}
         <article className="platform-support-360-card">
@@ -190,18 +230,19 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
         <button type="button" className="btn btn-primary" onClick={openPos}>
           POS aç
         </button>
-        <button type="button" className="btn btn-text" onClick={() => void load()}>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => void load()}>
           Yenile
         </button>
         <button type="button" className="btn btn-outline btn-sm" disabled={probeBusy} onClick={() => void runInfraProbe()}>
-          {probeBusy ? 'Probe…' : 'SMTP/IMAP probe'}
+          {probeBusy ? 'Probe…' : 'SMTP/IMAP'}
         </button>
       </div>
       {probeSummary ? <p className="platform-support-hint">{probeSummary}</p> : null}
 
-      <label className="platform-support-reply-label">
-        Komut paleti
+      <label className="platform-support-field platform-support-360-command">
+        <span className="platform-support-field-label">Komut paleti</span>
         <input
+          className="platform-support-control"
           value={commandLine}
           onChange={(e) => setCommandLine(e.target.value)}
           placeholder="/suspend veya requeue_outbox"
@@ -216,25 +257,9 @@ export function PlatformSupportTenant360({ tenantId, onMessage }: Props) {
           <option key={c.id} value={`/${c.id}`}>{c.label}</option>
         ))}
       </datalist>
-      <button type="button" className="btn btn-secondary" onClick={() => void runCommand()} disabled={!commandLine.trim()}>
+      <button type="button" className="btn btn-secondary btn-sm platform-support-360-run" onClick={() => void runCommand()} disabled={!commandLine.trim()}>
         Çalıştır
       </button>
-      {commandHelp.length ? (
-        <ul className="platform-support-360-command-help">
-          {commandHelp.map((c) => (
-            <li key={c.id}>
-              <button type="button" className="platform-support-inline-link" onClick={() => setCommandLine(`/${c.id}`)}>
-                {c.label}
-              </button>
-              <span className="platform-table-muted"> — {c.example}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="platform-support-hint platform-support-360-hints">
-          Örnek: <code>askıya</code>, <code>/unsuspend</code>, <code>/requeue_outbox</code>
-        </p>
-      )}
     </aside>
   );
 }

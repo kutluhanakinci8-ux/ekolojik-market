@@ -69,6 +69,30 @@ const KIND_LABELS: Record<string, string> = {
   stale_waiting: 'Beklemede (eski)',
 };
 
+const CASE_STATUS_LABELS: Record<string, string> = {
+  new: 'Yeni',
+  open: 'Açık',
+  pending: 'Beklemede',
+  solved: 'Çözüldü',
+  closed: 'Kapalı',
+};
+
+const CASE_KIND_LABELS: Record<string, string> = {
+  request: 'Talep',
+  incident: 'Sorun',
+  system: 'Sistem',
+};
+
+function resolveCaseTenantId(c: PlatformSupportCase | null | undefined): string | null {
+  if (!c) return null;
+  const direct = c.tenantId ?? c.links?.tenantId ?? null;
+  if (direct) return direct;
+  if (c.channel === 'contact_form' || c.channel === 'email' || (c.tags ?? []).includes('destek-mail')) {
+    return 'main';
+  }
+  return null;
+}
+
 function SupportEmailHtmlFrame({ html, title }: { html: string; title: string }) {
   return (
     <iframe
@@ -272,6 +296,8 @@ export function PlatformSupportTab() {
     kind: 'request',
     assignee: '',
     tags: '',
+    tenantId: '',
+    businessName: '',
   });
   const [inboxFilter, setInboxFilter] = useState<'all' | 'unread' | 'attachments'>('all');
   const [inboxSearch, setInboxSearch] = useState('');
@@ -390,11 +416,23 @@ export function PlatformSupportTab() {
     void load();
   }, [load]);
 
+  const selectSupportCase = useCallback((c: PlatformSupportCase) => {
+    setSelectedCaseId(c.id);
+    setZendeskIdDraft(c.externalTicketRef?.id ?? '');
+    const tid = resolveCaseTenantId(c);
+    if (tid) setContextTenantId(tid);
+  }, []);
+
   useEffect(() => {
     const c = caseRows.find((row) => row.id === selectedCaseId);
-    const tid = c?.tenantId ?? c?.links?.tenantId ?? null;
+    const tid = resolveCaseTenantId(c ?? null);
     if (tid) setContextTenantId(tid);
   }, [selectedCaseId, caseRows]);
+
+  useEffect(() => {
+    if (section !== 'cases' || selectedCaseId || caseRows.length === 0) return;
+    selectSupportCase(caseRows[0]);
+  }, [section, caseRows, selectedCaseId, selectSupportCase]);
 
   useEffect(() => {
     setShowAllActivity(false);
@@ -410,6 +448,8 @@ export function PlatformSupportTab() {
       kind: selectedCase.kind,
       assignee: selectedCase.assignee ?? '',
       tags: (selectedCase.tags ?? []).join(', '),
+      tenantId: selectedCase.tenantId ?? selectedCase.links?.tenantId ?? '',
+      businessName: selectedCase.businessName ?? '',
     });
     setCaseNotesDraft(selectedCase.notes ?? '');
   }, [
@@ -420,6 +460,8 @@ export function PlatformSupportTab() {
     selectedCase?.assignee,
     selectedCase?.tags,
     selectedCase?.notes,
+    selectedCase?.tenantId,
+    selectedCase?.businessName,
   ]);
 
   useEffect(() => {
@@ -692,8 +734,7 @@ export function PlatformSupportTab() {
   };
 
   const openLinkedCase = (c: PlatformSupportCase) => {
-    setSelectedCaseId(c.id);
-    setZendeskIdDraft(c.externalTicketRef?.id ?? '');
+    selectSupportCase(c);
     setSection('cases');
     const closed = c.status === 'closed' || c.status === 'solved';
     setPolicyMsg(closed ? `Kayıt #${c.number} (${c.status})` : `Kayıt #${c.number}`);
@@ -986,6 +1027,8 @@ export function PlatformSupportTab() {
       kind: caseMetaDraft.kind as PlatformSupportCase['kind'],
       assignee: caseMetaDraft.assignee.trim() || null,
       tags,
+      tenantId: caseMetaDraft.tenantId.trim() || null,
+      businessName: caseMetaDraft.businessName.trim() || null,
     });
     setCaseMetaSaving(false);
     if (!result.ok) {
@@ -1228,23 +1271,27 @@ export function PlatformSupportTab() {
       ) : null}
 
       {section === 'cases' ? (
-        <div className="platform-support-command-layout">
-        <div className="platform-support-inbox-layout platform-support-command-main">
-          <section className="platform-panel platform-panel--premium">
-            <h3>Operasyon kayıtları (Case)</h3>
-            <p className="platform-support-hint">
-              E-posta senkronunda otomatik talep; Zendesk webhook ve API köprüsü (env). Dosya:{' '}
-              <code>data/platform/support-cases.json</code>
-            </p>
-            <div className="platform-support-case-toolbar">
+        <div className="platform-support-cases-premium">
+          <header className="platform-support-cases-hero">
+            <div>
+              <h3>Operasyon kayıtları (Case)</h3>
+              <p className="platform-support-hint">
+                Soldan kayıt seçin — ortada #{selectedCase?.number ?? '…'} detayı, sağda Kiracı 360.
+              </p>
+            </div>
+            <div className="platform-support-cases-hero-actions">
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => setManualCaseOpen((v) => !v)}
               >
-                {manualCaseOpen ? 'Manuel kayıt iptal' : 'Manuel kayıt'}
+                {manualCaseOpen ? 'Manuel iptal' : 'Manuel kayıt'}
               </button>
             </div>
+          </header>
+          <div className="platform-support-cases-grid">
+          <aside className="platform-panel platform-panel--premium platform-support-case-rail">
+            <div className="platform-support-case-toolbar">
             {manualCaseOpen ? (
               <div className="platform-support-manual-case">
                 <h4>Manuel operasyon kaydı</h4>
@@ -1314,6 +1361,7 @@ export function PlatformSupportTab() {
                 </button>
               </div>
             ) : null}
+            </div>
             <div className="platform-support-case-filters">
               <PlatformFilterSelect
                 label="Durum"
@@ -1351,86 +1399,64 @@ export function PlatformSupportTab() {
                 ))}
               </PlatformFilterSelect>
             </div>
-            <table className="platform-table platform-table--scroll">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Tür</th>
-                  <th>Durum</th>
-                  <th>Konu</th>
-                  <th>Etiketler</th>
-                  <th>Kiracı</th>
-                  <th>Zendesk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {caseRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7}>Henüz kayıt yok</td>
-                  </tr>
-                ) : (
-                  caseRows.map((c) => (
-                    <tr key={c.id}>
-                      <td>
-                        <button type="button" className="btn btn-text" onClick={() => {
-                          setSelectedCaseId(c.id);
-                          setZendeskIdDraft(c.externalTicketRef?.id ?? '');
-                        }}>
-                          {c.number}
-                        </button>
-                      </td>
-                      <td>{c.kind}</td>
-                      <td>{c.status}</td>
-                      <td>{c.subject}</td>
-                      <td>
-                        {(c.tags ?? []).length === 0 ? (
-                          <span className="platform-table-muted">—</span>
-                        ) : (
-                          <span className="platform-support-tag-chips">
-                            {(c.tags ?? []).slice(0, 4).map((tag) => (
-                              <span key={tag} className="platform-support-tag-chip">{tag}</span>
-                            ))}
-                            {(c.tags ?? []).length > 4 ? (
-                              <span className="platform-table-muted">+{(c.tags ?? []).length - 4}</span>
-                            ) : null}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {c.tenantId ? (
-                          <button
-                            type="button"
-                            className="btn btn-text"
-                            onClick={() => setContextTenantId(c.tenantId!)}
-                          >
-                            {c.businessName ?? c.tenantId}
-                          </button>
-                        ) : (
-                          c.businessName ?? '—'
-                        )}
-                      </td>
-                      <td>
-                        {c.externalTicketRef?.url ? (
-                          <a href={c.externalTicketRef.url} target="_blank" rel="noopener noreferrer">
-                            #{c.externalTicketRef.id}
-                          </a>
-                        ) : (
-                          c.externalTicketRef?.id ?? '—'
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </section>
-          <section className="platform-panel platform-panel--premium">
+            <ul className="platform-support-case-rail-list" role="listbox" aria-label="Operasyon kayıtları">
+              {caseRows.length === 0 ? (
+                <li className="platform-support-case-rail-empty">Henüz kayıt yok</li>
+              ) : (
+                caseRows.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selectedCaseId === c.id}
+                      className={`platform-support-case-rail-item${selectedCaseId === c.id ? ' is-selected' : ''}`}
+                      onClick={() => selectSupportCase(c)}
+                    >
+                      <span className="platform-support-case-rail-num">#{c.number}</span>
+                      <span className="platform-support-case-rail-subject">{c.subject}</span>
+                      <span className="platform-support-case-rail-meta">
+                        <span className={`platform-support-status-pill platform-support-status-pill--${c.status}`}>
+                          {CASE_STATUS_LABELS[c.status] ?? c.status}
+                        </span>
+                        <span className="platform-table-muted">{CASE_KIND_LABELS[c.kind] ?? c.kind}</span>
+                        {c.externalTicketRef?.id ? (
+                          <span className="platform-table-muted">ZD #{c.externalTicketRef.id}</span>
+                        ) : null}
+                      </span>
+                      {(c.tags ?? []).length > 0 ? (
+                        <span className="platform-support-tag-chips">
+                          {(c.tags ?? []).slice(0, 3).map((tag) => (
+                            <span key={tag} className="platform-support-tag-chip">{tag}</span>
+                          ))}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </aside>
+          <section className="platform-panel platform-panel--premium platform-support-case-workspace">
             {selectedCase ? (
               <>
-                <h3>#{selectedCase.number} — {selectedCase.subject}</h3>
-                <p className="platform-table-muted">
-                  {selectedCase.channel} · {selectedCase.requesterEmail ?? selectedCase.requesterName ?? '—'}
-                </p>
+                <header className="platform-support-case-workspace-head">
+                  <div>
+                    <h3>#{selectedCase.number} — {selectedCase.subject}</h3>
+                    <p className="platform-table-muted">
+                      {selectedCase.channel} · {selectedCase.requesterEmail ?? selectedCase.requesterName ?? '—'}
+                    </p>
+                  </div>
+                  <div className="platform-support-case-workspace-badges">
+                    <span className={`platform-support-status-pill platform-support-status-pill--${selectedCase.status}`}>
+                      {CASE_STATUS_LABELS[selectedCase.status] ?? selectedCase.status}
+                    </span>
+                    {selectedCase.slaDueAt ? (
+                      <span className="platform-support-sla-chip" title="SLA bitiş">
+                        SLA {new Date(selectedCase.slaDueAt).toLocaleString('tr-TR')}
+                      </span>
+                    ) : null}
+                  </div>
+                </header>
                 <div className="platform-support-policy-form platform-support-case-meta">
                   <PlatformFilterSelect
                     label="Durum"
@@ -1484,9 +1510,30 @@ export function PlatformSupportTab() {
                       placeholder="messaging, vip (virgülle)"
                     />
                   </label>
+                  <label className="platform-support-field">
+                    <span className="platform-support-field-label">Kiracı ID</span>
+                    <input
+                      className="platform-support-control"
+                      value={caseMetaDraft.tenantId}
+                      onChange={(e) => setCaseMetaDraft((d) => ({ ...d, tenantId: e.target.value }))}
+                      placeholder="main"
+                      onBlur={() => {
+                        const tid = caseMetaDraft.tenantId.trim();
+                        if (tid) setContextTenantId(tid);
+                      }}
+                    />
+                  </label>
+                  <label className="platform-support-field">
+                    <span className="platform-support-field-label">İşletme adı</span>
+                    <input
+                      className="platform-support-control"
+                      value={caseMetaDraft.businessName}
+                      onChange={(e) => setCaseMetaDraft((d) => ({ ...d, businessName: e.target.value }))}
+                    />
+                  </label>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
+                    className="btn btn-primary btn-sm platform-support-case-save-btn"
                     disabled={caseMetaSaving}
                     onClick={() => void saveCaseMeta()}
                   >
@@ -1677,9 +1724,11 @@ export function PlatformSupportTab() {
                     <option key={o.username} value={o.username}>{o.displayName}</option>
                   ))}
                 </datalist>
+                <div className="platform-support-case-compose-actions">
                 <button type="button" className="btn btn-primary" onClick={() => void sendCaseAction()} disabled={!actionDraft.trim()}>
                   Gönder
                 </button>
+                </div>
                 <div className="platform-support-zendesk-row">
                   <label className="platform-support-reply-label">
                     Zendesk ticket ID
@@ -1859,8 +1908,23 @@ export function PlatformSupportTab() {
               <p className="platform-support-hint">Soldan bir kayıt seçin.</p>
             )}
           </section>
-        </div>
-        <PlatformSupportTenant360 tenantId={contextTenantId} onMessage={setPolicyMsg} />
+          <PlatformSupportTenant360
+            tenantId={contextTenantId}
+            casePreview={
+              selectedCase
+                ? {
+                    number: selectedCase.number,
+                    subject: selectedCase.subject,
+                    requesterEmail: selectedCase.requesterEmail,
+                    requesterName: selectedCase.requesterName,
+                    channel: selectedCase.channel,
+                    tenantHint: resolveCaseTenantId(selectedCase),
+                  }
+                : null
+            }
+            onMessage={setPolicyMsg}
+          />
+          </div>
         </div>
       ) : null}
 
