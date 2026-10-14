@@ -2,13 +2,24 @@
 
 import { clipEmailActivityHtml, clipEmailActivityText } from './platformSupportActivityContent.mjs';
 
-export const CASE_ACTIVITY_EXPORT_FILTERS = new Set(['all', 'email_inbound', 'email_outbound', 'note']);
+export const CASE_ACTIVITY_EXPORT_FILTERS = new Set([
+  'all',
+  'email_inbound',
+  'email_outbound',
+  'note',
+  'zendesk',
+  'case_meta',
+  'messaging',
+]);
 
 const FILTER_FILENAME_SLUG = {
   all: '',
   email_inbound: 'gelen',
   email_outbound: 'giden',
   note: 'not',
+  zendesk: 'zendesk',
+  case_meta: 'kayit',
+  messaging: 'mesaj',
 };
 
 function normalizeActivityFilter(filter) {
@@ -26,6 +37,15 @@ export function filterCaseActivities(activity, filter) {
   }
   if (f === 'email_outbound') {
     return items.filter((a) => a.type === 'email_outbound' || a.type === 'email_out');
+  }
+  if (f === 'zendesk') {
+    return items.filter((a) => a.type === 'zendesk_webhook' || a.type === 'zendesk_push');
+  }
+  if (f === 'case_meta') {
+    return items.filter((a) => a.type === 'case_updated' || a.type === 'case_spawned');
+  }
+  if (f === 'messaging') {
+    return items.filter((a) => a.type === 'messaging_out');
   }
   return items.filter((a) => a.type === f);
 }
@@ -63,6 +83,9 @@ function filterLabel(filter) {
     email_inbound: 'Gelen e-posta',
     email_outbound: 'Giden e-posta',
     note: 'İç not',
+    zendesk: 'Zendesk',
+    case_meta: 'Kayıt / politika',
+    messaging: 'Mesajlaşma',
   };
   return map[normalizeActivityFilter(filter)] ?? map.all;
 }

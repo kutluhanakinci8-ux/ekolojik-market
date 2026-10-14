@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createPlatformSupportCaseFromContact,
   createPlatformSupportCaseFromQueue,
+  createPlatformSupportCaseManual,
+  fetchPlatformSupportCommands,
   downloadPlatformSupportCsv,
   downloadPlatformSupportCaseActivityCsv,
   downloadPlatformSupportInboxAttachment,
@@ -19,12 +21,14 @@ import {
   syncPlatformSupportCaseZendeskStatus,
   fetchPlatformSupportCaseAi,
   postPlatformSupportCaseAction,
+  postPlatformSupportCommand,
   replyPlatformSupportInbox,
   savePlatformSupportSlaPolicy,
   syncPlatformSupportInbox,
   updatePlatformSupportCase,
   type PlatformSupportCase,
   type PlatformSupportCaseDetail,
+  type PlatformSupportCommandHelp,
   type PlatformSupportContactQueueItem,
   type PlatformSupportInboxAttachment,
   type PlatformSupportInboxMessage,
@@ -36,6 +40,10 @@ import { KpiIcon, PlatformFilterSelect, RingProgress } from './platformUserUi';
 import { PlatformSupportTenant360 } from './PlatformSupportTenant360';
 import { PlatformSupportSlaLive } from './PlatformSupportSlaLive';
 import { buildCaseUnifiedTimeline, type CaseTimelineEntry } from './platformSupportCaseTimeline';
+import {
+  filterCaseActivities,
+  type PlatformSupportActivityFilter,
+} from './platformSupportActivityFilter';
 
 const KIND_LABELS: Record<string, string> = {
   first_response: 'İlk yanıt bekliyor',
@@ -212,7 +220,19 @@ export function PlatformSupportTab() {
   const [exporting, setExporting] = useState(false);
   const [activityExporting, setActivityExporting] = useState<'csv' | 'html' | null>(null);
   const [policyDraft, setPolicyDraft] = useState<PlatformSupportSlaPolicy | null>(null);
-  const [activityFilter, setActivityFilter] = useState<'all' | 'email_inbound' | 'email_outbound' | 'note'>('all');
+  const [activityFilter, setActivityFilter] = useState<PlatformSupportActivityFilter>('all');
+  const [manualCaseOpen, setManualCaseOpen] = useState(false);
+  const [manualCaseDraft, setManualCaseDraft] = useState({
+    subject: '',
+    kind: 'request',
+    requesterEmail: '',
+    requesterName: '',
+    tenantId: '',
+    notes: '',
+  });
+  const [manualCaseSaving, setManualCaseSaving] = useState(false);
+  const [headerCommandLine, setHeaderCommandLine] = useState('');
+  const [commandHelp, setCommandHelp] = useState<PlatformSupportCommandHelp[]>([]);
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
@@ -287,6 +307,8 @@ export function PlatformSupportTab() {
     }
     const zendeskRes = await fetchPlatformSupportZendeskBridge();
     setZendeskApiReady(Boolean(zendeskRes.ok && zendeskRes.data?.apiConfigured));
+    const cmdRes = await fetchPlatformSupportCommands();
+    if (cmdRes.ok && cmdRes.commands?.length) setCommandHelp(cmdRes.commands);
     setLoading(false);
   }, [windowDays, caseListStatus, caseListKind]);
 
@@ -340,20 +362,7 @@ export function PlatformSupportTab() {
 
   const filteredCaseActivity = useMemo(() => {
     const items = caseDetail?.case.activity ?? [];
-    if (activityFilter === 'all') return items;
-    if (activityFilter === 'email_inbound') {
-      return items.filter((a) =>
-        a.type === 'email_inbound'
-        || a.type === 'email_inbound_closed',
-      );
-    }
-    if (activityFilter === 'email_outbound') {
-      return items.filter((a) =>
-        a.type === 'email_outbound'
-        || a.type === 'email_out',
-      );
-    }
-    return items.filter((a) => a.type === activityFilter);
+    return filterCaseActivities(items, activityFilter);
   }, [caseDetail?.case.activity, activityFilter]);
 
   const activityTypeLabel = (type: string) => {
@@ -370,6 +379,71 @@ export function PlatformSupportTab() {
       messaging_out: 'Mesajlaşma (giden)',
     };
     return map[type] ?? type;
+  };
+
+  const activityFilterLabel = (filter: PlatformSupportActivityFilter) => {
+    const map: Record<PlatformSupportActivityFilter, string> = {
+      all: 'Tümü',
+      email_inbound: 'Gelen e-posta',
+      email_outbound: 'Giden e-posta',
+      note: 'İç not',
+      zendesk: 'Zendesk',
+      case_meta: 'Kayıt / politika',
+      messaging: 'Mesajlaşma',
+    };
+    return map[filter];
+  };
+
+  const runHeaderCommand = async () => {
+    const line = headerCommandLine.trim();
+    if (!line) return;
+    const tenantId = contextTenantId ?? undefined;
+    const res = await postPlatformSupportCommand(
+      tenantId ? { tenantId, line } : { line },
+    );
+    if (!res.ok) {
+      const hint = res.hints?.length ? ` (${res.hints.join(', ')})` : '';
+      setPolicyMsg(`${userMessage(res.error, 'Komut başarısız')}${hint}`);
+      return;
+    }
+    setPolicyMsg('Komut uygulandı');
+    setHeaderCommandLine('');
+    void load();
+  };
+
+  const submitManualCase = async () => {
+    const subject = manualCaseDraft.subject.trim();
+    if (!subject) {
+      setPolicyMsg('Konu gerekli');
+      return;
+    }
+    setManualCaseSaving(true);
+    const result = await createPlatformSupportCaseManual({
+      subject,
+      kind: manualCaseDraft.kind as PlatformSupportCase['kind'],
+      requesterEmail: manualCaseDraft.requesterEmail.trim() || undefined,
+      requesterName: manualCaseDraft.requesterName.trim() || undefined,
+      tenantId: manualCaseDraft.tenantId.trim() || contextTenantId || null,
+      notes: manualCaseDraft.notes.trim() || undefined,
+    });
+    setManualCaseSaving(false);
+    if (!result.ok || !result.case) {
+      setPolicyMsg(userMessage(result.error, 'Kayıt oluşturulamadı'));
+      return;
+    }
+    setPolicyMsg(`Kayıt #${result.case.number} oluşturuldu`);
+    setManualCaseOpen(false);
+    setManualCaseDraft({
+      subject: '',
+      kind: 'request',
+      requesterEmail: '',
+      requesterName: '',
+      tenantId: '',
+      notes: '',
+    });
+    setSection('cases');
+    setSelectedCaseId(result.case.id);
+    void load();
   };
 
   const ACTIVITY_LIST_CAP = 24;
@@ -741,6 +815,33 @@ export function PlatformSupportTab() {
           >
             CSV
           </button>
+          <div className="platform-support-header-command">
+            <input
+              className="platform-support-header-command-input"
+              value={headerCommandLine}
+              onChange={(e) => setHeaderCommandLine(e.target.value)}
+              placeholder={contextTenantId ? `/requeue_outbox` : 'Komut (kiracı seçin)'}
+              list="platform-support-header-commands"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void runHeaderCommand();
+              }}
+              title="Kiracı 360 ile aynı komutlar; seçili kiracı veya satırda tenantId"
+            />
+            <datalist id="platform-support-header-commands">
+              {commandHelp.map((c) => (
+                <option key={c.id} value={`/${c.id}`}>{c.label}</option>
+              ))}
+            </datalist>
+            <button
+              type="button"
+              className="platform-support-compact-icon-btn"
+              disabled={!headerCommandLine.trim()}
+              onClick={() => void runHeaderCommand()}
+              title="Komutu çalıştır"
+            >
+              Komut
+            </button>
+          </div>
         </div>
       </header>
 
@@ -816,6 +917,84 @@ export function PlatformSupportTab() {
               E-posta senkronunda otomatik talep; Zendesk webhook ve API köprüsü (env). Dosya:{' '}
               <code>data/platform/support-cases.json</code>
             </p>
+            <div className="platform-support-case-toolbar">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setManualCaseOpen((v) => !v)}
+              >
+                {manualCaseOpen ? 'Manuel kayıt iptal' : 'Manuel kayıt'}
+              </button>
+            </div>
+            {manualCaseOpen ? (
+              <div className="platform-support-manual-case">
+                <h4>Manuel operasyon kaydı</h4>
+                <label className="platform-support-field">
+                  <span className="platform-support-field-label">Konu</span>
+                  <input
+                    className="platform-support-control"
+                    value={manualCaseDraft.subject}
+                    onChange={(e) => setManualCaseDraft((d) => ({ ...d, subject: e.target.value }))}
+                  />
+                </label>
+                <div className="platform-support-policy-form">
+                  <PlatformFilterSelect
+                    label="Tür"
+                    icon="role"
+                    value={manualCaseDraft.kind}
+                    onChange={(v) => setManualCaseDraft((d) => ({ ...d, kind: v }))}
+                  >
+                    <option value="request">Talep</option>
+                    <option value="incident">Sorun</option>
+                    <option value="system">Sistem</option>
+                  </PlatformFilterSelect>
+                  <label className="platform-support-field">
+                    <span className="platform-support-field-label">Kiracı ID</span>
+                    <input
+                      className="platform-support-control"
+                      value={manualCaseDraft.tenantId}
+                      onChange={(e) => setManualCaseDraft((d) => ({ ...d, tenantId: e.target.value }))}
+                      placeholder={contextTenantId ?? 'opsiyonel'}
+                    />
+                  </label>
+                </div>
+                <div className="platform-support-policy-form">
+                  <label className="platform-support-field">
+                    <span className="platform-support-field-label">Talep eden ad</span>
+                    <input
+                      className="platform-support-control"
+                      value={manualCaseDraft.requesterName}
+                      onChange={(e) => setManualCaseDraft((d) => ({ ...d, requesterName: e.target.value }))}
+                    />
+                  </label>
+                  <label className="platform-support-field">
+                    <span className="platform-support-field-label">E-posta</span>
+                    <input
+                      className="platform-support-control"
+                      value={manualCaseDraft.requesterEmail}
+                      onChange={(e) => setManualCaseDraft((d) => ({ ...d, requesterEmail: e.target.value }))}
+                    />
+                  </label>
+                </div>
+                <label className="platform-support-field">
+                  <span className="platform-support-field-label">Not</span>
+                  <textarea
+                    className="platform-support-control"
+                    rows={2}
+                    value={manualCaseDraft.notes}
+                    onChange={(e) => setManualCaseDraft((d) => ({ ...d, notes: e.target.value }))}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={manualCaseSaving}
+                  onClick={() => void submitManualCase()}
+                >
+                  {manualCaseSaving ? 'Oluşturuluyor…' : 'Kayıt oluştur'}
+                </button>
+              </div>
+            ) : null}
             <div className="platform-support-case-filters">
               <PlatformFilterSelect
                 label="Durum"
@@ -1209,7 +1388,7 @@ export function PlatformSupportTab() {
                           title={
                             activityFilter === 'all'
                               ? 'Tüm aktiviteler'
-                              : `Seçili filtre: ${activityTypeLabel(activityFilter)}`
+                              : `Seçili filtre: ${activityFilterLabel(activityFilter)}`
                           }
                         >
                           {activityExporting === 'csv' ? 'İndiriliyor…' : 'CSV'}
@@ -1228,12 +1407,15 @@ export function PlatformSupportTab() {
                             label="Filtre"
                             icon="role"
                             value={activityFilter}
-                            onChange={(v) => setActivityFilter(v as typeof activityFilter)}
+                            onChange={(v) => setActivityFilter(v as PlatformSupportActivityFilter)}
                           >
                             <option value="all">Tümü</option>
                             <option value="email_inbound">Gelen e-posta</option>
                             <option value="email_outbound">Giden e-posta</option>
                             <option value="note">İç not</option>
+                            <option value="zendesk">Zendesk</option>
+                            <option value="case_meta">Kayıt / politika</option>
+                            <option value="messaging">Mesajlaşma</option>
                           </PlatformFilterSelect>
                         ) : null}
                       </div>
@@ -1341,6 +1523,9 @@ export function PlatformSupportTab() {
                       <span className="platform-support-inbox-item-subject">
                         {head.subject || '(konu yok)'}
                         {count > 1 ? <span className="platform-support-thread-count">{count} mesaj</span> : null}
+                        {(head.attachments?.length ?? 0) > 0 ? (
+                          <span className="platform-support-inbox-attach-badge">Ek {head.attachments!.length}</span>
+                        ) : null}
                       </span>
                       <span className="platform-support-inbox-item-from">{head.from}</span>
                       {'outboxStatus' in head && head.outboxStatus && head.outboxStatus !== 'sent' ? (

@@ -1629,7 +1629,38 @@ export type PlatformSupportCaseActivityExportFilter =
   | 'all'
   | 'email_inbound'
   | 'email_outbound'
-  | 'note';
+  | 'note'
+  | 'zendesk'
+  | 'case_meta'
+  | 'messaging';
+
+export async function createPlatformSupportCaseManual(payload: {
+  subject: string;
+  kind?: PlatformSupportCase['kind'];
+  channel?: string;
+  requesterEmail?: string;
+  requesterName?: string;
+  tenantId?: string | null;
+  businessName?: string | null;
+  notes?: string;
+  priority?: string;
+}): Promise<{ ok: boolean; case?: PlatformSupportCase; error?: string }> {
+  const result = await platformSecurityPost<{ case?: PlatformSupportCase }>('/api/platform/support/cases', {
+    kind: payload.kind ?? 'request',
+    channel: payload.channel ?? 'manual',
+    status: 'new',
+    subject: payload.subject,
+    requesterEmail: payload.requesterEmail,
+    requesterName: payload.requesterName,
+    tenantId: payload.tenantId,
+    businessName: payload.businessName,
+    notes: payload.notes,
+    priority: payload.priority ?? 'normal',
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+  const caseRow = result.data?.case;
+  return caseRow ? { ok: true, case: caseRow } : { ok: false, error: 'Kayıt yanıtı eksik' };
+}
 
 export async function downloadPlatformSupportCaseActivityCsv(
   caseId: string,

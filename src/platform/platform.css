@@ -3801,6 +3801,48 @@
   margin-bottom: 0.25rem;
 }
 
+.platform-support-header-command {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1 1 200px;
+  max-width: 320px;
+}
+
+.platform-support-header-command-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #c5d6ca;
+}
+
+.platform-support-manual-case {
+  margin: 0.65rem 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2ebe4;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.platform-support-manual-case h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.platform-support-case-toolbar {
+  margin-bottom: 0.5rem;
+}
+
+.platform-support-inbox-attach-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #b45309;
+  margin-left: 0.35rem;
+}
+
 .platform-support-case-email-list header {
   display: flex;
   justify-content: space-between;

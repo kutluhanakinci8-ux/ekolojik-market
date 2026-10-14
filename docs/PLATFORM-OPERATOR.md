@@ -66,6 +66,8 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | Makrolar | `GET` / `PUT` | `/api/platform/support/macros` → `data/platform/support-macros.json` |
 | Komut paleti | `GET` | `/api/platform/support/commands` · `POST` `/api/platform/support/command` |
 | Kayıt meta | `PUT` | `/api/platform/support/cases/:id` (durum/öncelik/tür/atanan; aktivite + isteğe bağlı Zendesk durum senkronu) |
+| Manuel kayıt | `POST` | `/api/platform/support/cases` (`channel: manual`) |
+| Aktivite filtre | `GET` | `.../activity/export.csv?filter=` — `zendesk`, `case_meta`, `messaging` dahil |
 
 ### Ortam değişkenleri (destek@)
 
