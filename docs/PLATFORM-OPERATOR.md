@@ -55,7 +55,7 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 | Kayıt detay | `GET` | `/api/platform/support/cases/:id` |
 | Kayıt güncelle | `PUT` | `/api/platform/support/cases/:id` |
 | Aksiyon (not / e-posta) | `POST` | `/api/platform/support/cases/:id/action` |
-| AI | `POST` | `/api/platform/support/cases/:id/ai` (`kind`: `summary` \| `draft_reply`) |
+| AI | `POST` | `/api/platform/support/cases/:id/ai` — `kind`: `summary`, `draft_reply`, `apply_macro` (+ `macroId`), `personalize_macro`, `refine_draft` (+ `draft`); harici model: `EKOLOJIK_POSTA_AI=1` |
 | Aktivite dışa aktarma | `GET` | `/api/platform/support/cases/:id/activity/export.csv`, `.../export.html` — `?filter=all\|email_inbound\|email_outbound\|note` |
 | Kiracı 360 | `GET` | `/api/platform/support/tenant-360?tenantId=` |
 | Zendesk köprü | `GET` | `/api/platform/support/zendesk/bridge` |

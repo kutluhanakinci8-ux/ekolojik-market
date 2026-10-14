@@ -1141,6 +1141,11 @@ export type PlatformSupportCaseDetail = {
     }>;
   } | null;
   macros: Array<{ id: string; label: string; body: string }>;
+  aiCapabilities?: {
+    externalEnabled: boolean;
+    provider: string;
+    model: string;
+  };
 };
 
 export type PlatformSupportContactQueueItem = {
@@ -1445,11 +1450,23 @@ export async function fetchPlatformSupportSlaLive(
   }
 }
 
+export type PlatformSupportCaseAiKind =
+  | 'summary'
+  | 'draft_reply'
+  | 'apply_macro'
+  | 'personalize_macro'
+  | 'refine_draft';
+
 export async function fetchPlatformSupportCaseAi(
   caseId: string,
-  kind: 'summary' | 'draft_reply',
+  kind: PlatformSupportCaseAiKind,
+  options?: { macroId?: string; draft?: string },
 ): Promise<{ ok: boolean; text?: string; provider?: string; error?: string }> {
-  const result = await platformSecurityPost(`/api/platform/support/cases/${caseId}/ai`, { kind });
+  const result = await platformSecurityPost(`/api/platform/support/cases/${caseId}/ai`, {
+    kind,
+    macroId: options?.macroId,
+    draft: options?.draft,
+  });
   const text = (result as { text?: string }).text;
   const provider = (result as { provider?: string }).provider;
   return { ok: result.ok, text, provider, error: result.error };

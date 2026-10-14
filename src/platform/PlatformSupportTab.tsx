@@ -339,23 +339,38 @@ export function PlatformSupportTab() {
     void load();
   };
 
-  const runCaseAi = async (kind: 'summary' | 'draft_reply') => {
+  const runCaseAi = async (
+    kind: 'summary' | 'draft_reply' | 'apply_macro' | 'personalize_macro' | 'refine_draft',
+    options?: { macroId?: string },
+  ) => {
     if (!selectedCaseId) return;
     setAiBusy(true);
     setPolicyMsg(null);
-    const res = await fetchPlatformSupportCaseAi(selectedCaseId, kind);
+    const res = await fetchPlatformSupportCaseAi(selectedCaseId, kind, {
+      macroId: options?.macroId ?? (macroPick || undefined),
+      draft: kind === 'refine_draft' ? actionDraft : undefined,
+    });
     setAiBusy(false);
     if (!res.ok) {
       setPolicyMsg(userMessage(res.error, 'AI önerisi alınamadı'));
       return;
     }
-    if (kind === 'draft_reply' && res.text) {
-      setActionDraft(res.text);
-      setReplyChannel('email');
-      setPolicyMsg(res.provider === 'external' ? 'AI yanıt taslağı hazır' : 'Yerel taslak hazır');
-    } else if (res.text) {
+    if (kind === 'summary' && res.text) {
       setAiSummary(res.text);
       setPolicyMsg(res.provider === 'external' ? 'AI özet hazır' : 'Yerel özet hazır');
+      return;
+    }
+    if (res.text && kind !== 'summary') {
+      setActionDraft(res.text);
+      if (kind !== 'refine_draft') setReplyChannel('email');
+      const labels: Record<string, string> = {
+        draft_reply: res.provider === 'external' ? 'AI yanıt taslağı hazır' : 'Yerel taslak hazır',
+        apply_macro: 'Makro dolduruldu',
+        personalize_macro:
+          res.provider === 'external' ? 'Makro AI ile kişiselleştirildi' : 'Makro dolduruldu',
+        refine_draft: res.provider === 'external' ? 'Taslak AI ile düzenlendi' : 'Taslak korundu',
+      };
+      setPolicyMsg(labels[kind] ?? 'Hazır');
     }
   };
 
@@ -716,7 +731,30 @@ export function PlatformSupportTab() {
                   <button type="button" className="btn btn-secondary" disabled={aiBusy} onClick={() => void runCaseAi('draft_reply')}>
                     AI taslak
                   </button>
+                  {actionDraft.trim() ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={aiBusy || !caseDetail?.aiCapabilities?.externalEnabled}
+                      title={
+                        caseDetail?.aiCapabilities?.externalEnabled
+                          ? 'Harici AI ile düzenle'
+                          : 'EKOLOJIK_POSTA_AI=1 gerekir'
+                      }
+                      onClick={() => void runCaseAi('refine_draft')}
+                    >
+                      Taslağı düzenle
+                    </button>
+                  ) : null}
                 </div>
+                {caseDetail?.aiCapabilities ? (
+                  <p className="platform-support-hint platform-support-ai-hint">
+                    AI:{' '}
+                    {caseDetail.aiCapabilities.externalEnabled
+                      ? `harici (${caseDetail.aiCapabilities.model})`
+                      : 'yerel şablon (EKOLOJIK_POSTA_AI=1 + URL/key)'}
+                  </p>
+                ) : null}
                 {aiSummary ? (
                   <pre className="platform-support-ai-summary">{aiSummary}</pre>
                 ) : null}
@@ -740,8 +778,7 @@ export function PlatformSupportTab() {
                         onChange={(e) => {
                           const v = e.target.value;
                           setMacroPick(v);
-                          const macro = caseDetail.macros.find((m) => m.id === v);
-                          if (macro) setActionDraft(macro.body);
+                          if (v) void runCaseAi('apply_macro', { macroId: v });
                         }}
                       >
                         <option value="">Şablon seç…</option>
@@ -750,6 +787,16 @@ export function PlatformSupportTab() {
                         ))}
                       </select>
                     </label>
+                  ) : null}
+                  {macroPick && caseDetail?.macros?.length ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={aiBusy || !caseDetail.aiCapabilities?.externalEnabled}
+                      onClick={() => void runCaseAi('personalize_macro', { macroId: macroPick })}
+                    >
+                      Makro + AI
+                    </button>
                   ) : null}
                 </div>
                 <label className="platform-support-reply-label">
