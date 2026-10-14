@@ -57,6 +57,8 @@ export async function buildPlatformSupportTenant360(dataDir, tenantId) {
       stock: Number(p.stock) || 0,
     }));
 
+  const loginAlerts = recentLogins.filter((e) => !e.success).slice(0, 8);
+
   const userRoster = (userAnalytics?.roster ?? []).map((u) => ({
     id: u.id,
     username: u.username,
@@ -77,6 +79,7 @@ export async function buildPlatformSupportTenant360(dataDir, tenantId) {
     demo: isDemoTenant(id, businessName),
     lifecycle,
     userRoster,
+    loginAlerts,
     loginActivity: recentLogins,
     loginSummary: userAnalytics
       ? {

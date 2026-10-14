@@ -191,9 +191,27 @@ const GREENLEAF_LOGIN_ALIASES = new Map([
   ['kutluhanakinci8', 'kutluhan08'],
 ]);
 
-export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { username, password, pin }) {
+async function auditPosLoginAttempt(dataDir, tenantId, partial) {
+  try {
+    const { appendTenantLoginAudit } = await import('./tenantLoginAudit.mjs');
+    await appendTenantLoginAudit(dataDir, tenantId, partial);
+  } catch {
+    /* audit opsiyonel */
+  }
+}
+
+export async function issuePosApiTokenFromCredentials(
+  dataDir,
+  tenantId,
+  { username, password, pin, clientIp, userAgent },
+) {
   let normalized = String(username ?? '').trim().toLowerCase();
   const tenant = String(tenantId ?? 'main').trim() || 'main';
+  const auditMeta = {
+    clientIp: clientIp ? String(clientIp).trim() : undefined,
+    deviceInfo: userAgent ? String(userAgent).slice(0, 160) : 'web',
+    method: pin ? 'pin' : 'password',
+  };
   const {
     isPlatformOperatorUsername,
     normalizePlatformOperatorUsername,
@@ -234,6 +252,12 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
   }
   const user = store.users.find((u) => u.username === normalized && u.isActive !== false);
   if (!user) {
+    await auditPosLoginAttempt(dataDir, tenant, {
+      ...auditMeta,
+      username: normalized,
+      success: false,
+      failureReason: 'Kullanıcı adı veya şifre hatalı',
+    });
     return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
   }
 
@@ -244,8 +268,24 @@ export async function issuePosApiTokenFromCredentials(dataDir, tenantId, { usern
     authed = verifyPin(String(pin), user.pinHash);
   }
   if (!authed) {
+    await auditPosLoginAttempt(dataDir, tenant, {
+      ...auditMeta,
+      userId: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      success: false,
+      failureReason: 'Kullanıcı adı veya şifre hatalı',
+    });
     return { ok: false, status: 401, message: 'Kullanıcı adı veya şifre hatalı' };
   }
+
+  await auditPosLoginAttempt(dataDir, tenant, {
+    ...auditMeta,
+    userId: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    success: true,
+  });
 
   const token = await createPosApiToken(dataDir, {
     tenantId,
