@@ -134,6 +134,7 @@ export async function listPlatformSupportContactQueue(dataDir, { limit = 40 } = 
       email: c.email,
       subject: c.subject,
       messagePreview: String(c.message ?? '').slice(0, 160),
+      message: String(c.message ?? ''),
       createdAt: c.createdAt,
       hasCase: Boolean(linked),
       caseId: linked?.id ?? null,
@@ -283,7 +284,7 @@ export async function autoCreateCaseForInboxRow(dataDir, row) {
 
 export function buildPlatformCasesCsv(payload) {
   const lines = [
-    'number,id,kind,status,priority,tenantId,subject,requesterEmail,assignee,slaDueAt,externalId',
+    'number,id,kind,status,priority,tenantId,subject,requesterEmail,assignee,slaDueAt,externalId,tags',
   ];
   for (const c of payload.cases ?? []) {
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -300,6 +301,7 @@ export function buildPlatformCasesCsv(payload) {
         c.assignee ?? '',
         c.slaDueAt ?? '',
         c.externalTicketRef?.id ?? '',
+        esc((c.tags ?? []).join('; ')),
       ].join(','),
     );
   }

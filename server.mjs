@@ -1397,6 +1397,29 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/smoke-filters' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { getPlatformSupportSmokeFilters } = await import('./server/platformApi.mjs');
+          const payload = await getPlatformSupportSmokeFilters(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(payload));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { updatePlatformSupportSmokeFilters } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSupportSmokeFilters(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Filtre kaydedilemedi' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/contact-queue' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
