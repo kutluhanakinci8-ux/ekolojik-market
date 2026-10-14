@@ -999,6 +999,13 @@ export async function savePlatformSupportSlaPolicy(
   }
 }
 
+export type PlatformSupportInboxAttachment = {
+  id: string;
+  fileName: string;
+  mimeType?: string;
+  size?: number;
+};
+
 export type PlatformSupportInboxMessage = {
   id: string;
   messageId?: string | null;
@@ -1010,12 +1017,14 @@ export type PlatformSupportInboxMessage = {
   receivedAt: string;
   snippet: string;
   bodyText: string;
+  bodyHtml?: string | null;
   readAt: string | null;
   autoreplySentAt: string | null;
   repliedAt?: string | null;
   externalTicketRef: string | null;
   outboxStatus?: string;
   source?: string;
+  attachments?: PlatformSupportInboxAttachment[];
 };
 
 export type PlatformSupportInboxPayload = {
@@ -1067,6 +1076,36 @@ export async function replyPlatformSupportInbox(
 ): Promise<{ ok: boolean; error?: string }> {
   const result = await platformSecurityPost('/api/platform/support/inbox/reply', { messageId, body });
   return { ok: result.ok, error: result.error };
+}
+
+export async function downloadPlatformSupportInboxAttachment(
+  inboxMessageId: string,
+  attachmentId: string,
+  fileName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(
+      `/api/platform/support/inbox/${encodeURIComponent(inboxMessageId)}/attachment/${encodeURIComponent(attachmentId)}`,
+      { headers: posApiAuthHeaders() },
+    );
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: data.error ?? 'Ek indirilemedi' };
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || 'ek';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
 }
 
 export type PlatformSupportCase = {
@@ -1130,6 +1169,7 @@ export type PlatformSupportCaseDetail = {
       bodyHtml?: string | null;
       receivedAt: string;
       isReply: boolean;
+      attachments?: PlatformSupportInboxAttachment[];
     }>;
     outboundEvents: Array<{
       at: string;
@@ -1283,6 +1323,7 @@ export async function fetchPlatformSupportCaseDetail(
         inboxSnippet: data.inboxSnippet ?? null,
         emailPreview: data.emailPreview ?? null,
         macros: data.macros ?? [],
+        aiCapabilities: data.aiCapabilities,
       },
     };
   } catch {

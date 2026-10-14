@@ -3700,9 +3700,46 @@
   border-left: 3px solid #2d6a4f;
 }
 
-.platform-support-case-email-list li.is-outbound {
+.platform-support-case-email-list li.is-outbound,
+.platform-support-case-email-list li.is-email-out {
   border-left: 3px solid #b45309;
   background: #fffdf8;
+}
+
+.platform-support-case-email-list li.is-email-in,
+.platform-support-case-email-list li.is-root {
+  border-left: 3px solid #2d6a4f;
+}
+
+.platform-support-case-email-list li.is-messaging {
+  border-left: 3px solid #2563eb;
+  background: #f8fafc;
+}
+
+.platform-support-case-email-list--timeline {
+  max-height: 360px;
+}
+
+.platform-support-attachments {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.platform-support-attachment-btn {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid #c5d4cb;
+  background: #fff;
+  cursor: pointer;
+}
+
+.platform-support-attachment-btn:hover {
+  border-color: #2d6a4f;
 }
 
 .platform-support-case-email-list header {

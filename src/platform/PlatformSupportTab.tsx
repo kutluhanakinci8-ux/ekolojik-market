@@ -4,6 +4,7 @@ import {
   createPlatformSupportCaseFromQueue,
   downloadPlatformSupportCsv,
   downloadPlatformSupportCaseActivityCsv,
+  downloadPlatformSupportInboxAttachment,
   openPlatformSupportCaseActivityPrint,
   fetchPlatformSupportCaseDetail,
   fetchPlatformSupportCases,
@@ -21,6 +22,7 @@ import {
   type PlatformSupportCase,
   type PlatformSupportCaseDetail,
   type PlatformSupportContactQueueItem,
+  type PlatformSupportInboxAttachment,
   type PlatformSupportInboxMessage,
   type PlatformSupportPayload,
   type ClosedCaseInboundMode,
@@ -29,6 +31,7 @@ import {
 import { KpiIcon, PlatformFilterSelect, RingProgress } from './platformUserUi';
 import { PlatformSupportTenant360 } from './PlatformSupportTenant360';
 import { PlatformSupportSlaLive } from './PlatformSupportSlaLive';
+import { buildCaseUnifiedTimeline, type CaseTimelineEntry } from './platformSupportCaseTimeline';
 
 const KIND_LABELS: Record<string, string> = {
   first_response: 'İlk yanıt bekliyor',
@@ -43,6 +46,94 @@ function SupportEmailHtmlFrame({ html, title }: { html: string; title: string })
       srcDoc={html}
       title={title}
     />
+  );
+}
+
+function formatAttachmentSize(bytes?: number): string {
+  if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function SupportInboxAttachments({
+  messageId,
+  attachments,
+}: {
+  messageId: string;
+  attachments: PlatformSupportInboxAttachment[];
+}) {
+  if (!attachments.length) return null;
+  return (
+    <ul className="platform-support-attachments">
+      {attachments.map((a) => (
+        <li key={a.id}>
+          <button
+            type="button"
+            className="platform-support-attachment-btn"
+            onClick={() => void downloadPlatformSupportInboxAttachment(messageId, a.id, a.fileName)}
+          >
+            {a.fileName}
+            {a.size ? <span className="platform-table-muted"> ({formatAttachmentSize(a.size)})</span> : null}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CaseTimelineItem({ entry }: { entry: CaseTimelineEntry }) {
+  if (entry.kind === 'email_in') {
+    return (
+      <li className="is-email-in">
+        <header>
+          <span>{entry.label}</span>
+          <span>{formatDateTime(entry.at)}</span>
+        </header>
+        <p className="platform-table-muted">{entry.from}</p>
+        <p className="platform-support-case-email-body">{entry.bodyText}</p>
+        <SupportInboxAttachments messageId={entry.inboxMessageId} attachments={entry.attachments ?? []} />
+        {entry.bodyHtml ? (
+          <details className="platform-support-email-html-details">
+            <summary>HTML önizleme</summary>
+            <SupportEmailHtmlFrame html={entry.bodyHtml} title={`Gelen mail ${entry.inboxMessageId}`} />
+          </details>
+        ) : null}
+      </li>
+    );
+  }
+  if (entry.kind === 'email_out') {
+    return (
+      <li className="is-email-out">
+        <header>
+          <span>{entry.label}</span>
+          <span>{formatDateTime(entry.at)}</span>
+        </header>
+        {entry.bodyText ? <p className="platform-support-case-email-body">{entry.bodyText}</p> : null}
+        {entry.bodyHtml ? (
+          <details className="platform-support-email-html-details">
+            <summary>HTML önizleme</summary>
+            <SupportEmailHtmlFrame html={entry.bodyHtml} title="Giden e-posta" />
+          </details>
+        ) : null}
+        {entry.messageId ? <code className="platform-support-mono-truncate">{entry.messageId}</code> : null}
+      </li>
+    );
+  }
+  const who =
+    entry.direction === 'customer'
+      ? 'Müşteri'
+      : entry.direction === 'staff'
+        ? 'Kasa'
+        : entry.authorName || 'Mesaj';
+  return (
+    <li className="is-messaging">
+      <header>
+        <span>Mesajlaşma · {who}</span>
+        <span>{formatDateTime(entry.at)}</span>
+      </header>
+      <p className="platform-support-case-email-body">{entry.bodyText}</p>
+    </li>
   );
 }
 
@@ -118,6 +209,7 @@ export function PlatformSupportTab() {
   const [activityExporting, setActivityExporting] = useState<'csv' | 'html' | null>(null);
   const [policyDraft, setPolicyDraft] = useState<PlatformSupportSlaPolicy | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'email_inbound' | 'email_outbound' | 'note'>('all');
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'first_response' | 'stale_waiting'>('all');
   const [section, setSection] = useState<'inbox' | 'queue' | 'cases' | 'sla'>('cases');
@@ -191,6 +283,10 @@ export function PlatformSupportTab() {
   }, [selectedCaseId, caseRows]);
 
   useEffect(() => {
+    setShowAllActivity(false);
+  }, [selectedCaseId, activityFilter]);
+
+  useEffect(() => {
     if (!selectedCaseId) {
       setCaseDetail(null);
       return;
@@ -206,6 +302,11 @@ export function PlatformSupportTab() {
       }
     })();
   }, [selectedCaseId]);
+
+  const caseUnifiedTimeline = useMemo(
+    () => buildCaseUnifiedTimeline(caseDetail),
+    [caseDetail],
+  );
 
   const filteredCaseActivity = useMemo(() => {
     const items = caseDetail?.case.activity ?? [];
@@ -235,9 +336,16 @@ export function PlatformSupportTab() {
       zendesk_webhook: 'Zendesk (webhook)',
       zendesk_push: 'Zendesk (platform →)',
       note: 'İç not',
+      messaging_out: 'Mesajlaşma (giden)',
     };
     return map[type] ?? type;
   };
+
+  const ACTIVITY_LIST_CAP = 24;
+  const visibleCaseActivity = useMemo(() => {
+    if (showAllActivity) return filteredCaseActivity;
+    return filteredCaseActivity.slice(0, ACTIVITY_LIST_CAP);
+  }, [filteredCaseActivity, showAllActivity]);
 
   const filteredQueue = useMemo(() => {
     if (!data) return [];
@@ -667,62 +775,22 @@ export function PlatformSupportTab() {
                 <p className="platform-table-muted">
                   {selectedCase.channel} · {selectedCase.requesterEmail ?? selectedCase.requesterName ?? '—'}
                 </p>
-                {caseDetail?.emailPreview ? (
-                  <div className="platform-support-case-email-chain">
-                    <h4>E-posta zinciri</h4>
-                    {caseDetail.emailPreview.plusAddress ? (
+                {caseUnifiedTimeline.length > 0 ? (
+                  <div className="platform-support-case-email-chain platform-support-unified-timeline">
+                    <h4>Zaman çizelgesi</h4>
+                    {caseDetail?.emailPreview?.plusAddress ? (
                       <p className="platform-support-hint">
                         Plus adres: <code>{caseDetail.emailPreview.plusAddress}</code>
                       </p>
                     ) : null}
-                    <ul className="platform-support-case-email-list">
-                      {caseDetail.emailPreview.messages.map((m) => (
-                        <li key={m.id} className={m.isReply ? 'is-reply' : 'is-root'}>
-                          <header>
-                            <span>{m.isReply ? 'Gelen yanıt' : 'İlk mail'}</span>
-                            <span>{formatDateTime(m.receivedAt)}</span>
-                          </header>
-                          <p className="platform-table-muted">{m.from}</p>
-                          <p className="platform-support-case-email-body">{m.bodyText}</p>
-                          {m.bodyHtml ? (
-                            <details className="platform-support-email-html-details">
-                              <summary>HTML önizleme (gelen)</summary>
-                              <SupportEmailHtmlFrame html={m.bodyHtml} title={`Gelen mail ${m.id}`} />
-                            </details>
-                          ) : null}
-                        </li>
-                      ))}
-                      {caseDetail.emailPreview.outboundEvents.map((e, idx) => (
-                        <li key={`out-${e.at}-${idx}`} className="is-outbound">
-                          <header>
-                            <span>Giden · {e.kind}</span>
-                            <span>{formatDateTime(e.at)}</span>
-                          </header>
-                          {e.textPreview ? (
-                            <p className="platform-support-case-email-body">{e.textPreview}</p>
-                          ) : null}
-                          {e.htmlPreview ? (
-                            <details className="platform-support-email-html-details" open={e.kind === 'operator_reply'}>
-                              <summary>HTML önizleme (giden)</summary>
-                              <SupportEmailHtmlFrame html={e.htmlPreview} title={`Giden ${e.kind}`} />
-                            </details>
-                          ) : null}
-                          {e.messageId ? <code className="platform-support-mono-truncate">{e.messageId}</code> : null}
-                        </li>
+                    <ul className="platform-support-case-email-list platform-support-case-email-list--timeline">
+                      {caseUnifiedTimeline.map((entry) => (
+                        <CaseTimelineItem key={entry.key} entry={entry} />
                       ))}
                     </ul>
                   </div>
                 ) : caseDetail?.inboxSnippet ? (
                   <p className="platform-support-hint">Gelen mail: {caseDetail.inboxSnippet.subject}</p>
-                ) : null}
-                {caseDetail?.messagingPreview?.messages?.length ? (
-                  <div className="platform-support-case-thread">
-                    {caseDetail.messagingPreview.messages.map((m) => (
-                      <p key={m.id} className="platform-table-muted">
-                        <strong>{m.direction === 'customer' ? 'Müşteri' : 'Kasa'}:</strong> {m.bodyText.slice(0, 120)}
-                      </p>
-                    ))}
-                  </div>
                 ) : null}
                 <div className="platform-support-360-actions">
                   <button type="button" className="btn btn-secondary" disabled={aiBusy} onClick={() => void runCaseAi('summary')}>
@@ -886,20 +954,44 @@ export function PlatformSupportTab() {
                         {filteredCaseActivity.length === 0 ? (
                           <li className="platform-support-hint">Bu filtrede kayıt yok.</li>
                         ) : (
-                          filteredCaseActivity.slice(0, 24).map((a) => (
-                            <li key={a.id} className={`platform-support-activity-item platform-support-activity-item--${a.type}`}>
-                              <span className="platform-table-muted">
-                                {formatDateTime(a.createdAt)} · {activityTypeLabel(a.type)} · {a.createdBy}
-                              </span>
-                              <p className="platform-support-activity-body">{a.body}</p>
-                              {a.html ? (
-                                <details className="platform-support-email-html-details">
-                                  <summary>HTML önizleme</summary>
-                                  <SupportEmailHtmlFrame html={a.html} title={`Aktivite ${a.id}`} />
-                                </details>
-                              ) : null}
-                            </li>
-                          ))
+                          <>
+                            {visibleCaseActivity.map((a) => (
+                              <li key={a.id} className={`platform-support-activity-item platform-support-activity-item--${a.type}`}>
+                                <span className="platform-table-muted">
+                                  {formatDateTime(a.createdAt)} · {activityTypeLabel(a.type)} · {a.createdBy}
+                                </span>
+                                <p className="platform-support-activity-body">{a.body}</p>
+                                {a.html ? (
+                                  <details className="platform-support-email-html-details">
+                                    <summary>HTML önizleme</summary>
+                                    <SupportEmailHtmlFrame html={a.html} title={`Aktivite ${a.id}`} />
+                                  </details>
+                                ) : null}
+                              </li>
+                            ))}
+                            {filteredCaseActivity.length > ACTIVITY_LIST_CAP && !showAllActivity ? (
+                              <li>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  onClick={() => setShowAllActivity(true)}
+                                >
+                                  Tümünü göster ({filteredCaseActivity.length})
+                                </button>
+                              </li>
+                            ) : null}
+                            {showAllActivity && filteredCaseActivity.length > ACTIVITY_LIST_CAP ? (
+                              <li>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  onClick={() => setShowAllActivity(false)}
+                                >
+                                  Listeyi kısalt
+                                </button>
+                              </li>
+                            ) : null}
+                          </>
                         )}
                       </ul>
                     ) : (
@@ -1041,11 +1133,15 @@ export function PlatformSupportTab() {
                           <code>{msg.id}</code>
                         </header>
                         <p>{msg.bodyText || msg.snippet}</p>
+                        <SupportInboxAttachments messageId={msg.id} attachments={msg.attachments ?? []} />
                       </article>
                     ))}
                   </div>
                 ) : (
-                  <div className="platform-support-inbox-body">{selectedMail.bodyText || selectedMail.snippet}</div>
+                  <div className="platform-support-inbox-body">
+                    {selectedMail.bodyText || selectedMail.snippet}
+                    <SupportInboxAttachments messageId={selectedMail.id} attachments={selectedMail.attachments ?? []} />
+                  </div>
                 )}
                 <label className="platform-support-reply-label">
                   Yanıt (destek@)

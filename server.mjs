@@ -1128,6 +1128,34 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const platformSupportInboxAttachMatch = pathname.match(
+      /^\/api\/platform\/support\/inbox\/([^/]+)\/attachment\/([^/]+)$/,
+    );
+    if (platformSupportInboxAttachMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      const inboxId = decodeURIComponent(platformSupportInboxAttachMatch[1]);
+      const attachmentId = decodeURIComponent(platformSupportInboxAttachMatch[2]);
+      try {
+        const { loadPlatformSupportInboxAttachment } = await import('./server/platformSupportInbox.mjs');
+        const result = await loadPlatformSupportInboxAttachment(DATA_DIR, inboxId, attachmentId);
+        if (!result.ok || !result.data) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.meta.mimeType || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(result.meta.fileName || 'ek')}"`,
+        });
+        res.end(result.data);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ek indirme hatası' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/zendesk/webhook' && req.method === 'POST') {
       try {
         const { verifyZendeskWebhookSecret } = await import('./server/platformSupportZendesk.mjs');
