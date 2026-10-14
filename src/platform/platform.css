@@ -3742,6 +3742,42 @@
   border-color: #2d6a4f;
 }
 
+.platform-support-macro-editor {
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2ebe4;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.platform-support-macro-editor h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.platform-support-macro-editor-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px dashed #d8e3dc;
+}
+
+.platform-support-macro-editor-row textarea {
+  grid-column: 1 / -1;
+}
+
+.platform-support-macro-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.platform-support-zendesk-hint {
+  margin-top: 0.35rem;
+}
+
 .platform-support-case-email-list header {
   display: flex;
   justify-content: space-between;

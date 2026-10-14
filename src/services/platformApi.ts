@@ -1295,6 +1295,85 @@ export async function pushPlatformSupportCaseZendesk(
   }
 }
 
+export async function createPlatformSupportCaseZendesk(
+  caseId: string,
+): Promise<{ ok: boolean; ticketId?: string; url?: string | null; error?: string }> {
+  try {
+    const res = await fetch(`/api/platform/support/cases/${encodeURIComponent(caseId)}/zendesk/create`, {
+      method: 'POST',
+      headers: posApiAuthHeaders(),
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      ticketId?: string;
+      url?: string | null;
+      error?: string;
+    };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Zendesk ticket oluşturulamadı' };
+    }
+    return { ok: true, ticketId: data.ticketId, url: data.url };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export type PlatformSupportMacro = { id: string; label: string; body: string };
+
+export async function fetchPlatformSupportMacros(): Promise<{
+  ok: boolean;
+  macros?: PlatformSupportMacro[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch('/api/platform/support/macros', { headers: posApiAuthHeaders() });
+    const data = (await res.json()) as { ok?: boolean; macros?: PlatformSupportMacro[]; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Makrolar yüklenemedi' };
+    }
+    return { ok: true, macros: data.macros ?? [] };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function savePlatformSupportMacros(
+  macros: PlatformSupportMacro[],
+): Promise<{ ok: boolean; macros?: PlatformSupportMacro[]; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/support/macros', {
+      method: 'PUT',
+      headers: { ...posApiAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ macros }),
+    });
+    const data = (await res.json()) as { ok?: boolean; macros?: PlatformSupportMacro[]; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Makrolar kaydedilemedi' };
+    }
+    return { ok: true, macros: data.macros };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function syncPlatformSupportCaseZendeskStatus(
+  caseId: string,
+): Promise<{ ok: boolean; zendeskStatus?: string; error?: string }> {
+  try {
+    const res = await fetch(
+      `/api/platform/support/cases/${encodeURIComponent(caseId)}/zendesk/sync-status`,
+      { method: 'POST', headers: posApiAuthHeaders() },
+    );
+    const data = (await res.json()) as { ok?: boolean; zendeskStatus?: string; error?: string };
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error ?? 'Zendesk durum senkronu başarısız' };
+    }
+    return { ok: true, zendeskStatus: data.zendeskStatus };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
 export async function createPlatformSupportCaseFromQueue(payload: {
   tenantId: string;
   threadId: string;

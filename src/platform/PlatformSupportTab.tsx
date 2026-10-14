@@ -7,12 +7,16 @@ import {
   downloadPlatformSupportInboxAttachment,
   openPlatformSupportCaseActivityPrint,
   fetchPlatformSupportCaseDetail,
+  fetchPlatformSupportMacros,
+  savePlatformSupportMacros,
   fetchPlatformSupportCases,
   fetchPlatformSupportContactQueue,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
   fetchPlatformSupportZendeskBridge,
+  createPlatformSupportCaseZendesk,
   pushPlatformSupportCaseZendesk,
+  syncPlatformSupportCaseZendeskStatus,
   fetchPlatformSupportCaseAi,
   postPlatformSupportCaseAction,
   replyPlatformSupportInbox,
@@ -218,6 +222,8 @@ export function PlatformSupportTab() {
   const [zendeskIdDraft, setZendeskIdDraft] = useState('');
   const [zendeskApiReady, setZendeskApiReady] = useState(false);
   const [zendeskPushing, setZendeskPushing] = useState(false);
+  const [zendeskCreating, setZendeskCreating] = useState(false);
+  const [zendeskSyncing, setZendeskSyncing] = useState(false);
   const [inboxMessages, setInboxMessages] = useState<PlatformSupportInboxMessage[]>([]);
   const [inboxUnread, setInboxUnread] = useState(0);
   const [mailboxConfigured, setMailboxConfigured] = useState(false);
@@ -233,6 +239,9 @@ export function PlatformSupportTab() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [macroPick, setMacroPick] = useState('');
+  const [macroEditorOpen, setMacroEditorOpen] = useState(false);
+  const [macroDraft, setMacroDraft] = useState<Array<{ id: string; label: string; body: string }>>([]);
+  const [macroSaving, setMacroSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -526,6 +535,13 @@ export function PlatformSupportTab() {
     void load();
   };
 
+  const refreshCaseDetail = async () => {
+    if (!selectedCaseId) return;
+    const detail = await fetchPlatformSupportCaseDetail(selectedCaseId);
+    if (detail.ok && detail.data) setCaseDetail(detail.data);
+    void load();
+  };
+
   const pushCaseToZendesk = async () => {
     if (!selectedCaseId) return;
     setZendeskPushing(true);
@@ -536,11 +552,57 @@ export function PlatformSupportTab() {
       return;
     }
     setPolicyMsg(`Zendesk #${result.ticketId ?? zendeskIdDraft} güncellendi`);
-    void load();
-    if (selectedCaseId) {
-      const detail = await fetchPlatformSupportCaseDetail(selectedCaseId);
-      if (detail.ok && detail.data) setCaseDetail(detail.data);
+    void refreshCaseDetail();
+  };
+
+  const createCaseZendeskTicket = async () => {
+    if (!selectedCaseId) return;
+    setZendeskCreating(true);
+    const result = await createPlatformSupportCaseZendesk(selectedCaseId);
+    setZendeskCreating(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Zendesk ticket oluşturulamadı'));
+      return;
     }
+    if (result.ticketId) setZendeskIdDraft(result.ticketId);
+    setPolicyMsg(`Zendesk ticket #${result.ticketId} oluşturuldu`);
+    void refreshCaseDetail();
+  };
+
+  const syncCaseZendeskStatus = async () => {
+    if (!selectedCaseId) return;
+    setZendeskSyncing(true);
+    const result = await syncPlatformSupportCaseZendeskStatus(selectedCaseId);
+    setZendeskSyncing(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Durum senkronu başarısız'));
+      return;
+    }
+    setPolicyMsg(`Zendesk durumu güncellendi (${result.zendeskStatus ?? '—'})`);
+    void refreshCaseDetail();
+  };
+
+  const openMacroEditor = async () => {
+    const res = await fetchPlatformSupportMacros();
+    if (!res.ok || !res.macros?.length) {
+      setMacroDraft(caseDetail?.macros?.length ? [...caseDetail.macros] : []);
+    } else {
+      setMacroDraft(res.macros.map((m) => ({ ...m })));
+    }
+    setMacroEditorOpen(true);
+  };
+
+  const saveMacroEditor = async () => {
+    setMacroSaving(true);
+    const result = await savePlatformSupportMacros(macroDraft);
+    setMacroSaving(false);
+    if (!result.ok) {
+      setPolicyMsg(userMessage(result.error, 'Makrolar kaydedilemedi'));
+      return;
+    }
+    setPolicyMsg('Makro şablonları kaydedildi');
+    setMacroEditorOpen(false);
+    if (selectedCaseId) void refreshCaseDetail();
   };
 
   const onExport = async () => {
@@ -866,7 +928,85 @@ export function PlatformSupportTab() {
                       Makro + AI
                     </button>
                   ) : null}
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => void openMacroEditor()}>
+                    Makroları düzenle
+                  </button>
                 </div>
+                {macroEditorOpen ? (
+                  <div className="platform-support-macro-editor">
+                    <h4>Makro şablonları</h4>
+                    <p className="platform-support-hint">
+                      Değişkenler: <code>{'{{requesterFirstName}}'}</code>, <code>{'{{subject}}'}</code>,{' '}
+                      <code>{'{{caseNumber}}'}</code> — dosya: <code>data/platform/support-macros.json</code>
+                    </p>
+                    {macroDraft.map((m, idx) => (
+                      <div key={`${m.id}-${idx}`} className="platform-support-macro-editor-row">
+                        <input
+                          className="platform-support-control"
+                          value={m.id}
+                          placeholder="id"
+                          onChange={(e) => {
+                            const next = [...macroDraft];
+                            next[idx] = { ...next[idx], id: e.target.value };
+                            setMacroDraft(next);
+                          }}
+                        />
+                        <input
+                          className="platform-support-control"
+                          value={m.label}
+                          placeholder="Etiket"
+                          onChange={(e) => {
+                            const next = [...macroDraft];
+                            next[idx] = { ...next[idx], label: e.target.value };
+                            setMacroDraft(next);
+                          }}
+                        />
+                        <textarea
+                          className="platform-support-control"
+                          rows={3}
+                          value={m.body}
+                          onChange={(e) => {
+                            const next = [...macroDraft];
+                            next[idx] = { ...next[idx], body: e.target.value };
+                            setMacroDraft(next);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setMacroDraft(macroDraft.filter((_, i) => i !== idx))}
+                        >
+                          Sil
+                        </button>
+                      </div>
+                    ))}
+                    <div className="platform-support-macro-editor-actions">
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() =>
+                          setMacroDraft([
+                            ...macroDraft,
+                            { id: `macro_${macroDraft.length + 1}`, label: 'Yeni şablon', body: '' },
+                          ])
+                        }
+                      >
+                        Şablon ekle
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={macroSaving}
+                        onClick={() => void saveMacroEditor()}
+                      >
+                        {macroSaving ? 'Kaydediliyor…' : 'Kaydet'}
+                      </button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setMacroEditorOpen(false)}>
+                        Kapat
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <label className="platform-support-reply-label">
                   {replyChannel === 'note' ? 'İç not' : 'Yanıt metni'}
                   <textarea rows={5} value={actionDraft} onChange={(e) => setActionDraft(e.target.value)} />
@@ -896,17 +1036,44 @@ export function PlatformSupportTab() {
                       Zendesk&apos;te aç
                     </a>
                   ) : null}
-                  {zendeskApiReady && zendeskIdDraft.trim() ? (
+                  {zendeskApiReady && !selectedCase.externalTicketRef?.id ? (
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      disabled={zendeskPushing}
-                      onClick={() => void pushCaseToZendesk()}
+                      disabled={zendeskCreating}
+                      onClick={() => void createCaseZendeskTicket()}
                     >
-                      {zendeskPushing ? 'Gönderiliyor…' : 'Özeti Zendesk’e gönder'}
+                      {zendeskCreating ? 'Oluşturuluyor…' : 'Zendesk ticket oluştur'}
                     </button>
                   ) : null}
+                  {zendeskApiReady && (selectedCase.externalTicketRef?.id || zendeskIdDraft.trim()) ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        disabled={zendeskPushing}
+                        onClick={() => void pushCaseToZendesk()}
+                      >
+                        {zendeskPushing ? 'Gönderiliyor…' : 'Özeti Zendesk’e gönder'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        disabled={zendeskSyncing}
+                        onClick={() => void syncCaseZendeskStatus()}
+                        title="Platform kayıt durumunu Zendesk ticket’a yaz"
+                      >
+                        {zendeskSyncing ? 'Senkron…' : 'Durumu Zendesk’e yaz'}
+                      </button>
+                    </>
+                  ) : null}
                 </div>
+                {zendeskApiReady ? (
+                  <p className="platform-support-hint platform-support-zendesk-hint">
+                    Webhook, <code>platform_case_N</code> etiketi veya kayıtlı ticket ID ile kayda bağlanır; platform
+                    durumu değişince otomatik Zendesk senkronu dener.
+                  </p>
+                ) : null}
                 {caseDetail ? (
                   <div className="platform-support-case-activity">
                     <div className="platform-support-activity-head">

@@ -452,13 +452,24 @@ export async function getPlatformSupportCases(dataDir, query = {}) {
 }
 
 export async function patchPlatformSupportCase(dataDir, caseId, patch, operatorUsername) {
-  const { updatePlatformCase } = await import('./platformCaseStore.mjs');
+  const { getPlatformCase, updatePlatformCase } = await import('./platformCaseStore.mjs');
+  const before = await getPlatformCase(dataDir, caseId);
   const next = { ...patch };
   if (next.externalTicketRef != null && next.externalTicketRef !== false) {
     const { enrichExternalTicketRef } = await import('./platformSupportZendesk.mjs');
     next.externalTicketRef = enrichExternalTicketRef(next.externalTicketRef);
   }
-  return updatePlatformCase(dataDir, caseId, next, operatorUsername);
+  const result = await updatePlatformCase(dataDir, caseId, next, operatorUsername);
+  if (!result.ok) return result;
+
+  let zendeskSync = null;
+  if (patch.status != null && before && before.status !== result.case?.status) {
+    const { syncPlatformCaseStatusToZendesk } = await import('./platformSupportZendesk.mjs');
+    const sync = await syncPlatformCaseStatusToZendesk(dataDir, caseId);
+    zendeskSync = sync.ok ? { ok: true, zendeskStatus: sync.zendeskStatus } : { ok: false, error: sync.error };
+  }
+
+  return zendeskSync ? { ...result, zendeskSync } : result;
 }
 
 export async function getPlatformSupportZendeskBridge(dataDir) {
@@ -476,6 +487,34 @@ export async function postPlatformSupportCaseZendeskPush(dataDir, caseId, operat
   const result = await pushPlatformCaseSummaryToZendesk(dataDir, caseId);
   if (result.ok) return result;
   return { ok: false, status: result.status ?? 400, error: result.error };
+}
+
+export async function postPlatformSupportCaseZendeskCreate(dataDir, caseId, operatorUsername) {
+  const { createZendeskTicketFromPlatformCase } = await import('./platformSupportZendesk.mjs');
+  const result = await createZendeskTicketFromPlatformCase(dataDir, caseId, operatorUsername);
+  if (result.ok) return result;
+  return { ok: false, status: result.status ?? 400, error: result.error };
+}
+
+export async function postPlatformSupportCaseZendeskSyncStatus(dataDir, caseId) {
+  const { syncPlatformCaseStatusToZendesk } = await import('./platformSupportZendesk.mjs');
+  const result = await syncPlatformCaseStatusToZendesk(dataDir, caseId);
+  if (result.ok) return result;
+  return { ok: false, status: result.status ?? 400, error: result.error };
+}
+
+export async function getPlatformSupportMacros(dataDir) {
+  const { listPlatformSupportMacros } = await import('./platformSupportCaseOmni.mjs');
+  const macros = await listPlatformSupportMacros(dataDir);
+  return { ok: true, macros };
+}
+
+export async function putPlatformSupportMacros(dataDir, body) {
+  const { savePlatformSupportMacros } = await import('./platformSupportCaseOmni.mjs');
+  const macros = body?.macros ?? body;
+  const result = await savePlatformSupportMacros(dataDir, macros);
+  if (!result.ok) return { ok: false, status: 400, error: result.error };
+  return result;
 }
 
 export async function createPlatformSupportCase(dataDir, input, operatorUsername) {
