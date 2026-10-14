@@ -50,6 +50,27 @@ const SEV_LABELS: Record<string, string> = {
   info: 'Normal',
 };
 
+const CLOSED_CASE_INBOUND_PREVIEW: Record<
+  ClosedCaseInboundMode,
+  { summary: string; customer: string; ops: string }
+> = {
+  reopen: {
+    summary: 'Kapalı/çözüldü kayda gelen mail kaydı tekrar açar; aktivite gelen e-posta olarak eklenir.',
+    customer: 'Müşteri aynı kayıt numarasıyla yazışmaya devam eder.',
+    ops: 'Tek kayıt; SLA yeniden işler.',
+  },
+  keep_closed: {
+    summary: 'Kayıt kapalı kalır; mail arşiv aktivitesi (email_inbound_closed) eklenir.',
+    customer: 'Otomatik yanıt yok — gerekirse manuel iletişim.',
+    ops: 'Raporlarda görünür; kayıt yeniden açılmaz.',
+  },
+  new_case: {
+    summary: 'Yeni destek kaydı açılır; müşteriye şablon bildirim, ops@ iç uyarı gider.',
+    customer: 'Yeni kayıt numarası ve referans ile bilgilendirilir.',
+    ops: 'Eski kayıt kapalı; spawn + ops bildirimi.',
+  },
+};
+
 function formatDurationMs(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms)) return '—';
   if (ms < 60_000) return `${Math.round(ms / 1000)} sn`;
@@ -1028,6 +1049,23 @@ export function PlatformSupportTab() {
                   <option value="new_case">Yeni kayıt aç</option>
                 </select>
               </label>
+              {policyDraft.closedCaseInbound ? (
+                <div className="platform-support-policy-preview" role="note">
+                  <p className="platform-support-policy-preview-lead">
+                    {CLOSED_CASE_INBOUND_PREVIEW[policyDraft.closedCaseInbound].summary}
+                  </p>
+                  <ul className="platform-support-policy-preview-list">
+                    <li>
+                      <strong>Müşteri:</strong>{' '}
+                      {CLOSED_CASE_INBOUND_PREVIEW[policyDraft.closedCaseInbound].customer}
+                    </li>
+                    <li>
+                      <strong>Operasyon:</strong>{' '}
+                      {CLOSED_CASE_INBOUND_PREVIEW[policyDraft.closedCaseInbound].ops}
+                    </li>
+                  </ul>
+                </div>
+              ) : null}
               <button type="button" className="btn btn-primary" onClick={() => void savePolicy()}>
                 Kaydet
               </button>

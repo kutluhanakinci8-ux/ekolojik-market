@@ -65,6 +65,7 @@ Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
 |----------|----------|
 | `EKOLOJIK_SUPPORT_*` | destek@ IMAP/giden kimlik (`scripts/sunucu-ekolojik-destek-mailbox.sh`) |
 | `EKOLOJIK_SUPPORT_OPS_NOTIFY` | `new_case` spawn sonrası ops@ mail (varsayılan açık; `0` ile kapat) |
+| `EKOLOJIK_SUPPORT_OPS_SLA_NOTIFY` | Cron sonrası SLA/kuyruk özeti ops@ (kritik kuyruk veya geciken kayıt; 4 saat throttle) |
 | `EKOLOJIK_SUPPORT_IMAP_SYNC_ALERT` | Cron senkron hatasında ops@ (varsayılan: ops notify ile aynı; saatte en fazla 1) |
 | `EKOLOJIK_MAIL_LOGO_URL`, `EKOLOJIK_CONTACT_FORM_URL` | Otomatik alındı / spawn mail footer |
 | `EKOLOJIK_SOCIAL_*` | Footer sosyal linkleri (tam `https://` URL; boşsa satır gösterilmez) |
