@@ -22,6 +22,7 @@ import {
 } from './server/tenantAllowlist.mjs';
 import { checkRateLimit } from './server/rateLimit.mjs';
 import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
+import { supportInboxStatus } from './server/platformSupportMailConfig.mjs';
 import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
 import { sendCrmEmail } from './server/crmOutreach.mjs';
 import {
@@ -2137,6 +2138,7 @@ const server = createServer(async (req, res) => {
           replyTo: effective.replyTo || null,
           opsEmail: effective.opsEmail || null,
           contactAutoreply: isContactAutoreplyEnabled(),
+          supportInbox: supportInboxStatus(),
           counts,
         }),
       );

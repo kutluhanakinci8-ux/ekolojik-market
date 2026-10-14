@@ -74,6 +74,17 @@ EOF
     postconf -e "transport_maps = ${tm}, hash:${TRANSPORT_FILE}"
   fi
 
+  local vd
+  vd="$(postconf -h virtual_alias_domains)"
+  if [[ "${vd}" != *"${DOMAIN}"* ]]; then
+    if [[ -z "${vd}" ]]; then
+      postconf -e "virtual_alias_domains = ${DOMAIN}"
+    else
+      postconf -e "virtual_alias_domains = ${vd}, ${DOMAIN}"
+    fi
+    echo "OK   virtual_alias_domains += ${DOMAIN}"
+  fi
+
   systemctl reload postfix
   echo "OK   Postfix ${LOCAL_USER} → ${TOKEN} → ekolojik-lda-destek"
 }
@@ -122,6 +133,16 @@ systemctl reload dovecot
 echo "OK   Dovecot passdb: ${LOCAL_USER}"
 
 configure_postfix_destek
+
+if [[ -x "${SCRIPT_DIR}/sunucu-ekolojik-destek-plus-alias.sh" ]]; then
+  bash "${SCRIPT_DIR}/sunucu-ekolojik-destek-plus-alias.sh" --apply
+fi
+
+if bash "${SCRIPT_DIR}/sunucu-ekolojik-support-smtp-recipient-dogrula.sh" "${INSTALL_DIR}"; then
+  echo "OK   destek@ SMTP alıcı doğrulandı"
+else
+  echo "UYARI: destek@ SMTP alıcı doğrulama başarısız"
+fi
 
 cp -a "${ENV_FILE}" "${ENV_FILE}.bak.support.$(date +%Y%m%d%H%M%S)"
 set_env_kv EKOLOJIK_SUPPORT_INBOX "${LOCAL_USER}"

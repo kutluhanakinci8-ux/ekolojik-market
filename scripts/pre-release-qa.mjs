@@ -394,6 +394,18 @@ async function integrationGate() {
   }
   if (health.json?.contactAutoreply === false) {
     warn('ops', 'contactAutoreply kapalı', 'EKOLOJIK_CONTACT_AUTOREPLY=1 (müşteri alındı maili)');
+  } else if (health.json?.contactAutoreply === true) {
+    pass('ops', 'contactAutoreply açık');
+  }
+  const support = health.json?.supportInbox;
+  if (support && support.configured === false && support.bridgePrimary) {
+    warn(
+      'ops',
+      'destek@ IMAP yapılandırılmadı',
+      'outbox köprüsü aktif — VPS: sunucu-ekolojik-destek-mailbox.sh --apply',
+    );
+  } else if (support?.configured) {
+    pass('ops', 'destek@ IMAP yapılandırıldı', support.address ?? '');
   }
 
   const contact = await http('POST', '/api/contact', {
