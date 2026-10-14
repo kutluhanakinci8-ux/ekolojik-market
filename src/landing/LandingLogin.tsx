@@ -25,6 +25,7 @@ import {
   confirmPasswordReset,
   requestPasswordResetEmail,
 } from '../services/userPasswordApi';
+import { reportLoginAuditToServer } from '../services/loginAuditReport';
 
 type LoginMode = 'password' | 'pin';
 
@@ -103,6 +104,13 @@ export function LandingLogin() {
     );
     const tenantError = validateStoreCodeForLogin(resolvedTenant);
     if (tenantError) {
+      const auditUser = (loginUser || 'bilinmiyor').trim().toLowerCase();
+      void reportLoginAuditToServer(resolvedTenant === '__platform__' ? 'main' : resolvedTenant, {
+        username: auditUser,
+        failureKind: 'invalid_store_code',
+        failureReason: tenantError,
+        method: 'password',
+      });
       setError(tenantError);
       setBusy(false);
       return;

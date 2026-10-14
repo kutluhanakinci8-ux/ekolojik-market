@@ -1813,6 +1813,7 @@ export type PlatformSupportTenant360LoginRow = {
   method?: string;
   createdAt: string;
   failureReason?: string | null;
+  failureKind?: string | null;
   clientIp?: string | null;
 };
 

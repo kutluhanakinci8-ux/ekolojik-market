@@ -10,6 +10,7 @@ import {
 } from '../services/platformApi';
 import { saveTenantId } from '../storage/tenantSession';
 import { syncPosApiTokenToCurrentTenant } from '../services/posApiAuth';
+import { LOGIN_AUDIT_KIND_LABELS } from '../services/loginAuditReport';
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -202,24 +203,36 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
       {alerts.length > 0 ? (
         <article className="platform-support-360-card platform-support-360-card--alert">
           <h4>Son giriş uyarıları</h4>
-          <p className="platform-support-hint">Sunucu kaydı — hatalı şifre ve benzeri denemeler (Yenile ile güncellenir).</p>
+          <p className="platform-support-hint">
+            Greenleaf / kiracı sunucu kaydı — şifre, mağaza kodu, askı, 2FA, tarayıcı kilidi vb. (Yenile ile güncellenir).
+          </p>
           <ul className="platform-support-360-login-list platform-support-360-login-list--alerts">
-            {alerts.map((entry, idx) => (
+            {alerts.map((entry, idx) => {
+              const kindLabel = entry.failureKind
+                ? (LOGIN_AUDIT_KIND_LABELS[entry.failureKind] ?? entry.failureKind)
+                : null;
+              const methodLabel = entry.method === 'pin' ? 'PIN' : 'Şifre';
+              return (
               <li
                 key={entry.id ?? `alert-${entry.createdAt}-${idx}`}
                 className="is-failed"
               >
                 <span className="platform-support-360-login-time">{formatDateTime(entry.createdAt)}</span>
+                {kindLabel ? (
+                  <span className="platform-support-360-login-kind">{kindLabel}</span>
+                ) : null}
                 <span className="platform-support-360-login-user">
                   <strong>{entry.username || entry.displayName || '—'}</strong>
                   {entry.displayName && entry.username ? ` (${entry.username})` : ''}
                 </span>
+                <span className="platform-support-360-login-meta">{methodLabel}</span>
                 <span className="platform-support-360-login-result">
                   {entry.failureReason || 'Başarısız giriş'}
                   {entry.clientIp ? ` · IP ${entry.clientIp}` : ''}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </article>
       ) : null}
@@ -273,6 +286,9 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
                 </span>
                 <span className="platform-support-360-login-result">
                   {entry.success ? 'Başarılı' : 'Başarısız'}
+                  {!entry.success && entry.failureKind
+                    ? ` · ${LOGIN_AUDIT_KIND_LABELS[entry.failureKind] ?? entry.failureKind}`
+                    : ''}
                   {!entry.success && entry.failureReason ? ` · ${entry.failureReason}` : ''}
                 </span>
               </li>

@@ -5,6 +5,7 @@ import { resolveLoginTenantId } from '../config/loginTenant';
 import { isDedicatedPlatformOnlyUsername, PLATFORM_TENANT_ID } from '../config/platformOperators';
 import { saveTenantId } from '../storage/tenantSession';
 import { validateStoreCodeForLogin } from '../config/knownTenants';
+import { reportLoginAuditToServer } from '../services/loginAuditReport';
 import { LoginTenantStoreSection } from './LoginTenantStoreSection';
 
 interface PinLoginPadProps {
@@ -44,6 +45,13 @@ export function PinLoginPad({
     }
     const tenantError = validateStoreCodeForLogin(tenantId);
     if (tenantError) {
+      const auditUser = (username || 'bilinmiyor').trim().toLowerCase();
+      void reportLoginAuditToServer(tenantId === '__platform__' ? 'main' : tenantId, {
+        username: auditUser,
+        failureKind: 'invalid_store_code',
+        failureReason: tenantError,
+        method: 'pin',
+      });
       setError(tenantError);
       return;
     }
