@@ -1793,6 +1793,29 @@ export async function savePlatformSupportSmokeFilters(
   }
 }
 
+export type PlatformSupportTenant360UserRow = {
+  id: string;
+  username: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  mustChangePassword?: boolean;
+  totpEnabled?: boolean;
+  engagement?: string;
+};
+
+export type PlatformSupportTenant360LoginRow = {
+  id?: string;
+  username?: string;
+  displayName?: string;
+  success: boolean;
+  method?: string;
+  createdAt: string;
+  failureReason?: string | null;
+  clientIp?: string | null;
+};
+
 export type PlatformSupportTenant360Payload = {
   tenantId: string;
   businessName: string;
@@ -1801,6 +1824,14 @@ export type PlatformSupportTenant360Payload = {
     statusLabel: string;
     suspended: boolean;
     readOnly: boolean;
+  } | null;
+  userRoster?: PlatformSupportTenant360UserRow[];
+  loginActivity?: PlatformSupportTenant360LoginRow[];
+  loginSummary?: {
+    totalUsers: number;
+    activeCount: number;
+    loginSuccess30d: number;
+    loginFailed30d: number;
   } | null;
   accounting: {
     receivablesTotalTry: number;
@@ -1853,6 +1884,9 @@ export async function fetchPlatformSupportTenant360(
         businessName: data.businessName,
         demo: data.demo,
         lifecycle: data.lifecycle,
+        userRoster: data.userRoster ?? [],
+        loginActivity: data.loginActivity ?? [],
+        loginSummary: data.loginSummary ?? null,
         accounting: data.accounting,
         stock: data.stock,
         sales: data.sales,

@@ -11,10 +11,17 @@ import {
 import { saveTenantId } from '../storage/tenantSession';
 import { syncPosApiTokenToCurrentTenant } from '../services/posApiAuth';
 
-function formatTry(n: number | undefined): string {
-  if (n == null || !Number.isFinite(n)) return '—';
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n);
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '—';
+  return new Date(t).toLocaleString('tr-TR');
 }
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Yönetici',
+  cashier: 'Kasiyer',
+};
 
 export type PlatformSupportCasePreview = {
   number: number;
@@ -39,6 +46,7 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
   const [commandHelp, setCommandHelp] = useState<PlatformSupportCommandHelp[]>([]);
   const [probeBusy, setProbeBusy] = useState(false);
   const [probeSummary, setProbeSummary] = useState<string | null>(null);
+  const [showOps, setShowOps] = useState(false);
 
   const load = useCallback(async () => {
     if (!tenantId) {
@@ -109,7 +117,7 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
       <aside className="platform-panel platform-panel--premium platform-support-360 platform-support-360--empty">
         <div className="platform-support-360-empty-head">
           <h3>Kiracı 360</h3>
-          <span className="platform-support-360-kicker">Özet panel</span>
+          <span className="platform-support-360-kicker">Kimlik & kullanıcılar</span>
         </div>
         {casePreview ? (
           <article className="platform-support-360-card platform-support-360-card--accent">
@@ -120,18 +128,16 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
             </p>
             {casePreview.tenantHint ? (
               <p className="platform-support-hint">
-                Önerilen kiracı: <code>{casePreview.tenantHint}</code> — kayıt meta alanından bağlayın veya kaydı
-                güncelleyin.
+                Önerilen kiracı: <code>{casePreview.tenantHint}</code> — kayıt meta alanından bağlayın.
               </p>
             ) : (
               <p className="platform-support-hint">
-                Bu kayıtta kiracı atanmamış. Orta panelde <strong>Kiracı ID</strong> girin (ör. <code>main</code>) ve
-                kaydedin.
+                <strong>Kiracı ID</strong> alanına <code>main</code> yazıp kaydedin.
               </p>
             )}
           </article>
         ) : (
-          <p className="platform-support-hint">Talep veya kuyruk satırından kiracı seçildiğinde özet burada görünür.</p>
+          <p className="platform-support-hint">Talep seçildiğinde mağaza kimliği burada görünür.</p>
         )}
       </aside>
     );
@@ -156,80 +162,98 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
     );
   }
 
+  const roster = data.userRoster ?? [];
+  const logins = data.loginActivity ?? [];
+  const summary = data.loginSummary;
+
   return (
     <aside className="platform-panel platform-panel--premium platform-support-360">
       <div className="platform-support-360-empty-head">
         <div>
           <h3>{data.businessName}</h3>
-          <p className="platform-table-muted">{data.tenantId}</p>
+          <p className="platform-table-muted">
+            Kiracı <code>{data.tenantId}</code>
+            {data.demo ? ' · Demo' : ''}
+          </p>
         </div>
         {data.demo ? <span className="platform-support-badge platform-support-badge--info">Demo</span> : null}
       </div>
-      {casePreview ? (
-        <p className="platform-support-360-linked-case">
-          Talep <strong>#{casePreview.number}</strong> · {casePreview.subject}
-        </p>
-      ) : null}
       {data.lifecycle ? (
-        <p className="platform-support-hint">
+        <p className="platform-support-hint platform-support-360-lifecycle">
           {data.lifecycle.statusLabel}
           {data.lifecycle.suspended ? ' · Askıda' : ''}
           {data.lifecycle.readOnly ? ' · Salt okunur' : ''}
         </p>
       ) : null}
+      {casePreview ? (
+        <p className="platform-support-360-linked-case">
+          Talep <strong>#{casePreview.number}</strong> · {casePreview.subject}
+        </p>
+      ) : null}
 
-      <div className="platform-support-360-widgets">
-        <article className="platform-support-360-card">
-          <h4>Muhasebe</h4>
-          <p>{formatTry(data.accounting.receivablesTotalTry)}</p>
-          <p className="platform-table-muted">
-            Gecikmiş: {data.accounting.overduePaymentCount} ({formatTry(data.accounting.overduePaymentAmountTry)})
-          </p>
-        </article>
-        <article className="platform-support-360-card">
-          <h4>Stok</h4>
-          <p>{data.stock.productCount} ürün · {data.stock.lowStockCount} düşük stok</p>
-          {data.stock.lowStockSample.length ? (
-            <ul className="platform-support-360-list">
-              {data.stock.lowStockSample.map((p) => (
-                <li key={p.id}>{p.name} ({p.stock})</li>
+      {summary ? (
+        <p className="platform-support-hint platform-support-360-login-stats">
+          {summary.activeCount}/{summary.totalUsers} aktif kullanıcı · 30g: {summary.loginSuccess30d} başarılı,{' '}
+          {summary.loginFailed30d} başarısız giriş
+        </p>
+      ) : null}
+
+      <article className="platform-support-360-card platform-support-360-card--accent">
+        <h4>Mağaza kullanıcıları</h4>
+        {roster.length === 0 ? (
+          <p className="platform-support-hint">Kullanıcı kaydı yok.</p>
+        ) : (
+          <table className="platform-support-360-user-table">
+            <thead>
+              <tr>
+                <th>Kullanıcı</th>
+                <th>Rol</th>
+                <th>Son giriş</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roster.map((u) => (
+                <tr key={u.id} className={u.isActive ? '' : 'is-inactive'}>
+                  <td>
+                    <span className="platform-support-360-user-name">{u.displayName || u.username}</span>
+                    <span className="platform-table-muted platform-support-360-user-login">{u.username}</span>
+                    {u.mustChangePassword ? (
+                      <span className="platform-support-tag-chip">Şifre değişmeli</span>
+                    ) : null}
+                  </td>
+                  <td>{ROLE_LABELS[u.role] ?? u.role}</td>
+                  <td>{formatDateTime(u.lastLoginAt)}</td>
+                </tr>
               ))}
-            </ul>
-          ) : null}
-        </article>
-        <article className="platform-support-360-card">
-          <h4>Satış (30g)</h4>
-          <p>{data.sales.recentSaleCount30d} fiş · {formatTry(data.sales.revenue30dTry)}</p>
-        </article>
-        {data.security ? (
-          <article className="platform-support-360-card">
-            <h4>Güvenlik</h4>
-            <p>Skor: {data.security.securityScore}</p>
-            <p className="platform-table-muted">Başarısız giriş (30g): {data.security.loginFailed30d}</p>
-          </article>
-        ) : null}
-        <article className="platform-support-360-card">
-          <h4>Posta / mesaj</h4>
-          <p>
-            Outbox: {data.comms.outbox.pending} bekleyen, {data.comms.outbox.failed} hata
-          </p>
-          <p className="platform-table-muted">
-            Açık thread: {data.comms.messaging.open ?? 0} · ilk yanıt bekliyor:{' '}
-            {data.comms.messaging.pendingFirstResponse ?? 0}
-          </p>
-        </article>
-      </div>
+            </tbody>
+          </table>
+        )}
+      </article>
 
-      {data.openCases.length ? (
-        <div className="platform-support-360-cases">
-          <h4>Açık talepler</h4>
-          <ul className="platform-support-360-list">
-            {data.openCases.map((c) => (
-              <li key={c.id}>#{c.number} {c.subject}</li>
+      <article className="platform-support-360-card">
+        <h4>Giriş geçmişi</h4>
+        {logins.length === 0 ? (
+          <p className="platform-support-hint">Henüz giriş kaydı yok.</p>
+        ) : (
+          <ul className="platform-support-360-login-list">
+            {logins.map((entry, idx) => (
+              <li
+                key={entry.id ?? `${entry.createdAt}-${entry.username}-${idx}`}
+                className={entry.success ? 'is-success' : 'is-failed'}
+              >
+                <span className="platform-support-360-login-time">{formatDateTime(entry.createdAt)}</span>
+                <span className="platform-support-360-login-user">
+                  {entry.displayName || entry.username || '—'}
+                </span>
+                <span className="platform-support-360-login-result">
+                  {entry.success ? 'Başarılı' : 'Başarısız'}
+                  {!entry.success && entry.failureReason ? ` · ${entry.failureReason}` : ''}
+                </span>
+              </li>
             ))}
           </ul>
-        </div>
-      ) : null}
+        )}
+      </article>
 
       <div className="platform-support-360-actions">
         <button type="button" className="btn btn-primary" onClick={openPos}>
@@ -238,33 +262,45 @@ export function PlatformSupportTenant360({ tenantId, casePreview, onMessage }: P
         <button type="button" className="btn btn-outline btn-sm" onClick={() => void load()}>
           Yenile
         </button>
-        <button type="button" className="btn btn-outline btn-sm" disabled={probeBusy} onClick={() => void runInfraProbe()}>
-          {probeBusy ? 'Probe…' : 'SMTP/IMAP'}
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowOps((v) => !v)}>
+          {showOps ? 'Araçları gizle' : 'Operatör araçları'}
         </button>
       </div>
-      {probeSummary ? <p className="platform-support-hint">{probeSummary}</p> : null}
 
-      <label className="platform-support-field platform-support-360-command">
-        <span className="platform-support-field-label">Komut paleti</span>
-        <input
-          className="platform-support-control"
-          value={commandLine}
-          onChange={(e) => setCommandLine(e.target.value)}
-          placeholder="/suspend veya requeue_outbox"
-          list="platform-support-command-suggestions"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void runCommand();
-          }}
-        />
-      </label>
-      <datalist id="platform-support-command-suggestions">
-        {commandHelp.map((c) => (
-          <option key={c.id} value={`/${c.id}`}>{c.label}</option>
-        ))}
-      </datalist>
-      <button type="button" className="btn btn-secondary btn-sm platform-support-360-run" onClick={() => void runCommand()} disabled={!commandLine.trim()}>
-        Çalıştır
-      </button>
+      {showOps ? (
+        <div className="platform-support-360-ops">
+          <button type="button" className="btn btn-outline btn-sm" disabled={probeBusy} onClick={() => void runInfraProbe()}>
+            {probeBusy ? 'Probe…' : 'SMTP/IMAP'}
+          </button>
+          {probeSummary ? <p className="platform-support-hint">{probeSummary}</p> : null}
+          <label className="platform-support-field platform-support-360-command">
+            <span className="platform-support-field-label">Komut paleti</span>
+            <input
+              className="platform-support-control"
+              value={commandLine}
+              onChange={(e) => setCommandLine(e.target.value)}
+              placeholder="/suspend veya requeue_outbox"
+              list="platform-support-command-suggestions"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void runCommand();
+              }}
+            />
+          </label>
+          <datalist id="platform-support-command-suggestions">
+            {commandHelp.map((c) => (
+              <option key={c.id} value={`/${c.id}`}>{c.label}</option>
+            ))}
+          </datalist>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm platform-support-360-run"
+            onClick={() => void runCommand()}
+            disabled={!commandLine.trim()}
+          >
+            Çalıştır
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

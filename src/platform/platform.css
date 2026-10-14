@@ -4360,6 +4360,86 @@
   gap: 0.25rem;
 }
 
+.platform-support-360-lifecycle,
+.platform-support-360-login-stats {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+}
+
+.platform-support-360-user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.platform-support-360-user-table th {
+  text-align: left;
+  font-weight: 600;
+  color: #64748b;
+  padding: 0.35rem 0.25rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.platform-support-360-user-table td {
+  padding: 0.45rem 0.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.platform-support-360-user-table tr.is-inactive td {
+  opacity: 0.55;
+}
+
+.platform-support-360-user-name {
+  display: block;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.platform-support-360-user-login {
+  display: block;
+  font-size: 0.75rem;
+}
+
+.platform-support-360-login-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.platform-support-360-login-list li {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.78rem;
+}
+
+.platform-support-360-login-list li.is-failed .platform-support-360-login-result {
+  color: #b91c1c;
+}
+
+.platform-support-360-login-list li.is-success .platform-support-360-login-result {
+  color: #047857;
+}
+
+.platform-support-360-login-time {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.platform-support-360-ops {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .platform-support-case-rail-list {
   list-style: none;
   margin: 0.5rem 0 0;

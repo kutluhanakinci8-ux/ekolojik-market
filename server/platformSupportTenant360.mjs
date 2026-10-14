@@ -3,7 +3,7 @@
 import { readTenantStore } from './tenantAuth.mjs';
 import { buildPlatformTenantsLifecycle } from './platformTenantLifecycle.mjs';
 import { readPlatformCases } from './platformCaseStore.mjs';
-import { analyzeTenantUsers } from './platformUserMetrics.mjs';
+import { analyzeTenantUsers, mergeRecentLogins } from './platformUserMetrics.mjs';
 import { tenantSecuritySnapshots } from './platformSecurityMetrics.mjs';
 import { normalizeTenantId } from './tenantAllowlist.mjs';
 
@@ -37,6 +37,9 @@ export async function buildPlatformSupportTenant360(dataDir, tenantId) {
   const security = userAnalytics
     ? tenantSecuritySnapshots([userAnalytics])[0] ?? null
     : null;
+  const recentLogins = store
+    ? mergeRecentLogins([{ store, tenantId: id, businessName }], 25)
+    : [];
 
   const cases = (await readPlatformCases(dataDir))
     .filter((c) => c.tenantId === id || c.links?.tenantId === id)
@@ -54,6 +57,18 @@ export async function buildPlatformSupportTenant360(dataDir, tenantId) {
       stock: Number(p.stock) || 0,
     }));
 
+  const userRoster = (userAnalytics?.roster ?? []).map((u) => ({
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    role: u.role,
+    isActive: u.isActive,
+    lastLoginAt: u.lastLoginAt,
+    mustChangePassword: u.mustChangePassword,
+    totpEnabled: u.totpEnabled,
+    engagement: u.engagement,
+  }));
+
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -61,6 +76,16 @@ export async function buildPlatformSupportTenant360(dataDir, tenantId) {
     businessName,
     demo: isDemoTenant(id, businessName),
     lifecycle,
+    userRoster,
+    loginActivity: recentLogins,
+    loginSummary: userAnalytics
+      ? {
+          totalUsers: userAnalytics.totalUsers,
+          activeCount: userAnalytics.activeCount,
+          loginSuccess30d: userAnalytics.loginSuccess30d,
+          loginFailed30d: userAnalytics.loginFailed30d,
+        }
+      : null,
     accounting: {
       receivablesTotalTry: detail.receivablesTotalTry ?? 0,
       debtorsCount: detail.debtorsCount ?? 0,
