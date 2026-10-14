@@ -21,7 +21,7 @@
 7. **Altyapı** sekmesi — izolasyon kontrolleri, outbox, depolama, yedek/cron, SMTP/IMAP canlı test (`GET /api/platform/infrastructure`, `POST /api/platform/infrastructure/probe`)
 8. **Denetim** sekmesi — olay zaman çizelgesi, bildirim geçmişi, eşik uyarıları, CSV (`GET /api/platform/audit`, `GET /api/platform/audit/export.csv`)
 9. **Gelir** sekmesi — kiracı ciro, cari/tahsilat, plan dağılımı, tahmini MRR (`GET /api/platform/billing`, `GET /api/platform/billing/export.csv`)
-10. **Destek** sekmesi — mesaj SLA kuyruğu, eşik politikası, kiracı özet (`GET /api/platform/support`, `PUT /api/platform/support/policy`, `GET /api/platform/support/export.csv`)
+10. **Destek** sekmesi — gelen kutusu (destek@), kayıtlar (case), SLA, kiracı 360, AI özet/taslak (aşağıda API listesi)
 11. **Yapılandırma** sekmesi — runtime/allowlist özeti, operatör listesi, bakım bandı, deneme süresi, plan MRR (`GET /api/platform/settings`, `PUT /api/platform/settings` → `data/platform/console-settings.json`)
 12. **Entegrasyonlar** sekmesi — SMTP/IMAP, Lerta, mesaj API, webhook, kiracı kanal matrisi (`GET /api/platform/integrations`, `POST /api/platform/integrations/probe`, `GET /api/platform/integrations/export.csv`)
 
@@ -39,3 +39,40 @@ Askıya alınan veya denemesi biten kiracılarda mağaza girişi engellenir (`da
 | Deploy | `GREENLEAF_OWNER_PASSWORD` → `scripts/ensure-platform-operator.mjs` |
 
 `yonetici` hesabı kiracı içi demo/platform yedek giriş olarak kalabilir; `kutluhan08` yalnızca platform kasasında tutulur.
+
+## Destek (platform API özeti)
+
+Tüm uçlar platform Bearer gerektirir (`kutluhan08` oturumu).
+
+| Alan | Yöntem | Uç |
+|------|--------|-----|
+| Özet / SLA | `GET` | `/api/platform/support`, `/api/platform/support/sla-live`, `/api/platform/support/export.csv` |
+| Politika | `PUT` | `/api/platform/support/policy` (`closedCaseInbound`: `reopen` \| `keep_closed` \| `new_case`) |
+| Gelen kutusu | `GET` | `/api/platform/support/inbox` |
+| Senkron | `POST` | `/api/platform/support/inbox/sync` (UI düğmesi; VPS’te ayrıca 5 dk cron) |
+| Yanıt | `POST` | `/api/platform/support/inbox/reply` |
+| Kayıtlar | `GET` | `/api/platform/support/cases`, `/api/platform/support/cases/export.csv` |
+| Kayıt detay | `GET` | `/api/platform/support/cases/:id` |
+| Kayıt güncelle | `PUT` | `/api/platform/support/cases/:id` |
+| Aksiyon (not / e-posta) | `POST` | `/api/platform/support/cases/:id/action` |
+| AI | `POST` | `/api/platform/support/cases/:id/ai` (`kind`: `summary` \| `draft_reply`) |
+| Aktivite dışa aktarma | `GET` | `/api/platform/support/cases/:id/activity/export.csv`, `.../export.html` — `?filter=all\|email_inbound\|email_outbound\|note` |
+| Kiracı 360 | `GET` | `/api/platform/support/tenant-360?tenantId=` |
+
+### Ortam değişkenleri (destek@)
+
+| Değişken | Açıklama |
+|----------|----------|
+| `EKOLOJIK_SUPPORT_*` | destek@ IMAP/giden kimlik (`scripts/sunucu-ekolojik-destek-mailbox.sh`) |
+| `EKOLOJIK_SUPPORT_OPS_NOTIFY` | `new_case` spawn sonrası ops@ mail (varsayılan açık; `0` ile kapat) |
+| `EKOLOJIK_SUPPORT_IMAP_SYNC_ALERT` | Cron senkron hatasında ops@ (varsayılan: ops notify ile aynı; saatte en fazla 1) |
+| `EKOLOJIK_MAIL_LOGO_URL`, `EKOLOJIK_CONTACT_FORM_URL` | Otomatik alındı / spawn mail footer |
+| `EKOLOJIK_SOCIAL_*` | Footer sosyal linkleri (tam `https://` URL; boşsa satır gösterilmez) |
+
+### VPS cron (destek@ senkron)
+
+Deploy (root) kurar: `/etc/cron.d/ekolojik-support-inbox-sync` → `scripts/platform-support-inbox-sync.mjs`, log: `/var/log/ekolojik-support-inbox-sync.log`.
+
+Manuel: `MARKET_POS_DATA_DIR=/var/www/market-pos/data node scripts/platform-support-inbox-sync.mjs`
+
+Detaylı ürün notları: `docs/PLATFORM-DESTEK-KOMUTA-MERKEZI.md`.
