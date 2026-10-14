@@ -22,6 +22,9 @@ import {
   fetchPlatformSupportSmokeFilters,
   savePlatformSupportSmokeFilters,
   previewPlatformSupportSmokeFilters,
+  fetchPlatformSupportSkills,
+  savePlatformSupportSkills,
+  type PlatformSupportSkillsHub,
   type PlatformSupportSmokePreview,
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
@@ -296,6 +299,9 @@ export function PlatformSupportTab() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contactCaseSaving, setContactCaseSaving] = useState(false);
   const [contactExporting, setContactExporting] = useState(false);
+  const [skillsHub, setSkillsHub] = useState<PlatformSupportSkillsHub | null>(null);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [skillsSaving, setSkillsSaving] = useState(false);
   const [smokeFilterDraft, setSmokeFilterDraft] = useState<PlatformSupportSmokeFilters | null>(null);
   const [smokeFilterSaving, setSmokeFilterSaving] = useState(false);
   const [smokeFilterOpen, setSmokeFilterOpen] = useState(false);
@@ -352,6 +358,14 @@ export function PlatformSupportTab() {
     const contactRes = await fetchPlatformSupportContactQueue(80);
     if (contactRes.ok && contactRes.data) {
       setContactQueue(contactRes.data.items);
+    }
+    const skillsRes = await fetchPlatformSupportSkills();
+    if (skillsRes.ok && skillsRes.skills) {
+      setSkillsHub({
+        skills: skillsRes.skills,
+        channelMap: skillsRes.channelMap ?? {},
+        tagMap: skillsRes.tagMap ?? {},
+      });
     }
     const smokeRes = await fetchPlatformSupportSmokeFilters();
     if (smokeRes.ok && smokeRes.filters) {
@@ -2452,6 +2466,96 @@ export function PlatformSupportTab() {
           </table>
         </section>
       </div>
+
+      <section className="platform-panel platform-panel--premium platform-support-skills">
+        <div className="platform-panel-head">
+          <h3>Skill routing (atama)</h3>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setSkillsOpen((v) => !v)}>
+            {skillsOpen ? 'Gizle' : 'Düzenle'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            disabled={skillsSaving || !skillsHub}
+            onClick={async () => {
+              if (!skillsHub) return;
+              setSkillsSaving(true);
+              const result = await savePlatformSupportSkills(skillsHub);
+              setSkillsSaving(false);
+              if (!result.ok) setError(result.error ?? 'Skill kaydedilemedi');
+            }}
+          >
+            {skillsSaving ? '…' : 'Kaydet'}
+          </button>
+        </div>
+        <p className="platform-support-hint">
+          Vaka etiketi veya kanal → skill havuzu → round-robin atama (kapasite: maxOpenCases). Dosya:{' '}
+          <code>data/platform/support-skills.json</code>
+        </p>
+        {skillsOpen && skillsHub ? (
+          <div className="platform-support-smoke-form">
+            {skillsHub.skills.map((skill, idx) => (
+              <div key={skill.id} className="platform-support-field">
+                <span className="platform-support-field-label">
+                  {skill.label} (<code>{skill.id}</code>)
+                </span>
+                <textarea
+                  className="platform-support-control"
+                  rows={2}
+                  placeholder="operatör kullanıcı adları (satır başına)"
+                  value={skill.assignees.join('\n')}
+                  onChange={(e) =>
+                    setSkillsHub((h) =>
+                      h
+                        ? {
+                            ...h,
+                            skills: h.skills.map((s, i) =>
+                              i === idx
+                                ? {
+                                    ...s,
+                                    assignees: e.target.value
+                                      .split('\n')
+                                      .map((x) => x.trim())
+                                      .filter(Boolean),
+                                  }
+                                : s,
+                            ),
+                          }
+                        : h,
+                    )
+                  }
+                />
+                <label className="platform-support-field platform-support-field--inline">
+                  <span>Max açık vaka (0=sınırsız)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="platform-support-control"
+                    style={{ maxWidth: 120 }}
+                    value={skill.maxOpenCases}
+                    onChange={(e) =>
+                      setSkillsHub((h) =>
+                        h
+                          ? {
+                              ...h,
+                              skills: h.skills.map((s, i) =>
+                                i === idx ? { ...s, maxOpenCases: Number(e.target.value) || 0 } : s,
+                              ),
+                            }
+                          : h,
+                      )
+                    }
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="platform-support-hint">
+            {skillsHub?.skills.length ?? 0} skill tanımı · operatör listesi: {assigneeOptions.length}
+          </p>
+        )}
+      </section>
 
       <section className="platform-panel platform-panel--premium platform-support-smoke-filters">
         <div className="platform-panel-head">

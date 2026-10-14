@@ -12,15 +12,15 @@ export function isSupportAutoAssignEnabled() {
   return true;
 }
 
-async function readState(dataDir) {
+export async function readState(dataDir) {
   try {
     return JSON.parse(await readFile(STATE_PATH(dataDir), 'utf8'));
   } catch {
-    return { lastIndex: -1 };
+    return { lastIndex: -1, skillIndex: {} };
   }
 }
 
-async function writeState(dataDir, state) {
+export async function writeState(dataDir, state) {
   await mkdir(join(dataDir, 'platform'), { recursive: true });
   await writeFile(STATE_PATH(dataDir), JSON.stringify(state, null, 2), 'utf8');
 }
@@ -33,13 +33,20 @@ export async function listSupportAssigneeOptions(dataDir) {
   }));
 }
 
-export async function pickSupportAssignee(dataDir) {
+export async function pickSupportAssignee(dataDir, context = {}) {
   if (!isSupportAutoAssignEnabled()) return null;
+  try {
+    const { pickAssigneeForSkill } = await import('./platformSupportSkills.mjs');
+    const skilled = await pickAssigneeForSkill(dataDir, context);
+    if (skilled.assignee) return skilled.assignee;
+  } catch {
+    /* fallback */
+  }
   const options = await listSupportAssigneeOptions(dataDir);
   const active = options.map((o) => o.username).filter(Boolean);
   if (!active.length) return null;
   const state = await readState(dataDir);
   const next = (Number(state.lastIndex) + 1) % active.length;
-  await writeState(dataDir, { lastIndex: next, updatedAt: new Date().toISOString() });
+  await writeState(dataDir, { ...state, lastIndex: next, updatedAt: new Date().toISOString() });
   return active[next];
 }

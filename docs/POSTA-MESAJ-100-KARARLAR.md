@@ -4,7 +4,7 @@
 
 | # | Konu | Karar | Onay tarihi |
 |---|------|--------|-------------|
-| 0.1 | Tam Dovecot/JMAP webmail | **A** — Read-only JMAP genişlet; POS’ta tam webmail yok | 2026-10-08 |
+| 0.1 | Tam Dovecot/JMAP webmail | **A** — JMAP lite + tam ekran webmail UI; Dovecot sunucusu yok | 2026-10-08 |
 | 0.2 | Omnichannel (WA/SMS/IG) | **Faz 48** — WhatsApp webhook önce; kanal kanal | 2026-10-08 |
 | 0.3 | Native mobil uygulama | **PWA + push** (Faz 46); React Native v2 sonrası | 2026-10-08 |
 | 0.4 | Posta okuma auth modeli | **Bearer** — `posta` sekmesi veya admin; SSE/link için `access_token` query | 2026-10-08 |

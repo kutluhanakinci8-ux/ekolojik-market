@@ -21,6 +21,7 @@ Günlük Posta kullanımı: [EKOLOJIK-POSTA-KULLANIM.md](./EKOLOJIK-POSTA-KULLAN
 ## Kim kurulum sihirbazını görür?
 
 - Yalnızca **admin** rolü.
+- **Yeni kayıt:** `POST /api/auth/register` sonrası arka planda alias kuralları + deliverability alias seed çalışır (`registerMailHealthProbe.mjs`); hoş geldin e-postası kuyruğa alınır.
 - `settings.postaOnboarding.status` **`completed`** veya **`dismissed`** değilse, `/app` girişinde tam ekran sihirbaz açılır.
 - **Mevcut mağazalar (main vb.):** ilk `GET /api/posta/onboarding` veya deploy script `scripts/migrate-posta-onboarding.mjs` ile legacy migrasyon → genelde `completed`. Yeni **kayıt** tenant’ları sihirbazı tamamlar.
 

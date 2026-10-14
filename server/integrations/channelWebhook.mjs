@@ -1,5 +1,6 @@
 import { handleWhatsAppWebhook } from './whatsappCloud.mjs';
 import { handleSmsInboundWebhook } from './smsInbound.mjs';
+import { handleInstagramInboundWebhook } from './instagramInbound.mjs';
 
 /** @type {Map<string, (ctx: object) => Promise<object>>} */
 const adapters = new Map();
@@ -18,6 +19,14 @@ function registerDefaults() {
       method: ctx.method,
       body: ctx.body,
       req: ctx.req,
+    }),
+  );
+  adapters.set('instagram', async (ctx) =>
+    handleInstagramInboundWebhook(ctx.dataDir, ctx.tenantId, {
+      method: ctx.method,
+      body: ctx.body,
+      req: ctx.req,
+      query: ctx.query,
     }),
   );
 }

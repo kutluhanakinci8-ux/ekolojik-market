@@ -1525,6 +1525,29 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/skills' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { getPlatformSupportSkills } = await import('./server/platformApi.mjs');
+          const payload = await getPlatformSupportSkills(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(payload));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { updatePlatformSupportSkills } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSupportSkills(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Skill kaydedilemedi' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/smoke-filters' && (req.method === 'GET' || req.method === 'PUT')) {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -3908,6 +3931,7 @@ const server = createServer(async (req, res) => {
           updatedAt: new Date().toISOString(),
         };
         await writeStoreData(store, tenantId);
+        await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(
           JSON.stringify({

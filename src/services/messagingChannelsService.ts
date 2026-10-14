@@ -12,6 +12,20 @@ export type MessagingChannelsHub = {
     webhookPath: string;
     webhookUrlHint: string;
   };
+  sms?: {
+    enabled: boolean;
+    configured: boolean;
+    webhookPath: string;
+    webhookUrlHint: string;
+    inboundSecretSet: boolean;
+  };
+  instagram?: {
+    enabled: boolean;
+    configured: boolean;
+    webhookPath: string;
+    webhookUrlHint: string;
+    inboundSecretSet: boolean;
+  };
   channels?: { id: string; label: string; status: string }[];
   error?: string;
 };
@@ -23,6 +37,8 @@ export async function fetchMessagingChannelsHub(): Promise<MessagingChannelsHub>
 
 export async function saveMessagingChannelsHub(patch: {
   whatsapp?: { enabled?: boolean; displayPhone?: string | null; verifyToken?: string | null };
+  sms?: { enabled?: boolean };
+  instagram?: { enabled?: boolean };
 }): Promise<MessagingChannelsHub> {
   const res = await posHubFetch('/api/messaging/channels', {
     method: 'PUT',
