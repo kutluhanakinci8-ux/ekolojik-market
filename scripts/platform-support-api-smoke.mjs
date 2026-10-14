@@ -45,6 +45,17 @@ try {
   const apology = await buildSlaApologyQueue(tmp);
   assert(apology && Array.isArray(apology.items), 'sla apology queue');
 
+  const { maybeSpawnCasesForSecurityAlerts, isSecurityAlertCaseSpawnEnabled } = await import(
+    '../server/platformSupportSecurityCases.mjs',
+  );
+  assert(isSecurityAlertCaseSpawnEnabled() === false, 'alert case default off');
+  process.env.EKOLOJIK_SUPPORT_ALERT_CASE = '1';
+  const spawned = await maybeSpawnCasesForSecurityAlerts(tmp, [
+    { id: 'test_alert_smoke', severity: 'high', title: 'Test', detail: 'Smoke' },
+  ]);
+  assert(spawned.spawned === 1, 'alert case spawn');
+  delete process.env.EKOLOJIK_SUPPORT_ALERT_CASE;
+
   const preview = await previewSmokeMessagingFilter(tmp, { hideSmoke: true, tenantIds: [], subjectPatterns: [], customerNamePatterns: [] });
   assert(preview.ok, 'smoke preview');
 

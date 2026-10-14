@@ -148,6 +148,14 @@ export async function runSecurityNotifyCheck(dataDir, overview, storesByTenant, 
   }
   const nextPolicy = await writeSecurityAlertPolicy(dataDir, { ...policy, lastFired });
 
+  let supportCases = { spawned: 0 };
+  try {
+    const { maybeSpawnCasesForSecurityAlerts } = await import('./platformSupportSecurityCases.mjs');
+    supportCases = await maybeSpawnCasesForSecurityAlerts(dataDir, toSend);
+  } catch {
+    /* opsiyonel */
+  }
+
   return {
     ok: true,
     sent: true,
@@ -156,5 +164,6 @@ export async function runSecurityNotifyCheck(dataDir, overview, storesByTenant, 
     failedLogins24h,
     policy: nextPolicy,
     results,
+    supportCases,
   };
 }

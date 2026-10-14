@@ -15,6 +15,7 @@ import { PlatformSecurityTab } from './PlatformSecurityTab';
 import { PlatformInfrastructureTab } from './PlatformInfrastructureTab';
 import { PlatformTenantsTab } from './PlatformTenantsTab';
 import { PlatformUsersTab, type PlatformUsersTabFocus } from './PlatformUsersTab';
+import { PlatformNavProvider } from './PlatformNavContext';
 import './platform.css';
 
 type PlatformTab =
@@ -60,6 +61,7 @@ export function PlatformApp() {
   };
 
   return (
+    <PlatformNavProvider goToTab={setActiveTab}>
     <div className="platform-shell platform-shell--premium">
       <header className="platform-header platform-header--premium">
         <div>
@@ -203,5 +205,6 @@ export function PlatformApp() {
         <PlatformOverviewTab refreshTick={overviewRefreshTick} />
       )}
     </div>
+    </PlatformNavProvider>
   );
 }

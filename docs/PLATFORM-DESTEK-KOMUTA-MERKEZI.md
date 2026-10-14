@@ -11,10 +11,10 @@
 | Alan | Canlı | Kalan / risk |
 |------|--------|----------------|
 | Gelen kutusu | destek@ IMAP/outbox köprüsü, thread UI, ekler, okundu toplu | Harici DNS/alias VPS doğrulaması (`sunucu-ekolojik-support-imap-dogrula.sh`) |
-| Kanallar | Case + e-posta + mesaj (thread bağlı) + iletişim formu kuyruğu | Outbox/güvenlik uyarıları hâlâ ayrı sekmelerde özet |
+| Kanallar | Case + e-posta + mesaj (thread otomatik bağlanır) + iletişim formu kuyruğu | Derin omnichannel (routing, @mention) backlog |
 | SLA / kuyruk | Smoke filtresi (UI + önizleme), prod kuyruk, SLA canlı panel, **özür kuyruğu + toplu gönder** (`sla-apology` API) | Tam otomatik cron özür (onaysız) yok — operatör onayı gerekli |
-| Yanıt | Case detay: not / e-posta / mesaj; makrolar; AI taslak | Mesaj yanıtı thread bağlantısı olmadan çalışmaz |
-| Operasyon | Komut paleti, kiracı 360, Zendesk köprüsü, CSV export | Zendesk canlı webhook testi ortam bağımlı |
+| Yanıt | Case detay: not / e-posta / mesaj (thread yoksa oluştur); makrolar; AI taslak | — |
+| Operasyon | Komut paleti, kiracı 360, Zendesk köprüsü, CSV export; güvenlik eşik → case (`EKOLOJIK_SUPPORT_ALERT_CASE=1`) | Zendesk canlı webhook testi ortam bağımlı |
 | Outbox | Kiracı Posta + platform komut `/requeue_outbox`; Destek hero **opsSignals** (failed + kritik uyarı) | Prod **failed/pending** triage: `scripts/ops-outbox-health.mjs` |
 
 Teslim öncesi: `npm run test:ci`, `node scripts/pre-release-qa.mjs https://…`, `node scripts/ops-outbox-health.mjs` (VPS data dir).
@@ -160,9 +160,9 @@ Destek sekmesinde **özet widget + case’e bağlama**; detay ilgili sekmede.
 
 ### Faz D1 — Temiz kuyruk & güven (1 sprint)
 
-- [ ] QA/smoke thread filtresi (`channel`, `customerName`, `subject` kuralları; `data/platform/support-filters.json`).
-- [ ] Kuyruk önceliği: gerçek müşteri vs test etiketi.
-- [ ] SLA uyumu: yalnızca `human` yanıtlar veya prod etiketli thread’ler.
+- [x] QA/smoke thread filtresi (`support-filters.json` + UI; `messagingChannels`, `slaHumanOnly`).
+- [x] Kuyruk önceliği: smoke kiracı/deseni gizleme.
+- [x] SLA uyumu: `slaHumanOnly` — bot ilk personel yanıtı SLA örneğine dahil değil.
 
 ### Faz D2 — `destek@` MVP (1–2 sprint)
 

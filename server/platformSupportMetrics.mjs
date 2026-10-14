@@ -6,7 +6,11 @@ import { listMessagingThreads } from './messaging/store.mjs';
 import { ensurePostaOnboarding } from './postaOnboarding.mjs';
 import { isMessagingPublicApiConfigured } from './messaging/publicConfig.mjs';
 import { readSupportSlaPolicy, DEFAULT_SUPPORT_SLA_POLICY } from './platformSupportPolicy.mjs';
-import { readSupportFilterConfig, filterProductionMessagingThreads } from './platformSupportFilters.mjs';
+import {
+  readSupportFilterConfig,
+  filterProductionMessagingThreads,
+  threadEligibleForSlaHuman,
+} from './platformSupportFilters.mjs';
 import { listPlatformSupportInbox } from './platformSupportInbox.mjs';
 import { readPlatformCases, summarizeCases } from './platformCaseStore.mjs';
 import { computeMessagingSlaFromThreads } from './messaging/sla.mjs';
@@ -142,6 +146,13 @@ export async function buildPlatformSupportOverview(dataDir, { days } = {}) {
       }
 
       if (t.firstStaffResponseAt && t.firstCustomerMessageAt) {
+        const humanOk = await threadEligibleForSlaHuman(
+          dataDir,
+          tenantId,
+          t,
+          smokeFilter.slaHumanOnly === true,
+        );
+        if (!humanOk) continue;
         const ms = t.firstResponseMs ?? msBetween(t.firstCustomerMessageAt, t.firstStaffResponseAt);
         const custAt = Date.parse(t.firstCustomerMessageAt);
         if (ms != null && Number.isFinite(custAt) && custAt >= now - windowDays * 86400000) {

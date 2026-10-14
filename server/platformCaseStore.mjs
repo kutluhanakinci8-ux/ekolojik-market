@@ -103,6 +103,10 @@ export async function findCaseByLink(dataDir, link, { includeClosedMessaging = f
     if (includeClosedMessaging) return pickMessagingLinkedCase(matches);
     return matches.find((c) => c.status !== 'closed' && c.status !== 'solved') ?? null;
   }
+  if (link.alertKind) {
+    const kind = String(link.alertKind).trim();
+    return cases.find((c) => c.links?.alertKind === kind) ?? null;
+  }
   return null;
 }
 
