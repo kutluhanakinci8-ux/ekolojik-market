@@ -696,6 +696,10 @@ export type PlatformSupportPayload = {
     incident: number;
     overdue: number;
   };
+  contactForm?: {
+    total: number;
+    withoutCase: number;
+  };
   inbox?: {
     unread: number;
     total: number;
@@ -1840,6 +1844,29 @@ export async function openPlatformSupportCaseActivityPrint(
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank', 'noopener,noreferrer');
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sunucuya bağlanılamadı' };
+  }
+}
+
+export async function downloadPlatformSupportContactQueueCsv(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/platform/support/contact-queue/export.csv', {
+      headers: posApiAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? 'CSV indirilemedi' };
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `platform-iletisim-formu-${stamp}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
     return { ok: true };
   } catch {
     return { ok: false, error: 'Sunucuya bağlanılamadı' };

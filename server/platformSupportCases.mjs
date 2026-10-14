@@ -149,6 +149,26 @@ export async function listPlatformSupportContactQueue(dataDir, { limit = 40 } = 
   };
 }
 
+export function buildPlatformContactQueueCsv(payload) {
+  const lines = ['id,createdAt,name,email,subject,hasCase,caseNumber,messagePreview'];
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  for (const c of payload.items ?? []) {
+    lines.push(
+      [
+        c.id,
+        c.createdAt,
+        esc(c.name),
+        c.email,
+        esc(c.subject),
+        c.hasCase ? 'yes' : 'no',
+        c.caseNumber ?? '',
+        esc(c.messagePreview),
+      ].join(','),
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 async function attachInboundToLinkedCase(dataDir, row, linkedCase, extra = {}) {
   const { attachInboundEmailToCase } = await import('./platformSupportInboundCase.mjs');
   const result = await attachInboundEmailToCase(dataDir, linkedCase, row);
