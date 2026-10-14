@@ -219,6 +219,16 @@ export async function performPlatformCaseAction(dataDir, caseId, { channel, body
       } catch {
         /* mention bildirimi opsiyonel */
       }
+      try {
+        const { pushZendeskCommentForCaseReply } = await import('./platformSupportZendesk.mjs');
+        await pushZendeskCommentForCaseReply(dataDir, logged.case ?? caseRow, {
+          channel: 'note',
+          body: text,
+          operatorUsername,
+        });
+      } catch {
+        /* zendesk opsiyonel */
+      }
     }
     return logged;
   }
@@ -237,7 +247,19 @@ export async function performPlatformCaseAction(dataDir, caseId, { channel, body
       },
       operatorUsername,
     );
-    return { ...logged, delivery: sent };
+    let zendeskSync = null;
+    try {
+      const { pushZendeskCommentForCaseReply } = await import('./platformSupportZendesk.mjs');
+      const fresh = logged.case ?? caseRow;
+      zendeskSync = await pushZendeskCommentForCaseReply(dataDir, fresh, {
+        channel: 'email',
+        body: text,
+        operatorUsername,
+      });
+    } catch {
+      /* zendesk opsiyonel */
+    }
+    return { ...logged, delivery: sent, zendeskSync };
   }
 
   if (ch === 'messaging') {
@@ -282,7 +304,26 @@ export async function performPlatformCaseAction(dataDir, caseId, { channel, body
       { type: 'messaging_out', body: text, channel: 'conversation' },
       operatorUsername,
     );
-    return { ...logged, message: msg.message };
+    try {
+      const { dispatchStaffMessageToExternalChannel } = await import('./messaging/omnichannel.mjs');
+      const thread = msg.thread ?? { id: threadId, channel: 'platform' };
+      await dispatchStaffMessageToExternalChannel(dataDir, tenantId, thread, msg.message ?? { bodyText: text });
+    } catch {
+      /* dış kanal opsiyonel */
+    }
+    let zendeskSync = null;
+    try {
+      const { pushZendeskCommentForCaseReply } = await import('./platformSupportZendesk.mjs');
+      const fresh = logged.case ?? caseRow;
+      zendeskSync = await pushZendeskCommentForCaseReply(dataDir, fresh, {
+        channel: 'messaging',
+        body: text,
+        operatorUsername,
+      });
+    } catch {
+      /* zendesk opsiyonel */
+    }
+    return { ...logged, message: msg.message, zendeskSync };
   }
 
   return { ok: false, error: 'Geçersiz kanal (note, email, messaging)' };

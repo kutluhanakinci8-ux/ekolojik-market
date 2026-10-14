@@ -26,6 +26,9 @@ import {
   fetchPlatformSupportInbox,
   fetchPlatformSupportOverview,
   fetchPlatformSupportZendeskBridge,
+  fetchPlatformSupportMentionOperators,
+  fetchPlatformSupportAssigneeOptions,
+  fetchPlatformSupportMentionInbox,
   createPlatformSupportCaseZendesk,
   pushPlatformSupportCaseZendesk,
   syncPlatformSupportCaseZendeskStatus,
@@ -307,6 +310,9 @@ export function PlatformSupportTab() {
   const [macroEditorOpen, setMacroEditorOpen] = useState(false);
   const [macroDraft, setMacroDraft] = useState<Array<{ id: string; label: string; body: string }>>([]);
   const [macroSaving, setMacroSaving] = useState(false);
+  const [mentionOperators, setMentionOperators] = useState<Array<{ username: string; displayName: string }>>([]);
+  const [assigneeOptions, setAssigneeOptions] = useState<Array<{ username: string; displayName: string }>>([]);
+  const [mentionUnread, setMentionUnread] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -355,6 +361,14 @@ export function PlatformSupportTab() {
     setZendeskApiReady(Boolean(zendeskRes.ok && zendeskRes.data?.apiConfigured));
     const cmdRes = await fetchPlatformSupportCommands();
     if (cmdRes.ok && cmdRes.commands?.length) setCommandHelp(cmdRes.commands);
+    const mentionOps = await fetchPlatformSupportMentionOperators();
+    if (mentionOps.ok && mentionOps.operators) {
+      setMentionOperators(mentionOps.operators.map((o) => ({ username: o.username, displayName: o.displayName })));
+    }
+    const assignOps = await fetchPlatformSupportAssigneeOptions();
+    if (assignOps.ok && assignOps.operators) setAssigneeOptions(assignOps.operators);
+    const mentionInbox = await fetchPlatformSupportMentionInbox();
+    if (mentionInbox.ok) setMentionUnread(mentionInbox.unread ?? 0);
     setLoading(false);
   }, [windowDays, caseListStatus, caseListKind, caseListTag]);
 
@@ -1028,6 +1042,11 @@ export function PlatformSupportTab() {
         <div className="platform-support-compact-hero-primary">
           <div className="platform-support-compact-hero-title-row">
             <h2>Destek komuta merkezi</h2>
+            {mentionUnread > 0 ? (
+              <span className="platform-support-badge platform-support-badge--info" title="@mention bildirimleri">
+                @{mentionUnread} yeni
+              </span>
+            ) : null}
             <span className="platform-support-compact-hero-mail" title="Destek posta kutusu">
               {mailboxAddress ?? 'destek@ekolojikmarket.com.tr'}
             </span>
@@ -1439,6 +1458,7 @@ export function PlatformSupportTab() {
                       value={caseMetaDraft.assignee}
                       onChange={(e) => setCaseMetaDraft((d) => ({ ...d, assignee: e.target.value }))}
                       placeholder="operatör kullanıcı adı"
+                      list="platform-support-assignee-options"
                     />
                   </label>
                   <label className="platform-support-field platform-support-field--wide">
@@ -1632,7 +1652,17 @@ export function PlatformSupportTab() {
                 <label className="platform-support-reply-label">
                   {replyChannel === 'note' ? 'İç not (@operatör ile bildirim)' : 'Yanıt metni'}
                   <textarea rows={5} value={actionDraft} onChange={(e) => setActionDraft(e.target.value)} />
+                  {replyChannel === 'note' && mentionOperators.length ? (
+                    <p className="platform-support-hint">
+                      @mention: {mentionOperators.map((o) => `@${o.username}`).join(', ')}
+                    </p>
+                  ) : null}
                 </label>
+                <datalist id="platform-support-assignee-options">
+                  {assigneeOptions.map((o) => (
+                    <option key={o.username} value={o.username}>{o.displayName}</option>
+                  ))}
+                </datalist>
                 <button type="button" className="btn btn-primary" onClick={() => void sendCaseAction()} disabled={!actionDraft.trim()}>
                   Gönder
                 </button>

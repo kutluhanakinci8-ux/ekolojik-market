@@ -423,6 +423,9 @@ async function waveModuleSmokeGate() {
     'scripts/faz52-closure-smoke.mjs',
     'scripts/platform-support-api-smoke.mjs',
     'scripts/platform-support-zendesk-smoke.mjs',
+    'scripts/platform-support-zendesk-e2e.mjs',
+    'scripts/platform-support-backlog-smoke.mjs',
+    'scripts/crm-sms-smoke.mjs',
   ];
   for (const rel of scripts) {
     const r = await run('node', [rel]);

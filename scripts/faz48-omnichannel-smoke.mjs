@@ -49,7 +49,21 @@ try {
   const hub = await getMessagingChannelsHub(dir, 'main');
   if (!hub.whatsapp?.enabled) throw new Error('hub enabled');
 
-  console.log('OK    webhook registry + WA verify + inbound thread');
+  const smsIds = listChannelWebhookIds();
+  if (!smsIds.includes('sms')) throw new Error('sms adapter missing');
+
+  const smsIn = await ingestInboundChannelMessage(dir, 'main', {
+    channel: 'sms',
+    externalId: 'sms:905559998877',
+    customerId: 'sms-905559998877',
+    customerName: 'SMS',
+    bodyText: 'omni sms',
+    authorName: 'SMS',
+    idempotencyKey: 'sms:f48:1',
+  });
+  if (!smsIn.ok || smsIn.thread?.channel !== 'sms') throw new Error('sms inbound');
+
+  console.log('OK    webhook registry + WA verify + inbound thread + SMS inbound');
   console.log('\nFaz 48 omnichannel smoke: PASS');
 } finally {
   await rm(dir, { recursive: true, force: true });

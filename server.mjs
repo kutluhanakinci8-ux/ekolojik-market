@@ -1364,6 +1364,54 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/platform/support/assignee-options' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportAssigneeOptions } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportAssigneeOptions(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Atama listesi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/mention-inbox' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const auth = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!auth) return;
+      try {
+        const { getPlatformSupportMentionInbox } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportMentionInbox(DATA_DIR, auth.username);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mention kutusu alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/mention-inbox/read' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const auth = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!auth) return;
+      const body = await readRequestBody(req);
+      try {
+        const { postPlatformSupportMentionInboxRead } = await import('./server/platformApi.mjs');
+        const payload = await postPlatformSupportMentionInboxRead(DATA_DIR, auth.username, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu işaretlenemedi' }));
+      }
+      return;
+    }
+
     if (pathname === '/api/platform/support/sla-apology' && req.method === 'GET') {
       const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
       if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
@@ -2299,6 +2347,7 @@ const server = createServer(async (req, res) => {
             method: req.method,
             query: url.searchParams,
             body,
+            req,
           });
           if (result.challenge != null) {
             res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });

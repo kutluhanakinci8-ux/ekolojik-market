@@ -119,6 +119,15 @@ export async function createPlatformCase(dataDir, input, operatorUsername) {
   if (existing) return { ok: true, duplicate: true, case: existing };
 
   const now = new Date().toISOString();
+  let assignee = input.assignee ? String(input.assignee).trim() : null;
+  if (!assignee) {
+    try {
+      const { pickSupportAssignee } = await import('./platformSupportAssign.mjs');
+      assignee = await pickSupportAssignee(dataDir);
+    } catch {
+      assignee = null;
+    }
+  }
   const row = {
     id: `pc-${randomUUID()}`,
     number: nextCaseNumber(cases),
@@ -131,7 +140,7 @@ export async function createPlatformCase(dataDir, input, operatorUsername) {
     subject: String(input.subject ?? 'Destek kaydı').trim() || 'Destek kaydı',
     requesterName: String(input.requesterName ?? '').trim() || null,
     requesterEmail: String(input.requesterEmail ?? '').trim() || null,
-    assignee: input.assignee ? String(input.assignee).trim() : null,
+    assignee,
     tags: Array.isArray(input.tags) ? input.tags.map((t) => String(t).trim()).filter(Boolean) : [],
     links: {
       inboxMessageId: input.links?.inboxMessageId ?? null,

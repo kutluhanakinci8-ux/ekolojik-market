@@ -20,6 +20,7 @@ import type { AppPage } from './components/AppShell';
 import { fetchPostaUnreadCounts } from './services/postaInboxService';
 import { postaEventsStreamUrl } from './services/posHubFetch';
 import { PostaOnboardingWizard } from './components/onboarding/PostaOnboardingWizard';
+import { PostaOnboardingDismissedBanner } from './components/onboarding/PostaOnboardingDismissedBanner';
 import { fetchPostaOnboardingHub } from './services/postaOnboardingService';
 import {
   clearPostaOnboardingForce,
@@ -260,6 +261,7 @@ export function PosApp() {
 
   return (
     <>
+      <PostaOnboardingDismissedBanner />
       <WindowsZywellSetupBanner
         onApplyPrinterSettings={() => store.updateReceiptPrinterSettings({ ...DEFAULT_ZYWELL_RECEIPT_PRINTER })}
       />

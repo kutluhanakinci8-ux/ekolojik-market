@@ -409,3 +409,51 @@ export async function createZendeskTicketFromPlatformCase(dataDir, caseId, opera
 
   return { ok: true, ticketId, url: ref.url };
 }
+
+/** Platform yanıtını Zendesk ticket’a yorum olarak yaz (e-posta/mesaj = public, not = internal) */
+export async function pushZendeskCommentForCaseReply(dataDir, caseRow, { channel, body, operatorUsername }) {
+  const cfg = getZendeskBridgeConfig();
+  if (!cfg.apiConfigured) {
+    return { ok: false, skipped: true, reason: 'api_not_configured' };
+  }
+  const ref = enrichExternalTicketRef(caseRow.externalTicketRef);
+  if (!ref?.id) {
+    return { ok: false, skipped: true, reason: 'no_ticket_ref' };
+  }
+
+  const ch = String(channel ?? 'note').trim().toLowerCase();
+  const text = String(body ?? '').trim();
+  if (!text) return { ok: false, error: 'Boş yorum' };
+
+  const isPublic = ch === 'email' || ch === 'messaging';
+  const prefix =
+    ch === 'email'
+      ? '[Platform e-posta yanıtı]'
+      : ch === 'messaging'
+        ? '[Platform mesaj yanıtı]'
+        : '[Platform iç not]';
+  const commentBody = `${prefix} (${operatorUsername ?? 'operatör'})\n\n${text.slice(0, 8000)}`;
+
+  const api = await zendeskApiJson(cfg, `/tickets/${ref.id}.json`, {
+    method: 'PUT',
+    body: {
+      ticket: {
+        comment: { body: commentBody, public: isPublic },
+      },
+    },
+  });
+  if (!api.ok) return api;
+
+  await appendCaseActivity(
+    dataDir,
+    caseRow.id,
+    {
+      type: 'zendesk_push',
+      body: `Yanıt Zendesk #${ref.id} üzerine ${isPublic ? 'müşteri' : 'iç'} yorum olarak yazıldı.`,
+      channel: 'zendesk',
+    },
+    operatorUsername ?? 'platform',
+  );
+
+  return { ok: true, ticketId: ref.id, public: isPublic };
+}

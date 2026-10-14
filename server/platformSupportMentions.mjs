@@ -54,5 +54,19 @@ export async function notifyCaseNoteMentions(dataDir, { caseRow, noteBody, autho
     notified += 1;
   }
 
+  if (notified > 0) {
+    try {
+      const { recordMentionInboxItems } = await import('./platformSupportMentionInbox.mjs');
+      await recordMentionInboxItems(dataDir, {
+        caseRow,
+        mentions,
+        authorUsername,
+        noteBody,
+      });
+    } catch {
+      /* in-app opsiyonel */
+    }
+  }
+
   return { notified, mentions };
 }

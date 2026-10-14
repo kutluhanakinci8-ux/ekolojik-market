@@ -19,8 +19,8 @@ export function getCrmSmsConfig() {
   };
 }
 
-export function isCrmSmsConfigured() {
-  const c = getCrmSmsConfig();
+export function isCrmSmsConfigured(cfg = getCrmSmsConfig()) {
+  const c = cfg;
   if (c.provider === 'mock') return true;
   if (c.provider === 'netgsm') return Boolean(c.user && c.pass && c.header);
   if (c.provider === 'http') return Boolean(c.httpUrl);
@@ -57,21 +57,40 @@ async function sendHttpTemplate(phone, message, cfg) {
   return { ok: true, provider: 'http', messageId: text.slice(0, 80) };
 }
 
-export async function sendCrmSms({ to, body }) {
+export async function sendCrmSms({ to, body, dataDir, tenantId = 'main' }) {
   const phone = normalizeTrPhone(to);
   const message = String(body ?? '').trim();
   if (!phone) return { ok: false, error: 'Geçersiz telefon numarası' };
   if (!message) return { ok: false, error: 'SMS metni gerekli' };
-  if (!isCrmSmsConfigured()) {
+
+  let cfg = getCrmSmsConfig();
+  if (dataDir) {
+    const { getEffectiveCrmSmsConfig } = await import('./crmSmsTenant.mjs');
+    cfg = await getEffectiveCrmSmsConfig(dataDir, tenantId);
+  }
+  if (!isCrmSmsConfigured(cfg)) {
     return { ok: false, error: 'SMS operatör API yapılandırılmadı (EKOLOJIK_SMS_*)' };
   }
-
-  const cfg = getCrmSmsConfig();
+  let result;
   if (cfg.provider === 'mock') {
-    return { ok: true, provider: 'mock', messageId: `mock-sms-${Date.now()}` };
+    result = { ok: true, provider: 'mock', messageId: `mock-sms-${Date.now()}` };
+  } else if (cfg.provider === 'netgsm') {
+    result = await sendNetgsm(phone, message, cfg);
+  } else {
+    result = await sendHttpTemplate(phone, message, cfg);
   }
-  if (cfg.provider === 'netgsm') {
-    return sendNetgsm(phone, message, cfg);
+  if (dataDir && result.ok) {
+    try {
+      const { appendCrmSmsAudit } = await import('./crmSmsTenant.mjs');
+      await appendCrmSmsAudit(dataDir, tenantId, {
+        to: phone,
+        provider: result.provider,
+        messageId: result.messageId,
+        preview: message.slice(0, 120),
+      });
+    } catch {
+      /* audit opsiyonel */
+    }
   }
-  return sendHttpTemplate(phone, message, cfg);
+  return result;
 }
