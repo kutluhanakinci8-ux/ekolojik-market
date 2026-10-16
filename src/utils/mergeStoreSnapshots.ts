@@ -83,6 +83,35 @@ function mergeProductImageUrl(local: Product, chosen: Product): Product {
   return { ...chosen, imageUrl: localUrl };
 }
 
+/** Sunucuda kaydedilen fiyat, eski tarayıcı önbelleğini ezer */
+function mergeProductPricingFields(local: Product, remote: Product): Pick<
+  Product,
+  | 'purchasePrice'
+  | 'partnerPrice'
+  | 'couponPrice'
+  | 'fullSalePrice'
+  | 'ourPriceWithVat'
+  | 'partnerPriceWithVat'
+  | 'ourPercent'
+  | 'wholesalePrices'
+  | 'pricingUpdatedAt'
+> {
+  const localTs = ts(local.pricingUpdatedAt);
+  const remoteTs = ts(remote.pricingUpdatedAt);
+  const source = remoteTs >= localTs ? remote : local;
+  return {
+    purchasePrice: source.purchasePrice,
+    partnerPrice: source.partnerPrice,
+    couponPrice: source.couponPrice,
+    fullSalePrice: source.fullSalePrice,
+    ourPriceWithVat: source.ourPriceWithVat,
+    partnerPriceWithVat: source.partnerPriceWithVat,
+    ourPercent: source.ourPercent,
+    wholesalePrices: source.wholesalePrices,
+    pricingUpdatedAt: source.pricingUpdatedAt,
+  };
+}
+
 function mergeProductsById(
   local: Product[],
   remote: Product[],
@@ -101,7 +130,8 @@ function mergeProductsById(
     const stock = p.stock !== remoteP.stock
       ? Math.min(p.stock, remoteP.stock)
       : catalogBase.stock;
-    map.set(p.id, mergeProductImageUrl(p, { ...catalogBase, stock }));
+    const pricing = mergeProductPricingFields(p, remoteP);
+    map.set(p.id, mergeProductImageUrl(p, { ...catalogBase, ...pricing, stock }));
   }
   return [...map.values()];
 }
