@@ -18,9 +18,11 @@ const GREENLEAF_ID_START = 37;
 
 function buildPricing(item: GreenleafCatalogItem) {
   const pv = item.pv ?? 0.2;
-  const partnerPrice =
-    item.usdPrice > 0 ? Math.round(item.usdPrice * 35) : Math.max(50, Math.round(pv * 480));
-  const fullSalePrice = Math.round(partnerPrice * 2);
+  const fullSalePrice =
+    item.usdPrice > 0
+      ? Math.round(item.usdPrice * 35 * 2)
+      : Math.max(100, Math.round(pv * 960));
+  const partnerPrice = Math.round(fullSalePrice / 2);
   const ourPercent = Math.max(100, Math.round((fullSalePrice / partnerPrice - 1) * 100));
   const ourPriceWithVat = Math.round(fullSalePrice * 1.2 * 100) / 100;
   const partnerPriceWithVat = Math.round(partnerPrice * 1.2 * 100) / 100;
