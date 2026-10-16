@@ -30,6 +30,8 @@ export interface Product {
   sourceUrl?: string;
   /** Adet kademeli toptan birim fiyatları (KDV dahil) */
   wholesalePrices?: WholesalePrices;
+  /** Sunucu/istemci — son fiyat düzenleme (birleştirmede korunur) */
+  pricingUpdatedAt?: string;
 }
 
 export interface WholesalePrices {

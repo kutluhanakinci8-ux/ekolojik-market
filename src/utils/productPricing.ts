@@ -105,6 +105,7 @@ export function mergeProductPricing(
     ourPriceWithVat,
     partnerPriceWithVat,
     ourPercent,
+    pricingUpdatedAt: new Date().toISOString(),
   };
 }
 
