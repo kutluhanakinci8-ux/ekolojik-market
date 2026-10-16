@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Fotoğraftaki fişler — ödeme kart → nakit (sunucu store.json).
- * Satış yoksa fiş satırlarından ekler (stok dokunulmaz; kasa raporu için).
+ * Fotoğraftaki fişler — %50 satış fiyatı + nakit (sunucu store.json).
+ * Satış yoksa fiş satırlarından ekler (stok dokunulmaz).
  *
  * Kullanım: node scripts/fix-receipt-sales-payment-cash.mjs [/var/www/market-pos/data]
  */
@@ -14,18 +14,24 @@ const CODE_TO_PRODUCT_ID = Object.fromEntries(
   Object.entries(PRICE_BATCH_1_CODE_BY_PRODUCT_ID).map(([id, code]) => [code, Number(id)]),
 );
 
-/** Fiş OCR / yazım varyantları */
 const CODE_ALIASES = {
   LG1019: 'LGI019',
   ASF006: 'ASF066',
 };
+
+/** Fişteki liste fiyatının yarısı (fotoğraftaki el yazısı) */
+const SALE_PRICE_FACTOR = 0.5;
+
+function round2(n) {
+  return Math.round(Number(n) * 100) / 100;
+}
 
 function resolveProductId(code) {
   const normalized = CODE_ALIASES[code] ?? code;
   return CODE_TO_PRODUCT_ID[normalized];
 }
 
-/** 16.10.2026 Greenleaf fişleri (sale id = fiş no) */
+/** 16.10.2026 — unitPrice = termal fişteki brüt satır fiyatı (yarısı uygulanır) */
 const RECEIPT_SALES = [
   {
     id: 'S1792152021394',
@@ -77,7 +83,7 @@ const RECEIPT_SALES = [
   },
 ];
 
-const CORRECTION_AT = new Date().toISOString();
+const TARGET_TENANTS = new Set(['main']);
 
 function buildItems(lines) {
   const items = [];
@@ -90,20 +96,29 @@ function buildItems(lines) {
       productId,
       quantity: line.qty,
       priceType: 'our',
-      unitPrice: line.unitPrice,
+      unitPrice: round2(line.unitPrice * SALE_PRICE_FACTOR),
     });
   }
   return items;
 }
 
 function saleTotal(items) {
-  return Math.round(items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) * 100) / 100;
+  return round2(items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0));
+}
+
+function itemsSignature(items) {
+  return JSON.stringify(
+    (items ?? [])
+      .map((i) => [i.productId, i.quantity, i.unitPrice, i.priceType])
+      .sort((a, b) => a[0] - b[0]),
+  );
 }
 
 function applyCashPayment(sale) {
-  const total = Number(sale.total) || saleTotal(sale.items ?? []);
+  const total = saleTotal(sale.items ?? []);
   return {
     ...sale,
+    items: sale.items,
     total,
     paymentMethod: 'cash',
     paymentSplits: undefined,
@@ -111,18 +126,16 @@ function applyCashPayment(sale) {
     changeGiven: 0,
     status: sale.status ?? 'completed',
     saleKind: sale.saleKind ?? 'sale',
-    paymentCorrectedAt: CORRECTION_AT,
-    paymentCorrectionNote: 'Kart girişi → nakit (fiş düzeltmesi)',
+    paymentCorrectedAt: new Date().toISOString(),
+    paymentCorrectionNote: 'Fiş düzeltmesi: %50 satış fiyatı, nakit',
   };
 }
 
-function buildSaleFromReceipt(def) {
+function buildSaleFromReceipt(def, existingId) {
   const items = buildItems(def.lines);
-  const total = saleTotal(items);
   return applyCashPayment({
-    id: def.id,
+    id: existingId ?? def.id,
     items,
-    total,
     businessDate: def.businessDate,
     createdAt: def.createdAt,
   });
@@ -133,6 +146,15 @@ function findSaleIndex(sales, def) {
   return sales.findIndex((s) => ids.has(String(s.id)));
 }
 
+function saleNeedsUpdate(before, after) {
+  if (before.paymentMethod !== 'cash') return true;
+  if (before.paymentSplits) return true;
+  if (Math.abs(Number(before.total) - Number(after.total)) > 0.01) return true;
+  if (itemsSignature(before.items) !== itemsSignature(after.items)) return true;
+  if (before.paymentCorrectionNote !== after.paymentCorrectionNote) return true;
+  return false;
+}
+
 function migrateStore(snapshot) {
   const sales = [...(snapshot.sales ?? [])];
   let changed = false;
@@ -140,27 +162,23 @@ function migrateStore(snapshot) {
 
   for (const def of RECEIPT_SALES) {
     const idx = findSaleIndex(sales, def);
+    const existingId = idx >= 0 ? String(sales[idx].id) : def.id;
+    const rebuilt = buildSaleFromReceipt(def, existingId);
+
     if (idx >= 0) {
-      const before = sales[idx];
-      const next = applyCashPayment(before);
-      if (
-        before.paymentMethod !== 'cash'
-        || before.paymentSplits
-        || before.paymentCorrectedAt !== next.paymentCorrectedAt
-      ) {
-        sales[idx] = next;
+      if (saleNeedsUpdate(sales[idx], rebuilt)) {
+        sales[idx] = rebuilt;
         changed = true;
-        report.push(`  güncellendi: ${def.id} (kart→nakit)`);
+        report.push(`  güncellendi: ${existingId} toplam ${rebuilt.total} ₺ (%50, nakit)`);
       } else {
-        report.push(`  zaten nakit: ${def.id}`);
+        report.push(`  uyumlu: ${existingId} (${rebuilt.total} ₺)`);
       }
       continue;
     }
 
-    const built = buildSaleFromReceipt(def);
-    sales.push(built);
+    sales.push(rebuilt);
     changed = true;
-    report.push(`  eklendi: ${def.id} toplam ${built.total} ₺ (nakit)`);
+    report.push(`  eklendi: ${def.id} toplam ${rebuilt.total} ₺ (%50, nakit)`);
   }
 
   if (!changed) return { snapshot, changed: false, report };
@@ -177,6 +195,7 @@ function migrateStore(snapshot) {
 }
 
 async function migrateTenant(dataDir, tenantId) {
+  if (!TARGET_TENANTS.has(tenantId)) return;
   const snapshot = await readTenantStore(dataDir, tenantId);
   const { snapshot: next, changed, report } = migrateStore(snapshot);
   if (!changed) {
@@ -190,14 +209,14 @@ async function migrateTenant(dataDir, tenantId) {
 
 async function main() {
   const dataDir = process.argv[2] || join(process.cwd(), 'data');
-  console.log(`==> Fiş satışları nakit düzeltmesi: ${dataDir}`);
+  console.log(`==> Fiş satışları %50 + nakit: ${dataDir}`);
   await migrateTenant(dataDir, 'main');
 
   const tenantsDir = join(dataDir, 'tenants');
   try {
     const entries = await readdir(tenantsDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && entry.name !== 'main') {
+      if (entry.isDirectory()) {
         await migrateTenant(dataDir, entry.name);
       }
     }
