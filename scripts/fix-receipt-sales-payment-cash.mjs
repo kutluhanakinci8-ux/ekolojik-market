@@ -96,6 +96,8 @@ const RECEIPT_BATCHES = [
         id: 'S1792152528273',
         createdAt: '2026-10-16T12:08:48.000Z',
         businessDate: '2026-10-16',
+        paymentMethod: 'transfer',
+        paymentNote: 'Fiş düzeltmesi: havale (tutar aynı)',
         keepAmountsWhenExists: true,
         expectedTotal: 1403.5,
         lines: [
@@ -193,6 +195,10 @@ function itemsSignature(items) {
   );
 }
 
+function resolvePaymentMethod(def) {
+  return def?.paymentMethod === 'transfer' ? 'transfer' : 'cash';
+}
+
 function applyCashPayment(sale, def, batchLabel) {
   const subtotal = saleTotal(sale.items ?? []);
   const extraDiscount = round2(Math.max(0, def?.additionalDiscountTl ?? 0));
@@ -200,7 +206,8 @@ function applyCashPayment(sale, def, batchLabel) {
   if (def?.expectedTotal != null && Math.abs(total - def.expectedTotal) > 0.02) {
     total = round2(def.expectedTotal);
   }
-  const noteParts = [batchLabel];
+  const method = resolvePaymentMethod(def);
+  const noteParts = [def?.paymentNote ?? batchLabel];
   if (extraDiscount > 0) {
     noteParts.push(`+ ${extraDiscount} ₺ ek indirim`);
   }
@@ -209,10 +216,10 @@ function applyCashPayment(sale, def, batchLabel) {
     items: sale.items,
     total,
     crmDiscountTotal: extraDiscount > 0 ? extraDiscount : sale.crmDiscountTotal,
-    paymentMethod: 'cash',
+    paymentMethod: method,
     paymentSplits: undefined,
-    cashTendered: total,
-    changeGiven: 0,
+    cashTendered: method === 'cash' ? total : undefined,
+    changeGiven: method === 'cash' ? 0 : undefined,
     status: sale.status ?? 'completed',
     saleKind: sale.saleKind ?? 'sale',
     paymentCorrectedAt: new Date().toISOString(),
@@ -220,17 +227,18 @@ function applyCashPayment(sale, def, batchLabel) {
   };
 }
 
-function applyCashPaymentOnly(sale, batchLabel) {
+function applyPaymentPreserveAmount(sale, def, batchLabel) {
+  const method = resolvePaymentMethod(def);
   const total = round2(Number(sale.total) || saleTotal(sale.items ?? []));
   return {
     ...sale,
     total,
-    paymentMethod: 'cash',
+    paymentMethod: method,
     paymentSplits: undefined,
-    cashTendered: total,
-    changeGiven: 0,
+    cashTendered: method === 'cash' ? total : undefined,
+    changeGiven: method === 'cash' ? 0 : undefined,
     paymentCorrectedAt: new Date().toISOString(),
-    paymentCorrectionNote: batchLabel,
+    paymentCorrectionNote: def?.paymentNote ?? batchLabel,
   };
 }
 
@@ -254,7 +262,7 @@ function findSaleIndex(sales, def) {
 }
 
 function saleNeedsUpdate(before, after) {
-  if (before.paymentMethod !== 'cash') return true;
+  if (before.paymentMethod !== after.paymentMethod) return true;
   if (before.paymentSplits) return true;
   if (Math.abs(Number(before.total) - Number(after.total)) > 0.01) return true;
   if (itemsSignature(before.items) !== itemsSignature(after.items)) return true;
@@ -272,7 +280,7 @@ function migrateStore(snapshot) {
       const idx = findSaleIndex(sales, def);
       const existingId = idx >= 0 ? String(sales[idx].id) : def.id;
       const rebuilt = def.keepAmountsWhenExists && idx >= 0
-        ? applyCashPaymentOnly(sales[idx], `Fiş düzeltmesi: ${batch.label}`)
+        ? applyPaymentPreserveAmount(sales[idx], def, `Fiş düzeltmesi: ${batch.label}`)
         : buildSaleFromReceipt(def, existingId, batch.priceFactor, `Fiş düzeltmesi: ${batch.label}`);
 
       if (idx >= 0) {
