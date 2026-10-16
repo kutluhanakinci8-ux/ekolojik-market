@@ -160,6 +160,22 @@ const RECEIPT_BATCHES = [
           { code: 'ASB046', qty: 1, unitPrice: 145.01 },
         ],
       },
+      {
+        id: 'S1792154637488',
+        createdAt: '2026-10-16T12:43:57.000Z',
+        businessDate: '2026-10-16',
+        paymentMethod: 'transfer',
+        paymentNote: 'Fiş düzeltmesi: havale 1.091,03 ₺ (termal fiş — kasa listesinde eksikti)',
+        keepAmountsWhenExists: true,
+        expectedTotal: 1091.03,
+        lines: [
+          { code: 'CBA052', qty: 1, unitPrice: 211.01 },
+          { code: 'DAA109', qty: 1, unitPrice: 220.01 },
+          { code: 'DAA108', qty: 1, unitPrice: 241.01 },
+          { code: 'CAA039', qty: 1, unitPrice: 345 },
+          { code: 'ASF066', qty: 1, unitPrice: 74 },
+        ],
+      },
     ],
   },
 ];
