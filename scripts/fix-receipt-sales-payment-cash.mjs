@@ -61,6 +61,8 @@ const RECEIPT_SALES = [
     id: 'S1792151611448',
     createdAt: '2026-10-16T11:53:31.000Z',
     businessDate: '2026-10-16',
+    /** Fişteki ek indirim (satır %50 sonrası) → toplam 1.972 − 268 = 1.704 ₺ */
+    additionalDiscountTl: 268,
     lines: [
       { code: 'CBF015', qty: 1, unitPrice: 148 },
       { code: 'SBJ064', qty: 2, unitPrice: 536 },
@@ -114,12 +116,19 @@ function itemsSignature(items) {
   );
 }
 
-function applyCashPayment(sale) {
-  const total = saleTotal(sale.items ?? []);
+function applyCashPayment(sale, def) {
+  const subtotal = saleTotal(sale.items ?? []);
+  const extraDiscount = round2(Math.max(0, def?.additionalDiscountTl ?? 0));
+  const total = round2(Math.max(0, subtotal - extraDiscount));
+  const noteParts = ['Fiş düzeltmesi: %50 satış fiyatı, nakit'];
+  if (extraDiscount > 0) {
+    noteParts.push(`+ ${extraDiscount} ₺ ek indirim`);
+  }
   return {
     ...sale,
     items: sale.items,
     total,
+    crmDiscountTotal: extraDiscount > 0 ? extraDiscount : sale.crmDiscountTotal,
     paymentMethod: 'cash',
     paymentSplits: undefined,
     cashTendered: total,
@@ -127,18 +136,21 @@ function applyCashPayment(sale) {
     status: sale.status ?? 'completed',
     saleKind: sale.saleKind ?? 'sale',
     paymentCorrectedAt: new Date().toISOString(),
-    paymentCorrectionNote: 'Fiş düzeltmesi: %50 satış fiyatı, nakit',
+    paymentCorrectionNote: noteParts.join(' — '),
   };
 }
 
 function buildSaleFromReceipt(def, existingId) {
   const items = buildItems(def.lines);
-  return applyCashPayment({
-    id: existingId ?? def.id,
-    items,
-    businessDate: def.businessDate,
-    createdAt: def.createdAt,
-  });
+  return applyCashPayment(
+    {
+      id: existingId ?? def.id,
+      items,
+      businessDate: def.businessDate,
+      createdAt: def.createdAt,
+    },
+    def,
+  );
 }
 
 function findSaleIndex(sales, def) {
@@ -166,7 +178,7 @@ function migrateStore(snapshot) {
     const rebuilt = buildSaleFromReceipt(def, existingId);
 
     if (idx >= 0) {
-      if (saleNeedsUpdate(sales[idx], rebuilt)) {
+      if (saleNeedsUpdate(sales[idx], rebuilt) || Number(sales[idx].crmDiscountTotal ?? 0) !== Number(rebuilt.crmDiscountTotal ?? 0)) {
         sales[idx] = rebuilt;
         changed = true;
         report.push(`  güncellendi: ${existingId} toplam ${rebuilt.total} ₺ (%50, nakit)`);
