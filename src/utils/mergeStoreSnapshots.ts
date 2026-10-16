@@ -63,20 +63,25 @@ function mergeProductImageUrl(local: Product, chosen: Product): Product {
   return { ...chosen, imageUrl: localUrl };
 }
 
-function mergeProductsById(local: Product[], remote: Product[]): Product[] {
+function mergeProductsById(
+  local: Product[],
+  remote: Product[],
+  options?: { preferLocalCatalog?: boolean },
+): Product[] {
+  const preferLocal = options?.preferLocalCatalog ?? false;
   const map = new Map<number, Product>();
   for (const p of remote) map.set(p.id, p);
   for (const p of local) {
-    const prev = map.get(p.id);
-    if (!prev) {
+    const remoteP = map.get(p.id);
+    if (!remoteP) {
       map.set(p.id, p);
       continue;
     }
-    let chosen = prev;
-    if (p.stock !== prev.stock) {
-      chosen = p.stock < prev.stock ? p : prev;
-    }
-    map.set(p.id, mergeProductImageUrl(p, chosen));
+    const catalogBase = preferLocal ? p : remoteP;
+    const stock = p.stock !== remoteP.stock
+      ? Math.min(p.stock, remoteP.stock)
+      : catalogBase.stock;
+    map.set(p.id, mergeProductImageUrl(p, { ...catalogBase, stock }));
   }
   return [...map.values()];
 }
@@ -115,6 +120,7 @@ export function mergeStoreSnapshots(
   const updatedAt = new Date(
     Math.max(ts(local.updatedAt), ts(remote.updatedAt), Date.now()),
   ).toISOString();
+  const preferLocalCatalog = ts(localClean.updatedAt) >= ts(remoteClean.updatedAt);
 
   return {
     ...remoteClean,
@@ -133,7 +139,9 @@ export function mergeStoreSnapshots(
     saleReturns: mergeSaleReturnsById(localClean.saleReturns ?? [], remoteClean.saleReturns ?? []),
     stockMovements: mergeStockMovementsById(localClean.stockMovements ?? [], remoteClean.stockMovements ?? []),
     customers: mergeCustomersById(localClean.customers ?? [], remoteClean.customers ?? []),
-    products: mergeProductsById(localClean.products ?? [], remoteClean.products ?? []),
+    products: mergeProductsById(localClean.products ?? [], remoteClean.products ?? [], {
+      preferLocalCatalog,
+    }),
     productSets: remoteClean.productSets?.length ? remoteClean.productSets : localClean.productSets,
     priceType: local.priceType ?? remote.priceType,
     users: local.users?.length ? local.users : remote.users,
