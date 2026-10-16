@@ -42,6 +42,7 @@ interface StockOperationsModalProps {
   onUploadImage?: (productId: number, imageUrl: string) => void;
   onRemoveImage?: (productId: number) => void;
   onUpdatePricing?: (productId: number, input: ProductPricingInput) => void;
+  onPricingSaveResult?: (saved: boolean) => void;
   /** Lima / pos-lite: perakende KDV hariç */
   perakendeKdvHaric?: boolean;
   settings?: AppSettings;
@@ -110,6 +111,7 @@ export function StockOperationsModal({
   onUploadImage,
   onRemoveImage,
   onUpdatePricing,
+  onPricingSaveResult,
   perakendeKdvHaric = false,
   settings,
   onUpdateProductCategory,
@@ -185,6 +187,11 @@ export function StockOperationsModal({
     return value;
   };
 
+  const priceDraftChanged = (draft: number | undefined, current: number) => {
+    if (draft == null) return false;
+    return Math.abs(draft - current) > 0.004;
+  };
+
   const buildPricingPatch = (): ProductPricingInput | null => {
     if (!selectedProduct || !onUpdatePricing) return null;
     const patch: ProductPricingInput = {};
@@ -192,19 +199,21 @@ export function StockOperationsModal({
     const partner = parsePriceDraft(partnerDraft);
     const coupon = parsePriceDraft(couponDraft);
     const retail = parsePriceDraft(retailDraft);
-    if (purchase != null && purchase !== selectedProduct.purchasePrice) patch.purchasePrice = purchase;
-    if (partner != null && partner !== selectedProduct.partnerPrice) patch.partnerPrice = partner;
+    if (priceDraftChanged(purchase, selectedProduct.purchasePrice)) patch.purchasePrice = purchase;
+    if (priceDraftChanged(partner, selectedProduct.partnerPrice)) patch.partnerPrice = partner;
     const couponBase = selectedProduct.couponPrice ?? selectedProduct.partnerPrice;
-    if (coupon != null && coupon !== couponBase) patch.couponPrice = coupon;
-    if (retail != null && retail !== selectedProduct.fullSalePrice) patch.fullSalePrice = retail;
+    if (priceDraftChanged(coupon, couponBase)) patch.couponPrice = coupon;
+    if (priceDraftChanged(retail, selectedProduct.fullSalePrice)) patch.fullSalePrice = retail;
     return Object.keys(patch).length > 0 ? patch : null;
   };
 
-  const applyPricingDraft = () => {
+  const applyPricingDraft = (): boolean => {
     const id = Number.parseInt(productId, 10);
-    if (Number.isNaN(id) || !onUpdatePricing) return;
+    if (Number.isNaN(id) || !onUpdatePricing) return false;
     const patch = buildPricingPatch();
-    if (patch) onUpdatePricing(id, patch);
+    if (!patch) return false;
+    onUpdatePricing(id, patch);
+    return true;
   };
 
   const searchResults = useMemo(() => {
@@ -580,7 +589,7 @@ export function StockOperationsModal({
                 <button
                   type="button"
                   className="stock-ops-dialog__pricing-save"
-                  onClick={applyPricingDraft}
+                  onClick={() => onPricingSaveResult?.(applyPricingDraft())}
                 >
                   Fiyatları kaydet
                 </button>

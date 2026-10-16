@@ -806,7 +806,9 @@ export function StockScreen({ store }: StockScreenProps) {
         }}
         onUpdatePricing={(productId, input) => {
           store.updateProductPricing(productId, input);
-          showToast('Ürün fiyatları kaydedildi');
+        }}
+        onPricingSaveResult={(saved) => {
+          showToast(saved ? 'Ürün fiyatları kaydedildi' : 'Fiyat değişmedi — perakende alanını güncelleyip tekrar deneyin');
         }}
         perakendeKdvHaric={posLiteStock}
         settings={store.settings}

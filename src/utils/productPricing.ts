@@ -49,6 +49,23 @@ export interface ProductPricingInput {
 }
 
 /** Stok ekranı / giriş — alış, partner, perakende; KDV alanları otomatik */
+/** Greenleaf seed birleştirme — diskteki fiyatlar katalog satırını ezer */
+export function overlayStoredProductPricing(catalog: Product, stored?: Product | null): Product {
+  if (!stored) return catalog;
+  return {
+    ...catalog,
+    purchasePrice: stored.purchasePrice,
+    partnerPrice: stored.partnerPrice,
+    couponPrice: stored.couponPrice,
+    fullSalePrice: stored.fullSalePrice,
+    ourPriceWithVat: stored.ourPriceWithVat,
+    partnerPriceWithVat: stored.partnerPriceWithVat,
+    ourPercent: stored.ourPercent,
+    pv: stored.pv,
+    wholesalePrices: stored.wholesalePrices ?? catalog.wholesalePrices,
+  };
+}
+
 export function mergeProductPricing(
   product: Product,
   input: ProductPricingInput,
