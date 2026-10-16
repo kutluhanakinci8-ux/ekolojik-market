@@ -1,4 +1,6 @@
 import type { Customer } from '../types/business';
+import type { CurrencySettings } from '../types/currency';
+import { DEFAULT_CURRENCY_SETTINGS } from '../types/currency';
 import type { Product, Sale, StockMovement } from '../types/product';
 import type { SaleReturn } from '../types/saleReturn';
 import type { PaymentReminder } from '../types/paymentReminder';
@@ -42,6 +44,24 @@ function mergeStockMovementsById(local: StockMovement[], remote: StockMovement[]
     if (!prev || ts(m.createdAt) >= ts(prev.createdAt)) map.set(m.id, m);
   }
   return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function mergeCurrencySettings(
+  remote?: CurrencySettings,
+  local?: CurrencySettings,
+): CurrencySettings {
+  const r = { ...DEFAULT_CURRENCY_SETTINGS, ...remote, rates: { ...DEFAULT_CURRENCY_SETTINGS.rates, ...remote?.rates } };
+  const l = local ? { ...DEFAULT_CURRENCY_SETTINGS, ...local, rates: { ...DEFAULT_CURRENCY_SETTINGS.rates, ...local.rates } } : null;
+  if (!l) return r;
+  return {
+    ...r,
+    ...l,
+    rates: {
+      USD: { ...r.rates.USD, ...l.rates.USD },
+      KZT: { ...r.rates.KZT, ...l.rates.KZT },
+    },
+    displayCurrency: l.displayCurrency ?? r.displayCurrency ?? 'TRY',
+  };
 }
 
 function mergeCustomersById(local: Customer[], remote: Customer[]): Customer[] {
@@ -130,6 +150,10 @@ export function mergeStoreSnapshots(
       ...remoteClean.settings,
       ...localClean.settings,
       salesHistoryClearedAt: clearedAt ?? localClean.settings?.salesHistoryClearedAt,
+      currency: mergeCurrencySettings(
+        remoteClean.settings?.currency,
+        localClean.settings?.currency,
+      ),
       paymentReminders: mergePaymentRemindersById(
         localClean.settings?.paymentReminders ?? [],
         remoteClean.settings?.paymentReminders ?? [],
