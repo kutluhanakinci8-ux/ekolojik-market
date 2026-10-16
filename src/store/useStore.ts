@@ -244,6 +244,7 @@ import {
   overlayStoredProductPricing,
   type ProductPricingInput,
 } from '../utils/productPricing';
+import { patchProductPricingOnServer } from '../services/productPricingApi';
 import { isGreenleafPersistedImageUrl } from '../utils/greenleafProductImages';
 import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
 import { canPushTenantDataToServer } from '../config/tenantDataPolicy';
@@ -1746,10 +1747,12 @@ export function usePosStoreState() {
   const updateProductPricing = useCallback((productId: number, input: ProductPricingInput) => {
     const retailNet = usesNetRetailWithVatBreakdown(settings);
     const product = products.find((p) => p.id === productId);
+    let mergedLocal: Product | undefined;
     setProducts((prev) => {
       const next = prev.map((p) => {
         if (p.id !== productId) return p;
-        return mergeProductPricing(p, input, retailNet);
+        mergedLocal = mergeProductPricing(p, input, retailNet);
+        return mergedLocal;
       });
       setCart((cartPrev) =>
         cartPrev.map((item) => {
@@ -1764,13 +1767,22 @@ export function usePosStoreState() {
       );
       return next;
     });
+    void (async () => {
+      const remote = await patchProductPricingOnServer(productId, input);
+      if (remote.ok && remote.product) {
+        setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, ...remote.product! } : p)));
+        setSyncStatus('synced');
+        return;
+      }
+      if (tenantAutoSaveArmedRef.current) {
+        const saved = await persistStoreNowRef.current();
+        if (saved) setSyncStatus('synced');
+      }
+    })();
     if (authSession && product) {
       logActivity(authSession, 'settings_update', `Ürün fiyatları güncellendi: ${product.name}`, {
         urun: product.name,
       });
-    }
-    if (tenantAutoSaveArmedRef.current) {
-      void persistStoreNowRef.current();
     }
   }, [authSession, logActivity, products, settings]);
 

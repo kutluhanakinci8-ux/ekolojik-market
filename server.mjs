@@ -4786,6 +4786,50 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/store/product-pricing' && req.method === 'PATCH') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant);
+      if (!authPayload) return;
+      if (authPayload.role !== 'admin' && authPayload.role !== 'platform') {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Fiyat değiştirmek için yönetici yetkisi gerekir' }));
+        return;
+      }
+      const existingForAuth = await readTenantStore(DATA_DIR, resolvedTenant);
+      const writer = existingForAuth?.users?.find((u) => u.id === authPayload.userId);
+      const writerUsername =
+        writer?.username
+        ?? (authPayload.role === 'platform' ? authPayload.username : undefined);
+      const { assertTenantStoreWriteAllowed } = await import('./server/tenantWritePolicy.mjs');
+      const writePolicy = await assertTenantStoreWriteAllowed(writerUsername, resolvedTenant, DATA_DIR);
+      if (!writePolicy.ok) {
+        res.writeHead(writePolicy.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: writePolicy.error }));
+        return;
+      }
+      const body = await readRequestBody(req);
+      const productId = body?.productId;
+      const { patchTenantProductPricing } = await import('./server/productPricingPatch.mjs');
+      const result = await patchTenantProductPricing(
+        DATA_DIR,
+        resolvedTenant,
+        productId,
+        {
+          purchasePrice: body?.purchasePrice,
+          partnerPrice: body?.partnerPrice,
+          couponPrice: body?.couponPrice,
+          fullSalePrice: body?.fullSalePrice,
+        },
+        existingForAuth?.settings,
+      );
+      const status = result.ok ? 200 : result.status ?? 500;
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
     if (pathname === '/api/data' && req.method === 'PUT') {
       const tenantId = resolveTenantId(url);
       const resolvedTenant = await ensureTenantOrRespond(res, tenantId);

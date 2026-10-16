@@ -44,6 +44,27 @@ function filterAfterClear(items, clearedAt) {
   return items.filter((row) => ts(row.createdAt) > t0);
 }
 
+function mergeStoreProducts(incomingProducts, existingProducts, incomingTs, existingTs) {
+  const map = new Map();
+  for (const p of existingProducts ?? []) {
+    map.set(Number(p.id), p);
+  }
+  for (const p of incomingProducts ?? []) {
+    const id = Number(p.id);
+    const prev = map.get(id);
+    if (!prev) {
+      map.set(id, p);
+      continue;
+    }
+    const nextPriceTs = ts(p.pricingUpdatedAt);
+    const prevPriceTs = ts(prev.pricingUpdatedAt);
+    if (nextPriceTs > prevPriceTs) map.set(id, p);
+    else if (prevPriceTs > nextPriceTs) map.set(id, prev);
+    else map.set(id, incomingTs >= existingTs ? p : prev);
+  }
+  return [...map.values()];
+}
+
 function mergePaymentRemindersById(incoming, existing) {
   const map = new Map();
   for (const item of existing ?? []) {
@@ -99,6 +120,14 @@ export function mergeIncomingStoreWithExisting(incoming, existing) {
         existingReminders ?? [],
       ),
     };
+  }
+  if (Array.isArray(incoming.products) && Array.isArray(existing.products)) {
+    out.products = mergeStoreProducts(
+      incoming.products,
+      existing.products,
+      ts(incoming.updatedAt),
+      ts(existing.updatedAt),
+    );
   }
   out.updatedAt = new Date(Math.max(ts(incoming.updatedAt), ts(existing.updatedAt), Date.now())).toISOString();
   return out;
