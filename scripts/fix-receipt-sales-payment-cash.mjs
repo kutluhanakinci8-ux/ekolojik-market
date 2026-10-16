@@ -16,11 +16,10 @@ const CODE_TO_PRODUCT_ID = Object.fromEntries(
 
 const CODE_ALIASES = {
   LG1019: 'LGI019',
+  LB019: 'LGI019',
   ASF006: 'ASF066',
+  SEA069: 'SAA069',
 };
-
-/** Fişteki liste fiyatının yarısı (fotoğraftaki el yazısı) */
-const SALE_PRICE_FACTOR = 0.5;
 
 function round2(n) {
   return Math.round(Number(n) * 100) / 100;
@@ -31,8 +30,12 @@ function resolveProductId(code) {
   return CODE_TO_PRODUCT_ID[normalized];
 }
 
-/** 16.10.2026 — unitPrice = termal fişteki brüt satır fiyatı (yarısı uygulanır) */
-const RECEIPT_SALES = [
+/** @type {Array<{ priceFactor: number, label: string, sales: object[] }>} */
+const RECEIPT_BATCHES = [
+  {
+    priceFactor: 0.5,
+    label: '%50 + nakit',
+    sales: [
   {
     id: 'S1792152021394',
     createdAt: '2026-10-16T12:00:21.000Z',
@@ -83,11 +86,85 @@ const RECEIPT_SALES = [
       { code: 'DAA062', qty: 1, unitPrice: 290 },
     ],
   },
+    ],
+  },
+  {
+    priceFactor: 1,
+    label: 'kart→nakit (tutar aynı)',
+    sales: [
+      {
+        id: 'S1792152528273',
+        createdAt: '2026-10-16T12:08:48.000Z',
+        businessDate: '2026-10-16',
+        keepAmountsWhenExists: true,
+        expectedTotal: 1403.5,
+        lines: [
+          { code: 'DAB089', qty: 2, unitPrice: 120.73 },
+          { code: 'DAA062', qty: 1, unitPrice: 145.01 },
+          { code: 'ASB046', qty: 1, unitPrice: 145.01 },
+          { code: 'FPA151', qty: 2, unitPrice: 436.01 },
+        ],
+      },
+      {
+        id: 'S1792152619316',
+        createdAt: '2026-10-16T12:10:19.000Z',
+        businessDate: '2026-10-16',
+        keepAmountsWhenExists: true,
+        expectedTotal: 436.01,
+        lines: [{ code: 'FPA151', qty: 1, unitPrice: 436.01 }],
+      },
+      {
+        id: 'S1792152285521',
+        createdAt: '2026-10-16T12:04:45.000Z',
+        businessDate: '2026-10-16',
+        keepAmountsWhenExists: true,
+        expectedTotal: 395.75,
+        lines: [
+          { code: 'DAB089', qty: 1, unitPrice: 120.73 },
+          { code: 'SAA069', qty: 1, unitPrice: 130.01 },
+          { code: 'ASB046', qty: 1, unitPrice: 145.01 },
+        ],
+      },
+      {
+        id: 'S1792152427909',
+        createdAt: '2026-10-16T12:07:07.000Z',
+        businessDate: '2026-10-16',
+        keepAmountsWhenExists: true,
+        expectedTotal: 985.02,
+        lines: [
+          { code: 'CAA039', qty: 1, unitPrice: 345 },
+          { code: 'EAA022', qty: 1, unitPrice: 103.01 },
+          { code: 'SAA069', qty: 1, unitPrice: 130.01 },
+          { code: 'SBC053', qty: 1, unitPrice: 407 },
+        ],
+      },
+      {
+        id: 'S1792152162144',
+        createdAt: '2026-10-16T12:02:42.000Z',
+        businessDate: '2026-10-16',
+        keepAmountsWhenExists: true,
+        expectedTotal: 345,
+        lines: [{ code: 'CAA039', qty: 1, unitPrice: 345 }],
+      },
+      {
+        id: 'S1792152109074',
+        createdAt: '2026-10-16T12:01:49.000Z',
+        businessDate: '2026-10-16',
+        keepAmountsWhenExists: true,
+        expectedTotal: 829.02,
+        lines: [
+          { code: 'LGI019', qty: 1, unitPrice: 248 },
+          { code: 'FPA151', qty: 1, unitPrice: 436.01 },
+          { code: 'ASB046', qty: 1, unitPrice: 145.01 },
+        ],
+      },
+    ],
+  },
 ];
 
 const TARGET_TENANTS = new Set(['main']);
 
-function buildItems(lines) {
+function buildItems(lines, priceFactor) {
   const items = [];
   for (const line of lines) {
     const productId = resolveProductId(line.code);
@@ -98,7 +175,7 @@ function buildItems(lines) {
       productId,
       quantity: line.qty,
       priceType: 'our',
-      unitPrice: round2(line.unitPrice * SALE_PRICE_FACTOR),
+      unitPrice: round2(line.unitPrice * priceFactor),
     });
   }
   return items;
@@ -116,11 +193,14 @@ function itemsSignature(items) {
   );
 }
 
-function applyCashPayment(sale, def) {
+function applyCashPayment(sale, def, batchLabel) {
   const subtotal = saleTotal(sale.items ?? []);
   const extraDiscount = round2(Math.max(0, def?.additionalDiscountTl ?? 0));
-  const total = round2(Math.max(0, subtotal - extraDiscount));
-  const noteParts = ['Fiş düzeltmesi: %50 satış fiyatı, nakit'];
+  let total = round2(Math.max(0, subtotal - extraDiscount));
+  if (def?.expectedTotal != null && Math.abs(total - def.expectedTotal) > 0.02) {
+    total = round2(def.expectedTotal);
+  }
+  const noteParts = [batchLabel];
   if (extraDiscount > 0) {
     noteParts.push(`+ ${extraDiscount} ₺ ek indirim`);
   }
@@ -140,8 +220,22 @@ function applyCashPayment(sale, def) {
   };
 }
 
-function buildSaleFromReceipt(def, existingId) {
-  const items = buildItems(def.lines);
+function applyCashPaymentOnly(sale, batchLabel) {
+  const total = round2(Number(sale.total) || saleTotal(sale.items ?? []));
+  return {
+    ...sale,
+    total,
+    paymentMethod: 'cash',
+    paymentSplits: undefined,
+    cashTendered: total,
+    changeGiven: 0,
+    paymentCorrectedAt: new Date().toISOString(),
+    paymentCorrectionNote: batchLabel,
+  };
+}
+
+function buildSaleFromReceipt(def, existingId, priceFactor, batchLabel) {
+  const items = buildItems(def.lines, priceFactor);
   return applyCashPayment(
     {
       id: existingId ?? def.id,
@@ -149,7 +243,8 @@ function buildSaleFromReceipt(def, existingId) {
       businessDate: def.businessDate,
       createdAt: def.createdAt,
     },
-    def,
+    { ...def, priceFactor },
+    batchLabel,
   );
 }
 
@@ -172,25 +267,32 @@ function migrateStore(snapshot) {
   let changed = false;
   const report = [];
 
-  for (const def of RECEIPT_SALES) {
-    const idx = findSaleIndex(sales, def);
-    const existingId = idx >= 0 ? String(sales[idx].id) : def.id;
-    const rebuilt = buildSaleFromReceipt(def, existingId);
+  for (const batch of RECEIPT_BATCHES) {
+    for (const def of batch.sales) {
+      const idx = findSaleIndex(sales, def);
+      const existingId = idx >= 0 ? String(sales[idx].id) : def.id;
+      const rebuilt = def.keepAmountsWhenExists && idx >= 0
+        ? applyCashPaymentOnly(sales[idx], `Fiş düzeltmesi: ${batch.label}`)
+        : buildSaleFromReceipt(def, existingId, batch.priceFactor, `Fiş düzeltmesi: ${batch.label}`);
 
-    if (idx >= 0) {
-      if (saleNeedsUpdate(sales[idx], rebuilt) || Number(sales[idx].crmDiscountTotal ?? 0) !== Number(rebuilt.crmDiscountTotal ?? 0)) {
-        sales[idx] = rebuilt;
-        changed = true;
-        report.push(`  güncellendi: ${existingId} toplam ${rebuilt.total} ₺ (%50, nakit)`);
-      } else {
-        report.push(`  uyumlu: ${existingId} (${rebuilt.total} ₺)`);
+      if (idx >= 0) {
+        if (
+          saleNeedsUpdate(sales[idx], rebuilt)
+          || Number(sales[idx].crmDiscountTotal ?? 0) !== Number(rebuilt.crmDiscountTotal ?? 0)
+        ) {
+          sales[idx] = rebuilt;
+          changed = true;
+          report.push(`  güncellendi: ${existingId} toplam ${rebuilt.total} ₺ (${batch.label})`);
+        } else {
+          report.push(`  uyumlu: ${existingId} (${rebuilt.total} ₺)`);
+        }
+        continue;
       }
-      continue;
-    }
 
-    sales.push(rebuilt);
-    changed = true;
-    report.push(`  eklendi: ${def.id} toplam ${rebuilt.total} ₺ (%50, nakit)`);
+      sales.push(rebuilt);
+      changed = true;
+      report.push(`  eklendi: ${def.id} toplam ${rebuilt.total} ₺ (${batch.label})`);
+    }
   }
 
   if (!changed) return { snapshot, changed: false, report };
@@ -221,7 +323,7 @@ async function migrateTenant(dataDir, tenantId) {
 
 async function main() {
   const dataDir = process.argv[2] || join(process.cwd(), 'data');
-  console.log(`==> Fiş satışları %50 + nakit: ${dataDir}`);
+  console.log(`==> Fiş satış düzeltmeleri: ${dataDir}`);
   await migrateTenant(dataDir, 'main');
 
   const tenantsDir = join(dataDir, 'tenants');
