@@ -122,6 +122,9 @@ bash "${REPO_ROOT}/scripts/backup-market-pos-data.sh" "${INSTALL_DIR}/data"
 
 bash "${INSTALL_DIR}/kur.sh"
 
+echo "==> Sabit perakende fiyat düzeltmeleri (store.json)..."
+MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/apply-product-price-overrides.mjs" "${INSTALL_DIR}/data" || true
+
 echo "==> Mağaza sahibi tam yetki (kutluhan*)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/ensure-owner-admin-on-server.mjs" || true
 
