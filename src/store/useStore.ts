@@ -234,7 +234,12 @@ import {
   resolveEffectiveTenantId,
   usesNetRetailWithVatBreakdown,
 } from '../utils/tenantCatalogIsolation';
-import { applyRetailVat, mergeProductPricing, type ProductPricingInput } from '../utils/productPricing';
+import {
+  applyRetailVat,
+  mergeProductPricing,
+  overlayStoredProductPricing,
+  type ProductPricingInput,
+} from '../utils/productPricing';
 import { isGreenleafPersistedImageUrl } from '../utils/greenleafProductImages';
 import { isLimaOwnedImageUrl, resolveLimaProductImagePath } from '../utils/limaProductImages';
 import { canPushTenantDataToServer } from '../config/tenantDataPolicy';
@@ -269,6 +274,7 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
     const category = saved?.category ?? seed.category;
     const catalogEntry = PRICE_BATCH_1_BY_PRODUCT_ID[seed.id];
     const priced = catalogEntry ? applyCatalogPricing(seed, catalogEntry) : seed;
+    const withStoredPricing = overlayStoredProductPricing(priced, saved);
     const sampleDefaults = SAMPLE_PRODUCT_DEFAULTS[seed.id];
     const isSample = saved?.isSample ?? Boolean(sampleDefaults);
     const sampleStock = saved?.sampleStock ?? sampleDefaults?.sampleStock ?? 0;
@@ -279,19 +285,22 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
       ?? (saved?.barcode?.trim() || priced.barcode || productCode);
 
     return {
-      ...priced,
+      ...withStoredPricing,
       category,
-      stock: resolveWarehouseStockForProduct({
-        id: seed.id,
-        productCode,
-        barcode,
-      }),
+      stock: saved != null
+        ? saved.stock
+        : resolveWarehouseStockForProduct({
+          id: seed.id,
+          productCode,
+          barcode,
+        }),
       isSample,
       sampleStock: isSample ? sampleStock : 0,
       imageUrl,
       productCode,
       barcode,
-      wholesalePrices: resolveWholesalePrices(priced.fullSalePrice, saved?.wholesalePrices),
+      wholesalePrices: withStoredPricing.wholesalePrices
+        ?? resolveWholesalePrices(withStoredPricing.fullSalePrice, saved?.wholesalePrices),
     };
   });
 }
