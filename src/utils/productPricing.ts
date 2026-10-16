@@ -119,16 +119,23 @@ export function computeDerivedPrices(partnerPrice: number, retailPrice: number) 
   };
 }
 
+export function partnerPriceFromRetail(retailPrice: number): number {
+  return round2(Math.max(0, retailPrice) / 2);
+}
+
 export function applyCatalogPricing<T extends Omit<Product, 'stock'>>(product: T, entry: PriceCatalogEntry): T {
-  const derived = computeDerivedPrices(entry.partnerPrice, entry.retailPrice);
+  const retailPrice = round2(entry.retailPrice);
+  const partnerPrice = partnerPriceFromRetail(retailPrice);
+  const couponPrice = round2(entry.couponPrice ?? partnerPrice);
+  const derived = computeDerivedPrices(partnerPrice, retailPrice);
   return {
     ...product,
     productCode: entry.code,
     barcode: irsaliyeEanForCode(entry.code) ?? entry.code,
     pv: entry.pv,
     purchasePrice: entry.purchasePrice,
-    partnerPrice: entry.partnerPrice,
-    couponPrice: entry.couponPrice,
+    partnerPrice,
+    couponPrice,
     ...derived,
   };
 }
@@ -137,16 +144,17 @@ export function derivePurchasePrice(partnerPrice: number): number {
   return Math.round(partnerPrice * 0.82 * 100) / 100;
 }
 
-/** İrsaliye / tedarik birim alış fiyatından partner (%82) ve perakende (2× partner) türetir */
+/** İrsaliye alış → perakende (2× eski partner kuralı); partner = perakendenin yarısı */
 export function entryFromPurchasePrice(
   code: string,
   name: string,
   pv: number,
   purchasePrice: number,
 ): PriceCatalogEntry {
-  const purchase = Math.round(purchasePrice * 100) / 100;
-  const partnerPrice = Math.round((purchase / 0.82) * 100) / 100;
-  const retailPrice = Math.round(partnerPrice * 2 * 100) / 100;
+  const purchase = round2(purchasePrice);
+  const partnerFromPurchase = round2(purchase / 0.82);
+  const retailPrice = round2(partnerFromPurchase * 2);
+  const partnerPrice = partnerPriceFromRetail(retailPrice);
   return {
     code,
     name,

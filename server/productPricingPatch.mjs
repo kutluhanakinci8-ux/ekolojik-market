@@ -19,6 +19,24 @@ function usesNetRetailWithVatBreakdown(settings) {
   return profile === 'pos-lite' || name.includes('lima');
 }
 
+/** Perakende sabit; partner ve kupon = perakendenin tam yarısı */
+export function applyPartnerHalfRetailPricing(product, settings) {
+  const fullSalePrice = round2(Math.max(0, product.fullSalePrice ?? 0));
+  if (fullSalePrice <= 0) {
+    return applyProductPricingPatch(
+      product,
+      { partnerPrice: 0, couponPrice: 0 },
+      settings,
+    );
+  }
+  const partnerPrice = round2(fullSalePrice / 2);
+  return applyProductPricingPatch(
+    product,
+    { partnerPrice, couponPrice: partnerPrice },
+    settings,
+  );
+}
+
 export function applyProductPricingPatch(product, patch, settings) {
   const retailNet = usesNetRetailWithVatBreakdown(settings);
   const purchasePrice = round2(Math.max(0, patch.purchasePrice ?? product.purchasePrice ?? 0));
