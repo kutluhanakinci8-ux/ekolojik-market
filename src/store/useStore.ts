@@ -1755,6 +1755,9 @@ export function usePosStoreState() {
         urun: product.name,
       });
     }
+    if (tenantAutoSaveArmedRef.current) {
+      void persistStoreNowRef.current();
+    }
   }, [authSession, logActivity, products, settings]);
 
   const setProductSampleFlag = useCallback((productId: number, isSample: boolean) => {

@@ -1,6 +1,7 @@
 import type { Customer } from '../types/business';
 import type { Product, Sale, StockMovement } from '../types/product';
 import type { SaleReturn } from '../types/saleReturn';
+import type { PaymentReminder } from '../types/paymentReminder';
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import {
   applySalesHistoryClearToSnapshot,
@@ -62,22 +63,50 @@ function mergeProductImageUrl(local: Product, chosen: Product): Product {
   return { ...chosen, imageUrl: localUrl };
 }
 
-function mergeProductsById(local: Product[], remote: Product[]): Product[] {
+function mergeProductsById(
+  local: Product[],
+  remote: Product[],
+  options?: { preferLocalCatalog?: boolean },
+): Product[] {
+  const preferLocal = options?.preferLocalCatalog ?? false;
   const map = new Map<number, Product>();
   for (const p of remote) map.set(p.id, p);
   for (const p of local) {
-    const prev = map.get(p.id);
-    if (!prev) {
+    const remoteP = map.get(p.id);
+    if (!remoteP) {
       map.set(p.id, p);
       continue;
     }
-    let chosen = prev;
-    if (p.stock !== prev.stock) {
-      chosen = p.stock < prev.stock ? p : prev;
-    }
-    map.set(p.id, mergeProductImageUrl(p, chosen));
+    const catalogBase = preferLocal ? p : remoteP;
+    const stock = p.stock !== remoteP.stock
+      ? Math.min(p.stock, remoteP.stock)
+      : catalogBase.stock;
+    map.set(p.id, mergeProductImageUrl(p, { ...catalogBase, stock }));
   }
   return [...map.values()];
+}
+
+/** Ödeme takvimi: yerel liste sunucuyu tamamen ezmesin (vergi seed / boş önbellek). */
+export function mergePaymentRemindersById(
+  local: PaymentReminder[],
+  remote: PaymentReminder[],
+): PaymentReminder[] {
+  const map = new Map<string, PaymentReminder>();
+  for (const item of remote) {
+    if (item?.id) map.set(item.id, item);
+  }
+  for (const item of local) {
+    if (!item?.id) continue;
+    const prev = map.get(item.id);
+    if (!prev || ts(item.updatedAt) >= ts(prev.updatedAt)) {
+      map.set(item.id, item);
+    }
+  }
+  return [...map.values()].sort((a, b) => {
+    const byDate = a.dueDate.localeCompare(b.dueDate);
+    if (byDate !== 0) return byDate;
+    return a.title.localeCompare(b.title, 'tr');
+  });
 }
 
 /** İki sekme / iki kasa: satışları birleştir; sunucuya yazmadan önce ve çekince kullan. */
@@ -91,6 +120,7 @@ export function mergeStoreSnapshots(
   const updatedAt = new Date(
     Math.max(ts(local.updatedAt), ts(remote.updatedAt), Date.now()),
   ).toISOString();
+  const preferLocalCatalog = ts(localClean.updatedAt) >= ts(remoteClean.updatedAt);
 
   return {
     ...remoteClean,
@@ -100,12 +130,18 @@ export function mergeStoreSnapshots(
       ...remoteClean.settings,
       ...localClean.settings,
       salesHistoryClearedAt: clearedAt ?? localClean.settings?.salesHistoryClearedAt,
+      paymentReminders: mergePaymentRemindersById(
+        localClean.settings?.paymentReminders ?? [],
+        remoteClean.settings?.paymentReminders ?? [],
+      ),
     },
     sales: mergeSalesById(localClean.sales ?? [], remoteClean.sales ?? []),
     saleReturns: mergeSaleReturnsById(localClean.saleReturns ?? [], remoteClean.saleReturns ?? []),
     stockMovements: mergeStockMovementsById(localClean.stockMovements ?? [], remoteClean.stockMovements ?? []),
     customers: mergeCustomersById(localClean.customers ?? [], remoteClean.customers ?? []),
-    products: mergeProductsById(localClean.products ?? [], remoteClean.products ?? []),
+    products: mergeProductsById(localClean.products ?? [], remoteClean.products ?? [], {
+      preferLocalCatalog,
+    }),
     productSets: remoteClean.productSets?.length ? remoteClean.productSets : localClean.productSets,
     priceType: local.priceType ?? remote.priceType,
     users: local.users?.length ? local.users : remote.users,
