@@ -9,7 +9,7 @@ import type { ProductSet, ProductSetItem } from '../types/productSet';
 import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatCurrencyTry } from '../utils/format';
 import './StockOperationsModal.css';
 
 export type StockOperationType = 'in' | 'out' | 'set' | 'clear' | 'bundle';
@@ -727,24 +727,24 @@ export function StockOperationsModal({
                       <div className="stock-ops-dialog__preview-rows">
                         <div className="stock-ops-dialog__preview-row">
                           <span>Alış</span>
-                          <strong>{formatCurrency(previewPricing.purchase)}</strong>
+                          <strong>{formatCurrencyTry(previewPricing.purchase)}</strong>
                         </div>
                         <div className="stock-ops-dialog__preview-row">
                           <span>Partner</span>
-                          <strong>{formatCurrency(previewPricing.partner)}</strong>
+                          <strong>{formatCurrencyTry(previewPricing.partner)}</strong>
                         </div>
                         <div className="stock-ops-dialog__preview-row">
                           <span>Kupon</span>
-                          <strong>{formatCurrency(previewPricing.coupon)}</strong>
+                          <strong>{formatCurrencyTry(previewPricing.coupon)}</strong>
                         </div>
                         <div className="stock-ops-dialog__preview-row stock-ops-dialog__preview-row--accent">
                           <span>Perakende</span>
-                          <strong>{formatCurrency(previewPricing.retail)}</strong>
+                          <strong>{formatCurrencyTry(previewPricing.retail)}</strong>
                         </div>
                       </div>
                       {previewStockValue != null && previewStockValue > 0 && (
                         <p className="stock-ops-dialog__preview-hint">
-                          Stok değeri (alış × yeni): {formatCurrency(previewStockValue)}
+                          Stok değeri (alış × yeni): {formatCurrencyTry(previewStockValue)}
                         </p>
                       )}
                     </div>
