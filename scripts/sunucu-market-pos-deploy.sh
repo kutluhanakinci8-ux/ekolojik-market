@@ -128,6 +128,9 @@ MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/apply-product
 echo "==> Partner fiyatı = perakende / 2 (tüm ürünler)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/apply-partner-half-retail.mjs" "${INSTALL_DIR}/data" || true
 
+echo "==> Fiş satışları ödeme düzeltmesi (kart→nakit, idempotent)..."
+MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/fix-receipt-sales-payment-cash.mjs" "${INSTALL_DIR}/data" || true
+
 echo "==> Mağaza sahibi tam yetki (kutluhan*)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/ensure-owner-admin-on-server.mjs" || true
 
