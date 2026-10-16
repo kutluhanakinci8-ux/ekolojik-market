@@ -502,7 +502,16 @@
   color: #64748b;
 }
 
-.cashier-daily-close-btn {
+.cashier-daily-close-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.cashier-daily-close-btn,
+.cashier-daily-print-btn {
   white-space: nowrap;
 }
 

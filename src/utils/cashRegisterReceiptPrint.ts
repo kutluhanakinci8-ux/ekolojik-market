@@ -5,8 +5,11 @@ import {
   type CashRegisterSummary,
 } from './cashRegister';
 import { formatBusinessDateLabel } from './cashSession';
+import { getLastLimaRawPrintError, tryLimaRawReceiptPrint } from './limaRawReceiptPrint';
 import { printHtmlReceipt } from './receiptPrint';
+import { toThermalReceiptAscii } from './thermalReceiptAscii';
 import type { CashHandover } from '../types/business';
+import { STANDARD_WINDOWS_ZYWELL_PRINTER_NAME } from '../types/receiptPrinter';
 
 export type CashRegisterReportType = 'day_close' | 'handover';
 
@@ -29,8 +32,19 @@ export interface CashRegisterReceiptData {
 export interface PrintCashRegisterReceiptResult {
   printed: boolean;
   fiscal: boolean;
+  thermal?: boolean;
   message?: string;
 }
+
+export interface PrintCashRegisterReceiptOptions {
+  /** InPOS yok (POS Lite / Zywell) — mali rapor denemesi atlanır */
+  skipFiscal?: boolean;
+  skipFiscalConfirm?: boolean;
+  /** Windows kuyruk adı — dolu ise önce ESC/POS köprüsü (127.0.0.1:18765) */
+  windowsPrinterName?: string;
+}
+
+const PLAIN_LINE_WIDTH = 48;
 
 function formatReceiptMoney(amount: number): string {
   return new Intl.NumberFormat('tr-TR', {
@@ -223,6 +237,97 @@ export function buildCashRegisterReceiptHtml(data: CashRegisterReceiptData): str
 </html>`;
 }
 
+function plainPadLine(left: string, right: string, width = PLAIN_LINE_WIDTH): string {
+  const r = right.trim();
+  const maxLeft = Math.max(1, width - r.length - 1);
+  const l = left.length > maxLeft ? `${left.slice(0, maxLeft - 1)}.` : left;
+  const spaces = Math.max(1, width - l.length - r.length);
+  return `${l}${' '.repeat(spaces)}${r}`;
+}
+
+function formatPlainReceiptMoney(amount: number): string {
+  const formatted = formatReceiptMoney(amount).replace(/\u00a0/g, ' ');
+  return formatted;
+}
+
+export function buildPlainTextCashRegisterReceipt(
+  data: CashRegisterReceiptData,
+  paperWidthMm: 58 | 80 = 80,
+): string {
+  const lineWidth = paperWidthMm === 58 ? 32 : PLAIN_LINE_WIDTH;
+  const rule = '-'.repeat(Math.min(lineWidth, PLAIN_LINE_WIDTH));
+  const title = data.reportType === 'day_close' ? 'GUN KAPANIS FISI' : 'YONETIME NAKIT DEVRI';
+  const subtitle = data.reportType === 'day_close'
+    ? 'KASA HAREKETLERI OZETI'
+    : 'KASA HAREKETLERI + DEVIR';
+
+  const chronological = [...data.rows].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+
+  const lines: string[] = [
+    data.businessName.trim(),
+    title,
+    subtitle,
+    rule,
+    `Gun: ${formatBusinessDateLabel(data.businessDateKey)}`,
+    `Yazdirma: ${formatReceiptDateTime(data.createdAt)}`,
+  ];
+  if (data.cashierName?.trim()) {
+    lines.push(`Kasiyer: ${data.cashierName.trim()}`);
+  }
+  lines.push(rule);
+  lines.push(plainPadLine('Acilis bakiyesi', formatPlainReceiptMoney(data.openingBalance), lineWidth));
+  lines.push(
+    plainPadLine(
+      'Satis/Iade/Gider/Devir',
+      `${data.summary.saleCount}/${data.summary.returnCount}/${data.summary.expenseCount}/${data.summary.handoverCount}`,
+      lineWidth,
+    ),
+  );
+  lines.push(plainPadLine('Kapanis bakiyesi', formatPlainReceiptMoney(data.closingBalance), lineWidth));
+
+  if (data.handover) {
+    lines.push(rule);
+    lines.push(plainPadLine('Devir tutari', formatPlainReceiptMoney(data.handover.amount), lineWidth));
+    lines.push(`Alici: ${data.handover.recipient}`);
+    if (data.handover.note?.trim()) lines.push(`Not: ${data.handover.note.trim()}`);
+  }
+
+  lines.push(rule);
+  lines.push('HAREKETLER');
+  if (!chronological.length) {
+    lines.push('Bu gun icin hareket yok.');
+  } else {
+    for (const row of chronological) {
+      const signed = row.signedAmount >= 0
+        ? `+${formatPlainReceiptMoney(row.signedAmount)}`
+        : formatPlainReceiptMoney(row.signedAmount);
+      const head = `${formatMovementTime(row.createdAt)} ${CASH_ACTIVITY_KIND_LABELS[row.kind]}`;
+      lines.push(plainPadLine(head, signed, lineWidth));
+      lines.push(
+        plainPadLine(
+          'Bakiye',
+          formatPlainReceiptMoney(row.runningBalance),
+          lineWidth,
+        ),
+      );
+      const desc = truncateText(`${row.label}${row.sublabel ? ` · ${row.sublabel}` : ''}`, 44);
+      lines.push(`${desc} · ${row.paymentLabel}`);
+    }
+  }
+
+  lines.push(rule);
+  lines.push(
+    data.reportType === 'day_close'
+      ? 'Gun kapanis kaydi oncesi kasa hareketleri.'
+      : 'Yonetime devir kaydi sonrasi kasa hareketleri.',
+  );
+  lines.push('Bu belge bilgi amaclidir.');
+
+  return toThermalReceiptAscii(lines.join('\n'));
+}
+
 function buildFiscalPayload(data: CashRegisterReceiptData) {
   const chronological = [...data.rows].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -245,36 +350,72 @@ function buildFiscalPayload(data: CashRegisterReceiptData) {
   };
 }
 
+async function tryThermalCashRegisterPrint(
+  data: CashRegisterReceiptData,
+  printerName: string,
+): Promise<PrintCashRegisterReceiptResult | null> {
+  const plain = buildPlainTextCashRegisterReceipt(data);
+  const rawOk = await tryLimaRawReceiptPrint(plain, printerName);
+  if (rawOk) {
+    return {
+      printed: true,
+      fiscal: false,
+      thermal: true,
+      message: 'Gün sonu fişi yazdırıldı (Zywell)',
+    };
+  }
+  const rawErr = getLastLimaRawPrintError();
+  if (rawErr && typeof window !== 'undefined') {
+    return {
+      printed: false,
+      fiscal: false,
+      thermal: false,
+      message: rawErr,
+    };
+  }
+  return null;
+}
+
 export async function printCashRegisterReceipt(
   data: CashRegisterReceiptData,
-  options?: { skipFiscalConfirm?: boolean },
+  options?: PrintCashRegisterReceiptOptions,
 ): Promise<PrintCashRegisterReceiptResult> {
   let fiscalPrinted = false;
+  const printerName =
+    options?.windowsPrinterName?.trim() || STANDARD_WINDOWS_ZYWELL_PRINTER_NAME;
 
-  try {
-    const fiscal = await printFiscalCashReport(buildFiscalPayload(data));
-    if (fiscal.success) {
-      fiscalPrinted = isRealFiscalDevicePrint(fiscal);
-      if (fiscalPrinted) {
-        return {
-          printed: true,
-          fiscal: true,
-          message: fiscal.message ?? 'Kasa fişi yazdırıldı',
-        };
+  const thermalFirst = await tryThermalCashRegisterPrint(data, printerName);
+  if (thermalFirst?.printed) return thermalFirst;
+  if (thermalFirst && !thermalFirst.printed && thermalFirst.message) {
+    return thermalFirst;
+  }
+
+  if (!options?.skipFiscal) {
+    try {
+      const fiscal = await printFiscalCashReport(buildFiscalPayload(data));
+      if (fiscal.success) {
+        fiscalPrinted = isRealFiscalDevicePrint(fiscal);
+        if (fiscalPrinted) {
+          return {
+            printed: true,
+            fiscal: true,
+            message: fiscal.message ?? 'Kasa fişi yazdırıldı',
+          };
+        }
+      } else if (!options?.skipFiscalConfirm) {
+        const proceed = confirm(
+          `Yazar kasa fişi gönderilemedi: ${fiscal.message ?? 'Bilinmeyen hata'}\nTermal kasa fişi yazdırılsın mı?`,
+        );
+        if (!proceed) {
+          return { printed: false, fiscal: false, message: fiscal.message };
+        }
       }
-    } else if (!options?.skipFiscalConfirm) {
-      const proceed = confirm(
-        `Yazar kasa fişi gönderilemedi: ${fiscal.message ?? 'Bilinmeyen hata'}\nTermal kasa fişi yazdırılsın mı?`,
-      );
-      if (!proceed) {
-        return { printed: false, fiscal: false, message: fiscal.message };
-      }
-    }
-  } catch {
-    if (!options?.skipFiscalConfirm) {
-      const proceed = confirm('Yazar kasaya bağlanılamadı.\nTermal kasa fişi yazdırılsın mı?');
-      if (!proceed) {
-        return { printed: false, fiscal: false, message: 'Yazar kasa bağlantısı yok' };
+    } catch {
+      if (!options?.skipFiscalConfirm) {
+        const proceed = confirm('Yazar kasaya bağlanılamadı.\nTermal kasa fişi yazdırılsın mı?');
+        if (!proceed) {
+          return { printed: false, fiscal: false, message: 'Yazar kasa bağlantısı yok' };
+        }
       }
     }
   }
