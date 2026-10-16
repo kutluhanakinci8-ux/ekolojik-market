@@ -67,6 +67,12 @@ export function DisplayCurrencyPanel({ store, layout = 'default' }: DisplayCurre
         })}
       </div>
 
+      {toolbarLayout && (
+        <span className="dashboard-currency-bar-hint" title="Stok ve kasa tutarları TL olarak kaydedilir">
+          Kayıt: ₺ TL
+        </span>
+      )}
+
       {!toolbarLayout && activeRate && (
         <span className="dashboard-currency-rate">{activeRate}</span>
       )}

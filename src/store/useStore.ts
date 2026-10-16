@@ -226,6 +226,10 @@ import {
 } from '../storage/crmAttachments';
 
 import { posLocalStorageKeys, syncPosLocalStorageKeys } from '../storage/posLocalStorageKeys';
+import {
+  applyDisplayCurrencyPreference,
+  saveDisplayCurrencyPreference,
+} from '../storage/displayCurrencyPreference';
 import { DEFAULT_TENANT_ID, loadTenantId, saveTenantId } from '../storage/tenantSession';
 import {
   coerceTenantCatalogProducts,
@@ -534,8 +538,8 @@ function normalizePosNotesConfig(raw?: AppSettings['posNotes']): AppSettings['po
 }
 
 function normalizeCurrencySettings(raw?: CurrencySettings): CurrencySettings {
-  if (!raw) return DEFAULT_CURRENCY_SETTINGS;
-  return {
+  if (!raw) return applyDisplayCurrencyPreference(DEFAULT_CURRENCY_SETTINGS);
+  const merged: CurrencySettings = {
     ...DEFAULT_CURRENCY_SETTINGS,
     ...raw,
     rates: {
@@ -549,6 +553,7 @@ function normalizeCurrencySettings(raw?: CurrencySettings): CurrencySettings {
     },
     rateHistory: Array.isArray(raw.rateHistory) ? raw.rateHistory : [],
   };
+  return applyDisplayCurrencyPreference(merged);
 }
 
 function loadSettings(): AppSettings {
@@ -2515,6 +2520,9 @@ export function usePosStoreState() {
   }, [authSession, logActivity, settings.currency]);
 
   const updateCurrencySettings = useCallback((patch: Partial<CurrencySettings>) => {
+    if (patch.displayCurrency) {
+      saveDisplayCurrencyPreference(patch.displayCurrency);
+    }
     setSettings((prev) => ({
       ...prev,
       currency: normalizeCurrencySettings({ ...prev.currency, ...patch }),

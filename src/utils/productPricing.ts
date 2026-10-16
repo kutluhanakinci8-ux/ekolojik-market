@@ -49,8 +49,24 @@ export interface ProductPricingInput {
 }
 
 /** Stok ekranı / giriş — alış, partner, perakende; KDV alanları otomatik */
+type ProductPricingOverlay = Pick<
+  Product,
+  | 'purchasePrice'
+  | 'partnerPrice'
+  | 'couponPrice'
+  | 'fullSalePrice'
+  | 'ourPriceWithVat'
+  | 'partnerPriceWithVat'
+  | 'ourPercent'
+  | 'pv'
+  | 'wholesalePrices'
+>;
+
 /** Greenleaf seed birleştirme — diskteki fiyatlar katalog satırını ezer */
-export function overlayStoredProductPricing(catalog: Product, stored?: Product | null): Product {
+export function overlayStoredProductPricing<T extends ProductPricingOverlay>(
+  catalog: T,
+  stored?: Product | null,
+): T {
   if (!stored) return catalog;
   return {
     ...catalog,
