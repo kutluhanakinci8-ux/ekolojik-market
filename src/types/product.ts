@@ -86,6 +86,9 @@ export interface Sale {
   loyaltyPointsEarned?: number;
   loyaltyPointsRedeemed?: number;
   campaignId?: string;
+  /** Sunucu / operasyon düzeltmesi — ödeme tipi birleştirmede korunur */
+  paymentCorrectedAt?: string;
+  paymentCorrectionNote?: string;
 }
 
 export type StockMovementType =
