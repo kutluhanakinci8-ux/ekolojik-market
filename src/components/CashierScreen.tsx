@@ -23,6 +23,8 @@ import {
   printCashRegisterReceipt,
 } from '../utils/cashRegisterReceiptPrint';
 import { formatCurrency, formatDateTime } from '../utils/format';
+import { isPosLiteProfile } from '../utils/tenantProductProfile';
+import { STANDARD_WINDOWS_ZYWELL_PRINTER_NAME } from '../types/receiptPrinter';
 import './CashierScreen.css';
 
 interface CashierScreenProps {
@@ -135,6 +137,43 @@ export function CashierScreen({ store, embedded = false }: CashierScreenProps) {
     [activity],
   );
 
+  /** Gün sonu fişi — gün kapalıyken de hareket listesi dolu kalır */
+  const receiptRowsForViewDay = useMemo(() => {
+    const opening = isViewingHistory
+      ? viewDayData.openingBalance
+      : (viewSession?.openingBalance ?? summary.openingBalance);
+    const feed = buildCashActivityFeed(
+      viewDayData.sales,
+      viewDayData.returns,
+      viewDayData.expenses,
+      viewDayData.handovers,
+      opening,
+      viewDateKey,
+      0,
+      store.settings.customExpenseCategories ?? [],
+      store.journalVouchers,
+    );
+    return attachRunningBalances(feed);
+  }, [
+    isViewingHistory,
+    viewDayData,
+    viewSession?.openingBalance,
+    summary.openingBalance,
+    viewDateKey,
+    store.settings.customExpenseCategories,
+    store.journalVouchers,
+  ]);
+
+  const posLiteCashier = isPosLiteProfile(store.settings);
+  const receiptPrinterName =
+    store.settings.receiptPrinter?.windowsPrinterName?.trim() || STANDARD_WINDOWS_ZYWELL_PRINTER_NAME;
+
+  const cashRegisterPrintOptions = () => ({
+    skipFiscal: posLiteCashier,
+    skipFiscalConfirm: posLiteCashier,
+    windowsPrinterName: receiptPrinterName,
+  });
+
   const filteredActivityRows = useMemo(() => {
     if (activityFilter === 'all') return activityRows;
     if (activityFilter === 'virman') {
@@ -244,6 +283,7 @@ export function CashierScreen({ store, embedded = false }: CashierScreenProps) {
           cashierName: store.authSession?.displayName,
           handover: result.handover,
         }),
+        cashRegisterPrintOptions(),
       );
 
       if (!printResult.printed) {
@@ -261,6 +301,44 @@ export function CashierScreen({ store, embedded = false }: CashierScreenProps) {
     setHandoverNote('');
   };
 
+  const handlePrintDayCloseReceipt = async () => {
+    if (printBusy) return;
+
+    const rows = receiptRowsForViewDay;
+    const closingBalance = rows.length > 0
+      ? [...rows].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].runningBalance
+      : summary.closingBalance;
+
+    setPrintBusy(true);
+    try {
+      const printResult = await printCashRegisterReceipt(
+        buildCashRegisterReceiptData({
+          reportType: 'day_close',
+          businessName: store.settings.businessName,
+          businessDateKey: viewDateKey,
+          openingBalance: isViewingHistory ? viewDayData.openingBalance : summary.openingBalance,
+          closingBalance: isViewingHistory
+            ? (viewSession?.closingBalance ?? closingBalance)
+            : summary.closingBalance,
+          rows,
+          summary: buildReceiptSummary(),
+          cashierName: store.authSession?.displayName,
+        }),
+        cashRegisterPrintOptions(),
+      );
+
+      if (!printResult.printed) {
+        showToast(printResult.message ?? 'Gün sonu fişi yazdırılamadı');
+      } else {
+        showToast(printResult.message ?? 'Gün sonu fişi yazdırıldı');
+      }
+    } catch {
+      showToast('Gün sonu fişi yazdırılamadı');
+    } finally {
+      setPrintBusy(false);
+    }
+  };
+
   const handleCloseDay = async () => {
     if (printBusy) return;
 
@@ -273,10 +351,11 @@ export function CashierScreen({ store, embedded = false }: CashierScreenProps) {
           businessDateKey: activeDateKey,
           openingBalance: summary.openingBalance,
           closingBalance: summary.closingBalance,
-          rows: activityRows,
+          rows: receiptRowsForViewDay,
           summary: buildReceiptSummary(),
           cashierName: store.authSession?.displayName,
         }),
+        cashRegisterPrintOptions(),
       );
 
       if (!printResult.printed) {
@@ -646,14 +725,25 @@ export function CashierScreen({ store, embedded = false }: CashierScreenProps) {
                 ? ` Gün kapatıldı — ertesi gün açılış ${formatCurrency(previousClosedSession?.closingBalance ?? summary.closingBalance)}`
                 : ` Mevcut kapanış: ${formatCurrency(summary.closingBalance)}`}
             </p>
-            <button
-              type="button"
-              className="btn btn-ghost cashier-daily-close-btn"
-              onClick={handleCloseDay}
-              disabled={isDayClosed || printBusy}
-            >
-              {printBusy ? '⏳ Fiş...' : isDayClosed ? '✓ Gün Kapatıldı' : 'Günü Kapat ve Devret'}
-            </button>
+            <div className="cashier-daily-close-actions">
+              <button
+                type="button"
+                className="btn btn-outline cashier-daily-print-btn"
+                onClick={handlePrintDayCloseReceipt}
+                disabled={printBusy}
+                title="Zywell termal — günü kapatmadan gün sonu özet fişi"
+              >
+                {printBusy ? '⏳ Fiş...' : 'Gün sonu fişi (Zywell)'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost cashier-daily-close-btn"
+                onClick={handleCloseDay}
+                disabled={isDayClosed || printBusy}
+              >
+                {printBusy ? '⏳ Fiş...' : isDayClosed ? '✓ Gün Kapatıldı' : 'Günü Kapat ve Devret'}
+              </button>
+            </div>
           </div>
         )}
 
