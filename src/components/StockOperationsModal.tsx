@@ -9,7 +9,7 @@ import type { ProductSet, ProductSetItem } from '../types/productSet';
 import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
-import { formatCurrency, formatCurrencyTry } from '../utils/format';
+import { formatCurrencyTry } from '../utils/format';
 import './StockOperationsModal.css';
 
 export type StockOperationType = 'in' | 'out' | 'set' | 'clear' | 'bundle';
