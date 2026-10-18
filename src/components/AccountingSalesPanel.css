@@ -110,6 +110,10 @@
 
 .accounting-sales-modal {
   width: min(520px, 100%);
+}
+
+.accounting-sales-modal--wide {
+  width: min(920px, 100%);
   max-height: 90vh;
   overflow: auto;
   background: #fff;
@@ -157,6 +161,94 @@
 
 .accounting-sales-form-note {
   grid-column: 1 / -1;
+}
+
+.accounting-sales-field-hint {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.accounting-sales-lines {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #dbe7d8;
+}
+
+.accounting-sales-lines-head h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.accounting-sales-lines-table-wrap {
+  overflow-x: auto;
+}
+
+.accounting-sales-lines-table {
+  font-size: 0.8rem;
+}
+
+.accounting-sales-lines-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.accounting-sales-line-name select {
+  width: 100%;
+  min-width: 200px;
+  font-size: 0.78rem;
+}
+
+.accounting-sales-line-input {
+  width: 4.5rem;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+  border: 1px solid #dbe7d8;
+  text-align: right;
+}
+
+.accounting-sales-barcode {
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem;
+}
+
+.accounting-sales-line-actions {
+  text-align: right;
+}
+
+.accounting-sales-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.accounting-sales-add-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.accounting-sales-add-row select,
+.accounting-sales-add-row input {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid #dbe7d8;
+  min-width: 200px;
+}
+
+.accounting-sales-barcode-add input {
+  min-width: 160px;
+}
+
+.accounting-sales-set-hint {
+  margin: 0.5rem 0 0;
 }
 
 .accounting-sales-modal-foot {

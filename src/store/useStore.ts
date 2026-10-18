@@ -29,7 +29,11 @@ import {
   type StoreSnapshotFetchError,
 } from '../services/storeApi';
 import { mergeSalesById } from '../utils/mergeStoreSnapshots';
-import { applyCompletedSalePatch, type CompletedSalePatch } from './saleAdmin';
+import {
+  applyCompletedSalePatch,
+  type CompletedSalePatch,
+  validateCompletedSalePatch,
+} from './saleAdmin';
 import { localSnapshotHasStaleSales } from '../utils/salesHistoryClear';
 import {
   mergeServerAuthoritativeSnapshot,
@@ -5023,12 +5027,8 @@ export function usePosStoreState() {
   ): { ok: true } | { ok: false; error: string } => {
     const sale = sales.find((entry) => entry.id === saleId);
     if (!sale) return { ok: false, error: 'Satış bulunamadı' };
-    if (sale.paymentMethod === 'split' && !patch.paymentMethod) {
-      return { ok: false, error: 'Bölünmüş ödeme satışı buradan düzenlenemez' };
-    }
-    if (patch.total != null && (Number.isNaN(patch.total) || patch.total <= 0)) {
-      return { ok: false, error: 'Geçerli tutar girin' };
-    }
+    const validationError = validateCompletedSalePatch(sale, patch);
+    if (validationError) return { ok: false, error: validationError };
     const updated = applyCompletedSalePatch(sale, patch);
     setSales((prev) => prev.map((entry) => (entry.id === saleId ? updated : entry)));
     if (authSession) {
