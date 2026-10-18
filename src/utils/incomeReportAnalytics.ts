@@ -10,11 +10,18 @@ import {
   filterSalesByPeriod,
   formatReportDateLabel,
   getCategoryRevenue,
-  getPaymentBreakdown,
   type ReportPeriod,
 } from './analytics';
 import { formatCurrency } from './format';
-import { filterReturnsByPeriod, getSaleNetTotal } from './saleReturn';
+import { getBusinessDateKeyFromIso } from './businessDate';
+import { filterReturnsByPeriod, getSaleRefundedTotal } from './saleReturn';
+import {
+  DEFAULT_VAT_RATE,
+  getPaymentBreakdownNet,
+  roundMoney,
+  splitGrossAmount,
+  sumGrossCollections,
+} from './vatAnalytics';
 
 export interface IncomeChartRow {
   key: string;
@@ -35,6 +42,8 @@ export interface IncomeReportDashboard {
   saleCount: number;
   returnCount: number;
   returnsGrossTotal: number;
+  /** KDV dahil tahsilat (fiş tutarları, iade düşülmüş) */
+  collectionsGross: number;
   netMarginPercent: number;
   structureChart: IncomeChartRow[];
   paymentChart: IncomeChartRow[];
@@ -48,10 +57,6 @@ const PAYMENT_LABELS: Record<'cash' | 'card' | 'transfer' | 'credit', string> = 
   transfer: 'Havale',
   credit: 'Veresiye',
 };
-
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 function toChartRows(
   rows: Array<{ key: string; label: string; value: number }>,
@@ -80,7 +85,7 @@ function buildStructureChart(profitLoss: ProfitLossReport): IncomeChartRow[] {
 }
 
 function buildPaymentChart(sales: Sale[], saleReturns: SaleReturn[]): IncomeChartRow[] {
-  const breakdown = getPaymentBreakdown(sales, saleReturns);
+  const breakdown = getPaymentBreakdownNet(sales, saleReturns);
   return toChartRows(
     (Object.keys(breakdown) as Array<keyof typeof breakdown>).map((key) => ({
       key,
@@ -101,6 +106,21 @@ function buildCategoryChart(sales: Sale[], products: Product[]): IncomeChartRow[
   );
 }
 
+function resolveSaleBusinessDateKey(sale: Sale): string {
+  return sale.businessDate?.trim() || getBusinessDateKeyFromIso(sale.createdAt);
+}
+
+function getSaleNetRevenueAmount(
+  sale: Sale,
+  saleReturns: SaleReturn[],
+  vatRate = DEFAULT_VAT_RATE,
+): number {
+  const saleNet = sale.total <= 0 ? 0 : splitGrossAmount(sale.total, vatRate).netAmount;
+  const refundedGross = getSaleRefundedTotal(sale.id, saleReturns);
+  const refundNet = refundedGross <= 0 ? 0 : splitGrossAmount(refundedGross, vatRate).netAmount;
+  return Math.max(0, roundMoney(saleNet - refundNet));
+}
+
 function buildDailyTrend(
   sales: Sale[],
   saleReturns: SaleReturn[],
@@ -110,8 +130,8 @@ function buildDailyTrend(
   const byDay = new Map<string, number>();
 
   for (const sale of filtered) {
-    const day = sale.createdAt.slice(0, 10);
-    const net = getSaleNetTotal(sale, saleReturns);
+    const day = resolveSaleBusinessDateKey(sale);
+    const net = getSaleNetRevenueAmount(sale, saleReturns);
     if (net <= 0) continue;
     byDay.set(day, (byDay.get(day) ?? 0) + net);
   }
@@ -147,6 +167,7 @@ export function buildIncomeReportDashboard(
   const returnsGrossTotal = roundMoney(
     filteredReturns.reduce((sum, row) => sum + row.refundTotal, 0),
   );
+  const collectionsGross = sumGrossCollections(filteredSales, filteredReturns);
 
   const netMarginPercent = profitLoss.netRevenue > 0
     ? (profitLoss.netProfit / profitLoss.netRevenue) * 100
@@ -157,6 +178,7 @@ export function buildIncomeReportDashboard(
     saleCount: filteredSales.length,
     returnCount: filteredReturns.length,
     returnsGrossTotal,
+    collectionsGross,
     netMarginPercent,
     structureChart: buildStructureChart(profitLoss),
     paymentChart: buildPaymentChart(filteredSales, filteredReturns),
