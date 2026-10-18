@@ -1,0 +1,15 @@
+{
+  "name": "market-pos-inpos-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "InPOS M530 GMP-3 köprüsü — Windows kasa PC'de çalışır",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

@@ -1,0 +1,5004 @@
+import { createServer } from 'node:http';
+import { loadMarketPosEnv } from './server/loadEnv.mjs';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
+import { join, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { fetchAsatDebt, probeAsatConnectivity } from './server/asatClient.mjs';
+import { createFaturaSession, queryFaturaDebt } from './server/faturaOdemelisinClient.mjs';
+import { prepareOdemeSession, queryOdemeDebt } from './server/odemeComTrClient.mjs';
+import { pollBillEmails, testBillEmailConnection, listBillEmailInbox } from './server/billEmailClient.mjs';
+import {
+  readTenantStore,
+  writeTenantStore,
+  registerTenant,
+  saveContactMessage,
+  listContactMessages,
+} from './server/tenantAuth.mjs';
+import {
+  normalizeTenantId,
+  assertTenantResolvable,
+  isPublicTenantRegistrationEnabled,
+} from './server/tenantAllowlist.mjs';
+import { checkRateLimit } from './server/rateLimit.mjs';
+import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
+import { supportInboxStatus } from './server/platformSupportMailConfig.mjs';
+import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
+import { sendCrmEmail, sendCrmSmsOutreach, isCrmSmsConfigured } from './server/crmOutreach.mjs';
+import {
+  getEkolojikMailConfig,
+  getEkolojikOpsEmail,
+  getEkolojikSmtpHostHint,
+  getEkolojikImapConfig,
+  isEkolojikSmtpConfigured,
+  isEkolojikImapConfigured,
+} from './server/ekolojikMailConfig.mjs';
+import { verifyEkolojikSmtp } from './server/ekolojikSmtp.mjs';
+import { verifyImapMailbox } from './server/billEmailImap.mjs';
+import {
+  getOutboxCounts,
+  listRecentOutbox,
+  listMergedRecentOutbox,
+  requeueFailedOutboxMessage,
+  findOutboxMessageById,
+  listFailedOutboxMessages,
+  bulkRequeueFailedOutbox,
+  archiveFailedOutboxMessages,
+} from './server/emailOutbox.mjs';
+import { maybeAlertOutboxFailedThreshold } from './server/postaOutboxNotify.mjs';
+import {
+  createDeliverMessage,
+  processPendingOutbox,
+  sendEkolojikMail,
+} from './server/emailOutboxProcessor.mjs';
+import {
+  getPostaMailSettings,
+  savePostaMailSettings,
+  getEffectiveMailPresentation,
+  getPostaNotificationsMatrixHub,
+} from './server/postaSettings.mjs';
+import {
+  ensurePostaOnboarding,
+  getPostaOnboardingHub,
+  patchPostaOnboardingState,
+  completePostaOnboarding,
+  migrateLegacyPostaOnboarding,
+  reopenPostaOnboardingState,
+  verifyPostaOnboardingMailConnection,
+} from './server/postaOnboarding.mjs';
+import {
+  assertPosAdminApiAuth,
+  assertPosApiAuth,
+  extractBearerToken,
+  issuePosApiTokenFromCredentials,
+  refreshPosApiTokenFromBearer,
+} from './server/posApiAuth.mjs';
+import {
+  enforcePostaApiAccess,
+  requiresMessagingPosAuth,
+  requiresPostaPosAuth,
+} from './server/postaAccessAuth.mjs';
+import { logPostaAccessExport } from './server/postaAccessAudit.mjs';
+import { mergeStoreUserSecrets, sanitizeStoreSnapshotForClient } from './server/storeApiSanitize.mjs';
+// credentialVault — writeStoreData içinde dinamik import
+import {
+  buildOutboxCsv,
+  buildContactCsv,
+  buildMessagingExportZip,
+} from './server/postaExport.mjs';
+import {
+  isLertaPlatformConfigured,
+  listMessagingThreads as listLertaMessagingThreads,
+  sendMessagingMessage as sendLertaMessagingMessage,
+} from './server/lertaPlatformBridge.mjs';
+import {
+  listMessagingThreads,
+  getMessagingThread,
+  createMessagingThread,
+  listMessagingMessages,
+  appendMessagingMessage,
+  markMessagingThreadStaffRead,
+  markMessagingMessagesRead,
+  markMessagingThreadCustomerRead,
+  patchMessagingThread,
+  searchMessagingInThread,
+} from './server/messaging/store.mjs';
+import {
+  getMessagingRealtimeCapabilities,
+  getMessagingTyping,
+  setMessagingTyping,
+} from './server/messaging/realtime.mjs';
+import {
+  assertMessagingPublicAuth,
+  getMessagingPublicCapabilities,
+  parseCustomerThreadToken,
+  publicCreateThread,
+  publicListMessages,
+  publicPostMessage,
+  publicTyping,
+  smokeTestMessagingWidget,
+} from './server/messaging/publicApi.mjs';
+import { writeMessagingCorsHeaders } from './server/messaging/publicCors.mjs';
+import {
+  getMessagingPublicConfigHub,
+  saveMessagingPublicConfig,
+} from './server/messaging/publicConfig.mjs';
+import {
+  getTenantMailConfigHub,
+  getTenantImapConfig,
+  getTenantSmtpMailConfig,
+  isTenantImapConfigured,
+  isTenantSmtpConfigured,
+  saveTenantMailConfig,
+} from './server/tenantMailConfig.mjs';
+import {
+  getPostaJmapLiteSession,
+  getPostaJmapLiteEmails,
+  listPostaJmapLiteMailboxes,
+  queryPostaJmapLiteMailbox,
+  setPostaJmapLiteEmails,
+} from './server/postaJmapLite.mjs';
+import { readPostaDelegates, savePostaDelegates } from './server/postaDelegation.mjs';
+import {
+  buildComplianceArchiveExport,
+  setLegalHold,
+} from './server/postaCompliance.mjs';
+import {
+  listPostaMarketingCampaigns,
+  runPostaMarketingCampaign,
+  upsertPostaMarketingCampaign,
+} from './server/postaMarketing.mjs';
+import { buildPostaEnterpriseCapabilities } from './server/postaEnterpriseCapabilities.mjs';
+import {
+  deletePostaCalDavLiteEvent,
+  getPostaCalDavLiteEvent,
+  getPostaCalDavLitePrincipal,
+  listPostaCalDavLiteEvents,
+  upsertPostaCalDavLiteEvent,
+} from './server/postaCalDavLite.mjs';
+import { getPostaCardDavLitePrincipal } from './server/postaCardDavLite.mjs';
+import {
+  assertPostaPublicMailAuth,
+  getPostaPublicMailCapabilities,
+  sendPostaPublicMail,
+} from './server/postaPublicMail.mjs';
+import { attachPostaWebSocketGateway, getPostaWsGatewayMetrics } from './server/postaWsGateway.mjs';
+import { notifyOnMessagingMessage } from './server/messaging/notify.mjs';
+import {
+  getMessagingChannelsHub,
+  saveMessagingChannelsHub,
+} from './server/messaging/channelConfig.mjs';
+import { getMessagingBotHub, saveMessagingBotHub } from './server/messaging/botConfig.mjs';
+import { getMessagingSlaMetrics } from './server/messaging/sla.mjs';
+import {
+  getPortalSession,
+  linkContactFormToMessagingThread,
+  lookupPortalSessionByContact,
+  notifyCustomerThreadStatusEmail,
+  resolvePublicPortalOrigin,
+} from './server/messaging/customerPortal.mjs';
+import { handleChannelWebhook } from './server/integrations/channelWebhook.mjs';
+import { getEkolojikIsolationReport } from './server/ekolojikIsolationCheck.mjs';
+import { readMessagingAttachment } from './server/messaging/attachments.mjs';
+import {
+  runEkolojikDataRetention,
+  getRetentionPolicySummary,
+} from './server/dataRetention.mjs';
+import {
+  archivePostaInboxItem,
+  getPostaUnreadCounts,
+  listUnifiedPostaInbox,
+  markPostaInboxRead,
+  syncPostaInboxFromImap,
+  getComposeRecipientHints,
+  loadPostaInboxAttachment,
+  applyPostaInboxFlags,
+  listUnifiedPostaSent,
+} from './server/postaInbox.mjs';
+import {
+  deletePostaComposeDraft,
+  listPostaComposeDrafts,
+  upsertPostaComposeDraft,
+} from './server/postaComposeDrafts.mjs';
+import { listMailTemplates } from './server/mailTemplates.mjs';
+import { formatPostaComposeBody } from './server/postaComposeFormat.mjs';
+import {
+  getPostaComposeRteCapabilities,
+  sanitizePostaComposeHtml,
+  stripHtmlToPlainText,
+} from './server/postaComposeRte.mjs';
+import { validateOutboundAttachments } from './server/postaComposeActions.mjs';
+import {
+  listPostaContacts,
+  upsertPostaContact,
+  deletePostaContact,
+  contactsToVcard,
+  parseVcardImport,
+  parseCsvContactsImport,
+  importPostaContacts,
+} from './server/postaContacts.mjs';
+import {
+  listPostaCalendar,
+  upsertPostaCalendarEvent,
+  deletePostaCalendarEvent,
+  createCalendarEventFromMail,
+  syncPaymentRemindersSnapshot,
+} from './server/postaCalendar.mjs';
+import {
+  buildPostaCalendarIcsFeed,
+  getPostaCalendarSyncHub,
+  resolvePostaPublicBaseUrl,
+  rotatePostaCalendarFeedToken,
+  validatePostaCalendarFeedToken,
+} from './server/postaCalendarSync.mjs';
+import { getPostaStorageSummary } from './server/postaStorage.mjs';
+import { batchPostaInboxAction, markAllPostaInboxReadInFolder } from './server/postaInboxBatch.mjs';
+import {
+  getPostaRulesCapabilities,
+  listPostaRules,
+  mergePostaOnboardingAliasRules,
+  savePostaRules,
+} from './server/postaRules.mjs';
+import { getPostaOutboxAnalytics } from './server/postaOutboxAnalytics.mjs';
+import { getPostaDeliverabilityHub, seedTenantPostaAliases } from './server/postaDeliverability.mjs';
+import { suggestPostaCompose, isPostaAiEnabled } from './server/postaAiCompose.mjs';
+import { recordMailOpen, mailTrackPixelResponse } from './server/postaMailTrack.mjs';
+import {
+  buildPostaEngagementCsv,
+  getPostaEngagementSummary,
+  recordMailClick,
+} from './server/postaEngagement.mjs';
+import {
+  getPostaPushConfig,
+  listPostaPushSubscriptionCount,
+  removePostaPushSubscription,
+  savePostaPushSubscription,
+  sendPostaWebPush,
+} from './server/postaWebPush.mjs';
+import {
+  attachPostaSseStream,
+  broadcastPostaSseEvent,
+  getPostaLiveCapabilities,
+  getPostaLiveMetrics,
+  notifyPostaLiveInbox,
+} from './server/postaLive.mjs';
+let handleAsatProxy = null;
+let ASAT_PROXY_PREFIX = '/asat-proxy';
+try {
+  const asatProxy = await import('./server/asatProxy.mjs');
+  handleAsatProxy = asatProxy.handleAsatProxy;
+  ASAT_PROXY_PREFIX = asatProxy.ASAT_PROXY_PREFIX;
+} catch (error) {
+  console.warn('ASAT proxy modülü yüklenemedi:', error instanceof Error ? error.message : error);
+}
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+/** Ham fiş köprüsü script yolu (kurulum / deploy) */
+function resolveReceiptBridgeRepoRoot() {
+  if (existsSync(join(__dirname, 'scripts', 'lima-raw-print-bridge.mjs'))) {
+    return __dirname;
+  }
+  const fromEnv = process.env.RECEIPT_BRIDGE_REPO_ROOT?.trim();
+  if (fromEnv && existsSync(join(fromEnv, 'scripts', 'lima-raw-print-bridge.mjs'))) {
+    return fromEnv;
+  }
+  const sibling = join(__dirname, '..', 'ekolojik-market-pos');
+  if (existsSync(join(sibling, 'scripts', 'lima-raw-print-bridge.mjs'))) {
+    return sibling;
+  }
+  return __dirname;
+}
+const envBootstrap = loadMarketPosEnv(__dirname);
+if (envBootstrap.loaded) {
+  console.log(`Ekolojik env: ${envBootstrap.count} değişken yüklendi (${envBootstrap.path})`);
+}
+const DIST = join(__dirname, 'dist');
+const DATA_DIR = process.env.MARKET_POS_DATA_DIR?.trim()
+  ? join(process.env.MARKET_POS_DATA_DIR.trim())
+  : join(__dirname, 'data');
+const deliverMessage = createDeliverMessage(DATA_DIR);
+const PORT = Number(process.env.PORT || 5180);
+const HOST = process.env.HOST || '0.0.0.0';
+
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
+
+async function serveFile(path, res) {
+  const data = await readFile(path);
+  const ext = extname(path);
+  const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+  if (path.endsWith('.user.js')) {
+    headers['Content-Type'] = 'application/x-javascript; charset=utf-8';
+    headers['Content-Disposition'] = 'inline; filename="market-pos-fatura-kopru.user.js"';
+  }
+  if (
+    ext === '.html' ||
+    ext === '.js' ||
+    ext === '.css' ||
+    ext === '.json' ||
+    path.endsWith('app-release.json')
+  ) {
+    headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    headers.Pragma = 'no-cache';
+    headers.Expires = '0';
+  }
+  res.writeHead(200, headers);
+  res.end(data);
+}
+
+function resolveTenantId(url) {
+  return normalizeTenantId(url.searchParams.get('tenant'));
+}
+
+async function ensureTenantOrRespond(res, tenantId) {
+  const check = await assertTenantResolvable(DATA_DIR, tenantId);
+  if (!check.ok) {
+    res.writeHead(check.status ?? 404, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: check.error }));
+    return null;
+  }
+  return check.tenantId;
+}
+
+async function publicMessagingCorsGuard(req, res, tenantId) {
+  const cors = await writeMessagingCorsHeaders(req, res, DATA_DIR, tenantId);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(cors.ok ? 204 : cors.status ?? 403);
+    res.end();
+    return false;
+  }
+  if (!cors.ok && req.headers.origin) {
+    res.writeHead(cors.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: cors.error }));
+    return false;
+  }
+  return true;
+}
+
+async function readStoreData(tenantId = 'main') {
+  let data = await readTenantStore(DATA_DIR, tenantId);
+  if (!data) return null;
+
+  let persist = false;
+
+  const { shouldSkipIrsaliyeStockMigration } = await import('./server/tenantStoreGuard.mjs');
+  if (data?.products?.length && !shouldSkipIrsaliyeStockMigration(tenantId, data)) {
+    const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
+    data = snapshot;
+    if (stockChanged) persist = true;
+  }
+
+  const { elevateOwnerAdminsInStore } = await import('./server/ownerAdminElevate.mjs');
+  const elevated = elevateOwnerAdminsInStore(data);
+  if (elevated.changed) {
+    data = elevated.store;
+    persist = true;
+  }
+
+  if (persist) {
+    await writeStoreData(data, tenantId);
+  }
+  return data;
+}
+
+/** Legacy posta onboarding — yalnızca ilk onboarding GET veya deploy script. */
+async function maybeMigrateLegacyPostaOnboardingStore(tenantId) {
+  let store = await readStoreData(tenantId);
+  if (!store || store.settings?.postaOnboardingLegacyMigratedAt) {
+    return store;
+  }
+  const { store: migrated, changed } = migrateLegacyPostaOnboarding(store);
+  if (changed) {
+    await writeStoreData(migrated, tenantId);
+    return migrated;
+  }
+  return store;
+}
+
+async function writeStoreData(data, tenantId = 'main') {
+  await mkdir(DATA_DIR, { recursive: true });
+  const {
+    readCredentialVault,
+    mergeUsersIntoVault,
+    applyVaultToStoreSnapshot,
+    writeCredentialVault,
+  } = await import('./server/credentialVault.mjs');
+  let vault = await readCredentialVault(DATA_DIR, tenantId);
+  vault = mergeUsersIntoVault(vault, data?.users);
+  const toWrite = applyVaultToStoreSnapshot(data, vault);
+  await writeTenantStore(DATA_DIR, tenantId, toWrite);
+  await writeCredentialVault(DATA_DIR, tenantId, vault);
+  data = toWrite;
+  try {
+    const { archiveTenantStoreAfterWrite } = await import('./server/tenantStoreAutoBackup.mjs');
+    await archiveTenantStoreAfterWrite(DATA_DIR, tenantId, data);
+  } catch (error) {
+    console.warn('tenant auto-backup:', error instanceof Error ? error.message : error);
+  }
+}
+
+async function readRequestBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? JSON.parse(raw) : null;
+}
+
+const TCMB_URL = 'https://www.tcmb.gov.tr/kurlar/today.xml';
+
+function parseTcmbXml(xml) {
+  const rates = [];
+  const blocks = xml.match(/<Currency[\s\S]*?<\/Currency>/g) ?? [];
+  for (const block of blocks) {
+    const code = block.match(/Kod="([^"]+)"/)?.[1] ?? block.match(/CurrencyCode="([^"]+)"/)?.[1];
+    if (!code) continue;
+    const unit = Number(block.match(/<Unit>([^<]*)<\/Unit>/)?.[1] ?? '1');
+    const name = block.match(/<Isim>([^<]*)<\/Isim>/)?.[1] ?? code;
+    const buyRate = Number(block.match(/<ForexBuying>([^<]*)<\/ForexBuying>/)?.[1] ?? '0');
+    const sellRate = Number(block.match(/<ForexSelling>([^<]*)<\/ForexSelling>/)?.[1] ?? '0');
+    if (buyRate <= 0 && sellRate <= 0) continue;
+    rates.push({
+      code,
+      unit: unit > 0 ? unit : 1,
+      name,
+      buyRate: buyRate > 0 ? buyRate : sellRate,
+      sellRate: sellRate > 0 ? sellRate : buyRate,
+    });
+  }
+  const bulletinDate = xml.match(/Tarih="([^"]+)"/)?.[1];
+  return { bulletinDate, rates };
+}
+
+async function fetchTcmbRates() {
+  const response = await fetch(TCMB_URL, {
+    headers: { Accept: 'application/xml,text/xml' },
+  });
+  if (!response.ok) {
+    throw new Error(`TCMB HTTP ${response.status}`);
+  }
+  const xml = await response.text();
+  const parsed = parseTcmbXml(xml);
+  return {
+    fetchedAt: new Date().toISOString(),
+    bulletinDate: parsed.bulletinDate,
+    rates: parsed.rates,
+  };
+}
+
+function getRequestIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const first = String(forwarded).split(',')[0].trim();
+    if (first) return first;
+  }
+  const realIp = req.headers['x-real-ip'];
+  if (realIp) return String(realIp).trim();
+  let ip = req.socket?.remoteAddress || '';
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  return ip || 'unknown';
+}
+
+let postaWsBroadcast = (_tenantId, _event, _data) => {};
+
+function notifyMessagingRealtime(tenantId, signal, extra = {}) {
+  broadcastPostaSseEvent(tenantId, 'messaging', { signal, ...extra });
+  postaWsBroadcast(tenantId, 'messaging', { signal, ...extra });
+}
+
+const CANONICAL_WWW_HOST = 'www.ekolojikmarket.com.tr';
+const APEX_HOST = 'ekolojikmarket.com.tr';
+
+function maybeRedirectApexToWww(req, res, url) {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  if (host !== APEX_HOST) return false;
+  const target = `https://${CANONICAL_WWW_HOST}${url.pathname}${url.search}`;
+  res.writeHead(301, { Location: target, 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('Moved Permanently');
+  return true;
+}
+
+const server = createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url || '/', `http://${req.headers.host}`);
+    if (maybeRedirectApexToWww(req, res, url)) return;
+    let pathname = decodeURIComponent(url.pathname);
+
+    if (pathname === '/api/exchange-rates/tcmb' && req.method === 'GET') {
+      try {
+        const data = await fetchTcmbRates();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'TCMB kurları alınamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/utility-bills/odeme/prepare' && req.method === 'GET') {
+      try {
+        const data = await prepareOdemeSession();
+        res.writeHead(data.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'odeme.com.tr oturumu başlatılamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/utility-bills/odeme/query' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      const sessionId = data?.sessionId;
+      const contractNumber = data?.contractNumber ?? data?.contract ?? data?.aboneNo;
+      const turnstileToken = data?.turnstileToken ?? data?.turnstile;
+      if (!sessionId || !contractNumber) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, message: 'Oturum ve abone numarası gerekli' }));
+        return;
+      }
+      try {
+        const result = await queryOdemeDebt(sessionId, contractNumber, turnstileToken);
+        res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          contractNumber,
+          message: error instanceof Error ? error.message : 'odeme.com.tr sorgusu başarısız',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/utility-bills/fatura/session' && req.method === 'GET') {
+      try {
+        const data = await createFaturaSession();
+        res.writeHead(data.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Fatura oturumu başlatılamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/utility-bills/fatura/query' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      const sessionId = data?.sessionId;
+      const contractNumber = data?.contractNumber ?? data?.contract;
+      const captchaCode = data?.captchaCode ?? data?.captcha;
+      if (!sessionId || !contractNumber) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, message: 'Oturum ve sözleşme numarası gerekli' }));
+        return;
+      }
+      try {
+        const result = await queryFaturaDebt(sessionId, contractNumber, captchaCode);
+        res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          contractNumber,
+          message: error instanceof Error ? error.message : 'Fatura sorgusu başarısız',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/utility-bills/asat/diagnostics' && req.method === 'GET') {
+      try {
+        const data = await probeAsatConnectivity();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          reason: 'NETWORK_UNREACHABLE',
+          summary: error instanceof Error ? error.message : 'Tanılama başarısız',
+          recommendation: 'Manuel Gir kullanın.',
+          checks: [],
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/utility-bills/asat' && req.method === 'GET') {
+      const contract = (
+        url.searchParams.get('contract')
+        ?? url.searchParams.get('subscriber')
+      )?.trim();
+      if (!contract) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, message: 'Sözleşme numarası gerekli' }));
+        return;
+      }
+      try {
+        const data = await fetchAsatDebt(contract);
+        res.writeHead(data.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          contractNumber: contract,
+          subscriberNumber: contract,
+          message: error instanceof Error ? error.message : 'ASAT sorgusu başarısız',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/bill-email/test' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await testBillEmailConnection(data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'E-posta bağlantı testi başarısız',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/bill-email/poll' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await pollBillEmails(DATA_DIR, data ?? {}, resolvedTenant);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'E-posta taraması başarısız',
+          processed: 0,
+          items: [],
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/bill-email/inbox' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const limit = Number(url.searchParams.get('limit') || 50);
+      const sourceId = url.searchParams.get('sourceId')?.trim() || undefined;
+      try {
+        const result = await listBillEmailInbox(DATA_DIR, resolvedTenant, { limit, sourceId });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Inbox listesi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/system/ekolojik-isolation' && req.method === 'GET') {
+      try {
+        const report = await getEkolojikIsolationReport(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...report }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Rapor alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/client-ip' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ip: getRequestIp(req) }));
+      return;
+    }
+
+    if (pathname === '/api/auth/register' && req.method === 'POST') {
+      if (!isPublicTenantRegistrationEnabled()) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: 'Herkese açık kayıt kapalı. Destek ile iletişime geçin.',
+        }));
+        return;
+      }
+      const ip = getRequestIp(req);
+      const rl = checkRateLimit(`register:${ip}`, { limit: 8, windowMs: 60 * 60 * 1000 });
+      if (!rl.ok) {
+        res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.',
+        }));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const result = await registerTenant(DATA_DIR, data ?? {});
+        res.writeHead(result.ok ? 201 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Kayıt başarısız',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/platform-token' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      try {
+        const { issuePlatformApiTokenFromCredentials } = await import('./server/platformAuth.mjs');
+        const result = await issuePlatformApiTokenFromCredentials(DATA_DIR, {
+          username: data?.username,
+          password: data?.password,
+        });
+        res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Platform token alınamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/tenants' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { listPlatformTenants } = await import('./server/platformApi.mjs');
+        const tenants = await listPlatformTenants(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, tenants }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/alerts' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { listPlatformAlerts } = await import('./server/platformApi.mjs');
+        const payload = await listPlatformAlerts(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Uyarılar alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/users' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformUserOperations } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformUserOperations(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kullanıcı verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSecurityOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSecurityOverview(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Güvenlik verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformSecurityExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformSecurityExportCsv(DATA_DIR, daysParam);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/policy' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { readSecurityAlertPolicy } = await import('./server/platformSecurityPolicy.mjs');
+          const policy = await readSecurityAlertPolicy(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, policy }));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { updatePlatformSecurityAlertPolicy } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSecurityAlertPolicy(DATA_DIR, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Politika kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/notify-check' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { platformSecurityNotifyCheck } = await import('./server/platformApi.mjs');
+        const result = await platformSecurityNotifyCheck(DATA_DIR, { force: body.force === true });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...result }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bildirim kontrolü başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/revoke-platform-sessions' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { platformRevokeAllSessions } = await import('./server/platformApi.mjs');
+        const result = await platformRevokeAllSessions(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Oturum sonlandırılamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/security/revoke-user' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const tenantId = String(body.tenantId ?? '').trim();
+        const userId = String(body.userId ?? '').trim();
+        if (!tenantId || !userId) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'tenantId ve userId gerekli' }));
+          return;
+        }
+        const { platformRevokeTenantUserSession } = await import('./server/platformApi.mjs');
+        const result = await platformRevokeTenantUserSession(DATA_DIR, tenantId, userId);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kullanıcı oturumu sonlandırılamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/audit' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformAuditOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformAuditOverview(DATA_DIR, { days: daysParam || 30 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Denetim verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/audit/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformAuditExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformAuditExportCsv(DATA_DIR, daysParam || 90);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/billing' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformBillingOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformBillingOverview(DATA_DIR, { days: daysParam || 30 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Gelir verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/billing/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformBillingExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformBillingExportCsv(DATA_DIR, daysParam || 30);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformSupportOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportOverview(DATA_DIR, {
+          days: Number.isFinite(daysParam) && daysParam > 0 ? daysParam : undefined,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Destek verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/policy' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { readSupportSlaPolicy } = await import('./server/platformSupportPolicy.mjs');
+          const policy = await readSupportSlaPolicy(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, policy }));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { updatePlatformSupportSlaPolicy } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSupportSlaPolicy(DATA_DIR, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Politika kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/integrations' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformIntegrationsOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformIntegrationsOverview(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Entegrasyon verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/integrations/probe' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { platformIntegrationsProbe } = await import('./server/platformApi.mjs');
+        const result = await platformIntegrationsProbe(DATA_DIR, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Probe başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/integrations/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformIntegrationsExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformIntegrationsExportCsv(DATA_DIR);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/settings' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { getPlatformSettingsOverview } = await import('./server/platformApi.mjs');
+          const payload = await getPlatformSettingsOverview(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, ...payload }));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { patchPlatformConsoleSettings } = await import('./server/platformApi.mjs');
+        const result = await patchPlatformConsoleSettings(DATA_DIR, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ayarlar kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/inbox' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportInbox } = await import('./server/platformApi.mjs');
+        const folder = String(url.searchParams.get('folder') ?? 'inbound').trim().toLowerCase();
+        const limit = Number(url.searchParams.get('limit')) || undefined;
+        const payload = await getPlatformSupportInbox(DATA_DIR, { folder, limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Gelen kutusu alınamadı' }));
+      }
+      return;
+    }
+
+    const platformSupportInboxAttachMatch = pathname.match(
+      /^\/api\/platform\/support\/inbox\/([^/]+)\/attachment\/([^/]+)$/,
+    );
+    if (platformSupportInboxAttachMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      const inboxId = decodeURIComponent(platformSupportInboxAttachMatch[1]);
+      const attachmentId = decodeURIComponent(platformSupportInboxAttachMatch[2]);
+      try {
+        const { loadPlatformSupportInboxAttachment } = await import('./server/platformSupportInbox.mjs');
+        const result = await loadPlatformSupportInboxAttachment(DATA_DIR, inboxId, attachmentId);
+        if (!result.ok || !result.data) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.meta.mimeType || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(result.meta.fileName || 'ek')}"`,
+        });
+        res.end(result.data);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ek indirme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/zendesk/webhook' && req.method === 'POST') {
+      try {
+        const { verifyZendeskWebhookSecret } = await import('./server/platformSupportZendesk.mjs');
+        const auth = verifyZendeskWebhookSecret(req);
+        if (!auth.ok) {
+          res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: auth.error }));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { postPlatformSupportZendeskWebhook } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportZendeskWebhook(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Webhook işlenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/zendesk/bridge' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportZendeskBridge } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportZendeskBridge(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk yapılandırması alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/macros' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportMacros } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportMacros(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Makrolar alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/macros' && req.method === 'PUT') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { putPlatformSupportMacros } = await import('./server/platformApi.mjs');
+        const result = await putPlatformSupportMacros(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Makrolar kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/inbox/mark-read' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { markPlatformSupportInboxRead } = await import('./server/platformApi.mjs');
+        const result = await markPlatformSupportInboxRead(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu işaretlenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/tags' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCaseTags } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseTags(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Etiketler alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/inbox/sync' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { syncPlatformSupportInbox } = await import('./server/platformApi.mjs');
+        const result = await syncPlatformSupportInbox(DATA_DIR, { maxMessages: 50 });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Senkron başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const { getPlatformSupportCases } = await import('./server/platformApi.mjs');
+        const limitRaw = url.searchParams.get('limit');
+        const limit = limitRaw ? Number(limitRaw) : undefined;
+        const payload = await getPlatformSupportCases(DATA_DIR, {
+          status: url.searchParams.get('status') || undefined,
+          kind: url.searchParams.get('kind') || undefined,
+          tag: url.searchParams.get('tag') || undefined,
+          limit: limit && Number.isFinite(limit) ? limit : undefined,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Talepler alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCasesExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformSupportCasesExportCsv(DATA_DIR);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/from-inbox' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { createPlatformSupportCaseFromInbox } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCaseFromInbox(
+          DATA_DIR,
+          body.messageId,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/sla-live' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const days = Number(url.searchParams.get('days') || 7);
+        const { getPlatformSupportSlaLive } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportSlaLive(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'SLA verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/mention-operators' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportMentionOperators } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportMentionOperators(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Operatör listesi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/assignee-options' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportAssigneeOptions } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportAssigneeOptions(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Atama listesi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/mention-inbox' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const auth = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!auth) return;
+      try {
+        const { getPlatformSupportMentionInbox } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportMentionInbox(DATA_DIR, auth.username);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mention kutusu alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/mention-inbox/read' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const auth = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!auth) return;
+      const body = await readRequestBody(req);
+      try {
+        const { postPlatformSupportMentionInboxRead } = await import('./server/platformApi.mjs');
+        const payload = await postPlatformSupportMentionInboxRead(DATA_DIR, auth.username, body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu işaretlenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/sla-apology' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportSlaApologyQueue } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportSlaApologyQueue(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Özür kuyruğu alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/sla-apology' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { postPlatformSupportSlaApologyBatch } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportSlaApologyBatch(
+          DATA_DIR,
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Özür gönderimi başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/tenant-360' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const tenantId = url.searchParams.get('tenantId');
+        const { getPlatformSupportTenant360 } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportTenant360(DATA_DIR, tenantId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : '360 alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/commands' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCommands } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCommands();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Komut listesi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/command' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { postPlatformSupportCommand } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCommand(DATA_DIR, body, authPayload.username ?? 'platform');
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Komut başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/smoke-filters/preview' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { previewPlatformSupportSmokeFilters } = await import('./server/platformApi.mjs');
+        const result = await previewPlatformSupportSmokeFilters(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Önizleme başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/skills' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { getPlatformSupportSkills } = await import('./server/platformApi.mjs');
+          const payload = await getPlatformSupportSkills(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(payload));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { updatePlatformSupportSkills } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSupportSkills(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Skill kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/smoke-filters' && (req.method === 'GET' || req.method === 'PUT')) {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        if (req.method === 'GET') {
+          const { getPlatformSupportSmokeFilters } = await import('./server/platformApi.mjs');
+          const payload = await getPlatformSupportSmokeFilters(DATA_DIR);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(payload));
+          return;
+        }
+        const body = (await readRequestBody(req)) ?? {};
+        const { updatePlatformSupportSmokeFilters } = await import('./server/platformApi.mjs');
+        const result = await updatePlatformSupportSmokeFilters(DATA_DIR, body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Filtre kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/contact-queue/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportContactQueueExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformSupportContactQueueExportCsv(DATA_DIR, {});
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/contact-queue' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const { getPlatformSupportContactQueue } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformSupportContactQueue(DATA_DIR, {
+          limit: Number(url.searchParams.get('limit') || 40),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/from-contact' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { createPlatformSupportCaseFromContact } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCaseFromContact(
+          DATA_DIR,
+          body.contactId,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases/from-queue' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { createPlatformSupportCaseFromQueue } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCaseFromQueue(
+          DATA_DIR,
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/cases' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { createPlatformSupportCase } = await import('./server/platformApi.mjs');
+        const result = await createPlatformSupportCase(DATA_DIR, body, authPayload.username ?? 'platform');
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt oluşturulamadı' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseAiMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)\/ai$/);
+    if (platformSupportCaseAiMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { suggestPlatformSupportCaseAi } = await import('./server/platformApi.mjs');
+        const result = await suggestPlatformSupportCaseAi(DATA_DIR, platformSupportCaseAiMatch[1], body);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'AI önerisi alınamadı' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseActivityCsvMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/activity\/export\.csv$/,
+    );
+    if (platformSupportCaseActivityCsvMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const activityFilter = url.searchParams.get('filter') || 'all';
+        const { getPlatformSupportCaseActivityExport } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseActivityExport(
+          DATA_DIR,
+          platformSupportCaseActivityCsvMatch[1],
+          'csv',
+          { filter: activityFilter },
+        );
+        if (!result.ok) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.contentType,
+          'Content-Disposition': `attachment; filename="${result.filename}"`,
+        });
+        res.end(result.body);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseActivityHtmlMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/activity\/export\.html$/,
+    );
+    if (platformSupportCaseActivityHtmlMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const url = new URL(req.url ?? '', 'http://local');
+        const activityFilter = url.searchParams.get('filter') || 'all';
+        const { getPlatformSupportCaseActivityExport } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseActivityExport(
+          DATA_DIR,
+          platformSupportCaseActivityHtmlMatch[1],
+          'html',
+          { filter: activityFilter },
+        );
+        if (!result.ok) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.contentType,
+          'Content-Disposition': `inline; filename="${result.filename}"`,
+        });
+        res.end(result.body);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Dışa aktarma başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseZendeskPushMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/zendesk\/push$/,
+    );
+    if (platformSupportCaseZendeskPushMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const { postPlatformSupportCaseZendeskPush } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseZendeskPush(
+          DATA_DIR,
+          platformSupportCaseZendeskPushMatch[1],
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk gönderimi başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseZendeskCreateMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/zendesk\/create$/,
+    );
+    if (platformSupportCaseZendeskCreateMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const { postPlatformSupportCaseZendeskCreate } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseZendeskCreate(
+          DATA_DIR,
+          platformSupportCaseZendeskCreateMatch[1],
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk oluşturma başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseZendeskSyncMatch = pathname.match(
+      /^\/api\/platform\/support\/cases\/([^/]+)\/zendesk\/sync-status$/,
+    );
+    if (platformSupportCaseZendeskSyncMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { postPlatformSupportCaseZendeskSyncStatus } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseZendeskSyncStatus(
+          DATA_DIR,
+          platformSupportCaseZendeskSyncMatch[1],
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Zendesk durum senkronu başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseActionMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)\/action$/);
+    if (platformSupportCaseActionMatch && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { postPlatformSupportCaseAction } = await import('./server/platformApi.mjs');
+        const result = await postPlatformSupportCaseAction(
+          DATA_DIR,
+          platformSupportCaseActionMatch[1],
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İşlem başarısız' }));
+      }
+      return;
+    }
+
+    const platformSupportCaseMatch = pathname.match(/^\/api\/platform\/support\/cases\/([^/]+)$/);
+    if (platformSupportCaseMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformSupportCaseDetail } = await import('./server/platformApi.mjs');
+        const result = await getPlatformSupportCaseDetail(DATA_DIR, platformSupportCaseMatch[1]);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt alınamadı' }));
+      }
+      return;
+    }
+
+    if (platformSupportCaseMatch && req.method === 'PUT') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { patchPlatformSupportCase } = await import('./server/platformApi.mjs');
+        const result = await patchPlatformSupportCase(
+          DATA_DIR,
+          platformSupportCaseMatch[1],
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt güncellenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/inbox/reply' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      try {
+        const body = (await readRequestBody(req)) ?? {};
+        const { replyPlatformSupportInboxMessage } = await import('./server/platformApi.mjs');
+        const result = await replyPlatformSupportInboxMessage(
+          DATA_DIR,
+          body,
+          authPayload.username ?? 'platform',
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Yanıt gönderilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/support/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformSupportExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformSupportExportCsv(
+          DATA_DIR,
+          Number.isFinite(daysParam) && daysParam > 0 ? daysParam : undefined,
+        );
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/infrastructure' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformInfrastructureOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformInfrastructureOverview(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Altyapı verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/infrastructure/probe' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = await readRequestBody(req);
+        const { platformInfrastructureProbe } = await import('./server/platformApi.mjs');
+        const result = await platformInfrastructureProbe(DATA_DIR, {
+          smtp: body?.smtp !== false,
+          imap: body?.imap !== false,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Probe başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/tenants/lifecycle' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const { getPlatformTenantsLifecycle } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformTenantsLifecycle(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kiracı verisi alınamadı' }));
+      }
+      return;
+    }
+
+    const platformTenantLifecycleMatch = pathname.match(/^\/api\/platform\/tenants\/([^/]+)\/lifecycle$/);
+    if (platformTenantLifecycleMatch && req.method === 'PUT') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      const authPayload = await assertPlatformApiAuth(req, res, DATA_DIR);
+      if (!authPayload) return;
+      const targetTenant = normalizeTenantId(platformTenantLifecycleMatch[1]);
+      try {
+        const body = await readRequestBody(req);
+        const { patchPlatformTenantLifecycle } = await import('./server/platformApi.mjs');
+        const result = await patchPlatformTenantLifecycle(
+          DATA_DIR,
+          targetTenant,
+          body ?? {},
+          authPayload.username,
+        );
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Güncelleme başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/comms' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformCommsOverview } = await import('./server/platformApi.mjs');
+        const payload = await getPlatformCommsOverview(DATA_DIR, { days: daysParam || 14 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...payload }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Posta/mesaj verisi alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/comms/export.csv' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const daysParam = Number(new URL(req.url ?? '', 'http://local').searchParams.get('days'));
+        const { getPlatformCommsExportCsv } = await import('./server/platformApi.mjs');
+        const { csv, filename } = await getPlatformCommsExportCsv(DATA_DIR, daysParam || 14);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        });
+        res.end(csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV oluşturulamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/comms/outbox/process' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = await readRequestBody(req);
+        const { platformCommsProcessOutbox } = await import('./server/platformApi.mjs');
+        const result = await platformCommsProcessOutbox(DATA_DIR, { limit: body?.limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Outbox işlenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/comms/outbox/requeue' && req.method === 'POST') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      try {
+        const body = await readRequestBody(req);
+        const { platformCommsRequeueFailed } = await import('./server/platformApi.mjs');
+        const result = await platformCommsRequeueFailed(DATA_DIR, {
+          tenantId: body?.tenantId,
+          all: body?.all !== false,
+          ids: Array.isArray(body?.ids) ? body.ids : [],
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Yeniden kuyruk başarısız' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/platform/calendar' && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      const year = Number(url.searchParams.get('year')) || new Date().getFullYear();
+      const month = Number(url.searchParams.get('month')) || new Date().getMonth() + 1;
+      try {
+        const { getPlatformMergedCalendar } = await import('./server/platformApi.mjs');
+        const result = await getPlatformMergedCalendar(DATA_DIR, year, month);
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, calendar: result }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim alınamadı' }));
+      }
+      return;
+    }
+
+    const platformTenantDetailMatch = pathname.match(/^\/api\/platform\/tenants\/([^/]+)$/);
+    if (platformTenantDetailMatch && req.method === 'GET') {
+      const { assertPlatformApiAuth } = await import('./server/platformAuth.mjs');
+      if (!(await assertPlatformApiAuth(req, res, DATA_DIR))) return;
+      const targetTenant = normalizeTenantId(platformTenantDetailMatch[1]);
+      try {
+        const { getPlatformTenantDetail } = await import('./server/platformApi.mjs');
+        const detail = await getPlatformTenantDetail(DATA_DIR, targetTenant);
+        if (!detail) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, tenant: detail }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Detay alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/pos-token' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const data = await readRequestBody(req);
+      try {
+        const clientIp =
+          String(req.headers['x-forwarded-for'] ?? '')
+            .split(',')[0]
+            .trim() || req.socket?.remoteAddress || '';
+        const result = await issuePosApiTokenFromCredentials(DATA_DIR, resolvedTenant, {
+          username: data?.username,
+          password: data?.password,
+          pin: data?.pin,
+          clientIp,
+          userAgent: req.headers['user-agent'],
+        });
+        res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Token alınamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/login-audit' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const data = await readRequestBody(req);
+      const clientIp =
+        String(req.headers['x-forwarded-for'] ?? '')
+          .split(',')[0]
+          .trim() || req.socket?.remoteAddress || '';
+      try {
+        const { recordClientLoginAuditFailure } = await import('./server/tenantLoginAudit.mjs');
+        const result = await recordClientLoginAuditFailure(DATA_DIR, resolvedTenant, data, {
+          clientIp,
+          userAgent: req.headers['user-agent'],
+        });
+        const status = result.ok ? 200 : result.status ?? 400;
+        res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result.ok ? { ok: true } : { ok: false, error: result.error }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : 'Kayıt alınamadı',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/pos-token/refresh' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const token = extractBearerToken(req);
+      try {
+        const result = await refreshPosApiTokenFromBearer(DATA_DIR, token, resolvedTenant);
+        res.writeHead(result.ok ? 200 : result.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Token yenilenemedi',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/password-reset-request' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const clientIp = req.socket?.remoteAddress ?? 'unknown';
+      const rate = checkRateLimit(`pwd-reset:${clientIp}`, { limit: 6, windowMs: 60 * 60 * 1000 });
+      if (!rate.ok) {
+        res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, message: 'Çok fazla deneme. Lütfen sonra tekrar deneyin.' }));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const { handlePasswordResetRequest } = await import('./server/userPasswordApi.mjs');
+        const result = await handlePasswordResetRequest(DATA_DIR, resolvedTenant, data);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Şifre sıfırlama hatası',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/auth/password-reset-confirm' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const data = await readRequestBody(req);
+      try {
+        const { handlePasswordResetConfirm } = await import('./server/userPasswordApi.mjs');
+        const result = await handlePasswordResetConfirm(DATA_DIR, resolvedTenant, data);
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Şifre sıfırlama hatası',
+        }));
+      }
+      return;
+    }
+
+    const userPasswordRoute = pathname.match(/^\/api\/users\/([^/]+)\/password$/);
+    if (userPasswordRoute && req.method === 'PATCH') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant);
+      if (!authPayload) return;
+      const data = await readRequestBody(req);
+      try {
+        const { handlePatchUserPassword } = await import('./server/userPasswordApi.mjs');
+        const result = await handlePatchUserPassword(
+          DATA_DIR,
+          resolvedTenant,
+          decodeURIComponent(userPasswordRoute[1]),
+          authPayload,
+          data ?? {},
+        );
+        res.writeHead(result.ok ? 200 : result.status ?? 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          message: error instanceof Error ? error.message : 'Şifre güncellenemedi',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/crm/send-email' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await sendCrmEmail(DATA_DIR, {
+          to: data?.to,
+          subject: data?.subject ?? '',
+          body: data?.body ?? '',
+          fromName: data?.fromName,
+          tenantId,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : 'E-posta hatası',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/crm/send-sms' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await sendCrmSmsOutreach(DATA_DIR, {
+          to: data?.to,
+          body: data?.body ?? data?.message ?? '',
+          tenantId,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : 'SMS hatası',
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/crm/sms-configured' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, configured: isCrmSmsConfigured() }));
+      return;
+    }
+
+    if (pathname === '/api/email/health' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const smtp = await isTenantSmtpConfigured(DATA_DIR, tenantId);
+      const verify = smtp ? await verifyEkolojikSmtp({ dataDir: DATA_DIR, tenantId }) : { ok: false, error: 'SMTP yapılandırılmadı' };
+      const counts = await getOutboxCounts(DATA_DIR);
+      const cfg = await getTenantSmtpMailConfig(DATA_DIR, tenantId);
+      const effective = await getEffectiveMailPresentation(DATA_DIR);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          tenantId,
+          smtpConfigured: smtp,
+          smtpVerified: verify.ok,
+          smtpError: verify.error ?? null,
+          smtpHost: cfg.smtpHost || null,
+          smtpHostHint: getEkolojikSmtpHostHint(),
+          from: cfg.from || null,
+          fromName: effective.fromName || null,
+          replyTo: effective.replyTo || null,
+          opsEmail: effective.opsEmail || null,
+          contactAutoreply: isContactAutoreplyEnabled(),
+          supportInbox: supportInboxStatus(),
+          counts,
+        }),
+      );
+      return;
+    }
+
+    const postaClickMatch = pathname.match(/^\/api\/posta\/track\/click\/([a-f0-9]+)$/i);
+    if (postaClickMatch && req.method === 'GET') {
+      const encoded = url.searchParams.get('u')?.trim() ?? '';
+      let target = '';
+      try {
+        target = Buffer.from(encoded, 'base64url').toString('utf8');
+      } catch {
+        target = '';
+      }
+      if (!/^https?:\/\//i.test(target)) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Bad link');
+        return;
+      }
+      try {
+        let clickTenant = 'main';
+        try {
+          const { findOutboxMessageByTrackToken } = await import('./server/emailOutbox.mjs');
+          const hit = await findOutboxMessageByTrackToken(DATA_DIR, postaClickMatch[1]);
+          if (hit?.message?.tenantId) clickTenant = hit.message.tenantId;
+        } catch {
+          /* ignore */
+        }
+        await recordMailClick(DATA_DIR, postaClickMatch[1], {
+          url: target,
+          ip: getRequestIp(req),
+          tenantId: clickTenant,
+        });
+      } catch {
+        /* yine de yönlendir */
+      }
+      res.writeHead(302, { Location: target, 'Cache-Control': 'no-store' });
+      res.end();
+      return;
+    }
+
+    const postaTrackMatch = pathname.match(/^\/api\/posta\/track\/open\/([a-f0-9]+)\.gif$/i);
+    if (postaTrackMatch && req.method === 'GET') {
+      try {
+        let openTenant = 'main';
+        try {
+          const { findOutboxMessageByTrackToken } = await import('./server/emailOutbox.mjs');
+          const hit = await findOutboxMessageByTrackToken(DATA_DIR, postaTrackMatch[1]);
+          if (hit?.message?.tenantId) openTenant = hit.message.tenantId;
+        } catch {
+          /* ignore */
+        }
+        await recordMailOpen(DATA_DIR, postaTrackMatch[1], { ip: getRequestIp(req), tenantId: openTenant });
+        res.writeHead(200, {
+          'Content-Type': 'image/gif',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        });
+        res.end(mailTrackPixelResponse());
+      } catch {
+        res.writeHead(200, { 'Content-Type': 'image/gif' });
+        res.end(mailTrackPixelResponse());
+      }
+      return;
+    }
+
+    const channelWebhookMatch = pathname.match(/^\/api\/webhooks\/messaging\/([^/]+)$/);
+    if (channelWebhookMatch) {
+      const channelId = decodeURIComponent(channelWebhookMatch[1]);
+      const tenantId = resolveTenantId(url);
+      if (req.method === 'GET' || req.method === 'POST') {
+        const body = req.method === 'POST' ? await readRequestBody(req) : null;
+        try {
+          const result = await handleChannelWebhook(channelId, {
+            dataDir: DATA_DIR,
+            tenantId,
+            method: req.method,
+            query: url.searchParams,
+            body,
+            req,
+          });
+          if (result.challenge != null) {
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end(String(result.challenge));
+            return;
+          }
+          if (req.method === 'POST' && Array.isArray(result.results)) {
+            for (const row of result.results) {
+              if (!row?.ok || !row.thread || !row.message) continue;
+              notifyMessagingRealtime(tenantId, 'message', {
+                threadId: row.thread.id,
+                messageId: row.message.id,
+                direction: 'customer',
+                messageAt: row.message.createdAt,
+              });
+              void notifyPostaLiveInbox(
+                DATA_DIR,
+                tenantId,
+                {
+                  channel: 'messaging',
+                  threadId: row.thread.id,
+                  messageId: row.message.id,
+                  direction: 'customer',
+                  messageAt: row.message.createdAt,
+                  sourceId: row.message.id,
+                },
+                () => getPostaUnreadCounts(DATA_DIR, tenantId),
+              );
+              void notifyOnMessagingMessage(DATA_DIR, {
+                thread: row.thread,
+                message: row.message,
+                tenantId,
+              }).catch(() => undefined);
+            }
+          }
+          const status = result.status ?? (result.ok ? 200 : 400);
+          res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Webhook hatası' }));
+        }
+        return;
+      }
+    }
+
+    if (requiresPostaPosAuth(pathname, req.method) || requiresMessagingPosAuth(pathname)) {
+      const tenantId = resolveTenantId(url);
+      const postaAuth = await enforcePostaApiAccess(req, res, url, DATA_DIR, tenantId);
+      if (!postaAuth) return;
+      if (
+        req.method === 'GET' &&
+        (pathname.includes('/export') || pathname.endsWith('.csv') || pathname.endsWith('.vcf'))
+      ) {
+        void logPostaAccessExport(DATA_DIR, {
+          userId: postaAuth.userId,
+          tenantId,
+          pathname,
+          ip: getRequestIp(req),
+        });
+      }
+    }
+
+    if (
+      (pathname === '/api/posta/inbox' || pathname === '/api/posta/inbox/search') &&
+      req.method === 'GET'
+    ) {
+      const tenantId = resolveTenantId(url);
+      const folder = url.searchParams.get('folder')?.trim() || 'gelen';
+      const limit = Number(url.searchParams.get('limit') || 60);
+      const q = url.searchParams.get('q')?.trim() || '';
+      const listMode = url.searchParams.get('listMode')?.trim() || 'message';
+      const unread = url.searchParams.get('unread');
+      const starred = url.searchParams.get('starred');
+      const hasAttachment = url.searchParams.get('hasAttachment');
+      try {
+        const result = await listUnifiedPostaInbox(DATA_DIR, tenantId, {
+          folder,
+          limit,
+          q,
+          listMode,
+          unread,
+          starred,
+          hasAttachment,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Inbox hatası' }));
+      }
+      return;
+    }
+
+    const inboxAttachMatch = pathname.match(/^\/api\/posta\/inbox\/([^/]+)\/attachment\/([^/]+)$/);
+    if (inboxAttachMatch && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const inboxId = decodeURIComponent(inboxAttachMatch[1]);
+      const attachmentId = decodeURIComponent(inboxAttachMatch[2]);
+      try {
+        const result = await loadPostaInboxAttachment(DATA_DIR, tenantId, inboxId, attachmentId);
+        if (!result.ok || !result.data) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': result.meta.mimeType || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(result.meta.fileName || 'ek')}"`,
+        });
+        res.end(result.data);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ek indirme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/sent' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 80);
+      try {
+        const result = await listUnifiedPostaSent(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Gönderilen hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/sync' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await syncPostaInboxFromImap(DATA_DIR, tenantId);
+        if (result.ok && (result.added > 0 || result.updated > 0)) {
+          void notifyPostaLiveInbox(
+            DATA_DIR,
+            tenantId,
+            {
+              channel: 'imap',
+              reason: 'sync',
+              added: result.added ?? 0,
+              updated: result.updated ?? 0,
+              messageAt: new Date().toISOString(),
+            },
+            () => getPostaUnreadCounts(DATA_DIR, tenantId),
+          );
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'IMAP sync hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/mark-read' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await markPostaInboxRead(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/archive' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await archivePostaInboxItem(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/storage' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getPostaStorageSummary(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Depolama hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/batch' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await batchPostaInboxAction(DATA_DIR, tenantId, {
+          action: data?.action,
+          items: data?.items,
+          actor: data?.actor ?? 'pos',
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Toplu işlem hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/mark-all-read' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const folder = String(data?.folder ?? 'gelen');
+      try {
+        const result = await markAllPostaInboxReadInFolder(DATA_DIR, tenantId, folder, data?.actor ?? 'pos');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/rules/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaRulesCapabilities()));
+      return;
+    }
+
+    if (pathname === '/api/posta/rules' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaRules(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/rules' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaRules(DATA_DIR, tenantId, data?.rules);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/config' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaPushConfig()));
+      return;
+    }
+
+    if (pathname === '/api/posta/push/status' && req.method === 'GET') {
+      try {
+        const cfg = getPostaPushConfig();
+        const subs = await listPostaPushSubscriptionCount(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, configured: cfg.configured, subscribers: subs.count }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Push durum hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/subscribe' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaPushSubscription(DATA_DIR, data?.subscription, {
+          userAgent: req.headers['user-agent'],
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Abonelik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/subscribe' && req.method === 'DELETE') {
+      const data = await readRequestBody(req);
+      try {
+        const result = await removePostaPushSubscription(DATA_DIR, data?.endpoint);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Abonelik silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/push/test' && req.method === 'POST') {
+      try {
+        const result = await sendPostaWebPush(DATA_DIR, {
+          title: 'Ekolojik Posta test',
+          body: 'Web push (NB PM-4) çalışıyor.',
+          url: '/',
+          tag: 'posta-push-test',
+        });
+        res.writeHead(result.ok ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Push test hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/engagement/summary' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const days = Number(url.searchParams.get('days') || 14);
+      try {
+        const result = await getPostaEngagementSummary(DATA_DIR, { days, tenantId });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Engagement hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/engagement/export.csv' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const type = url.searchParams.get('type')?.trim() || 'combined';
+      const days = Number(url.searchParams.get('days') || 90);
+      try {
+        const result = await buildPostaEngagementCsv(DATA_DIR, { type, days, tenantId });
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="ekolojik-engagement-${type}.csv"`,
+        });
+        res.end(result.csv);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CSV hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/analytics' && req.method === 'GET') {
+      const days = Number(url.searchParams.get('days') || 14);
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getPostaOutboxAnalytics(DATA_DIR, { days, tenantId });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Analitik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 100);
+      try {
+        const items = await listFailedOutboxMessages(DATA_DIR, { tenantId, limit });
+        const counts = await getOutboxCounts(DATA_DIR);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, counts, items, total: items.length }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Failed listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed/requeue' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const data = await readRequestBody(req);
+        const result = await bulkRequeueFailedOutbox(DATA_DIR, {
+          tenantId,
+          ids: Array.isArray(data?.ids) ? data.ids : [],
+          all: Boolean(data?.all),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Requeue hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/outbox/failed/archive' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const data = await readRequestBody(req);
+        const result = await archiveFailedOutboxMessages(DATA_DIR, {
+          tenantId,
+          ids: Array.isArray(data?.ids) ? data.ids : [],
+          all: Boolean(data?.all),
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/deliverability' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getPostaDeliverabilityHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Deliverability hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/deliverability/seed-aliases' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const seeded = await seedTenantPostaAliases(DATA_DIR, tenantId);
+        const hub = await getPostaDeliverabilityHub(DATA_DIR, tenantId);
+        res.writeHead(seeded.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...seeded, deliverability: hub }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Alias seed hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/live/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaLiveCapabilities()));
+      return;
+    }
+
+    if (pathname === '/api/posta/tenants' && req.method === 'GET') {
+      try {
+        const store = await readTenantStore(DATA_DIR);
+        const ids = Object.keys(store?.tenants ?? { main: true });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, tenants: ids.length ? ids : ['main'], defaultTenant: 'main' }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Tenant listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/jmap-lite/session' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaJmapLiteSession()));
+      return;
+    }
+
+    if (pathname === '/api/posta/jmap-lite/Mailbox/query' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(listPostaJmapLiteMailboxes()));
+      return;
+    }
+
+    if (pathname === '/api/posta/jmap-lite/Email/query' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const folder = url.searchParams.get('folder')?.trim() || 'gelen';
+      const limit = Number(url.searchParams.get('limit') || 50);
+      try {
+        const result = await queryPostaJmapLiteMailbox(DATA_DIR, tenantId, { folder, limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'JMAP lite hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/jmap-lite/Email/get' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const idsParam = url.searchParams.get('ids')?.trim() || '';
+      const ids = idsParam.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+      try {
+        const result = await getPostaJmapLiteEmails(DATA_DIR, tenantId, ids);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'JMAP get hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/jmap-lite/Email/set' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const updates = Array.isArray(data?.updates) ? data.updates : Array.isArray(data) ? data : [];
+      try {
+        const result = await setPostaJmapLiteEmails(DATA_DIR, tenantId, updates);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'JMAP set hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/enterprise/capabilities' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await buildPostaEnterpriseCapabilities(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Enterprise özellik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/delegates' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await readPostaDelegates(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Delegasyon okunamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/delegates' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaDelegates(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Delegasyon kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/compliance/archive' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const limit = Number(url.searchParams.get('limit') || 500);
+      try {
+        const result = await buildComplianceArchiveExport(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Arşiv dışa aktarma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/compliance/legal-hold' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await setLegalHold(DATA_DIR, tenantId, {
+          messageIds: data?.messageIds,
+          hold: data?.hold !== false,
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Legal hold hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/marketing/campaigns' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaMarketingCampaigns(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kampanya listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/marketing/campaigns' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaMarketingCampaign(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kampanya kaydı hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/marketing/campaigns/run' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      const campaignId = String(data?.campaignId ?? url.searchParams.get('id') ?? '').trim();
+      if (!campaignId) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'campaignId gerekli' }));
+        return;
+      }
+      try {
+        const result = await runPostaMarketingCampaign(DATA_DIR, tenantId, campaignId, {
+          limit: Number(data?.limit || 200),
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kampanya çalıştırma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/caldav-lite/principal' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaCalDavLitePrincipal()));
+      return;
+    }
+
+    if (pathname === '/api/posta/carddav-lite/principal' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaCardDavLitePrincipal()));
+      return;
+    }
+
+    if (pathname === '/api/posta/ws/metrics' && req.method === 'GET') {
+      try {
+        const ws = getPostaWsGatewayMetrics();
+        const days = Number(url.searchParams.get('days') || 7);
+        const live = await getPostaLiveMetrics(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            ws,
+            messagingLatency: live.deliveryLatency?.byChannel?.['ws-messaging'] ?? null,
+            windowDays: days,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'WS metrik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/caldav-lite/events' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaCalDavLiteEvents(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV lite hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/caldav-lite/events' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaCalDavLiteEvent(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV lite yazma hatası' }));
+      }
+      return;
+    }
+
+    const calDavEventMatch = pathname.match(/^\/api\/posta\/caldav-lite\/events\/([^/]+)$/);
+    if (calDavEventMatch && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const eventId = decodeURIComponent(calDavEventMatch[1]);
+      try {
+        const result = await getPostaCalDavLiteEvent(DATA_DIR, tenantId, eventId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV get hatası' }));
+      }
+      return;
+    }
+
+    if (calDavEventMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const eventId = decodeURIComponent(calDavEventMatch[1]);
+      try {
+        const result = await deletePostaCalDavLiteEvent(DATA_DIR, tenantId, eventId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'CalDAV lite silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/mail/v1/capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaPublicMailCapabilities()));
+      return;
+    }
+
+    if (pathname === '/api/public/mail/v1/messages' && req.method === 'POST') {
+      const auth = assertPostaPublicMailAuth(req);
+      if (!auth.ok) {
+        res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(auth));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const result = await sendPostaPublicMail(DATA_DIR, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Public mail hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/capabilities' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      try {
+        const caps = await getMessagingPublicCapabilities(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(caps));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Capabilities hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const auth = await assertMessagingPublicAuth(req, DATA_DIR, tenantId);
+      if (!auth.ok) {
+        res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(auth));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const result = await publicCreateThread(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Thread oluşturma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const token = url.searchParams.get('token')?.trim() || '';
+      const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
+      if (!parsed.ok) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(parsed));
+        return;
+      }
+      try {
+        const result = await publicListMessages(DATA_DIR, tenantId, parsed.threadId, parsed.customerId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+        notifyMessagingRealtime(tenantId, 'read', { threadId: parsed.threadId, party: 'customer' });
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads/messages' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const token = url.searchParams.get('token')?.trim() || '';
+      const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
+      if (!parsed.ok) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(parsed));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const result = await publicPostMessage(DATA_DIR, tenantId, parsed.threadId, parsed.customerId, data ?? {});
+        if (result.ok) {
+          notifyMessagingRealtime(tenantId, 'message', {
+            threadId: parsed.threadId,
+            messageId: result.message?.id,
+            direction: 'customer',
+            messageAt: result.message?.createdAt,
+          });
+          void notifyPostaLiveInbox(
+            DATA_DIR,
+            tenantId,
+            {
+              channel: 'messaging',
+              threadId: parsed.threadId,
+              messageId: result.message?.id,
+              direction: 'customer',
+              messageAt: result.message?.createdAt,
+            },
+            () => getPostaUnreadCounts(DATA_DIR, tenantId),
+          );
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj gönderim hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/portal/session' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const token = url.searchParams.get('token')?.trim() || '';
+      try {
+        const result = await getPortalSession(DATA_DIR, tenantId, token);
+        res.writeHead(result.ok ? 200 : 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Portal oturumu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/portal/lookup' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await lookupPortalSessionByContact(DATA_DIR, tenantId, data ?? {}, {
+          origin: resolvePublicPortalOrigin(req),
+        });
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Portal arama hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/portal/open' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const auth = await assertMessagingPublicAuth(req, DATA_DIR, tenantId);
+      if (!auth.ok) {
+        res.writeHead(auth.status ?? 401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(auth));
+        return;
+      }
+      const data = await readRequestBody(req);
+      try {
+        const result = await publicCreateThread(DATA_DIR, tenantId, data ?? {});
+        if (result.ok && result.thread && result.customerToken) {
+          result.portalUrl = `${resolvePublicPortalOrigin(req)}/portal/mesajlar?${new URLSearchParams({
+            token: result.customerToken,
+            ...(tenantId !== 'main' ? { tenant: tenantId } : {}),
+          }).toString()}`;
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Portal açılış hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/public/messaging/v1/threads/typing' && (req.method === 'GET' || req.method === 'POST')) {
+      const tenantId = resolveTenantId(url);
+      if (!(await publicMessagingCorsGuard(req, res, tenantId))) return;
+      const token = url.searchParams.get('token')?.trim() || '';
+      const parsed = await parseCustomerThreadToken(DATA_DIR, tenantId, token);
+      if (!parsed.ok) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(parsed));
+        return;
+      }
+      try {
+        if (req.method === 'POST') {
+          const data = await readRequestBody(req);
+          const result = await publicTyping(
+            DATA_DIR,
+            tenantId,
+            parsed.threadId,
+            parsed.customerId,
+            Boolean(data?.active),
+          );
+          notifyMessagingRealtime(tenantId, 'typing', {
+            threadId: parsed.threadId,
+            party: 'customer',
+            active: Boolean(data?.active),
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        const typing = getMessagingTyping(tenantId, parsed.threadId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, typing }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Typing hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/live/metrics' && req.method === 'GET') {
+      const days = Number(url.searchParams.get('days') || 7);
+      try {
+        const result = await getPostaLiveMetrics(DATA_DIR, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Canlılık metrik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/compose/rte-capabilities' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(getPostaComposeRteCapabilities()));
+      return;
+    }
+
+    if (pathname === '/api/posta/notifications/matrix' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const settings = await getPostaMailSettings(DATA_DIR, tenantId);
+        const result = getPostaNotificationsMatrixHub(settings);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bildirim matrisi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/compose/ai-suggest' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      try {
+        const result = await suggestPostaCompose({
+          subject: data?.subject,
+          body: data?.body,
+          tone: data?.tone,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...result, aiEnabled: isPostaAiEnabled() }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'AI öneri hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/inbox/flags' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const id = String(data?.id ?? '').trim();
+      if (!id) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'id gerekli' }));
+        return;
+      }
+      try {
+        const result = await applyPostaInboxFlags(DATA_DIR, tenantId, id, {
+          starred: data?.starred,
+          spam: data?.spam,
+          trashed: data?.trashed,
+          snoozedUntil: data?.snoozedUntil,
+          labels: data?.labels,
+        });
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bayrak hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/drafts' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await listPostaComposeDrafts(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Taslak listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/drafts' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaComposeDraft(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Taslak kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const q = url.searchParams.get('q') ?? '';
+      const limit = Number(url.searchParams.get('limit') || 120);
+      try {
+        const result = await listPostaContacts(DATA_DIR, tenantId, { q, limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kişi listesi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaContact(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kişi kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts/import' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const format = String(data?.format ?? 'vcf').toLowerCase();
+      const text = String(data?.text ?? '');
+      try {
+        const rows = format === 'csv' ? parseCsvContactsImport(text) : parseVcardImport(text);
+        const result = await importPostaContacts(DATA_DIR, tenantId, rows);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İçe aktarma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/contacts/export.vcf' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const listed = await listPostaContacts(DATA_DIR, tenantId, { limit: 500 });
+        const body = contactsToVcard(listed.contacts ?? []);
+        res.writeHead(200, {
+          'Content-Type': 'text/vcard; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-posta-contacts.vcf"',
+        });
+        res.end(body);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Dışa aktarma hatası' }));
+      }
+      return;
+    }
+
+    const contactDeleteMatch = pathname.match(/^\/api\/posta\/contacts\/([^/]+)$/);
+    if (contactDeleteMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const contactId = decodeURIComponent(contactDeleteMatch[1]);
+      try {
+        const result = await deletePostaContact(DATA_DIR, tenantId, contactId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kişi silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/sync' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const base = resolvePostaPublicBaseUrl(req);
+        const result = await getPostaCalendarSyncHub(DATA_DIR, tenantId, base);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim sync hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/sync/rotate-token' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const rotated = await rotatePostaCalendarFeedToken(DATA_DIR, tenantId);
+        const base = resolvePostaPublicBaseUrl(req);
+        const hub = await getPostaCalendarSyncHub(DATA_DIR, tenantId, base);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...rotated, hub }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Token hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/export.ics' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 200);
+      try {
+        const feed = await buildPostaCalendarIcsFeed(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-posta-calendar.ics"',
+        });
+        res.end(feed.ics);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'ICS export hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/feed.ics' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const token = url.searchParams.get('token')?.trim() ?? '';
+      try {
+        const valid = await validatePostaCalendarFeedToken(DATA_DIR, tenantId, token);
+        if (!valid) {
+          res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('Unauthorized');
+          return;
+        }
+        const limit = Number(url.searchParams.get('limit') || 200);
+        const feed = await buildPostaCalendarIcsFeed(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Cache-Control': 'private, max-age=300',
+        });
+        res.end(feed.ics);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('ICS feed error');
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const limit = Number(url.searchParams.get('limit') || 120);
+      try {
+        const result = await listPostaCalendar(DATA_DIR, tenantId, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await upsertPostaCalendarEvent(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/sync-payments' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await syncPaymentRemindersSnapshot(DATA_DIR, tenantId, data?.reminders ?? []);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ödeme senkron hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/calendar/from-mail' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await createCalendarEventFromMail(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim mail hatası' }));
+      }
+      return;
+    }
+
+    const calendarDeleteMatch = pathname.match(/^\/api\/posta\/calendar\/([^/]+)$/);
+    if (calendarDeleteMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const eventId = decodeURIComponent(calendarDeleteMatch[1]);
+      try {
+        const result = await deletePostaCalendarEvent(DATA_DIR, tenantId, eventId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Takvim silme hatası' }));
+      }
+      return;
+    }
+
+    const draftDeleteMatch = pathname.match(/^\/api\/posta\/drafts\/([^/]+)$/);
+    if (draftDeleteMatch && req.method === 'DELETE') {
+      const tenantId = resolveTenantId(url);
+      const draftId = decodeURIComponent(draftDeleteMatch[1]);
+      try {
+        const result = await deletePostaComposeDraft(DATA_DIR, tenantId, draftId);
+        res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Taslak silme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/unread-counts' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getPostaUnreadCounts(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Sayaç hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/events' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      attachPostaSseStream(req, res, tenantId, {
+        fetchUnread: () => getPostaUnreadCounts(DATA_DIR, tenantId),
+      });
+      return;
+    }
+
+    if (pathname === '/api/posta/templates' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, templates: listMailTemplates() }));
+      return;
+    }
+
+    if (pathname === '/api/posta/compose-hints' && req.method === 'GET') {
+      const limit = Number(url.searchParams.get('limit') || 40);
+      try {
+        const hints = await getComposeRecipientHints(DATA_DIR, { limit });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hints));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İpucu hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/imap/health' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await isTenantImapConfigured(DATA_DIR, tenantId))) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, imapConfigured: false, imapVerified: false, tenantId }));
+        return;
+      }
+      const cfg = await getTenantImapConfig(DATA_DIR, tenantId);
+      try {
+        const verify = await verifyImapMailbox(cfg);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            imapConfigured: true,
+            imapVerified: verify.ok,
+            imapHost: cfg.imapHost,
+            imapUser: cfg.imapUser,
+            tenantId,
+            mailboxCount: verify.mailboxCount ?? null,
+            unseenCount: verify.unseenCount ?? null,
+            message: verify.message ?? null,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            imapConfigured: true,
+            imapVerified: false,
+            imapHost: cfg.imapHost,
+            imapUser: cfg.imapUser,
+            tenantId,
+            error: error instanceof Error ? error.message : 'IMAP hatası',
+          }),
+        );
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/tenant-mail' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const hub = await getTenantMailConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Tenant mail okunamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/tenant-mail' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        await saveTenantMailConfig(DATA_DIR, tenantId, data ?? {});
+        await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
+        const hub = await getTenantMailConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Tenant mail kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        let store = await maybeMigrateLegacyPostaOnboardingStore(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        if (!store.settings?.postaOnboarding) {
+          store = {
+            ...store,
+            settings: {
+              ...store.settings,
+              postaOnboarding: ensurePostaOnboarding(store.settings),
+            },
+          };
+          await writeStoreData(store, tenantId);
+        }
+        const hub = await getPostaOnboardingHub(DATA_DIR, tenantId, store);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding' && req.method === 'PATCH') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        let store = await readStoreData(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        const { settings, onboarding } = patchPostaOnboardingState(store, data ?? {});
+        store = { ...store, settings, updatedAt: new Date().toISOString() };
+        await writeStoreData(store, tenantId);
+        const hub = await getPostaOnboardingHub(DATA_DIR, tenantId, store);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, onboarding, summary: hub.summary }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding güncelleme hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/reopen' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        let store = await readStoreData(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        const { store: next, onboarding } = reopenPostaOnboardingState(store);
+        await writeStoreData({ ...next, updatedAt: new Date().toISOString() }, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, onboarding }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Yeniden açılamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/verify-connection' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const result = await verifyPostaOnboardingMailConnection(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bağlantı testi hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/seed-alias-rules' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const aliasSeed = await seedTenantPostaAliases(DATA_DIR, tenantId);
+        const result = await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...result, postaAliases: aliasSeed }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kural eklenemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/onboarding/complete' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        let store = await readStoreData(tenantId);
+        if (!store) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Mağaza bulunamadı' }));
+          return;
+        }
+        const result = completePostaOnboarding(store, {
+          primaryOnly: data?.primaryOnly !== false,
+          userIds: Array.isArray(data?.userIds) ? data.userIds : [],
+          skipIncompleteSteps: data?.skipIncompleteSteps === true,
+        });
+        store = {
+          ...store,
+          settings: result.settings,
+          users: result.users,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeStoreData(store, tenantId);
+        await mergePostaOnboardingAliasRules(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            onboarding: result.onboarding,
+            grantCount: result.grantCount,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Onboarding tamamlama hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/settings' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const settings = await getPostaMailSettings(DATA_DIR, tenantId);
+        const effective = await getEffectiveMailPresentation(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, settings, effective }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ayar hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/settings' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await savePostaMailSettings(DATA_DIR, data ?? {}, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/export/outbox.csv' && req.method === 'GET') {
+      const from = url.searchParams.get('from')?.trim() || undefined;
+      const to = url.searchParams.get('to')?.trim() || undefined;
+      try {
+        const result = await buildOutboxCsv(DATA_DIR, { from, to });
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-outbox.csv"',
+        });
+        res.end(`\ufeff${result.csv}`);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Export hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/posta/export/contact.csv' && req.method === 'GET') {
+      const from = url.searchParams.get('from')?.trim() || undefined;
+      const to = url.searchParams.get('to')?.trim() || undefined;
+      try {
+        const result = await buildContactCsv(DATA_DIR, { from, to });
+        if (!result.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="ekolojik-contact.csv"',
+        });
+        res.end(`\ufeff${result.csv}`);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Export hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/email/outbox/retry' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const data = await readRequestBody(req);
+      const id = data?.id?.trim();
+      if (!id) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Outbox id gerekli' }));
+        return;
+      }
+      try {
+        const requeued = await requeueFailedOutboxMessage(DATA_DIR, id);
+        if (!requeued.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(requeued));
+          return;
+        }
+        const run = await processPendingOutbox(DATA_DIR, deliverMessage, { limit: 10 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, requeued: true, processed: run }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Retry hatası' }));
+      }
+      return;
+    }
+
+    if (pathname.startsWith('/api/email/outbox/') && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const parts = pathname.split('/').filter(Boolean);
+      const outboxId = parts[3];
+      if (outboxId && outboxId !== 'recent' && outboxId !== 'process' && outboxId !== 'retry') {
+        const hit = await findOutboxMessageById(DATA_DIR, decodeURIComponent(outboxId));
+        if (!hit) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Kayıt bulunamadı' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, folder: hit.folder, message: hit.message }));
+        return;
+      }
+    }
+
+    if (pathname === '/api/email/outbox/recent' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const limit = Number(url.searchParams.get('limit') || 30);
+      const recent = await listRecentOutbox(DATA_DIR, limit);
+      const items = await listMergedRecentOutbox(DATA_DIR, limit);
+      const counts = await getOutboxCounts(DATA_DIR);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, counts, items, ...recent }));
+      return;
+    }
+
+    if (pathname === '/api/email/test' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      const to = data?.to?.trim();
+      if (!to?.includes('@')) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Geçerli to e-posta gerekli' }));
+        return;
+      }
+      try {
+        const attachCheck = validateOutboundAttachments(data?.attachments);
+        if (!attachCheck.ok) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: attachCheck.error }));
+          return;
+        }
+        const bodyRaw = data?.body?.trim() || 'Bu mesaj Ekolojik Market bağımsız posta outbox (Faz 1) testidir.';
+        const htmlSanitized = data?.html ? sanitizePostaComposeHtml(data.html) : '';
+        const formatted = htmlSanitized
+          ? { text: stripHtmlToPlainText(htmlSanitized) || bodyRaw, html: htmlSanitized }
+          : formatPostaComposeBody(bodyRaw);
+        const result = await sendEkolojikMail(DATA_DIR, {
+          to,
+          cc: data?.cc?.trim() || undefined,
+          bcc: data?.bcc?.trim() || undefined,
+          subject: data?.subject?.trim() || 'Ekolojik Market — SMTP test',
+          body: formatted.text,
+          html: formatted.html,
+          fromName: data?.fromName,
+          tenantId,
+          idempotencyKey: `test:${to}:${Date.now()}`,
+          source: 'posta-compose',
+          inReplyTo: data?.inReplyTo?.trim() || undefined,
+          references: data?.references?.trim() || undefined,
+          attachments: attachCheck.attachments,
+        });
+        res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Test hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/email/outbox/process' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      try {
+        const run = await processPendingOutbox(DATA_DIR, deliverMessage, { limit: 30 });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...run }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'İşlem hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/public-config' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const hub = await getMessagingPublicConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(hub));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Public config hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/public-config' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const saved = await saveMessagingPublicConfig(DATA_DIR, tenantId, data ?? {});
+        const hub = await getMessagingPublicConfigHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ...hub, rotate: saved.ok }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Public config kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/widget-test' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      try {
+        const result = await smokeTestMessagingWidget(DATA_DIR, tenantId);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Widget test hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/channels' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getMessagingChannelsHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kanal hub hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/channels' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await saveMessagingChannelsHub(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Kanal kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/bot-config' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await getMessagingBotHub(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bot config hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/bot-config' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const data = await readRequestBody(req);
+      try {
+        const result = await saveMessagingBotHub(DATA_DIR, tenantId, data ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bot kayıt hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/sla' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const days = Number(url.searchParams.get('days') || 14);
+      try {
+        const result = await getMessagingSlaMetrics(DATA_DIR, tenantId, { days });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'SLA metrik hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/capabilities' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const publicCaps = await getMessagingPublicCapabilities(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(
+          JSON.stringify({
+            ...getMessagingRealtimeCapabilities(),
+            public: publicCaps,
+          }),
+        );
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Capabilities hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/export' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      try {
+        const result = await buildMessagingExportZip(DATA_DIR, tenantId);
+        if (!result.ok) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+          return;
+        }
+        const contentType = result.fallback ? 'application/json; charset=utf-8' : 'application/zip';
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Content-Disposition': `attachment; filename="${result.filename}"`,
+        });
+        res.end(result.buffer);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Export hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/threads' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const customerId = url.searchParams.get('customerId')?.trim() || undefined;
+      const limit = Number(url.searchParams.get('limit') || 50);
+      const q = url.searchParams.get('q')?.trim() || undefined;
+      const includeArchived = url.searchParams.get('includeArchived') === '1';
+      try {
+        const result = await listMessagingThreads(DATA_DIR, tenantId, { limit, customerId, q, includeArchived });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/messaging/threads' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      const data = await readRequestBody(req);
+      try {
+        const result = await createMessagingThread(DATA_DIR, tenantId, data ?? {});
+        if (result.ok && result.message) {
+          try {
+            result.notifications = await notifyOnMessagingMessage(DATA_DIR, {
+              thread: result.thread,
+              message: result.message,
+              tenantId,
+            });
+          } catch (notifyError) {
+            result.notifications = {
+              ok: false,
+              error: notifyError instanceof Error ? notifyError.message : 'Bildirim hatası',
+            };
+          }
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Oluşturma hatası' }));
+      }
+      return;
+    }
+
+    if (pathname.startsWith('/api/messaging/threads/')) {
+      const parts = pathname.split('/').filter(Boolean);
+      const threadId = parts[3];
+      const sub = parts[4];
+      const tenantId = resolveTenantId(url);
+
+      if (sub === 'typing' && threadId && req.method === 'GET') {
+        const typing = getMessagingTyping(tenantId, threadId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, typing }));
+        return;
+      }
+
+      if (sub === 'typing' && threadId && req.method === 'POST') {
+        const data = await readRequestBody(req);
+        const party = data?.party === 'customer' ? 'customer' : 'staff';
+        const typing = setMessagingTyping(tenantId, threadId, party, Boolean(data?.active));
+        notifyMessagingRealtime(tenantId, 'typing', {
+          threadId,
+          party,
+          active: Boolean(data?.active),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, typing }));
+        return;
+      }
+
+      if (sub === 'read' && threadId && req.method === 'POST') {
+        try {
+          const result = await markMessagingThreadStaffRead(DATA_DIR, tenantId, threadId);
+          if (result.ok) {
+            notifyMessagingRealtime(tenantId, 'read', { threadId, party: 'staff' });
+          }
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Okundu hatası' }));
+        }
+        return;
+      }
+
+      if (sub === 'flags' && threadId && req.method === 'POST') {
+        const data = await readRequestBody(req);
+        try {
+          const before = await getMessagingThread(DATA_DIR, tenantId, threadId);
+          const result = await patchMessagingThread(DATA_DIR, tenantId, threadId, {
+            pinned: data?.pinned,
+            archived: data?.archived,
+            muted: data?.muted,
+            status: data?.status,
+            assignedUserId: data?.assignedUserId,
+            botHandoff: data?.botHandoff,
+          });
+          if (
+            result.ok &&
+            result.thread &&
+            data?.status != null &&
+            before.ok &&
+            before.thread?.status !== result.thread.status
+          ) {
+            try {
+              result.statusNotification = await notifyCustomerThreadStatusEmail(
+                DATA_DIR,
+                tenantId,
+                result.thread,
+                {
+                  previousStatus: before.thread.status,
+                  origin: resolvePublicPortalOrigin(req),
+                },
+              );
+            } catch (statusErr) {
+              result.statusNotification = {
+                ok: false,
+                error: statusErr instanceof Error ? statusErr.message : 'Durum bildirimi hatası',
+              };
+            }
+          }
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Bayrak hatası' }));
+        }
+        return;
+      }
+
+      if (
+        parts[4] === 'messages' &&
+        parts[5] &&
+        parts[6] === 'read' &&
+        threadId &&
+        req.method === 'POST'
+      ) {
+        const messageId = decodeURIComponent(parts[5]);
+        const data = await readRequestBody(req);
+        const reader = data?.party === 'customer' ? 'customer' : 'staff';
+        try {
+          const result =
+            reader === 'customer'
+              ? await markMessagingThreadCustomerRead(DATA_DIR, tenantId, threadId, { messageId })
+              : await markMessagingMessagesRead(DATA_DIR, tenantId, threadId, { reader: 'staff', messageId });
+          if (result.ok) {
+            notifyMessagingRealtime(tenantId, 'read', { threadId, messageId, party: reader });
+          }
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj okundu hatası' }));
+        }
+        return;
+      }
+
+      if (sub === 'messages' && threadId && req.method === 'GET') {
+        const limit = Number(url.searchParams.get('limit') || 100);
+        const q = url.searchParams.get('q')?.trim() || undefined;
+        try {
+          const result = q
+            ? await searchMessagingInThread(DATA_DIR, tenantId, threadId, q, { limit })
+            : await listMessagingMessages(DATA_DIR, tenantId, threadId, { limit });
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Mesaj listesi hatası' }));
+        }
+        return;
+      }
+
+      if (sub === 'messages' && threadId && req.method === 'POST') {
+        const data = await readRequestBody(req);
+        try {
+          const result = await appendMessagingMessage(DATA_DIR, tenantId, threadId, data ?? {});
+          if (result.ok && result.message) {
+            setMessagingTyping(tenantId, threadId, 'staff', false);
+            notifyMessagingRealtime(tenantId, 'message', {
+              threadId,
+              messageId: result.message.id,
+              direction: result.message.direction,
+              messageAt: result.message.createdAt ?? new Date().toISOString(),
+            });
+            void notifyPostaLiveInbox(
+              DATA_DIR,
+              tenantId,
+              {
+                channel: 'messaging',
+                threadId,
+                messageId: result.message.id,
+                direction: result.message.direction,
+                messageAt: result.message.createdAt ?? new Date().toISOString(),
+                sourceId: result.message.id,
+              },
+              () => getPostaUnreadCounts(DATA_DIR, tenantId),
+            );
+            try {
+              result.notifications = await notifyOnMessagingMessage(DATA_DIR, {
+                thread: result.thread,
+                message: result.message,
+                tenantId,
+              });
+            } catch (notifyError) {
+              result.notifications = {
+                ok: false,
+                error: notifyError instanceof Error ? notifyError.message : 'Bildirim hatası',
+              };
+            }
+          }
+          res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Gönderim hatası' }));
+        }
+        return;
+      }
+
+      if (!sub && threadId && req.method === 'GET') {
+        try {
+          const result = await getMessagingThread(DATA_DIR, tenantId, threadId);
+          res.writeHead(result.ok ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Thread hatası' }));
+        }
+        return;
+      }
+    }
+
+    if (pathname.startsWith('/api/messaging/attachments/') && req.method === 'GET') {
+      const parts = pathname.split('/').filter(Boolean);
+      const attachmentId = decodeURIComponent(parts[3] ?? '');
+      const tenantId = resolveTenantId(url);
+      try {
+        const file = await readMessagingAttachment(DATA_DIR, tenantId, attachmentId);
+        if (!file.ok) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(file));
+          return;
+        }
+        res.writeHead(200, {
+          'Content-Type': file.mimeType,
+          'Content-Length': file.size,
+          'Content-Disposition': `inline; filename="${file.fileName.replace(/"/g, '')}"`,
+        });
+        res.end(file.data);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Ek okunamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/system/data-retention/policy' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, policy: getRetentionPolicySummary() }));
+      return;
+    }
+
+    if (pathname === '/api/system/data-retention/run' && req.method === 'POST') {
+      try {
+        const tenantId = resolveTenantId(url);
+        const result = await runEkolojikDataRetention(DATA_DIR, tenantId);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Retention hatası' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/lerta/messaging/threads' && req.method === 'GET') {
+      if (!isLertaPlatformConfigured()) {
+        res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Lerta messaging yapılandırılmadı' }));
+        return;
+      }
+      const limit = url.searchParams.get('limit') ?? '50';
+      const result = await listLertaMessagingThreads({ limit: Number(limit) || 50 });
+      res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname.startsWith('/api/lerta/messaging/threads/') && req.method === 'POST') {
+      const parts = pathname.split('/').filter(Boolean);
+      const threadId = parts[4];
+      const action = parts[5];
+      if (action === 'messages' && threadId) {
+        if (!isLertaPlatformConfigured()) {
+          res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Lerta messaging yapılandırılmadı' }));
+          return;
+        }
+        const data = await readRequestBody(req);
+        const result = await sendLertaMessagingMessage({
+          threadId,
+          bodyText: data?.bodyText ?? data?.body ?? '',
+          locale: data?.locale ?? 'tr',
+        });
+        res.writeHead(result.ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+        return;
+      }
+    }
+
+    if (pathname === '/api/contact/messages' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosAdminApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const limit = Number(url.searchParams.get('limit') || 50);
+      try {
+        const messages = await listContactMessages(DATA_DIR, limit);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, messages }));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Liste alınamadı' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/contact' && req.method === 'POST') {
+      const data = await readRequestBody(req);
+      try {
+        const tenantId = resolveTenantId(url);
+        const result = await saveContactMessage(DATA_DIR, data ?? {}, { tenantId });
+        if (result.ok && result.contact) {
+          try {
+            const { autoCreateCaseForContactRow } = await import('./server/platformSupportCases.mjs');
+            void autoCreateCaseForContactRow(DATA_DIR, result.contact);
+          } catch {
+            /* case bridge opsiyonel */
+          }
+          let portalUrl;
+          try {
+            const link = await linkContactFormToMessagingThread(DATA_DIR, tenantId, result.contact, {
+              origin: resolvePublicPortalOrigin(req),
+            });
+            if (link.ok) portalUrl = link.portalUrl;
+          } catch {
+            /* messaging bridge opsiyonel */
+          }
+          void notifyPostaLiveInbox(
+            DATA_DIR,
+            tenantId,
+            {
+              channel: 'contact',
+              contactId: result.contact.id,
+              messageAt: result.contact.createdAt ?? new Date().toISOString(),
+              sourceId: result.contact.id,
+            },
+            () => getPostaUnreadCounts(DATA_DIR, tenantId),
+          );
+          try {
+            result.notifications = await sendContactNotifications(
+              DATA_DIR,
+              result.contact,
+              tenantId,
+              { portalUrl },
+            );
+          } catch (mailError) {
+            result.notifications = {
+              ok: false,
+              error: mailError instanceof Error ? mailError.message : 'Posta kuyruğu hatası',
+            };
+          }
+          if (portalUrl) result.portalUrl = portalUrl;
+          result.reference = result.contact.id;
+          delete result.contact;
+        }
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, message: 'Mesaj kaydedilemedi' }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/pos/receipt-print-log' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const body = await readRequestBody(req);
+      const { appendReceiptPrintLog } = await import('./server/receiptPrintLog.mjs');
+      await appendReceiptPrintLog(DATA_DIR, tenantId, {
+        phase: body?.phase ?? 'unknown',
+        detail: body?.detail ?? null,
+        userAgent: body?.userAgent ?? null,
+      });
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (pathname === '/api/pos/lima-thermal-print/health' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const port = Number(process.env.LIMA_RAW_PRINT_PORT || 18765);
+      try {
+        const probe = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) });
+        const data = await probe.json().catch(() => ({}));
+        res.writeHead(probe.ok ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: probe.ok, bridge: data }));
+      } catch (error) {
+        res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: String(error) }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/pos/lima-thermal-print' && req.method === 'POST') {
+      const tenantId = resolveTenantId(url);
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, tenantId))) return;
+      const body = await readRequestBody(req);
+      const { forwardLimaThermalPrint } = await import('./server/limaThermalPrint.mjs');
+      const result = await forwardLimaThermalPrint(body, resolveReceiptBridgeRepoRoot());
+      res.writeHead(result.ok ? 200 : result.status || 500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname === '/api/data' && req.method === 'GET') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      if (!(await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant))) return;
+      const data = await readStoreData(resolvedTenant);
+      if (!data) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Mağaza verisi bulunamadı' }));
+        return;
+      }
+      const {
+        sanitizeIsolatedTenantStoreRead,
+        sanitizeMainTenantStoreRead,
+      } = await import('./server/tenantStoreGuard.mjs');
+      const mainSafe = sanitizeMainTenantStoreRead(resolvedTenant, data);
+      const tenantSafe = sanitizeIsolatedTenantStoreRead(resolvedTenant, mainSafe);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(sanitizeStoreSnapshotForClient(tenantSafe)));
+      return;
+    }
+
+    if (pathname === '/api/store/product-pricing' && req.method === 'PATCH') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant);
+      if (!authPayload) return;
+      if (authPayload.role !== 'admin' && authPayload.role !== 'platform') {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: 'Fiyat değiştirmek için yönetici yetkisi gerekir' }));
+        return;
+      }
+      const existingForAuth = await readTenantStore(DATA_DIR, resolvedTenant);
+      const writer = existingForAuth?.users?.find((u) => u.id === authPayload.userId);
+      const writerUsername =
+        writer?.username
+        ?? (authPayload.role === 'platform' ? authPayload.username : undefined);
+      const { assertTenantStoreWriteAllowed } = await import('./server/tenantWritePolicy.mjs');
+      const writePolicy = await assertTenantStoreWriteAllowed(writerUsername, resolvedTenant, DATA_DIR);
+      if (!writePolicy.ok) {
+        res.writeHead(writePolicy.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: writePolicy.error }));
+        return;
+      }
+      const body = await readRequestBody(req);
+      const productId = body?.productId;
+      const { patchTenantProductPricing } = await import('./server/productPricingPatch.mjs');
+      const result = await patchTenantProductPricing(
+        DATA_DIR,
+        resolvedTenant,
+        productId,
+        {
+          purchasePrice: body?.purchasePrice,
+          partnerPrice: body?.partnerPrice,
+          couponPrice: body?.couponPrice,
+          fullSalePrice: body?.fullSalePrice,
+        },
+        existingForAuth?.settings,
+      );
+      const status = result.ok ? 200 : result.status ?? 500;
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname === '/api/data' && req.method === 'PUT') {
+      const tenantId = resolveTenantId(url);
+      const resolvedTenant = await ensureTenantOrRespond(res, tenantId);
+      if (!resolvedTenant) return;
+      const authPayload = await assertPosApiAuth(req, res, DATA_DIR, resolvedTenant);
+      if (!authPayload) return;
+      const existingForAuth = await readTenantStore(DATA_DIR, resolvedTenant);
+      const writer = existingForAuth?.users?.find((u) => u.id === authPayload.userId);
+      const writerUsername =
+        writer?.username
+        ?? (authPayload.role === 'platform' ? authPayload.username : undefined);
+      const { assertTenantStoreWriteAllowed } = await import('./server/tenantWritePolicy.mjs');
+      const writePolicy = await assertTenantStoreWriteAllowed(writerUsername, resolvedTenant, DATA_DIR);
+      if (!writePolicy.ok) {
+        res.writeHead(writePolicy.status ?? 403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: writePolicy.error }));
+        return;
+      }
+      let data = await readRequestBody(req);
+      if (!data || typeof data !== 'object') {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, message: 'Geçersiz veri' }));
+        return;
+      }
+      const existing = await readTenantStore(DATA_DIR, resolvedTenant);
+      const {
+        readCredentialVault,
+        stripUntrustedUserSecretsFromIncoming,
+        applyVaultToStoreSnapshot,
+      } = await import('./server/credentialVault.mjs');
+      const credentialVault = await readCredentialVault(DATA_DIR, resolvedTenant);
+      data = stripUntrustedUserSecretsFromIncoming(data, credentialVault);
+      if (existing && typeof existing === 'object') {
+        if (!Array.isArray(data.products) && Array.isArray(existing.products)) {
+          data.products = existing.products;
+        }
+        if (!Array.isArray(data.sales) && Array.isArray(existing.sales)) {
+          data.sales = existing.sales;
+        }
+        if (!Array.isArray(data.customers) && Array.isArray(existing.customers)) {
+          data.customers = existing.customers;
+        }
+        if (data.settings == null && existing.settings) {
+          data.settings = existing.settings;
+        }
+        const { mergeIncomingStoreWithExisting } = await import('./server/storeSnapshotMerge.mjs');
+        Object.assign(data, mergeIncomingStoreWithExisting(data, existing));
+      }
+      data.updatedAt = data.updatedAt || new Date().toISOString();
+      const {
+        guardIsolatedTenantStoreWrite,
+        guardMainTenantStoreWrite,
+        shouldSkipIrsaliyeStockMigration,
+      } = await import('./server/tenantStoreGuard.mjs');
+      let guarded = guardIsolatedTenantStoreWrite(resolvedTenant, existing, data);
+      guarded = guardMainTenantStoreWrite(resolvedTenant, guarded);
+      let withSecrets = mergeStoreUserSecrets(existing, guarded, credentialVault.users);
+      withSecrets = applyVaultToStoreSnapshot(withSecrets, credentialVault);
+      let toSave = withSecrets;
+      if (!shouldSkipIrsaliyeStockMigration(resolvedTenant, existing ?? withSecrets)) {
+        const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);
+        toSave = changed ? stockFixed : withSecrets;
+      }
+      const { elevateOwnerAdminsInStore } = await import('./server/ownerAdminElevate.mjs');
+      toSave = elevateOwnerAdminsInStore(toSave).store;
+      await writeStoreData(toSave, resolvedTenant);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, updatedAt: toSave.updatedAt }));
+      return;
+    }
+
+    if (pathname.startsWith(ASAT_PROXY_PREFIX)) {
+      if (!handleAsatProxy) {
+        res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('ASAT proxy modülü yüklü değil');
+        return;
+      }
+      try {
+        await handleAsatProxy(req, res, pathname, url.search, ASAT_PROXY_PREFIX);
+      } catch (error) {
+        res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(error instanceof Error ? error.message : 'ASAT proxy hatası');
+      }
+      return;
+    }
+
+    if (pathname.endsWith('/')) pathname += 'index.html';
+
+    if (pathname === '/widget/messaging.js') {
+      const widgetPath = join(DIST, 'widget', 'messaging.js');
+      try {
+        const data = await readFile(widgetPath);
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+        });
+        res.end(data);
+        return;
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('widget/messaging.js bulunamadı — npm run build');
+        return;
+      }
+    }
+
+    const filePath = join(DIST, pathname);
+    const fileStat = await stat(filePath).catch(() => null);
+
+    if (fileStat?.isFile()) {
+      await serveFile(filePath, res);
+      return;
+    }
+
+    await serveFile(join(DIST, 'index.html'), res);
+  } catch (error) {
+    if (process.env.EKOLOJIK_DEBUG_REQUEST_ERRORS === '1') {
+      console.error('request handler error:', error);
+    }
+    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Sunucu hatası');
+  }
+});
+
+const OUTBOX_DRAIN_MS = 30_000;
+setInterval(() => {
+  if (!isEkolojikSmtpConfigured()) return;
+  processPendingOutbox(DATA_DIR, deliverMessage, { limit: 15 })
+    .then(() => maybeAlertOutboxFailedThreshold(DATA_DIR, 'main'))
+    .catch((error) => {
+      console.warn('email-outbox drain:', error instanceof Error ? error.message : error);
+    });
+}, OUTBOX_DRAIN_MS);
+
+setTimeout(() => {
+  maybeAlertOutboxFailedThreshold(DATA_DIR, 'main').catch(() => {});
+}, 120_000);
+
+const RETENTION_MS = 24 * 60 * 60 * 1000;
+const runRetention = () => {
+  runEkolojikDataRetention(DATA_DIR, 'main').then((result) => {
+    const r = result.removed;
+    const total = (r.outboxSentFailed ?? 0) + (r.messagingAttachments ?? 0) + (r.contactMessages ?? 0);
+    if (total > 0) {
+      console.log('data-retention:', JSON.stringify(r));
+    }
+  }).catch((error) => {
+    console.warn('data-retention:', error instanceof Error ? error.message : error);
+  });
+};
+setTimeout(runRetention, 60_000);
+setInterval(runRetention, RETENTION_MS);
+
+postaWsBroadcast = attachPostaWebSocketGateway(server, {
+  dataDir: DATA_DIR,
+  resolveTenantFromUrl: resolveTenantId,
+}).broadcast;
+
+server.listen(PORT, HOST, () => {
+  console.log(`Market POS → http://${HOST}:${PORT}`);
+  if (isEkolojikSmtpConfigured()) {
+    console.log('Ekolojik mail outbox: SMTP aktif, kuyruk drain 30s');
+  } else {
+    console.log('Ekolojik mail outbox: SMTP yok — EKOLOJIK_SMTP_* tanımlayın');
+  }
+  if (process.env.RECEIPT_BRIDGE_AUTOSTART !== '0') {
+    import('./server/receiptBridgeAutostart.mjs')
+      .then(({ ensureReceiptBridgeRunning }) =>
+        ensureReceiptBridgeRunning(resolveReceiptBridgeRepoRoot()),
+      )
+      .catch((err) => console.warn('[receipt-bridge] otomatik başlatma:', err));
+  }
+});

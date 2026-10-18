@@ -1,0 +1,139 @@
+import { useState } from 'react';
+import type { Store } from '../store/useStore';
+import { loadLastQuickUser } from '../storage/quickLogin';
+import { resolveLoginTenantId } from '../config/loginTenant';
+import { isDedicatedPlatformOnlyUsername, PLATFORM_TENANT_ID } from '../config/platformOperators';
+import { saveTenantId } from '../storage/tenantSession';
+import { validateStoreCodeForLogin } from '../config/knownTenants';
+import { reportLoginAuditToServer } from '../services/loginAuditReport';
+import { LoginTenantStoreSection } from './LoginTenantStoreSection';
+
+interface PinLoginPadProps {
+  store: Store;
+  tenantId: string;
+  onTenantIdChange: (tenantId: string) => void;
+  initialExpandedTenant?: boolean;
+  defaultUsername?: string;
+  onSwitchToPassword: () => void;
+  onSuccess?: () => void;
+}
+
+export function PinLoginPad({
+  store,
+  tenantId,
+  onTenantIdChange,
+  initialExpandedTenant = false,
+  defaultUsername,
+  onSwitchToPassword,
+  onSuccess,
+}: PinLoginPadProps) {
+  const [username, setUsername] = useState(defaultUsername ?? loadLastQuickUser() ?? '');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const platformOnlyLogin = isDedicatedPlatformOnlyUsername(username);
+
+  const appendDigit = (digit: string) => {
+    if (pin.length >= 6) return;
+    setPin((prev) => prev + digit);
+  };
+
+  const handleSubmit = async () => {
+    if (pin.length !== 6) {
+      setError('PIN 6 haneli olmalıdır.');
+      return;
+    }
+    const tenantError = validateStoreCodeForLogin(tenantId);
+    if (tenantError) {
+      const auditUser = (username || 'bilinmiyor').trim().toLowerCase();
+      void reportLoginAuditToServer(tenantId === '__platform__' ? 'main' : tenantId, {
+        username: auditUser,
+        failureKind: 'invalid_store_code',
+        failureReason: tenantError,
+        method: 'pin',
+      });
+      setError(tenantError);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const resolvedTenant = resolveLoginTenantId(
+        username,
+        platformOnlyLogin ? PLATFORM_TENANT_ID : tenantId,
+      );
+      saveTenantId(resolvedTenant);
+      await store.refreshTenantData();
+      const result = await store.loginWithPin(username, pin);
+      if (result.status === 'error' || result.status === 'locked') {
+        setError(result.message);
+        setPin('');
+      } else if (result.status === 'success') {
+        onSuccess?.();
+      }
+    } catch {
+      setError('PIN girişi başarısız.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="pin-login">
+      <LoginTenantStoreSection
+        tenantId={tenantId}
+        onTenantIdChange={onTenantIdChange}
+        initialExpanded={initialExpandedTenant && !platformOnlyLogin}
+        hideForOwnerAccount={platformOnlyLogin}
+      />
+
+      <label className="pin-login-username">
+        Kullanıcı Adı
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value.toLowerCase())}
+          autoComplete="username"
+        />
+      </label>
+
+      <div className="pin-display" aria-label="PIN">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <span key={index} className={`pin-dot ${index < pin.length ? 'is-filled' : ''}`} />
+        ))}
+      </div>
+
+      <div className="pin-keypad">
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'].map((key) => (
+          <button
+            key={key}
+            type="button"
+            className={`pin-key ${key === 'clear' || key === 'back' ? 'pin-key--action' : ''}`}
+            onClick={() => {
+              if (key === 'clear') setPin('');
+              else if (key === 'back') setPin((prev) => prev.slice(0, -1));
+              else appendDigit(key);
+            }}
+          >
+            {key === 'clear' ? 'C' : key === 'back' ? '←' : key}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="login-error" role="alert">{error}</p>}
+
+      <button
+        type="button"
+        className="btn btn-primary login-submit"
+        onClick={handleSubmit}
+        disabled={busy || pin.length !== 6 || !username.trim()}
+      >
+        {busy ? 'Giriş yapılıyor...' : 'PIN ile Giriş'}
+      </button>
+
+      <button type="button" className="btn btn-text login-mode-switch" onClick={onSwitchToPassword}>
+        Şifre ile giriş
+      </button>
+    </div>
+  );
+}

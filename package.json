@@ -1,0 +1,58 @@
+{
+  "name": "greenleaf-pos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Greenleaf — Windows yerel POS (veri PCde)",
+  "type": "module",
+  "scripts": {
+    "greenleaf:dev": "npm run build && node scripts/greenleaf-start.mjs",
+    "greenleaf:start": "node scripts/greenleaf-start.mjs",
+    "dev": "vite --port 5190",
+    "build": "npm run images:sync && npm run windows:receipt-install:sync && tsc -b && vite build",
+    "windows:receipt-install:sync": "node scripts/sync-windows-receipt-install-public.mjs",
+    "images:sync": "node scripts/download-product-images.mjs",
+    "preview": "vite preview --host 0.0.0.0 --port 5180",
+    "start": "vite preview --host 0.0.0.0 --port ${PORT:-5180}",
+    "deploy:vps": "bash scripts/deploy-vps.sh",
+    "seed:lima": "node scripts/seed-lima-demo-products.mjs",
+    "scrape:greenleaf": "node scripts/scrape-greenleaf.mjs",
+    "scrape:greenleaf-shop": "node scripts/scrape-greenleaf-shop.mjs",
+    "translate:greenleaf-shop": "node scripts/translate-greenleaf-shop.mjs",
+    "repair:greenleaf-shop-tr": "node scripts/repair-greenleaf-shop-tr.mjs",
+    "test:tenant-mail": "node scripts/e2e-tenant-mail.mjs",
+    "test:jmap-lite": "node scripts/jmap-lite-smoke.mjs",
+    "test:imap-move": "node scripts/posta-imap-move-regression.mjs",
+    "test:faz46": "node scripts/faz46-caldav-push-smoke.mjs",
+    "test:faz47": "node scripts/faz47-engagement-smoke.mjs",
+    "test:faz48": "node scripts/faz48-omnichannel-smoke.mjs",
+    "test:faz49": "node scripts/faz49-bot-sla-smoke.mjs",
+    "test:faz50": "node scripts/faz50-portal-smoke.mjs",
+    "test": "node scripts/run-unit-tests.mjs && node scripts/run-wave-smokes.mjs",
+    "test:qa": "node scripts/pre-release-qa.mjs",
+    "test:ci": "node scripts/ci-with-server.mjs",
+    "test:faz52": "node scripts/faz52-closure-smoke.mjs",
+    "test:nb-ui-visual": "node scripts/posta-nb-ui-visual-smoke.mjs"
+  },
+  "dependencies": {
+    "imapflow": "^1.7.8",
+    "nodemailer": "^10.0.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.4",
+    "web-push": "^3.6.7",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@iamtraction/google-translate": "^2.0.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.4.1",
+    "playwright": "^1.49.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.4.3"
+  },
+  "overrides": {
+    "@fastify/busboy": "^3.2.2",
+    "undici": "^6.29.0"
+  }
+}

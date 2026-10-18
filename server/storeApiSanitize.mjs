@@ -1,0 +1,64 @@
+/** İstemciye giden mağaza snapshot — şifre hash'leri döndürülmez. */
+export function sanitizeStoreSnapshotForClient(store) {
+  if (!store || typeof store !== 'object') return store ?? {};
+  if (!Array.isArray(store.users)) return { ...store };
+  const users = store.users.map((user) => {
+    if (!user || typeof user !== 'object') return user;
+    const { passwordHash, pinHash, totpSecret, ...safe } = user;
+    return safe;
+  });
+  return { ...store, users };
+}
+
+function isSha256Hex(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+}
+
+/** PUT ile gelen kullanıcı kayıtlarında boş bırakılan secret alanları diskteki değerle koru. */
+export function mergeStoreUserSecrets(existing, incoming, vaultUsers = null) {
+  if (!incoming || typeof incoming !== 'object') return incoming;
+  if (!Array.isArray(incoming.users) || !Array.isArray(existing?.users)) {
+    return incoming;
+  }
+  const vault = vaultUsers && typeof vaultUsers === 'object' ? vaultUsers : {};
+  const byId = new Map(existing.users.map((u) => [u.id, u]));
+  const byUsername = new Map(
+    existing.users.map((u) => [String(u.username ?? '').trim().toLowerCase(), u]),
+  );
+  const users = incoming.users.map((user) => {
+    const usernameKey = String(user.username ?? '').trim().toLowerCase();
+    const prev = byId.get(user.id) ?? byUsername.get(usernameKey);
+    if (!prev) return user;
+    const next = { ...user };
+    const vaultEntry = vault[usernameKey] ?? {};
+    const keepSecret = (field) => {
+      const incomingVal = next[field];
+      const prevVal = prev[field];
+      const vaultVal = vaultEntry[field];
+      if (field === 'passwordHash' && isSha256Hex(incomingVal) && incomingVal !== prevVal) {
+        next[field] = incomingVal;
+        return;
+      }
+      if ((!incomingVal || incomingVal === '') && prevVal) {
+        next[field] = prevVal;
+        return;
+      }
+      if ((!incomingVal || incomingVal === '') && vaultVal) {
+        next[field] = vaultVal;
+      }
+    };
+    keepSecret('passwordHash');
+    keepSecret('pinHash');
+    keepSecret('totpSecret');
+    return next;
+  });
+  for (const prev of existing.users) {
+    if (!prev?.id) continue;
+    const inList = users.some(
+      (u) => u.id === prev.id
+        || String(u.username ?? '').trim().toLowerCase() === String(prev.username ?? '').trim().toLowerCase(),
+    );
+    if (!inList) users.push(prev);
+  }
+  return { ...incoming, users };
+}

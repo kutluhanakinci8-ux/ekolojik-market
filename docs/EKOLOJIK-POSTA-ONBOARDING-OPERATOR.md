@@ -1,0 +1,196 @@
+# Posta & mesajlaşma kurulumu — operatör rehberi
+
+Bu belge, **kayıt sonrası 3 adımlı kurulum sihirbazını**, **işletme posta kutusu** kavramını ve **VPS ortam değişkenlerini** özetler. Teknik plan: [PLAN-EKOLOJIK-POSTA-KAYIT-ONBOARDING.md](./PLAN-EKOLOJIK-POSTA-KAYIT-ONBOARDING.md).
+
+Günlük Posta kullanımı: [EKOLOJIK-POSTA-KULLANIM.md](./EKOLOJIK-POSTA-KULLANIM.md).
+
+---
+
+## İşletme kutusu ≠ kişisel e-posta
+
+| Adres | Ne işe yarar? |
+|-------|----------------|
+| **Kayıt / ayarlardaki e-posta** | İşletme iletişim ve bildirim adresi (CRM, sözleşme, test maili alıcısı). Kişisel Gmail/Outlook değildir. |
+| **Posta → Gelen (IMAP)** | Sunucuda tanımlı **ortak işletme hesabı** (ör. `info@ekolojikmarket.com.tr`). Yetkili personel POS üzerinden aynı kutuyu görür. |
+| **Müşteri mesajları (Sohbet)** | `data/messaging/` içi yazışma; e-posta kutusundan bağımsız. Site widget’ı isteğe bağlıdır. |
+
+> Size verilen `info@…` (veya hosting IMAP kullanıcısı) **mağazanın ortak posta kutusudur**. Kişisel hesabınızı bu alana bağlamayın.
+
+---
+
+## Kim kurulum sihirbazını görür?
+
+- Yalnızca **admin** rolü.
+- **Yeni kayıt:** `POST /api/auth/register` sonrası arka planda alias kuralları + deliverability alias seed çalışır (`registerMailHealthProbe.mjs`); hoş geldin e-postası kuyruğa alınır.
+- `settings.postaOnboarding.status` **`completed`** veya **`dismissed`** değilse, `/app` girişinde tam ekran sihirbaz açılır.
+- **Mevcut mağazalar (main vb.):** ilk `GET /api/posta/onboarding` veya deploy script `scripts/migrate-posta-onboarding.mjs` ile legacy migrasyon → genelde `completed`. Yeni **kayıt** tenant’ları sihirbazı tamamlar.
+
+**Sonra hatırlat:** `status: dismissed` — tekrar açmak için **Ayarlar → E-posta → Kurulumu yeniden aç** veya `POST /api/posta/onboarding/reopen` (yönetici API token gerekir).
+
+### Yönetim API token (güvenlik)
+
+Onboarding güncelleme, tenant-mail kaydı, messaging anahtar rotate ve CRM mail gönderimi sunucuda **yönetici Bearer token** ister (`POST /api/auth/pos-token` — POS giriş şifresi/PIN ile). Token, başarılı girişte otomatik alınır (`sessionStorage`). Deploy sonrası **bir kez çıkış yapıp tekrar giriş** yapın.
+
+Üretimde `EKOLOJIK_POS_API_SECRET` tanımlayın (yoksa `data/pos-api-secret` otomatik oluşur). Tenant IMAP/SMTP şifreleri `data/tenant-mail/*.json` içinde **şifreli** saklanır (sunucu secret ile).
+
+`GET` ve `PUT /api/data` geçerli POS token ister; yanıt kullanıcı şifre hash'lerini içermez — giriş sonrası token ile senkron çalışır.
+
+E-posta outbox dosyaları `data/email-outbox/{pending|sent|failed}/{tenantId}/` altında tutulur (eski düz dosyalar ilk işlemde taşınır).
+
+**Başarısız outbox hijyeni (Faz 39):** Hub → Ayarlar → E-posta → **Başarısız gönderimler** (toplu yeniden kuyruk / arşiv). Sunucuda haftalık arşiv:
+
+```bash
+EKOLOJIK_DRY_RUN=1 bash scripts/sunucu-ekolojik-outbox-failed-arsivle.sh /var/www/market-pos
+EKOLOJIK_DRY_RUN=0 bash scripts/sunucu-ekolojik-outbox-failed-arsivle.sh /var/www/market-pos
+# İsteğe bağlı tek tenant: EKOLOJIK_OUTBOX_ARCHIVE_TENANT=main
+```
+
+Eşik uyarısı: `EKOLOJIK_OUTBOX_FAILED_ALERT_THRESHOLD` (varsayılan 50) — bildirim matrisinde **outbox_failed → ops e-posta** açık olmalı.
+
+Haftalık cron (root, bir kez):
+
+```bash
+bash scripts/sunucu-ekolojik-outbox-failed-cron-kur.sh
+```
+
+**Yerel Postfix (`127.0.0.1:25`) + ops bildirimleri:** `EKOLOJIK_OPS_EMAIL` (genelde `info@…`) Postfix’te **virtual alias** ile teslim alınmalıdır. Aksi halde `550 Recipient address rejected` ve binlerce `outbox-failed-ops` kaydı oluşur (kod artık meta-mail döngüsünü keser; kök neden yine Postfix).
+
+```bash
+bash scripts/sunucu-ekolojik-smtp-ops-recipient-dogrula.sh /var/www/market-pos
+bash scripts/sunucu-ekolojik-imap-vps-alias-fix.sh   # root — virtual_alias_maps düzeltir
+node scripts/outbox-failed-archive-report.mjs /var/www/market-pos/data 800
+```
+
+DNS TXT önerileri (Turhost panel, SPF/DMARC/DKIM tek tablo): `bash scripts/sunucu-ekolojik-dns-txt-onerileri.sh /var/www/market-pos` — rehber: `docs/EKOLOJIK-DNS-TURHOST-PANEL.md`  
+Kırılma testi giderim faz planı: `docs/PLAN-KIRILMA-GIDERIM.md`
+
+---
+
+## 3 adım — operatör akışı
+
+### Adım 1 — E-posta altyapısı
+
+**Amaç:** SMTP (giden) ve IMAP (gelen) hazır mı kontrol etmek; isteğe bağlı test maili.
+
+| POS’ta | Sunucu API |
+|--------|------------|
+| SMTP / IMAP durum kartları | `GET /api/email/health`, `GET /api/posta/imap/health` |
+| DNS özet (SPF/DKIM) | `GET /api/posta/deliverability` |
+| Test gönder | `POST /api/email/test` (sihirbaz “Test gönder”) |
+| Gönderen / ops | `GET /api/posta/settings` |
+
+**Geçiş:** “Sunucu yöneticisi hallediyor” → adım atlanır (`mailHealth.skipped`).
+
+**Alias (Faz 5):** `siparis@`, `fatura@` genelde hosting’de aynı IMAP hesabına yönlenir. Sihirbazda **siparis@ / fatura@ kurallarını ekle** veya:
+
+```bash
+curl -sS -X POST 'https://ekolojikmarket.com.tr/api/posta/onboarding/seed-alias-rules'
+```
+
+Tenant alias: `settings.postaAliases` (kayıt/onboarding seed: `siparis@` / `fatura@` domain). Sunucu env: `EKOLOJIK_MAIL_ALIASES=…` yedek.
+
+DNS doğrulama (tenant From domain): `EKOLOJIK_VERIFY_TENANT=main EKOLOJIK_DNS_STRICT=1 bash scripts/sunucu-ekolojik-dns-mail-dogrula.sh`
+
+**Tenant özel kutu (Faz 6):** Ayarlar → E-posta → **Mağaza posta kutusu** — “Platform .env” kapatılıp mağaza **SMTP + IMAP** girilir (`data/tenant-mail/{tenantId}.json`). Giden test ve outbox ilgili `tenantId` ile gönderilir. `main` varsayılan olarak `.env` kullanır.
+
+**VPS checklist (minimum):**
+
+| Değişken | Açıklama |
+|----------|----------|
+| `EKOLOJIK_MAIL_FROM` | Giden From adresi |
+| `EKOLOJIK_SMTP_HOST` / port | Genelde `127.0.0.1:25` (yerel Postfix) |
+| `EKOLOJIK_IMAP_HOST` / user / pass | Gelen kutu (ör. `info@ekolojikmarket.com.tr`) |
+| `EKOLOJIK_OPS_EMAIL` | İç bildirimler (iletişim formu, mesaj özeti) |
+
+Doğrulama:
+
+```bash
+bash /var/www/ekolojik-market-pos/scripts/sunucu-ekolojik-posta-faz22-dogrula.sh /var/www/market-pos
+```
+
+### Adım 2 — Mesajlaşmayı siteye ekleme
+
+**Amaç:** Web sitesinden müşteri mesajı → POS **Posta → Müşteri mesajları**.
+
+| Yöntem | Detay |
+|--------|--------|
+| **Mağaza anahtarı (önerilen)** | Sihirbaz: “Mağaza API anahtarı oluştur” → `data/messaging/{tenantId}/public-config.json` |
+| **Sunucu genel anahtar** | `.env` → `EKOLOJIK_MESSAGING_PUBLIC_KEY` (tenant anahtarı yoksa fallback) |
+
+| API | İş |
+|-----|-----|
+| `GET /api/messaging/public-config?tenant=…` | Anahtar durumu |
+| `POST /api/messaging/public-config` body `{ "rotate": true }` | Yeni tenant anahtarı |
+| `GET /widget/messaging.js` | Embed script (cache 24s sunucu) |
+| `POST /api/messaging/widget-test` | Admin smoke — test thread POS Sohbet’e düşer |
+| `allowedOrigins` (public-config JSON) | Harici site CORS allowlist |
+| `GET /api/public/messaging/v1/capabilities?tenant=…` | Widget “API açık mı?” |
+
+Embed örneği (sihirbazda kopyalanır):
+
+- `tenantId` — `main` veya kayıt tenant id
+- `apiKey` — mağaza veya env anahtarı
+- `apiBase` — `https://ekolojikmarket.com.tr/api/public/messaging/v1`
+- Multi-tenant: `?tenant=…` sorgu parametresi
+
+**Geçiş:** “Sadece POS içi sohbet” → `messagingEmbed.skipped`.
+
+### Adım 3 — Posta sekmesi
+
+**Amaç:** Birincil yöneticide **Posta** menüsü (yeni kayıtlarda zaten açıktır).
+
+- **Bitir** → `POST /api/posta/onboarding/complete`
+- Diğer kullanıcılar: **Ayarlar → Kullanıcılar** → sekme yetkileri.
+
+---
+
+## Onboarding API (destek / test)
+
+Tümü oturum gerektirmez (POS ile aynı güvenlik modeli); tenant: `?tenant=demo-mağaza`.
+
+| Endpoint | Metot | Açıklama |
+|----------|-------|----------|
+| `/api/posta/onboarding` | GET | Durum + SMTP/IMAP/messaging özet |
+| `/api/posta/onboarding` | PATCH | Adım `done` / `skipped`, `status` |
+| `/api/posta/onboarding/complete` | POST | Tamamla + primary admin `posta` |
+
+Örnek (main):
+
+```bash
+curl -sS 'https://ekolojikmarket.com.tr/api/posta/onboarding'
+```
+
+---
+
+## Deploy sonrası veri migrasyonu (Faz 3)
+
+Her deploy:
+
+```bash
+node /var/www/ekolojik-market-pos/scripts/migrate-posta-onboarding.mjs /var/www/market-pos/data
+```
+
+(`sunucu-market-pos-deploy.sh` bunu otomatik çalıştırır.)
+
+- Eski mağaza: admin’lere `posta`, onboarding `completed`.
+- Yeni kayıt (sihirbaz devam ediyor): otomatik tamamlanmaz.
+
+---
+
+## Sorun giderme
+
+| Belirti | Kontrol |
+|---------|---------|
+| Sihirbaz sürekli açılıyor | `GET /api/posta/onboarding` → `status`; tamamlamak için adım 3 veya `complete` |
+| Posta menüsü yok | Kullanıcı `allowedTabs` içinde `posta`; admin mi? Migrasyon çalıştı mı? |
+| Gelen boş | IMAP env + **IMAP yenile**; `GET /api/posta/imap/health` |
+| Widget 401/503 | `public-config` / `EKOLOJIK_MESSAGING_PUBLIC_KEY`; `capabilities` |
+| Test mail gitmiyor | `GET /api/email/health`, outbox kuyruk (Ayarlar → E-posta) |
+
+---
+
+## İlgili belgeler
+
+- [PLAN-EKOLOJIK-POSTA-KAYIT-ONBOARDING.md](./PLAN-EKOLOJIK-POSTA-KAYIT-ONBOARDING.md) — faz planı
+- [PLAN-EKOLOJIK-MAIL-MESAJ-BAGIMSIZ.md](./PLAN-EKOLOJIK-MAIL-MESAJ-BAGIMSIZ.md) — mail/mesaj bağımsızlık
+- [EKOLOJIK-FAZ6-SMTP-RUNBOOK.md](./EKOLOJIK-FAZ6-SMTP-RUNBOOK.md) / [EKOLOJIK-FAZ7-IMAP-RUNBOOK.md](./EKOLOJIK-FAZ7-IMAP-RUNBOOK.md)

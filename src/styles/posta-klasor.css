@@ -1,0 +1,156 @@
+/* Posta (görünüm) — klasör değişince shell/kolon sabit (3 kolon grid-column) */
+
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) {
+  width: 100%;
+  max-width: 1480px;
+  box-sizing: border-box;
+}
+
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .posta-hub-meta-strip,
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .settings-flash,
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .posta-hub-smtp-warn,
+.module-screen.posta-hub-screen.posta-hub-screen--premium:not(.posta-hub-screen--sohbet-focus) > .posta-hub-offline-hint {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-hub-folders {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-hub-list,
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-yazisma-col {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.posta-hub-shell:not(.posta-hub-shell--sohbet):not(.posta-hub-shell--tam) > .posta-hub-detail {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+}
+
+/* Posta klasör rail — posta-yazisma-col + posta-yazisma-thread-card (mesaj sekmesi ile birebir) */
+
+.posta-hub-screen--premium .posta-hub-folders {
+  padding: 0;
+  gap: 0;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.posta-hub-screen--premium .posta-hub-folders .posta-klasor-rail.posta-yazisma-col {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: transparent;
+  border-right: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.posta-hub-screen--premium .posta-hub-folders .posta-klasor-rail .posta-yazisma-threads {
+  margin-top: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  scrollbar-gutter: auto;
+}
+
+.posta-hub-screen--premium .posta-hub-folders .posta-klasor-rail .posta-hub-compose {
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.posta-hub-screen--premium .posta-hub-folders .posta-klasor-rail .posta-hub-folder-group {
+  margin: 8px 0 2px;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(45, 107, 40, 0.65);
+  list-style: none;
+}
+
+.posta-hub-screen--premium .posta-hub-folders .posta-klasor-rail .posta-hub-folder-group:first-of-type {
+  margin-top: 0;
+}
+
+/* Eski .posta-hub-folders button kurallarını ez (active sınıfı kullanılmıyor) */
+.posta-hub-screen--premium .posta-hub-folders .posta-yazisma-thread-card--folder {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(27, 61, 26, 0.04);
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.posta-hub-screen--premium .posta-hub-folders > .posta-hub-folder-meta {
+  flex-shrink: 0;
+  width: auto;
+  margin-top: auto;
+  margin-left: var(--posta-yazisma-gutter, 16px);
+  margin-right: var(--posta-yazisma-gutter, 16px);
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+.posta-hub-screen--premium .posta-hub-folders > .posta-hub-sync {
+  flex-shrink: 0;
+  width: auto;
+  margin: 0 var(--posta-yazisma-gutter, 16px) 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+/* Gelen kutusu orta kolon — posta-yazisma-col gutter */
+.posta-hub-screen--premium .posta-hub-list.posta-yazisma-col.posta-hub-list-col {
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--posta-border-soft);
+  background: #fcfefb;
+}
+
+.posta-hub-screen--premium .posta-hub-list.posta-hub-list-col .posta-hub-list-head {
+  margin: 0 0 8px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.posta-hub-screen--premium .posta-hub-list.posta-hub-list-col .posta-hub-list-title {
+  margin: 0;
+}
+
+.posta-hub-screen--premium .posta-hub-list.posta-hub-list-col > ul {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: auto;
+}
+
+.posta-hub-screen--premium .posta-hub-list.posta-hub-list-col .posta-hub-list-toolbar,
+.posta-hub-screen--premium .posta-hub-list.posta-hub-list-col .posta-hub-search {
+  width: 100%;
+  box-sizing: border-box;
+}

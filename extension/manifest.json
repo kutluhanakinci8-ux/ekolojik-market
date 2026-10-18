@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Market POS ASAT Köprüsü",
+  "version": "1.0.0",
+  "description": "ASAT ödenmemiş borçlarını Greenleaf POS takvimine aktarır",
+  "content_scripts": [
+    {
+      "matches": ["https://online.asat.gov.tr/*"],
+      "js": ["asat-bridge-inject.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

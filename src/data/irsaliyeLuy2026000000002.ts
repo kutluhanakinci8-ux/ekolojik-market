@@ -1,0 +1,135 @@
+/**
+ * e-İrsaliye LUY2026000000002 (29.09.2026) — Lü Ye Kozmetik
+ * Stok kodu = productCode; EAN-13 = irsaliye “Sonra Gönderilecek Miktar” sütunu
+ */
+export const IRSALIYE_LUY2026000000002_ID = 'LUY2026000000002';
+
+/** localStorage: irsaliye stok audit kaydı (sürüm artınca yeniden hareket yazılır) */
+export const IRSALIYE_STOCK_MIGRATION_KEY = `market-pos-irsaliye-stock-${IRSALIYE_LUY2026000000002_ID}-v5-irsaliye`;
+
+/** Stok kodu → birim alış fiyatı (TL) — irsaliye satırları 1–34 (ilk birim fiyat geçerli) */
+export const IRSALIYE_PURCHASE_BY_CODE: Record<string, number> = {
+  ASF066: 51.25,
+  CAA039: 287.5,
+  FPA151: 363.33,
+  DAB089: 82.5,
+  LGI019: 206.67,
+  YBA045: 199.25,
+  EAA022: 71.25,
+  CAB040: 204.75,
+  CAA038: 204.75,
+  KLA128: 266.33,
+  CEA069: 130.08,
+  SAA069: 89.92,
+  ASA086: 199.25,
+  ASA017: 152.92,
+  SBJ064: 223.33,
+  SBC053: 339.17,
+  EBB018: 261.67,
+  CCA016: 154.17,
+  CBA052: 175.83,
+  DAA109: 152.17,
+  CBF015: 51.25,
+  CBF014: 51.25,
+  DAC056: 141.17,
+  DAB087: 179.17,
+  DAA108: 166.75,
+  DAA062: 100.33,
+  CBE034: 117.58,
+  ASF055: 127.33,
+  ASF054: 301.58,
+  ASF053: 152.92,
+  ASB047: 166.75,
+  ASB046: 100.33,
+  ASB045: 90.67,
+  ASB044: 179.17,
+  SBE089: 16038.33,
+};
+
+/** Stok kodu → EAN-13 (irsaliye PDF “Sonra Gönderilecek Miktar”) */
+export const IRSALIYE_EAN_BY_CODE: Record<string, string> = {
+  ASF066: '6955470956859',
+  CAA039: '6955470954275',
+  FPA151: '6955470957498',
+  DAB089: '6955470954459',
+  LGI019: '6955470954312',
+  YBA045: '6955470957115',
+  EAA022: '6955470954220',
+  CAB040: '6955470954398',
+  CAA038: '6955470954237',
+  /** Paket (KLA128) — kasada stok kodu ile; EAN tekli (KLA128T) için */
+  KLA128T: '6955470959966',
+  CEA069: '6955470940223',
+  SAA069: '6955470954466',
+  ASA086: '6955470956880',
+  ASA017: '6955470956170',
+  SBJ064: '6955470951489',
+  SBC053: '6955470950215',
+  EBB018: '6955470948496',
+  CCA016: '6955470951649',
+  CBA052: '6955470951779',
+  DAA109: '6955470951564',
+  CBF015: '6955470951588',
+  CBF014: '6955470951571',
+  DAC056: '6955470950734',
+  DAB087: '6955470951724',
+  DAA108: '6955470951526',
+  DAA062: '6955470951656',
+  CBE034: '6955470951519',
+  ASF055: '6955470951618',
+  ASF054: '6955470951601',
+  ASF053: '6955470951595',
+  ASB047: '6955470951533',
+  ASB046: '6955470951472',
+  ASB045: '6955470951502',
+  ASB044: '6955470951496',
+  SBE089: '6955470954480',
+};
+
+export function irsaliyeEanForCode(code?: string | null): string | undefined {
+  const key = code?.trim().toUpperCase();
+  if (!key) return undefined;
+  return IRSALIYE_EAN_BY_CODE[key];
+}
+
+/**
+ * Stok kodu → toplam adet (39 satır; tekrarlayan kodlar toplandı)
+ * Kaynak: LUY2026000000002 PDF
+ */
+export const IRSALIYE_STOCK_BY_CODE: Record<string, number> = {
+  ASF066: 96,
+  CAA039: 20,
+  FPA151: 40,
+  DAB089: 75,
+  LGI019: 12,
+  YBA045: 20,
+  EAA022: 24,
+  CAB040: 20,
+  CAA038: 20,
+  KLA128: 27,
+  CEA069: 30,
+  SAA069: 24,
+  ASA086: 20,
+  ASA017: 20,
+  SBJ064: 48,
+  SBC053: 30,
+  EBB018: 20,
+  CCA016: 96,
+  CBA052: 20,
+  DAA109: 20,
+  CBF015: 36,
+  CBF014: 36,
+  DAC056: 16,
+  DAB087: 60,
+  DAA108: 40,
+  DAA062: 61,
+  CBE034: 48,
+  ASF055: 47,
+  ASF054: 8,
+  ASF053: 27,
+  ASB047: 40,
+  ASB046: 75,
+  ASB045: 120,
+  ASB044: 30,
+  SBE089: 6,
+};

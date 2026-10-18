@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Faz 5/6 — SPF / DMARC / DKIM TXT (dig; tam deliverability manuel test kalır)
+set -euo pipefail
+
+REPO_ROOT="${EKOLOJIK_REPO_ROOT:-/var/www/ekolojik-market-pos}"
+DATA_DIR="${EKOLOJIK_DATA_DIR:-/var/www/market-pos/data}"
+TENANT="${EKOLOJIK_VERIFY_TENANT:-main}"
+STRICT="${EKOLOJIK_DNS_STRICT:-0}"
+
+DOMAIN="${EKOLOJIK_MAIL_DOMAIN:-}"
+if [[ -z "${DOMAIN}" ]] && [[ -f "${REPO_ROOT}/scripts/lib/ekolojik-tenant-mail-domain.mjs" ]]; then
+  DOMAIN="$(node "${REPO_ROOT}/scripts/lib/ekolojik-tenant-mail-domain.mjs" "${DATA_DIR}" "${TENANT}" 2>/dev/null || true)"
+fi
+DOMAIN="${DOMAIN:-ekolojikmarket.com.tr}"
+FAIL=0
+
+warn() { echo "UYARI: $*"; }
+ok() { echo "OK   $*"; }
+bad() { echo "HATA: $*"; FAIL=1; }
+
+if ! command -v dig >/dev/null 2>&1; then
+  warn "dig yok — DNS doğrulama atlandı"
+  exit 0
+fi
+
+echo "=== Ekolojik DNS mail (TXT) ==="
+echo "Alan: ${DOMAIN} (tenant=${TENANT}, strict=${STRICT})"
+echo ""
+
+DNS_RESOLVERS=()
+if [[ -n "${EKOLOJIK_DNS_RESOLVER:-}" ]]; then
+  DNS_RESOLVERS+=("${EKOLOJIK_DNS_RESOLVER}")
+elif [[ -n "${EKOLOJIK_DNS_RESOLVERS:-}" ]]; then
+  IFS=',' read -r -a DNS_RESOLVERS <<< "${EKOLOJIK_DNS_RESOLVERS}"
+else
+  DNS_RESOLVERS=(dns1.turhost.com dns2.turhost.com 1.1.1.1 8.8.8.8)
+fi
+
+txt_records() {
+  local name="$1" out="" r
+  for r in "${DNS_RESOLVERS[@]}"; do
+    r="${r// /}"
+    [[ -z "${r}" ]] && continue
+    out="$(dig +short TXT "${name}" @"${r}" 2>/dev/null | tr -d '"' | tr '\n' ' ')"
+    if [[ -n "${out// /}" ]]; then
+      echo "${out}"
+      return 0
+    fi
+  done
+  dig +short TXT "${name}" 2>/dev/null | tr -d '"' | tr '\n' ' '
+}
+
+SPF="$(txt_records "${DOMAIN}")"
+if echo "${SPF}" | grep -qi 'v=spf1'; then
+  ok "SPF TXT @${DOMAIN}"
+  echo "     ${SPF}"
+else
+  if [[ "${STRICT}" == "1" ]]; then
+    bad "SPF kaydı yok veya v=spf1 bulunamadı (@${DOMAIN})"
+  else
+    warn "SPF @${DOMAIN} — docs/EKOLOJIK-FAZ6-SMTP-RUNBOOK.md"
+  fi
+fi
+
+DMARC="$(txt_records "_dmarc.${DOMAIN}")"
+if echo "${DMARC}" | grep -qi 'v=DMARC1'; then
+  ok "DMARC _dmarc.${DOMAIN}"
+  echo "     ${DMARC}"
+else
+  if [[ "${STRICT}" == "1" ]]; then
+    bad "DMARC kaydı yok (_dmarc.${DOMAIN})"
+  else
+    warn "DMARC _dmarc.${DOMAIN} yok"
+  fi
+fi
+
+DKIM_FOUND=0
+SELECTORS=(default mail dkim selector1 selector2 "${EKOLOJIK_DKIM_SELECTOR:-ekolojik}")
+for sel in "${SELECTORS[@]}"; do
+  D="$(txt_records "${sel}._domainkey.${DOMAIN}")"
+  if echo "${D}" | grep -qi 'v=DKIM1'; then
+    ok "DKIM ${sel}._domainkey.${DOMAIN}"
+    DKIM_FOUND=1
+    break
+  fi
+done
+if [[ $DKIM_FOUND -eq 0 ]]; then
+  if [[ "${STRICT}" == "1" ]]; then
+    bad "DKIM TXT bulunamadı (selector: ${SELECTORS[*]} — Turhost: ekolojik._domainkey)"
+  else
+    warn "DKIM selector denemeleri boş — panel/hosting DKIM adını kontrol edin"
+  fi
+fi
+
+echo ""
+if [[ $FAIL -eq 0 ]]; then
+  echo "✓ DNS mail TXT kapısı geçti (veya uyarı modu)"
+  exit 0
+fi
+echo "HATA: DNS — EKOLOJIK_DNS_STRICT=0 ile uyarı modunda tekrar deneyin"
+exit 1

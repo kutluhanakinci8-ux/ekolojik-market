@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fatura Köprüsü Kurulumu</title>
+  <style>
+    :root {
+      font-family: Inter, system-ui, sans-serif;
+      color: #1f2937;
+      --green: #51b848;
+      --green-dark: #3d9636;
+      --border: #d8e2d8;
+      --muted: #6b7280;
+      --warn-bg: #fffbeb;
+      --warn-border: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: linear-gradient(180deg, #f4faf6 0%, #fff 100%);
+      line-height: 1.5;
+    }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    .lead { color: var(--muted); margin: 0 0 20px; }
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .warn {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+    li strong { display: block; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button, a.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      padding: 11px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary { background: var(--green); color: #fff; }
+    .btn-primary:hover { background: var(--green-dark); }
+    .btn-outline {
+      background: #fff;
+      color: #1f2937;
+      border: 1px solid var(--border);
+    }
+    .status {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.ok { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+    .status.error { border-color: #fecaca; background: #fff1f2; color: #b91c1c; }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Fatura Köprüsü Kurulumu</h1>
+  <p class="lead">ASAT borç sorgusu sonucunun otomatik takvime aktarılması için bir kez kurulur.</p>
+
+  <div class="warn">
+    <strong>Neden kod ekranı açıldı?</strong>
+    Tarayıcıda <strong>Tampermonkey</strong> (veya Violentmonkey) yüklü değilse
+    <code>.user.js</code> dosyası kurulmaz; sadece metin olarak görünür. Bu normaldir.
+  </div>
+
+  <div class="card">
+    <ol>
+      <li>
+        <strong>1) Tarayıcı eklentisini kurun</strong>
+        Chrome için Tampermonkey’i yükleyin (ücretsiz).
+        <div class="btn-row">
+          <a class="btn btn-outline" href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener noreferrer">
+            Tampermonkey İndir (Chrome)
+          </a>
+        </div>
+      </li>
+      <li>
+        <strong>2) Köprü betiğini yükleyin</strong>
+        Tampermonkey kurulduktan sonra aşağıdaki butona basın.
+        Üstte <em>“Betik yüklensin mi?”</em> penceresi çıkmalı → <strong>Yükle</strong> deyin.
+        <div class="btn-row">
+          <a class="btn btn-primary" href="/fatura-userscript.user.js" id="installLink">
+            Köprüyü Yükle
+          </a>
+          <button type="button" class="btn btn-outline" id="copyBtn">Kodu Kopyala (manuel kurulum)</button>
+        </div>
+      </li>
+      <li>
+        <strong>3) Market POS sayfasına dönün</strong>
+        Takvim ekranını yenileyin (F5). ASAT kartında
+        <em>“✓ Köprü hazır”</em> yazısını görmelisiniz.
+      </li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <strong>Manuel kurulum (Tampermonkey penceresi açılmazsa)</strong>
+    <p style="margin:8px 0 0; font-size:14px; color:var(--muted);">
+      Tampermonkey simgesi → <em>Panel</em> → <em>Yeni betik oluştur</em> →
+      <em>Kodu Kopyala</em> ile gelen içeriği yapıştırın → Kaydet.
+    </p>
+  </div>
+
+  <div class="btn-row">
+    <button type="button" class="btn btn-outline" id="closeBtn">Pencereyi Kapat</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const installLink = document.getElementById('installLink');
+    const copyBtn = document.getElementById('copyBtn');
+
+    function showStatus(text, kind) {
+      statusEl.textContent = text;
+      statusEl.className = 'status show' + (kind ? ' ' + kind : '');
+    }
+
+    copyBtn.addEventListener('click', async function () {
+      try {
+        const res = await fetch('/fatura-userscript.user.js', { cache: 'no-store' });
+        const text = await res.text();
+        await navigator.clipboard.writeText(text);
+        showStatus('Kod kopyalandı. Tampermonkey panelinde yeni betik oluşturup yapıştırın.', 'ok');
+      } catch (e) {
+        showStatus('Kopyalama başarısız. Köprüyü Yükle bağlantısını sağ tık → Bağlantıyı kopyala ile deneyin.', 'error');
+      }
+    });
+
+    installLink.addEventListener('click', function () {
+      showStatus('Tampermonkey yüklüyse üstte “Betik yüklensin mi?” penceresi açılır. Açılmazsa önce Tampermonkey kurun veya Kodu Kopyala kullanın.');
+    });
+
+    document.getElementById('closeBtn').addEventListener('click', function () {
+      window.close();
+    });
+  </script>
+</body>
+</html>

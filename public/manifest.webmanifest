@@ -1,0 +1,33 @@
+{
+  "name": "Ekolojik Market POS",
+  "short_name": "Ekolojik POS",
+  "description": "Posta hub, webmail lite ve mağaza yönetimi",
+  "start_url": "/app?view=posta",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "browser"],
+  "background_color": "#ffffff",
+  "theme_color": "#2d5a27",
+  "lang": "tr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/product-images/p-1.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Posta Merkezi",
+      "url": "/app?view=posta",
+      "description": "E-posta ve mesajlaşma hub"
+    },
+    {
+      "name": "Webmail",
+      "url": "/app?page=posta-webmail&view=posta",
+      "description": "Tam ekran JMAP lite webmail"
+    }
+  ]
+}
