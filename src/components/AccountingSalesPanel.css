@@ -247,6 +247,11 @@
   min-width: 160px;
 }
 
+.accounting-sales-add-price input {
+  min-width: 5.5rem;
+  text-align: right;
+}
+
 .accounting-sales-set-hint {
   margin: 0.5rem 0 0;
 }

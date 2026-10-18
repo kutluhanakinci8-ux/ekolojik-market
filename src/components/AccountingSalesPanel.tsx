@@ -87,6 +87,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
   const [lineRows, setLineRows] = useState<EditLineRow[]>([]);
   const [preservedSetLines, setPreservedSetLines] = useState<CartItem[]>([]);
   const [addProductId, setAddProductId] = useState('');
+  const [addUnitPrice, setAddUnitPrice] = useState('');
   const [barcodeAdd, setBarcodeAdd] = useState('');
 
   const productById = useMemo(
@@ -163,6 +164,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
         })),
     );
     setAddProductId('');
+    setAddUnitPrice('');
     setBarcodeAdd('');
   };
 
@@ -186,10 +188,26 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
     setLineRows((prev) => prev.filter((row) => row.key !== key));
   };
 
-  const addProductLine = (productId: number) => {
+  const resolveAddUnitPrice = (productId: number): number => {
+    const manual = parseMoneyInput(addUnitPrice);
+    if (addUnitPrice.trim() && !Number.isNaN(manual) && manual >= 0) return manual;
+    const product = productById.get(productId);
+    return product ? resolveRetailSaleUnitPrice(product) : 0;
+  };
+
+  const syncAddPriceFromProduct = (productId: number) => {
+    const product = productById.get(productId);
+    if (!product) {
+      setAddUnitPrice('');
+      return;
+    }
+    setAddUnitPrice(formatMoneyInput(resolveRetailSaleUnitPrice(product)));
+  };
+
+  const addProductLine = (productId: number, unitPriceOverride?: number) => {
     const product = productById.get(productId);
     if (!product) return;
-    const unitPrice = resolveRetailSaleUnitPrice(product);
+    const unitPrice = unitPriceOverride ?? resolveAddUnitPrice(productId);
     setLineRows((prev) => [
       ...prev,
       {
@@ -211,6 +229,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
     setFormError(null);
     addProductLine(id);
     setAddProductId('');
+    setAddUnitPrice('');
   };
 
   const handleAddFromBarcode = () => {
@@ -222,6 +241,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
     setFormError(null);
     addProductLine(product.id);
     setBarcodeAdd('');
+    setAddUnitPrice('');
   };
 
   const handleSave = () => {
@@ -489,7 +509,13 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                   Ürün ekle
                   <select
                     value={addProductId}
-                    onChange={(e) => setAddProductId(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setAddProductId(next);
+                      const id = parseInt(next, 10);
+                      if (id) syncAddPriceFromProduct(id);
+                      else setAddUnitPrice('');
+                    }}
                   >
                     <option value="">Seçin…</option>
                     {sortedProducts.map((p) => (
@@ -498,6 +524,15 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                       </option>
                     ))}
                   </select>
+                </label>
+                <label className="accounting-sales-add-price">
+                  Birim fiyat (₺)
+                  <input
+                    value={addUnitPrice}
+                    onChange={(e) => setAddUnitPrice(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="Katalog"
+                  />
                 </label>
                 <button type="button" className="btn btn-outline btn-sm" onClick={handleAddFromSelect}>
                   Ekle
