@@ -10,18 +10,13 @@ import {
   filterSalesByPeriod,
   formatReportDateLabel,
   getCategoryRevenue,
+  getPaymentBreakdown,
   type ReportPeriod,
 } from './analytics';
 import { formatCurrency } from './format';
 import { getBusinessDateKeyFromIso } from './businessDate';
-import { filterReturnsByPeriod, getSaleRefundedTotal } from './saleReturn';
-import {
-  DEFAULT_VAT_RATE,
-  getPaymentBreakdownNet,
-  roundMoney,
-  splitGrossAmount,
-  sumGrossCollections,
-} from './vatAnalytics';
+import { filterReturnsByPeriod, getSaleNetTotal } from './saleReturn';
+import { roundMoney, sumGrossCollections } from './vatAnalytics';
 
 export interface IncomeChartRow {
   key: string;
@@ -85,7 +80,7 @@ function buildStructureChart(profitLoss: ProfitLossReport): IncomeChartRow[] {
 }
 
 function buildPaymentChart(sales: Sale[], saleReturns: SaleReturn[]): IncomeChartRow[] {
-  const breakdown = getPaymentBreakdownNet(sales, saleReturns);
+  const breakdown = getPaymentBreakdown(sales, saleReturns);
   return toChartRows(
     (Object.keys(breakdown) as Array<keyof typeof breakdown>).map((key) => ({
       key,
@@ -110,17 +105,6 @@ function resolveSaleBusinessDateKey(sale: Sale): string {
   return sale.businessDate?.trim() || getBusinessDateKeyFromIso(sale.createdAt);
 }
 
-function getSaleNetRevenueAmount(
-  sale: Sale,
-  saleReturns: SaleReturn[],
-  vatRate = DEFAULT_VAT_RATE,
-): number {
-  const saleNet = sale.total <= 0 ? 0 : splitGrossAmount(sale.total, vatRate).netAmount;
-  const refundedGross = getSaleRefundedTotal(sale.id, saleReturns);
-  const refundNet = refundedGross <= 0 ? 0 : splitGrossAmount(refundedGross, vatRate).netAmount;
-  return Math.max(0, roundMoney(saleNet - refundNet));
-}
-
 function buildDailyTrend(
   sales: Sale[],
   saleReturns: SaleReturn[],
@@ -131,9 +115,9 @@ function buildDailyTrend(
 
   for (const sale of filtered) {
     const day = resolveSaleBusinessDateKey(sale);
-    const net = getSaleNetRevenueAmount(sale, saleReturns);
-    if (net <= 0) continue;
-    byDay.set(day, (byDay.get(day) ?? 0) + net);
+    const grossCollected = getSaleNetTotal(sale, saleReturns);
+    if (grossCollected <= 0) continue;
+    byDay.set(day, (byDay.get(day) ?? 0) + grossCollected);
   }
 
   return [...byDay.entries()]

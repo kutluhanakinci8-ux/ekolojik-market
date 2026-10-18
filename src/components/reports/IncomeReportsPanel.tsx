@@ -58,8 +58,8 @@ export function IncomeReportsPanel({ store, period }: IncomeReportsPanelProps) {
   return (
     <div className="accounting-reports-section income-reports-premium">
       <p className="module-hint">
-        Dönem: <strong>{periodLabel}</strong>. Net satış ve ödeme kırılımı <strong>KDV hariç</strong> hesaplanır;
-        tahsilat (fiş tutarı) <strong>KDV dahil</strong> gösterilir — iki rakamın farkı KDV tutarıdır.
+        Dönem: <strong>{periodLabel}</strong>. Gelir tablosu <strong>KDV hariç net satış</strong> üzerinden;
+        ödeme dağılımı ve günlük trend müşteriden tahsil edilen <strong>KDV dahil fiş tutarı</strong>dır.
       </p>
 
       <div className="accounting-partner-profit-kpis income-reports-kpis">
@@ -123,7 +123,7 @@ export function IncomeReportsPanel({ store, period }: IncomeReportsPanelProps) {
 
         <section className="module-card income-reports-chart-card">
           <h2>Ödeme yöntemi dağılımı</h2>
-          <p className="cash-reports-chart-sub">KDV hariç net tahsilat — gelir tablosu ile aynı taban</p>
+          <p className="cash-reports-chart-sub">KDV dahil tahsilat (üstteki toplam ile uyumlu, iade düşülmüş)</p>
           {dashboard.paymentChart.length === 0 ? (
             <p className="module-empty">Ödeme kaydı yok</p>
           ) : (
@@ -173,7 +173,7 @@ export function IncomeReportsPanel({ store, period }: IncomeReportsPanelProps) {
 
         <section className="module-card income-reports-chart-card">
           <h2>Günlük satış trendi</h2>
-          <p className="cash-reports-chart-sub">KDV hariç net satış, iş gününe göre (iade sonrası)</p>
+          <p className="cash-reports-chart-sub">KDV dahil tahsilat, iş gününe göre (iade sonrası)</p>
           {dashboard.dailyTrend.length === 0 ? (
             <p className="module-empty">Trend verisi yok</p>
           ) : (
