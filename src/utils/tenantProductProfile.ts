@@ -19,6 +19,7 @@ export const POS_LITE_CASHIER_TABS: AppPage[] = ['sales', 'stock', 'transactions
 /** Raporlar menüsü — müşteri/tedarikçi/ortak/döviz hariç */
 export const POS_LITE_REPORT_SUBTABS: ReportsSubTab[] = [
   'gelir',
+  'gunluk-satis-fis',
   'gider',
   'stok',
   'kasa',

@@ -26,6 +26,7 @@ import { SuppliersScreen } from './SuppliersScreen';
 import { CustomerReportsPanel } from './CustomerReportsPanel';
 import { CashReportsPanel } from './CashReportsPanel';
 import { IncomeReportsPanel } from './reports/IncomeReportsPanel';
+import { SalesDailyReceiptReportPanel } from './reports/SalesDailyReceiptReportPanel';
 import { ExpenseReportsPanel } from './reports/ExpenseReportsPanel';
 import { StockReportsPanel } from './reports/StockReportsPanel';
 import { SupplierReportsPanel } from './reports/SupplierReportsPanel';
@@ -40,6 +41,7 @@ import { isPosLiteProfile } from '../utils/tenantProductProfile';
 
 export type ReportsSubTab =
   | 'gelir'
+  | 'gunluk-satis-fis'
   | 'gider'
   | 'stok'
   | 'kasa'
@@ -53,6 +55,7 @@ export type ReportsSubTab =
 
 const REPORTS_PERIOD_SUBTABS: ReportsSubTab[] = [
   'gelir',
+  'gunluk-satis-fis',
   'gider',
   'stok',
   'kasa',
@@ -99,6 +102,7 @@ const TABS: { id: AccountingTab; label: string }[] = [
 
 const REPORTS_SUBTABS: ReportsMenuItem[] = [
   { id: 'gelir', label: 'Gelir Raporları', icon: '📊' },
+  { id: 'gunluk-satis-fis', label: 'Günlük Satış Fişi', icon: '🧾' },
   { id: 'gider', label: 'Gider Raporları', icon: '📉' },
   { id: 'stok', label: 'Stok Raporları', icon: '📦' },
   { id: 'kasa', label: 'Kasa Raporları', icon: '💰' },
@@ -541,6 +545,10 @@ export function AccountingScreen({
             <div className="accounting-reports-panel">
           {reportsSubTab === 'gelir' && (
             <IncomeReportsPanel store={store} period={period} />
+          )}
+
+          {reportsSubTab === 'gunluk-satis-fis' && (
+            <SalesDailyReceiptReportPanel store={store} />
           )}
 
           {reportsSubTab === 'gider' && (
