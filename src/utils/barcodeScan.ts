@@ -61,18 +61,6 @@ function setCodes(set: ProductSet): string[] {
   return list;
 }
 
-/** KLA128 paket + KLA128T tekli aynı EAN — kasada tekli satış öncelikli */
-const KLA128_UNIT_PRODUCT_ID = 138;
-
-function disambiguateSharedBarcodeHits(hits: Product[]): Product[] {
-  if (hits.length <= 1) return hits;
-  const unit = hits.find((p) => p.id === KLA128_UNIT_PRODUCT_ID && p.stock > 0);
-  if (unit) return [unit];
-  const inStock = hits.filter((p) => p.stock > 0);
-  if (inStock.length === 1) return inStock;
-  return hits;
-}
-
 function matchesScan(scanVariants: string[], entityVariants: string[]): boolean {
   const foldedScan = new Set(scanVariants.flatMap((v) => [v, foldCode(v)]));
   for (const entity of entityVariants) {
@@ -98,15 +86,13 @@ export function resolveBarcodeScan(
 
   const scanVariants = codeVariants(normalized);
 
-  let productHits: Product[] = [];
+  const productHits: Product[] = [];
   for (const product of products) {
     if (product.isSample) continue;
     if (matchesScan(scanVariants, productCodes(product))) {
       productHits.push(product);
     }
   }
-  productHits = disambiguateSharedBarcodeHits(productHits);
-
   const setHits: ProductSet[] = [];
   for (const set of sets) {
     if (!set.isActive) continue;

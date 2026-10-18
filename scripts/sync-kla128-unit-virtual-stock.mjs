@@ -75,29 +75,51 @@ function migrateStore(snapshot) {
   }
 
   const pack = products[packIdx];
+  const packBarcode = 'KLA128';
+  let packChanged = false;
+  if (pack.barcode !== packBarcode || pack.productCode !== packBarcode) {
+    products[packIdx] = {
+      ...pack,
+      productCode: packBarcode,
+      barcode: packBarcode,
+    };
+    packChanged = true;
+  }
+
   const unitIdx = products.findIndex((p) => Number(p.id) === UNIT_PRODUCT_ID);
-  const rebuilt = buildUnitProduct(pack, unitIdx >= 0 ? products[unitIdx] : undefined);
+  const rebuilt = buildUnitProduct(products[packIdx], unitIdx >= 0 ? products[unitIdx] : undefined);
 
   const report = [];
+  let unitChanged = false;
   if (unitIdx >= 0) {
     const prev = products[unitIdx];
     const stockChanged = prev.stock !== rebuilt.stock;
     const priceChanged =
       prev.ourPriceWithVat !== rebuilt.ourPriceWithVat
-      || prev.fullSalePrice !== rebuilt.fullSalePrice;
-    if (!stockChanged && !priceChanged && prev.productCode === UNIT_CODE) {
-      report.push(`  uyumlu: KLA128T stok ${rebuilt.stock} (paket ${pack.stock}×10)`);
-      return { snapshot, changed: false, report };
+      || prev.fullSalePrice !== rebuilt.fullSalePrice
+      || prev.barcode !== rebuilt.barcode;
+    if (stockChanged || priceChanged || prev.productCode !== UNIT_CODE) {
+      products[unitIdx] = rebuilt;
+      unitChanged = true;
+      report.push(
+        `  güncellendi: KLA128T stok ${rebuilt.stock} (paket ${products[packIdx].stock}×10), barkod ${UNIT_BARCODE}`,
+      );
     }
-    products[unitIdx] = rebuilt;
-    report.push(
-      `  güncellendi: KLA128T stok ${rebuilt.stock} (paket ${pack.stock}×10), perakende ${RETAIL_GROSS} ₺ KDV dahil`,
-    );
   } else {
     products.push(rebuilt);
+    unitChanged = true;
     report.push(
-      `  eklendi: KLA128T stok ${rebuilt.stock} (paket ${pack.stock}×10), perakende ${RETAIL_GROSS} ₺ KDV dahil`,
+      `  eklendi: KLA128T stok ${rebuilt.stock} (paket ${products[packIdx].stock}×10), perakende ${RETAIL_GROSS} ₺ KDV dahil`,
     );
+  }
+
+  if (packChanged) {
+    report.push(`  paket KLA128 barkod → ${packBarcode} (EAN yalnızca tekli)`);
+  }
+
+  if (!packChanged && !unitChanged) {
+    report.push(`  uyumlu: KLA128 paket barkod ${packBarcode}, KLA128T stok ${rebuilt.stock}`);
+    return { snapshot, changed: false, report };
   }
 
   return {

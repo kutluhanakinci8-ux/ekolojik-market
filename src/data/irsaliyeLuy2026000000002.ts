@@ -57,8 +57,7 @@ export const IRSALIYE_EAN_BY_CODE: Record<string, string> = {
   EAA022: '6955470954220',
   CAB040: '6955470954398',
   CAA038: '6955470954237',
-  KLA128: '6955470959966',
-  /** Tekli satış — paket ile aynı EAN */
+  /** Paket (KLA128) — kasada stok kodu ile; EAN tekli (KLA128T) için */
   KLA128T: '6955470959966',
   CEA069: '6955470940223',
   SAA069: '6955470954466',
