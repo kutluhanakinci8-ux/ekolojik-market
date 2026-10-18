@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Store } from '../store/useStore';
-import type { Sale } from '../types/product';
+import type { CartItem, PriceType, Product, Sale } from '../types/product';
 import { filterByBusinessDate } from '../utils/cashSession';
 import { getBusinessDateKey, getBusinessDateKeyFromIso } from '../utils/businessDate';
 import { formatCurrency, formatDateTime } from '../utils/format';
-import type { CompletedSalePatch } from '../store/saleAdmin';
+import { resolveSaleBarcode } from '../utils/productBarcode';
+import { foldTurkish } from '../utils/productSearch';
+import { resolveRetailSaleUnitPrice } from '../utils/productPricing';
+import { sumSaleLineTotal, type CompletedSalePatch } from '../store/saleAdmin';
 import './AccountingSalesPanel.css';
 
 const PAYMENT_LABELS: Record<Sale['paymentMethod'], string> = {
@@ -17,6 +20,14 @@ const PAYMENT_LABELS: Record<Sale['paymentMethod'], string> = {
 
 interface AccountingSalesPanelProps {
   store: Store;
+}
+
+interface EditLineRow {
+  key: string;
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+  priceType: PriceType;
 }
 
 function resolveSaleBusinessDate(sale: Sale): string {
@@ -35,6 +46,31 @@ function saleItemSummary(sale: Sale, productNameById: Map<number, string>): stri
   return parts.length ? `${parts.join(', ')}${extra}` : '—';
 }
 
+function parseMoneyInput(value: string): number {
+  return parseFloat(value.replace(',', '.'));
+}
+
+function formatMoneyInput(amount: number): string {
+  return String(amount).replace('.', ',');
+}
+
+function productSearchLabel(product: Product): string {
+  const code = product.productCode?.trim() || `#${product.id}`;
+  const barcode = resolveSaleBarcode(product) ?? '';
+  return barcode ? `${code} · ${barcode} — ${product.name}` : `${code} — ${product.name}`;
+}
+
+function findProductByScan(products: Product[], raw: string): Product | undefined {
+  const q = raw.trim();
+  if (!q) return undefined;
+  const folded = foldTurkish(q).replace(/\s/g, '');
+  return products.find((p) => {
+    const code = foldTurkish(p.productCode ?? '').replace(/\s/g, '');
+    const barcode = (resolveSaleBarcode(p) ?? '').replace(/\s/g, '');
+    return code === folded || barcode === q || String(p.id) === q;
+  });
+}
+
 export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
   const defaultDate = store.activeBusinessDate || getBusinessDateKey();
   const [dateKey, setDateKey] = useState(defaultDate);
@@ -48,9 +84,27 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
   const [greenleafNumber, setGreenleafNumber] = useState('');
   const [businessDate, setBusinessDate] = useState('');
   const [note, setNote] = useState('');
+  const [lineRows, setLineRows] = useState<EditLineRow[]>([]);
+  const [preservedSetLines, setPreservedSetLines] = useState<CartItem[]>([]);
+  const [addProductId, setAddProductId] = useState('');
+  const [barcodeAdd, setBarcodeAdd] = useState('');
+
+  const productById = useMemo(
+    () => new Map(store.products.map((p) => [p.id, p])),
+    [store.products],
+  );
 
   const productNameById = useMemo(
     () => new Map(store.products.map((p) => [p.id, p.name])),
+    [store.products],
+  );
+
+  const sortedProducts = useMemo(
+    () => [...store.products].sort((a, b) => {
+      const ac = a.productCode ?? '';
+      const bc = b.productCode ?? '';
+      return ac.localeCompare(bc, 'tr');
+    }),
     [store.products],
   );
 
@@ -66,21 +120,57 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
     [daySales],
   );
 
+  const linesCartPreview = useMemo((): CartItem[] => [
+    ...lineRows.map((row) => ({
+      productId: row.productId,
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      priceType: row.priceType,
+    })),
+    ...preservedSetLines,
+  ], [lineRows, preservedSetLines]);
+
+  const computedLinesTotal = useMemo(
+    () => sumSaleLineTotal(linesCartPreview),
+    [linesCartPreview],
+  );
+
+  useEffect(() => {
+    if (!editing) return;
+    setTotalInput(formatMoneyInput(computedLinesTotal));
+  }, [computedLinesTotal, editing]);
+
   const openEdit = (sale: Sale) => {
     setEditing(sale);
     setFormError(null);
     const method = sale.paymentMethod === 'split' ? 'cash' : sale.paymentMethod;
     setPaymentMethod(method);
-    setTotalInput(String(sale.total).replace('.', ','));
+    setTotalInput(formatMoneyInput(sale.total));
     setCustomerName(sale.customerName ?? '');
     setGreenleafNumber(sale.greenleafNumber ?? '');
     setBusinessDate(resolveSaleBusinessDate(sale));
     setNote(sale.paymentCorrectionNote ?? '');
+    setPreservedSetLines((sale.items ?? []).filter((line) => line.setId && !line.productId));
+    setLineRows(
+      (sale.items ?? [])
+        .filter((line) => line.productId)
+        .map((line, index) => ({
+          key: `line-${sale.id}-${index}-${line.productId}`,
+          productId: line.productId!,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          priceType: line.priceType,
+        })),
+    );
+    setAddProductId('');
+    setBarcodeAdd('');
   };
 
   const closeEdit = () => {
     setEditing(null);
     setFormError(null);
+    setLineRows([]);
+    setPreservedSetLines([]);
   };
 
   const showToast = (message: string) => {
@@ -88,20 +178,72 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
     window.setTimeout(() => setToast(null), 4500);
   };
 
-  const handleSave = () => {
-    if (!editing) return;
-    const parsed = parseFloat(totalInput.replace(',', '.'));
-    if (Number.isNaN(parsed) || parsed <= 0) {
-      setFormError('Geçerli bir tutar girin');
+  const updateLine = (key: string, patch: Partial<EditLineRow>) => {
+    setLineRows((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  };
+
+  const removeLine = (key: string) => {
+    setLineRows((prev) => prev.filter((row) => row.key !== key));
+  };
+
+  const addProductLine = (productId: number) => {
+    const product = productById.get(productId);
+    if (!product) return;
+    const unitPrice = resolveRetailSaleUnitPrice(product);
+    setLineRows((prev) => [
+      ...prev,
+      {
+        key: `line-new-${Date.now()}-${productId}`,
+        productId,
+        quantity: 1,
+        unitPrice,
+        priceType: 'our',
+      },
+    ]);
+  };
+
+  const handleAddFromSelect = () => {
+    const id = parseInt(addProductId, 10);
+    if (!id) {
+      setFormError('Ürün seçin');
       return;
     }
+    setFormError(null);
+    addProductLine(id);
+    setAddProductId('');
+  };
+
+  const handleAddFromBarcode = () => {
+    const product = findProductByScan(store.products, barcodeAdd);
+    if (!product) {
+      setFormError(`Barkod/kod bulunamadı: ${barcodeAdd.trim()}`);
+      return;
+    }
+    setFormError(null);
+    addProductLine(product.id);
+    setBarcodeAdd('');
+  };
+
+  const handleSave = () => {
+    if (!editing) return;
+    const manualTotal = parseMoneyInput(totalInput);
+    const items: CartItem[] = [
+      ...lineRows.map((row) => ({
+        productId: row.productId,
+        quantity: row.quantity,
+        unitPrice: row.unitPrice,
+        priceType: row.priceType,
+      })),
+      ...preservedSetLines,
+    ];
     const patch: CompletedSalePatch = {
       paymentMethod,
-      total: parsed,
+      total: Number.isNaN(manualTotal) ? undefined : manualTotal,
       customerName,
       greenleafNumber,
       businessDate,
       note,
+      items,
     };
     const result = store.updateCompletedSale(editing.id, patch);
     if (!result.ok) {
@@ -129,7 +271,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
           </p>
         </div>
         <p className="module-hint accounting-sales-hint">
-          Ödeme tipi ve tutar düzenlemesi kasa listesine yansır. Stok satır adedi buradan değiştirilmez.
+          Satış satırları ve fiyatlar düzenlenebilir; stok hareketi otomatik güncellenmez.
         </p>
       </div>
 
@@ -184,7 +326,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
       {editing && (
         <div className="accounting-sales-modal-backdrop" role="presentation" onClick={closeEdit}>
           <div
-            className="accounting-sales-modal"
+            className="accounting-sales-modal accounting-sales-modal--wide"
             role="dialog"
             aria-labelledby="accounting-sales-edit-title"
             onClick={(e) => e.stopPropagation()}
@@ -215,6 +357,9 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                   onChange={(e) => setTotalInput(e.target.value)}
                   inputMode="decimal"
                 />
+                <span className="accounting-sales-field-hint">
+                  Satır toplamı: {formatCurrency(computedLinesTotal)}
+                </span>
               </label>
               <label>
                 İş günü
@@ -237,6 +382,140 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
               </label>
             </div>
+
+            <section className="accounting-sales-lines">
+              <div className="accounting-sales-lines-head">
+                <h3>Satılan ürünler</h3>
+              </div>
+              <div className="accounting-sales-lines-table-wrap">
+                <table className="module-table accounting-sales-lines-table">
+                  <thead>
+                    <tr>
+                      <th>Kod</th>
+                      <th>Barkod</th>
+                      <th>Ürün</th>
+                      <th className="num">Adet</th>
+                      <th className="num">Birim (₺)</th>
+                      <th className="num">Satır</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="module-empty">Ürün satırı yok — ekleyin</td>
+                      </tr>
+                    ) : (
+                      lineRows.map((row) => {
+                        const product = productById.get(row.productId);
+                        const lineTotal = row.quantity * row.unitPrice;
+                        return (
+                          <tr key={row.key}>
+                            <td><code>{product?.productCode ?? row.productId}</code></td>
+                            <td className="accounting-sales-barcode">
+                              {product ? (resolveSaleBarcode(product) ?? '—') : '—'}
+                            </td>
+                            <td className="accounting-sales-line-name">
+                              <select
+                                value={row.productId}
+                                onChange={(e) => {
+                                  const nextId = parseInt(e.target.value, 10);
+                                  const nextProduct = productById.get(nextId);
+                                  updateLine(row.key, {
+                                    productId: nextId,
+                                    unitPrice: nextProduct
+                                      ? resolveRetailSaleUnitPrice(nextProduct)
+                                      : row.unitPrice,
+                                  });
+                                }}
+                              >
+                                {sortedProducts.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {productSearchLabel(p)}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="num">
+                              <input
+                                className="accounting-sales-line-input"
+                                type="number"
+                                min={1}
+                                step={1}
+                                value={row.quantity}
+                                onChange={(e) => updateLine(row.key, {
+                                  quantity: Math.max(1, parseInt(e.target.value, 10) || 1),
+                                })}
+                              />
+                            </td>
+                            <td className="num">
+                              <input
+                                className="accounting-sales-line-input"
+                                inputMode="decimal"
+                                value={formatMoneyInput(row.unitPrice)}
+                                onChange={(e) => {
+                                  const v = parseMoneyInput(e.target.value);
+                                  if (!Number.isNaN(v)) updateLine(row.key, { unitPrice: v });
+                                }}
+                              />
+                            </td>
+                            <td className="num">{formatCurrency(lineTotal)}</td>
+                            <td className="accounting-sales-line-actions">
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => removeLine(row.key)}
+                                aria-label="Satırı sil"
+                              >
+                                Sil
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {preservedSetLines.length > 0 && (
+                <p className="module-hint accounting-sales-set-hint">
+                  Set satırları korunuyor ({preservedSetLines.length}) — bu ekrandan değiştirilmez.
+                </p>
+              )}
+
+              <div className="accounting-sales-add-row">
+                <label>
+                  Ürün ekle
+                  <select
+                    value={addProductId}
+                    onChange={(e) => setAddProductId(e.target.value)}
+                  >
+                    <option value="">Seçin…</option>
+                    {sortedProducts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {productSearchLabel(p)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className="btn btn-outline btn-sm" onClick={handleAddFromSelect}>
+                  Ekle
+                </button>
+                <label className="accounting-sales-barcode-add">
+                  Barkod / kod
+                  <input
+                    value={barcodeAdd}
+                    onChange={(e) => setBarcodeAdd(e.target.value)}
+                    placeholder="6955470959966 veya KLA128T"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddFromBarcode(); }}
+                  />
+                </label>
+                <button type="button" className="btn btn-outline btn-sm" onClick={handleAddFromBarcode}>
+                  Okut / Ara
+                </button>
+              </div>
+            </section>
 
             {formError && <p className="sale-return-error" role="alert">{formError}</p>}
 
