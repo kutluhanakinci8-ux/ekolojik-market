@@ -25,6 +25,7 @@ export const PRODUCT_CATEGORIES: Record<number, string> = {
   6: 'kisisel-bakim',
   7: 'kisisel-bakim',
   8: 'kagit-mendil',
+  138: 'kagit-mendil',
   9: 'kagit-mendil',
   10: 'cilt-bakim',
   11: 'temizlik',
