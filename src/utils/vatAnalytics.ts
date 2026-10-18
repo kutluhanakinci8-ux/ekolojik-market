@@ -88,6 +88,59 @@ export function sumReturnsNetFromGrossTotals(
   }, 0));
 }
 
+export type PaymentBreakdown = Record<'cash' | 'card' | 'transfer' | 'credit', number>;
+
+/** Ödeme tipine göre KDV hariç net tahsilat (gelir tablosu net satış ile uyumlu) */
+export function getPaymentBreakdownNet(
+  sales: Sale[],
+  saleReturns: SaleReturn[] = [],
+  vatRate = DEFAULT_VAT_RATE,
+): PaymentBreakdown {
+  const breakdown: PaymentBreakdown = { cash: 0, card: 0, transfer: 0, credit: 0 };
+  for (const sale of sales) {
+    if (sale.total <= 0) continue;
+    const saleNet = splitGrossAmount(sale.total, vatRate).netAmount;
+    if (sale.paymentMethod === 'split' && sale.paymentSplits?.length) {
+      const grossTotal = sale.total;
+      for (const split of sale.paymentSplits) {
+        if (split.method in breakdown) {
+          const portion = grossTotal > 0 ? split.amount / grossTotal : 0;
+          breakdown[split.method] += saleNet * portion;
+        }
+      }
+    } else if (
+      sale.paymentMethod === 'cash'
+      || sale.paymentMethod === 'card'
+      || sale.paymentMethod === 'transfer'
+      || sale.paymentMethod === 'credit'
+    ) {
+      breakdown[sale.paymentMethod] += saleNet;
+    }
+  }
+  for (const entry of saleReturns) {
+    if (entry.refundTotal <= 0) continue;
+    const retNet = splitGrossAmount(entry.refundTotal, vatRate).netAmount;
+    if (entry.refundMethod in breakdown) {
+      breakdown[entry.refundMethod] -= retNet;
+    }
+  }
+  return {
+    cash: roundMoney(breakdown.cash),
+    card: roundMoney(breakdown.card),
+    transfer: roundMoney(breakdown.transfer),
+    credit: roundMoney(breakdown.credit),
+  };
+}
+
+export function sumGrossCollections(
+  sales: Sale[],
+  saleReturns: SaleReturn[] = [],
+): number {
+  const grossSales = roundMoney(sales.reduce((sum, sale) => sum + sale.total, 0));
+  const grossReturns = roundMoney(saleReturns.reduce((sum, row) => sum + row.refundTotal, 0));
+  return roundMoney(grossSales - grossReturns);
+}
+
 export function calculatePurchaseVat(
   invoices: PurchaseInvoice[],
 ): Pick<VatSummary, 'purchaseGross' | 'purchaseNet' | 'purchaseVat'> {
