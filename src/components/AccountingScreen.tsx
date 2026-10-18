@@ -20,6 +20,7 @@ import { exportCustomerLedgerCsv, exportSupplierLedgerCsv } from '../utils/repor
 import { buildTrialBalance, trialBalancePeriodLabel } from '../utils/trialBalance';
 import { AccountingVoucherPanel } from './AccountingVoucherPanel';
 import { CashierScreen } from './CashierScreen';
+import { AccountingSalesPanel } from './AccountingSalesPanel';
 import { CustomersScreen } from './CustomersScreen';
 import { SuppliersScreen } from './SuppliersScreen';
 import { CustomerReportsPanel } from './CustomerReportsPanel';
@@ -78,6 +79,7 @@ interface AccountingScreenProps {
 type AccountingTab =
   | 'fis'
   | 'kasa'
+  | 'satislar'
   | 'islemler'
   | 'musteriler'
   | 'tedarikciler'
@@ -88,6 +90,7 @@ type AccountingTab =
 const TABS: { id: AccountingTab; label: string }[] = [
   { id: 'fis', label: 'Fiş Girişi' },
   { id: 'kasa', label: 'Kasa' },
+  { id: 'satislar', label: 'Satışlar' },
   { id: 'musteriler', label: 'Müşteriler' },
   { id: 'tedarikciler', label: 'Tedarikçiler' },
   { id: 'defter', label: 'Defter & Bakiye' },
@@ -189,6 +192,10 @@ const TAB_HERO: Record<AccountingTab, { title: string; subtitle: string }> = {
     title: 'Kasa',
     subtitle: 'Günlük kasa oturumu, nakit hareketleri ve gün sonu işlemleri',
   },
+  satislar: {
+    title: 'Satışlar',
+    subtitle: 'Günlük satış listesi — ödeme tipi ve tutar düzenleme',
+  },
   islemler: {
     title: 'İşlemler',
     subtitle: 'Sistemde en çok kullanılan modüller ve sekme geçişleri',
@@ -240,7 +247,7 @@ export function AccountingScreen({
   const hasCustomers = tabPerms.hasCustomers;
   const visibleTabs = TABS.filter((item) => {
     if (item.id === 'fis') return hasAccounting;
-    if (item.id === 'kasa') return hasCashier || hasAccounting;
+    if (item.id === 'kasa' || item.id === 'satislar') return hasCashier || hasAccounting;
     if (item.id === 'musteriler') return hasCustomers || hasAccounting;
     if (item.id === 'tedarikciler') return hasAccounting;
     return hasAccounting;
@@ -348,6 +355,10 @@ export function AccountingScreen({
 
       {!reportsOnly && activeTab === 'kasa' && (
         <CashierScreen store={store} embedded />
+      )}
+
+      {!reportsOnly && activeTab === 'satislar' && (
+        <AccountingSalesPanel store={store} />
       )}
 
       {!reportsOnly && activeTab === 'musteriler' && (

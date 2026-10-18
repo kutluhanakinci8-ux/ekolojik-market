@@ -28,6 +28,7 @@ export const SYSTEM_ACTIVITY_MODULE_LABELS: Record<SystemActivityModule, string>
 
 const MODULE_BY_ACTION: Partial<Record<ActivityAction, SystemActivityModule>> = {
   sale_complete: 'sales',
+  sale_update: 'sales',
   sale_return: 'sales',
   cart_clear: 'sales',
   stock_adjust: 'stock',

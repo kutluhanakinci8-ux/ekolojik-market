@@ -29,6 +29,7 @@ import {
   type StoreSnapshotFetchError,
 } from '../services/storeApi';
 import { mergeSalesById } from '../utils/mergeStoreSnapshots';
+import { applyCompletedSalePatch, type CompletedSalePatch } from './saleAdmin';
 import { localSnapshotHasStaleSales } from '../utils/salesHistoryClear';
 import {
   mergeServerAuthoritativeSnapshot,
@@ -5007,6 +5008,34 @@ export function usePosStoreState() {
     return { ok: true, returnRecord };
   }, [sales, saleReturns, authSession, cashSessions, logActivity]);
 
+  const updateCompletedSale = useCallback((
+    saleId: string,
+    patch: CompletedSalePatch,
+  ): { ok: true } | { ok: false; error: string } => {
+    const sale = sales.find((entry) => entry.id === saleId);
+    if (!sale) return { ok: false, error: 'Satış bulunamadı' };
+    if (sale.paymentMethod === 'split' && !patch.paymentMethod) {
+      return { ok: false, error: 'Bölünmüş ödeme satışı buradan düzenlenemez' };
+    }
+    if (patch.total != null && (Number.isNaN(patch.total) || patch.total <= 0)) {
+      return { ok: false, error: 'Geçerli tutar girin' };
+    }
+    const updated = applyCompletedSalePatch(sale, patch);
+    setSales((prev) => prev.map((entry) => (entry.id === saleId ? updated : entry)));
+    if (authSession) {
+      const paymentLabel = updated.paymentMethod === 'cash' ? 'Nakit'
+        : updated.paymentMethod === 'card' ? 'Kart'
+          : updated.paymentMethod === 'credit' ? 'Veresiye'
+            : 'Havale';
+      logActivity(authSession, 'sale_update', `Satış düzenlendi — ${formatCurrencyTry(updated.total)}`, {
+        satisId: saleId,
+        odeme: paymentLabel,
+        kasiyer: authSession.displayName,
+      });
+    }
+    return { ok: true };
+  }, [sales, authSession, logActivity]);
+
   const updateCustomerCrm = useCallback((customerId: string, patch: Partial<CustomerCrmProfile>) => {
     setCustomers((prev) => prev.map((c) => (
       c.id === customerId ? withUpdatedCrm(c, patch, crmSettings) : c
@@ -5529,6 +5558,7 @@ export function usePosStoreState() {
     updatePosCheckoutSettings,
     updateReceiptPrinterSettings,
     processSaleReturn,
+    updateCompletedSale,
     setProductStock,
     updateProductBarcode,
     updateProductCategory,

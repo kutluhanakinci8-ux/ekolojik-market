@@ -6,6 +6,7 @@ export type ActivityAction =
   | 'logout'
   | 'page_view'
   | 'sale_complete'
+  | 'sale_update'
   | 'sale_return'
   | 'cart_clear'
   | 'customer_add'
@@ -66,6 +67,7 @@ const ACTION_LABELS: Record<ActivityAction, string> = {
   logout: 'Çıkış',
   page_view: 'Sekme',
   sale_complete: 'Satış',
+  sale_update: 'Satış',
   sale_return: 'İade',
   cart_clear: 'Sepet',
   customer_add: 'Müşteri',
