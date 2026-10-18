@@ -274,7 +274,7 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
   const images = loadAllImages();
   if (stored) migrateImagesFromProducts(stored);
 
-  return CATALOG_PRODUCTS.map((seed) => {
+  const merged = CATALOG_PRODUCTS.map((seed) => {
     const saved = storedMap.get(seed.id);
     const imageUrl = images[seed.id] ?? saved?.imageUrl ?? seed.imageUrl;
     const category = saved?.category ?? seed.category;
@@ -309,6 +309,15 @@ function mergeWithSeed(stored: Product[] | null): Product[] {
         ?? resolveWholesalePrices(withStoredPricing.fullSalePrice, saved?.wholesalePrices),
     };
   });
+
+  const pack = merged.find((p) => p.id === 8);
+  const unitIdx = merged.findIndex((p) => p.id === 138);
+  if (pack && unitIdx >= 0) {
+    const unitStock = Math.max(0, Math.floor((Number(pack.stock) || 0) * 10));
+    merged[unitIdx] = { ...merged[unitIdx], stock: unitStock };
+  }
+
+  return merged;
 }
 
 function loadProducts(): Product[] {
