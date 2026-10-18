@@ -50,6 +50,12 @@ const batch1: PriceCatalogEntry[] = [
   priced('ASF054', 'iLiFE Çamaşır Deterjanı (2KG)', 1),
   priced('ASF066', 'iLiFE Bakteriyostatik Çamaşır Sabunu', 0.2),
   priced('KLA128', 'CARICH Bambu Yüz Mendili', 0.2),
+  priced('KLA128T', 'CARICH Bambu Yüz Mendili (tek adet)', 0.02, {
+    purchasePrice: 26.63,
+    partnerPrice: 78.34,
+    couponPrice: 78.34,
+    retailPrice: 156.67,
+  }),
   priced('CEA069', 'CARICH Bambu Cep Mendili', 0.2),
   priced('CAA038', 'CARICH Zencefil Hacim Şampuanı', 0.5),
   priced('CAB040', 'CARICH Zencefil Hacim Saç Kremi', 0.5),
@@ -115,6 +121,7 @@ export const PRICE_BATCH_1_BY_PRODUCT_ID: Record<number, PriceCatalogEntry> = {
   35: batch1.find((e) => e.code === 'CCA016')!,
   36: batch1.find((e) => e.code === 'CBA052')!,
   137: batch1.find((e) => e.code === 'SBE089')!,
+  138: batch1.find((e) => e.code === 'KLA128T')!,
 };
 
 /** Sistem ürün ID → stok kodu (barkod) */
