@@ -37,11 +37,9 @@ Mac’te:
 
 ```bash
 cd ~/greenleaf
-git fetch origin
-git pull origin greenleaf-standalone.bundle main   # HAYIR - doğru komut:
-git pull ../path/to/greenleaf-standalone.bundle main
-# veya tam yol:
-git pull "$HOME/Downloads/greenleaf-standalone.bundle" main
+# Bundle’ı indirin (ekolojik-market → delivery/greenleaf-standalone.bundle)
+BUNDLE="$HOME/Downloads/greenleaf-standalone.bundle"
+git pull "$BUNDLE" main
 git push -u origin main
 ```
 
