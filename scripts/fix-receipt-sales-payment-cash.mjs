@@ -176,6 +176,18 @@ const RECEIPT_BATCHES = [
           { code: 'ASF066', qty: 1, unitPrice: 74 },
         ],
       },
+      {
+        id: 'S1792152323347',
+        createdAt: '2026-10-16T12:05:23.347Z',
+        businessDate: '2026-10-16',
+        paymentMethod: 'transfer',
+        paymentNote: 'Fiş düzeltmesi: havale 752,00 ₺ (S1792152323347 — termal fiş, kasada kayıt yoktu)',
+        expectedTotal: 752,
+        lines: [
+          { code: 'CAA039', qty: 1, unitPrice: 345 },
+          { code: 'SBC053', qty: 1, unitPrice: 407 },
+        ],
+      },
     ],
   },
 ];
