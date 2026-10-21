@@ -20,6 +20,13 @@ const PARTNER_GROSS = 188;
 const PARTNER_NET = 156.67;
 const PURCHASE_UNIT = 26.63;
 const TARGET_TENANTS = new Set(['main']);
+const PACK_CATALOG_IMAGE = '/product-images/p-8.jpg';
+
+function resolvePackImageUrl(pack) {
+  const url = pack?.imageUrl?.trim();
+  if (url?.startsWith('data:')) return url;
+  return PACK_CATALOG_IMAGE;
+}
 
 function round2(n) {
   return Math.round(Number(n) * 100) / 100;
@@ -43,12 +50,13 @@ function buildUnitProduct(pack, existing) {
     suratTotal: 0,
     arasTotal: 0,
     yurticiTotal: 0,
-    imageUrl: pack?.imageUrl,
+    imageUrl: resolvePackImageUrl(pack),
   };
 
   return {
     ...base,
     id: UNIT_PRODUCT_ID,
+    imageUrl: resolvePackImageUrl(pack),
     productCode: UNIT_CODE,
     barcode: UNIT_BARCODE,
     stock: unitStock,
@@ -82,11 +90,14 @@ function migrateStore(snapshot) {
   const packBarcodeWrong =
     pack.barcode !== packBarcode
     || /KLA128Barkod/i.test(String(pack.barcode ?? ''));
-  if (packBarcodeWrong || pack.productCode !== packBarcode) {
+  const packImage = resolvePackImageUrl(pack);
+  const packImageWrong = pack.imageUrl !== packImage;
+  if (packBarcodeWrong || pack.productCode !== packBarcode || packImageWrong) {
     products[packIdx] = {
       ...pack,
       productCode: packBarcode,
       barcode: packBarcode,
+      imageUrl: packImage,
     };
     packChanged = true;
   }

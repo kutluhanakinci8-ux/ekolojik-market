@@ -73,5 +73,17 @@ for (const { id, url } of jobs) {
   }
 }
 
+/** Repoda sabitlenen görseller (Greenleaf URL yerine mağaza fotoğrafı) */
+const REPO_STATIC_PRODUCT_IMAGES = {
+  8: 'p-8.jpg',
+  138: 'p-138.jpg',
+};
+for (const [idStr, fileName] of Object.entries(REPO_STATIC_PRODUCT_IMAGES)) {
+  const id = Number(idStr);
+  if (existsSync(join(OUT_DIR, fileName))) {
+    manifest[id] = `/product-images/${fileName}`;
+  }
+}
+
 writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 console.log(`\nBitti: ${ok} indirildi, ${fail} hata → ${MANIFEST}`);
