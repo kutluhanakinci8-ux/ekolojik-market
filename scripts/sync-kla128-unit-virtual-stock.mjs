@@ -22,9 +22,7 @@ const PURCHASE_UNIT = 26.63;
 const TARGET_TENANTS = new Set(['main']);
 const PACK_CATALOG_IMAGE = '/product-images/p-8.jpg';
 
-function resolvePackImageUrl(pack) {
-  const url = pack?.imageUrl?.trim();
-  if (url?.startsWith('data:')) return url;
+function resolvePackImageUrl() {
   return PACK_CATALOG_IMAGE;
 }
 
