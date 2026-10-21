@@ -7,7 +7,7 @@ import { formatCurrency, formatDateTime } from '../utils/format';
 import { resolveSaleBarcode } from '../utils/productBarcode';
 import { foldTurkish } from '../utils/productSearch';
 import { resolveRetailSaleUnitPrice } from '../utils/productPricing';
-import { sumSaleLineTotal, type CompletedSalePatch } from '../store/saleAdmin';
+import { formatSalePaymentLabel, sumSaleLineTotal, type CompletedSalePatch } from '../store/saleAdmin';
 import './AccountingSalesPanel.css';
 
 const PAYMENT_LABELS: Record<Sale['paymentMethod'], string> = {
@@ -89,6 +89,8 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
   const [addProductId, setAddProductId] = useState('');
   const [addUnitPrice, setAddUnitPrice] = useState('');
   const [barcodeAdd, setBarcodeAdd] = useState('');
+  const [splitCashInput, setSplitCashInput] = useState('');
+  const [splitCardInput, setSplitCardInput] = useState('');
 
   const productById = useMemo(
     () => new Map(store.products.map((p) => [p.id, p])),
@@ -144,8 +146,11 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
   const openEdit = (sale: Sale) => {
     setEditing(sale);
     setFormError(null);
-    const method = sale.paymentMethod === 'split' ? 'cash' : sale.paymentMethod;
-    setPaymentMethod(method);
+    setPaymentMethod(sale.paymentMethod);
+    const cashPart = sale.paymentSplits?.find((s) => s.method === 'cash')?.amount;
+    const cardPart = sale.paymentSplits?.find((s) => s.method === 'card')?.amount;
+    setSplitCashInput(cashPart != null ? formatMoneyInput(cashPart) : '');
+    setSplitCardInput(cardPart != null ? formatMoneyInput(cardPart) : '');
     setTotalInput(formatMoneyInput(sale.total));
     setCustomerName(sale.customerName ?? '');
     setGreenleafNumber(sale.greenleafNumber ?? '');
@@ -265,6 +270,14 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
       note,
       items,
     };
+    if (paymentMethod === 'split') {
+      const cash = parseMoneyInput(splitCashInput);
+      const card = parseMoneyInput(splitCardInput);
+      patch.paymentSplits = [
+        { method: 'cash', amount: cash },
+        { method: 'card', amount: card },
+      ];
+    }
     const result = store.updateCompletedSale(editing.id, patch);
     if (!result.ok) {
       setFormError(result.error);
@@ -291,7 +304,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
           </p>
         </div>
         <p className="module-hint accounting-sales-hint">
-          Satış satırları ve fiyatlar düzenlenebilir; stok hareketi otomatik güncellenmez.
+          Ödeme tipi (nakit+kart dahil) ve satır fiyatları düzenlenebilir; stok hareketi otomatik güncellenmez.
         </p>
       </div>
 
@@ -326,7 +339,9 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                   </td>
                   <td>
                     <span className={`accounting-sales-pay accounting-sales-pay--${sale.paymentMethod}`}>
-                      {PAYMENT_LABELS[sale.paymentMethod]}
+                      {sale.paymentMethod === 'split' && sale.paymentSplits?.length
+                        ? formatSalePaymentLabel(sale)
+                        : PAYMENT_LABELS[sale.paymentMethod]}
                     </span>
                   </td>
                   <td className="num">{formatCurrency(sale.total)}</td>
@@ -368,8 +383,31 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                   <option value="card">Kart</option>
                   <option value="transfer">Havale</option>
                   <option value="credit">Veresiye</option>
+                  <option value="split">Nakit + Kart (bölünmüş)</option>
                 </select>
               </label>
+              {paymentMethod === 'split' && (
+                <>
+                  <label>
+                    Nakit (₺)
+                    <input
+                      value={splitCashInput}
+                      onChange={(e) => setSplitCashInput(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="ör. 180"
+                    />
+                  </label>
+                  <label>
+                    Kart (₺)
+                    <input
+                      value={splitCardInput}
+                      onChange={(e) => setSplitCardInput(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="ör. 600"
+                    />
+                  </label>
+                </>
+              )}
               <label>
                 Tutar (₺)
                 <input

@@ -31,7 +31,7 @@ export function PosPaymentModal({
     setError(null);
     setTender('');
     setCashPart('');
-    setCardPart(total > 0 ? String(Math.round(total * 100) / 100) : '');
+    setCardPart('');
   }, [open, total, mode]);
 
   const tenderNum = parseFloat(tender.replace(',', '.'));
@@ -125,7 +125,14 @@ export function PosPaymentModal({
             <div className="pos-payment-split-grid">
               <label className="pos-payment-field">
                 <span>Nakit</span>
-                <input type="text" inputMode="decimal" value={cashPart} onChange={(e) => setCashPart(e.target.value)} />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoFocus
+                  value={cashPart}
+                  onChange={(e) => setCashPart(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitSplit(); }}
+                />
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => fillRemainder('cash')}>Kalanı nakit</button>
               </label>
               <label className="pos-payment-field">

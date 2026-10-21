@@ -5032,10 +5032,12 @@ export function usePosStoreState() {
     const updated = applyCompletedSalePatch(sale, patch);
     setSales((prev) => prev.map((entry) => (entry.id === saleId ? updated : entry)));
     if (authSession) {
-      const paymentLabel = updated.paymentMethod === 'cash' ? 'Nakit'
-        : updated.paymentMethod === 'card' ? 'Kart'
-          : updated.paymentMethod === 'credit' ? 'Veresiye'
-            : 'Havale';
+      const paymentLabel = updated.paymentMethod === 'split'
+        ? 'Bölünmüş'
+        : updated.paymentMethod === 'cash' ? 'Nakit'
+          : updated.paymentMethod === 'card' ? 'Kart'
+            : updated.paymentMethod === 'credit' ? 'Veresiye'
+              : 'Havale';
       logActivity(authSession, 'sale_update', `Satış düzenlendi — ${formatCurrencyTry(updated.total)}`, {
         satisId: saleId,
         odeme: paymentLabel,
