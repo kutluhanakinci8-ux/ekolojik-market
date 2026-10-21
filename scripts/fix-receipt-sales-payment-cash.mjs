@@ -277,6 +277,12 @@ function findSaleIndex(sales, def) {
   return sales.findIndex((s) => ids.has(String(s.id)));
 }
 
+/** Muhasebe satış düzenlemeden gelen ödeme — deploy fiş scripti ezmesin. */
+function hasManualAccountingPaymentEdit(sale) {
+  const note = String(sale?.paymentCorrectionNote ?? '');
+  return note.includes('Muhasebe satış düzenleme') || note.includes('Muhasebe');
+}
+
 function saleNeedsUpdate(before, after) {
   if (before.paymentMethod !== after.paymentMethod) return true;
   if (before.paymentSplits) return true;
@@ -300,6 +306,10 @@ function migrateStore(snapshot) {
         : buildSaleFromReceipt(def, existingId, batch.priceFactor, `Fiş düzeltmesi: ${batch.label}`);
 
       if (idx >= 0) {
+        if (hasManualAccountingPaymentEdit(sales[idx])) {
+          report.push(`  atlandı (manuel ödeme): ${existingId}`);
+          continue;
+        }
         if (
           saleNeedsUpdate(sales[idx], rebuilt)
           || Number(sales[idx].crmDiscountTotal ?? 0) !== Number(rebuilt.crmDiscountTotal ?? 0)

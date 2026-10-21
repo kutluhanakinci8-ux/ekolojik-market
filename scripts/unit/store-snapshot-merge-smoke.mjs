@@ -1,0 +1,48 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import { mergeIncomingStoreWithExisting } from '../../server/storeSnapshotMerge.mjs';
+
+const saleId = 'S-test-payment-merge';
+const base = {
+  id: saleId,
+  createdAt: '2026-10-16T12:00:00.000Z',
+  total: 100,
+  items: [],
+  paymentMethod: 'transfer',
+};
+
+const existing = {
+  updatedAt: '2026-10-16T13:00:00.000Z',
+  sales: [{
+    ...base,
+    paymentMethod: 'cash',
+    paymentCorrectedAt: '2026-10-16T14:00:00.000Z',
+    paymentCorrectionNote: 'Muhasebe satış düzenleme',
+  }],
+};
+
+const staleIncoming = {
+  updatedAt: '2026-10-16T15:00:00.000Z',
+  sales: [{ ...base, paymentMethod: 'transfer' }],
+};
+
+const merged = mergeIncomingStoreWithExisting(staleIncoming, existing);
+const row = merged.sales.find((s) => s.id === saleId);
+assert.equal(row.paymentMethod, 'cash', 'newer paymentCorrectedAt on disk must win over stale PUT');
+assert.equal(row.paymentCorrectionNote, 'Muhasebe satış düzenleme');
+
+const newerIncoming = {
+  updatedAt: '2026-10-16T16:00:00.000Z',
+  sales: [{
+    ...base,
+    paymentMethod: 'card',
+    paymentCorrectedAt: '2026-10-16T17:00:00.000Z',
+    paymentCorrectionNote: 'Muhasebe satış düzenleme',
+  }],
+};
+
+const merged2 = mergeIncomingStoreWithExisting(newerIncoming, existing);
+const row2 = merged2.sales.find((s) => s.id === saleId);
+assert.equal(row2.paymentMethod, 'card', 'newer payment correction from client must persist');
+
+console.log('store-snapshot-merge-smoke: ok');

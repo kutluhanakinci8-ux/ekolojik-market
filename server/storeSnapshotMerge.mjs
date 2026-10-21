@@ -8,12 +8,39 @@ function ts(iso) {
   return Number.isFinite(t) ? t : 0;
 }
 
+function mergeSaleRecord(local, remote) {
+  const localCorrected = ts(local.paymentCorrectedAt);
+  const remoteCorrected = ts(remote.paymentCorrectedAt);
+  let chosen;
+  if (remoteCorrected > localCorrected) chosen = remote;
+  else if (localCorrected > remoteCorrected) chosen = local;
+  else chosen = ts(local.createdAt) >= ts(remote.createdAt) ? local : remote;
+
+  const paymentSource = remoteCorrected >= localCorrected ? remote : local;
+  if (localCorrected || remoteCorrected) {
+    return {
+      ...chosen,
+      paymentMethod: paymentSource.paymentMethod,
+      paymentSplits: paymentSource.paymentSplits,
+      cashTendered: paymentSource.cashTendered,
+      changeGiven: paymentSource.changeGiven,
+      paymentCorrectedAt: paymentSource.paymentCorrectedAt,
+      paymentCorrectionNote: paymentSource.paymentCorrectionNote,
+    };
+  }
+  return chosen;
+}
+
 function mergeSalesById(local, remote) {
   const map = new Map();
   for (const s of remote ?? []) map.set(s.id, s);
   for (const s of local ?? []) {
     const prev = map.get(s.id);
-    if (!prev || ts(s.createdAt) >= ts(prev.createdAt)) map.set(s.id, s);
+    if (!prev) {
+      map.set(s.id, s);
+      continue;
+    }
+    map.set(s.id, mergeSaleRecord(s, prev));
   }
   return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

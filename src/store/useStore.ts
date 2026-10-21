@@ -5030,7 +5030,16 @@ export function usePosStoreState() {
     const validationError = validateCompletedSalePatch(sale, patch);
     if (validationError) return { ok: false, error: validationError };
     const updated = applyCompletedSalePatch(sale, patch);
-    setSales((prev) => prev.map((entry) => (entry.id === saleId ? updated : entry)));
+    const nextSales = sales.map((entry) => (entry.id === saleId ? updated : entry));
+    setSales(nextSales);
+    if (syncReady && authSession) {
+      void saveStoreSnapshot({
+        ...buildCurrentSnapshot(),
+        sales: nextSales,
+      }).then((saved) => {
+        if (saved) setSyncStatus('synced');
+      });
+    }
     if (authSession) {
       const paymentLabel = updated.paymentMethod === 'split'
         ? 'Bölünmüş'
@@ -5045,7 +5054,7 @@ export function usePosStoreState() {
       });
     }
     return { ok: true };
-  }, [sales, authSession, logActivity]);
+  }, [sales, authSession, logActivity, syncReady, buildCurrentSnapshot]);
 
   const updateCustomerCrm = useCallback((customerId: string, patch: Partial<CustomerCrmProfile>) => {
     setCustomers((prev) => prev.map((c) => (
