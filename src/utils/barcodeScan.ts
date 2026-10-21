@@ -25,6 +25,8 @@ export function normalizeBarcodeScanInput(raw: string): string {
   value = value.replace(/\s+/g, '');
   // Bazı okuyucular GS1 / AIM önek gönderir
   value = value.replace(/^]C1/i, '').replace(/^]E0/i, '').replace(/^]d2/i, '');
+  const klaCompound = value.match(/^KLA128Barkod(\d{8,14})$/i);
+  if (klaCompound) value = klaCompound[1];
   return value;
 }
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * KLA128 (10’lu paket, id 8) → tekli sanal stok KLA128T (id 138).
- * Stok: paket adedi × 10. Perakende KDV dahil 188 ₺. Barkod paket ile aynı (6955470959966).
+ * Stok: paket adedi × 10 (0,2 paket = 2 tekli). Perakende KDV dahil 376 ₺, partner 188 ₺.
+ * Tekli barkod: 6955470959966 (paket kasada KLA128).
  *
  * Kullanım: node scripts/sync-kla128-unit-virtual-stock.mjs [/var/www/market-pos/data]
  */
@@ -13,8 +14,10 @@ const PACK_PRODUCT_ID = 8;
 const UNIT_PRODUCT_ID = 138;
 const UNIT_CODE = 'KLA128T';
 const UNIT_BARCODE = '6955470959966';
-const RETAIL_GROSS = 188;
-const RETAIL_NET = 156.67;
+const RETAIL_GROSS = 376;
+const RETAIL_NET = 313.33;
+const PARTNER_GROSS = 188;
+const PARTNER_NET = 156.67;
 const PURCHASE_UNIT = 26.63;
 const TARGET_TENANTS = new Set(['main']);
 
@@ -22,15 +25,11 @@ function round2(n) {
   return Math.round(Number(n) * 100) / 100;
 }
 
-function partnerFromRetailNet(net) {
-  return round2(net / 2);
-}
-
 function buildUnitProduct(pack, existing) {
-  const packStock = Math.max(0, Math.floor(Number(pack?.stock) || 0));
-  const unitStock = packStock * 10;
-  const partner = partnerFromRetailNet(RETAIL_NET);
-  const partnerGross = round2(partner * 1.2);
+  const packStock = Math.max(0, Number(pack?.stock) || 0);
+  const unitStock = Math.floor(packStock * 10);
+  const partner = PARTNER_NET;
+  const partnerGross = PARTNER_GROSS;
 
   const base = existing ?? {
     id: UNIT_PRODUCT_ID,
@@ -68,7 +67,10 @@ function buildUnitProduct(pack, existing) {
 }
 
 function migrateStore(snapshot) {
-  const products = [...(snapshot.products ?? [])];
+  if (!snapshot?.products?.length) {
+    return { snapshot, changed: false, report: ['  store yok veya ürün listesi boş — atlandı'] };
+  }
+  const products = [...snapshot.products];
   const packIdx = products.findIndex((p) => Number(p.id) === PACK_PRODUCT_ID);
   if (packIdx < 0) {
     return { snapshot, changed: false, report: ['  paket ürün KLA128 (id 8) bulunamadı — atlandı'] };
@@ -77,7 +79,10 @@ function migrateStore(snapshot) {
   const pack = products[packIdx];
   const packBarcode = 'KLA128';
   let packChanged = false;
-  if (pack.barcode !== packBarcode || pack.productCode !== packBarcode) {
+  const packBarcodeWrong =
+    pack.barcode !== packBarcode
+    || /KLA128Barkod/i.test(String(pack.barcode ?? ''));
+  if (packBarcodeWrong || pack.productCode !== packBarcode) {
     products[packIdx] = {
       ...pack,
       productCode: packBarcode,
@@ -146,10 +151,13 @@ async function main() {
   const dataDir = process.argv[2] || join(process.cwd(), 'data');
   console.log(`==> KLA128 tekli sanal stok: ${dataDir}`);
   const entries = await readdir(dataDir, { withFileTypes: true });
-  const tenants = entries
-    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
-    .map((e) => e.name);
-  for (const tenantId of tenants) {
+  const tenantIds = new Set(['main']);
+  for (const entry of entries) {
+    if (entry.isDirectory() && !entry.name.startsWith('.')) {
+      tenantIds.add(entry.name);
+    }
+  }
+  for (const tenantId of tenantIds) {
     await migrateTenant(dataDir, tenantId);
   }
   console.log('==> Bitti');

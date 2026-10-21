@@ -52,9 +52,9 @@ const batch1: PriceCatalogEntry[] = [
   priced('KLA128', 'CARICH Bambu Yüz Mendili', 0.2),
   priced('KLA128T', 'CARICH Bambu Yüz Mendili (tek adet)', 0.02, {
     purchasePrice: 26.63,
-    partnerPrice: 78.34,
-    couponPrice: 78.34,
-    retailPrice: 156.67,
+    partnerPrice: 156.67,
+    couponPrice: 156.67,
+    retailPrice: 313.33,
   }),
   priced('CEA069', 'CARICH Bambu Cep Mendili', 0.2),
   priced('CAA038', 'CARICH Zencefil Hacim Şampuanı', 0.5),
