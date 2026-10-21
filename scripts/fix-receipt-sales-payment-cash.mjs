@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fotoğraftaki fişler — %50 satış fiyatı + nakit (sunucu store.json).
- * Satış yoksa fiş satırlarından ekler (stok dokunulmaz).
+ * Satış yoksa fiş satırlarından ekler. `deductStock: true` ise stok + hareket yazılır (idempotent).
  *
  * Kullanım: node scripts/fix-receipt-sales-payment-cash.mjs [/var/www/market-pos/data]
  */
@@ -187,6 +187,7 @@ const RECEIPT_BATCHES = [
           { code: 'CAA039', qty: 1, unitPrice: 345 },
           { code: 'SBC053', qty: 1, unitPrice: 407 },
         ],
+        deductStock: true,
       },
     ],
   },
@@ -298,13 +299,73 @@ function saleNeedsUpdate(before, after) {
   return false;
 }
 
+function deductStockForSale(snapshot, sale, report) {
+  const saleId = String(sale.id);
+  const movements = [...(snapshot.stockMovements ?? [])];
+  if (movements.some((m) => m.saleId === saleId)) {
+    report.push(`  stok uyumlu: ${saleId} (hareket zaten var)`);
+    return { snapshot, changed: false };
+  }
+
+  const products = [...(snapshot.products ?? [])];
+  const newMovements = [];
+  let stockChanged = false;
+
+  for (const item of sale.items ?? []) {
+    if (item.priceType === 'sample') continue;
+    const productId = Number(item.productId);
+    if (!productId) continue;
+    const qty = Number(item.quantity) || 0;
+    if (qty <= 0) continue;
+
+    const idx = products.findIndex((p) => Number(p.id) === productId);
+    if (idx < 0) {
+      report.push(`  stok uyarı: ürün id ${productId} bulunamadı (${saleId})`);
+      continue;
+    }
+
+    const product = products[idx];
+    const previousStock = Number(product.stock) || 0;
+    const newStock = Math.max(0, previousStock - qty);
+    newMovements.push({
+      id: `M-${saleId}-${productId}`,
+      productId: product.id,
+      productName: product.name,
+      type: 'sale',
+      quantity: qty,
+      previousStock,
+      newStock,
+      note: `Satış ${saleId}`,
+      saleId,
+      createdAt: sale.createdAt,
+    });
+    products[idx] = { ...product, stock: newStock };
+    stockChanged = true;
+    report.push(
+      `  stok düşüldü: #${productId} ${previousStock} → ${newStock} (−${qty}, ${saleId})`,
+    );
+  }
+
+  if (!stockChanged) return { snapshot, changed: false };
+
+  return {
+    snapshot: {
+      ...snapshot,
+      products,
+      stockMovements: [...newMovements, ...movements],
+    },
+    changed: true,
+  };
+}
+
 function migrateStore(snapshot) {
-  const sales = [...(snapshot.sales ?? [])];
+  let working = { ...snapshot, sales: [...(snapshot.sales ?? [])] };
   let changed = false;
   const report = [];
 
   for (const batch of RECEIPT_BATCHES) {
     for (const def of batch.sales) {
+      const sales = working.sales;
       const idx = findSaleIndex(sales, def);
       const existingId = idx >= 0 ? String(sales[idx].id) : def.id;
       const rebuilt = def.keepAmountsWhenExists && idx >= 0
@@ -322,12 +383,24 @@ function migrateStore(snapshot) {
         } else {
           report.push(`  uyumlu: ${existingId} (${rebuilt.total} ₺)`);
         }
-        continue;
+      } else {
+        sales.push(rebuilt);
+        changed = true;
+        report.push(`  eklendi: ${def.id} toplam ${rebuilt.total} ₺ (${batch.label})`);
       }
 
-      sales.push(rebuilt);
-      changed = true;
-      report.push(`  eklendi: ${def.id} toplam ${rebuilt.total} ₺ (${batch.label})`);
+      working = { ...working, sales };
+
+      if (def.deductStock) {
+        const sale = working.sales.find((s) => String(s.id) === String(def.id));
+        if (sale) {
+          const stockResult = deductStockForSale(working, sale, report);
+          if (stockResult.changed) {
+            working = stockResult.snapshot;
+            changed = true;
+          }
+        }
+      }
     }
   }
 
@@ -335,8 +408,8 @@ function migrateStore(snapshot) {
 
   return {
     snapshot: {
-      ...snapshot,
-      sales: sales.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      ...working,
+      sales: working.sales.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       updatedAt: new Date().toISOString(),
     },
     changed: true,
