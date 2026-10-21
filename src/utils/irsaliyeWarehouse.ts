@@ -30,7 +30,18 @@ export function irsaliyeStockForProduct(product: Pick<Product, 'id' | 'productCo
   return qty == null ? undefined : qty;
 }
 
+/** 10’lu paketten tekil satış — irsaliyede yalnızca paket stok kodu (ör. KLA128) var */
+const VIRTUAL_UNIT_WAREHOUSE_CODES = new Set(['KLA128T']);
+
+export function isVirtualUnitWarehouseProduct(
+  product: Pick<Product, 'id' | 'productCode'>,
+): boolean {
+  const code = resolveProductStockCode(product.id, product.productCode);
+  return code != null && VIRTUAL_UNIT_WAREHOUSE_CODES.has(code);
+}
+
 export function isIrsaliyeWarehouseProduct(product: Pick<Product, 'id' | 'productCode'>): boolean {
+  if (isVirtualUnitWarehouseProduct(product)) return true;
   return irsaliyeStockForProduct(product) != null;
 }
 
