@@ -566,13 +566,15 @@ export function StockOperationsModal({
   );
 
   const countCatalogProducts = useMemo(
-    () => [...products].sort((a, b) => {
-      const codeA = a.productCode ?? String(a.id);
-      const codeB = b.productCode ?? String(b.id);
-      const byCode = codeA.localeCompare(codeB, 'tr', { numeric: true, sensitivity: 'base' });
-      if (byCode !== 0) return byCode;
-      return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
-    }),
+    () => [...products]
+      .filter((p) => p.stock > 0)
+      .sort((a, b) => {
+        const codeA = a.productCode ?? String(a.id);
+        const codeB = b.productCode ?? String(b.id);
+        const byCode = codeA.localeCompare(codeB, 'tr', { numeric: true, sensitivity: 'base' });
+        if (byCode !== 0) return byCode;
+        return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
+      }),
     [products],
   );
 
@@ -1164,8 +1166,8 @@ export function StockOperationsModal({
                 {countPhase === 'scan' ? (
                   <>
                     <p className="stock-ops-dialog__count-lead">
-                      Ürünler <strong>liste sırasıyla</strong> (ürün kodu) alt alta gösterilir; rafta bulduğunuz
-                      ürünü sayın (barkod okutma veya adet yazma), sonra <strong>Sonraki ürün</strong> ile
+                      Yalnızca <strong>sistemde stoğu olan</strong> ürünler, ürün kodu sırasıyla alt alta listelenir;
+                      rafta bulduğunuz ürünü sayın (barkod veya adet), sonra <strong>Sonraki ürün</strong> ile
                       sıradakine geçin. <strong>Sistem stoğu</strong> sayım bitene kadar değişmez.
                       Oturum bu cihazda otomatik kaydedilir.
                     </p>
@@ -1253,6 +1255,11 @@ export function StockOperationsModal({
                     </form>
                     {countScanError && (
                       <p className="stock-ops-dialog__count-error" role="alert">{countScanError}</p>
+                    )}
+                    {countSequentialListVisible && countCatalogProducts.length === 0 && (
+                      <p className="stock-ops-dialog__count-resume" role="status">
+                        Stokta ürün yok — sayım listesi boş. Stok girişi yapın veya sayımı kapatın.
+                      </p>
                     )}
                     {countSequentialListVisible && countCatalogProducts.length > 0 && (
                       <div className="stock-ops-dialog__count-seq-head" role="status">
