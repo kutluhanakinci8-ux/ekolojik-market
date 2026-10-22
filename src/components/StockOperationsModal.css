@@ -780,6 +780,17 @@
   color: #475569;
 }
 
+.stock-ops-dialog__count-resume {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1e40af;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .stock-ops-dialog__count-scan input {
   font-size: 16px;
   font-family: ui-monospace, monospace;

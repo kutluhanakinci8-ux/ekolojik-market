@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getCategoryLabel } from '../data/categories';
 import { ProductCategoryManagerModal } from './ProductCategoryManagerModal';
 import { categoriesForStockFilters, countProductsByCategory } from '../utils/productCategories';
@@ -26,6 +26,11 @@ import { ProductSetModal } from './ProductSetModal';
 import { StockOperationsModal, type StockOperationType } from './StockOperationsModal';
 import { isTenantCatalogIsolated } from '../utils/tenantCatalogIsolation';
 import { resolveRetailSaleUnitPrice } from '../utils/productPricing';
+import {
+  countDraftLineTotal,
+  loadStockCountSessionDraft,
+  type StockCountSessionDraft,
+} from '../storage/stockCountSession';
 
 interface StockScreenProps {
   store: Store;
@@ -106,6 +111,14 @@ export function StockScreen({ store }: StockScreenProps) {
   const [stockOpsOpen, setStockOpsOpen] = useState(false);
   const [stockOpsProductId, setStockOpsProductId] = useState<number | undefined>();
   const [stockOpsMode, setStockOpsMode] = useState<StockOperationType>('in');
+  const [pendingCountDraft, setPendingCountDraft] = useState<StockCountSessionDraft | null>(null);
+
+  useEffect(() => {
+    const draft = loadStockCountSessionDraft();
+    setPendingCountDraft(
+      draft && Object.keys(draft.countLines).length > 0 ? draft : null,
+    );
+  }, [stockOpsOpen]);
 
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
 
@@ -346,6 +359,20 @@ export function StockScreen({ store }: StockScreenProps) {
             <strong>Resim düzenleme açık:</strong> Her satırdaki küçük resme tıklayıp fotoğraf yükleyin.
             Özel fotoğrafı kaldırmak için resmin üzerindeki ✕ kullanın.
             Bitirmek için <strong>Düzenlemeyi bitir</strong> butonuna basın.
+          </div>
+        )}
+
+        {pendingCountDraft && !stockOpsOpen && (
+          <div className="stock-image-edit-hint stock-count-draft-banner" role="status">
+            <strong>Yarım kalan barkod sayımı</strong> bu cihazda kayıtlı (
+            {Object.keys(pendingCountDraft.countLines).length} kalem, {countDraftLineTotal(pendingCountDraft)} okutma).
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => openStockOps(undefined, 'set')}
+            >
+              Sayıma devam et
+            </button>
           </div>
         )}
 

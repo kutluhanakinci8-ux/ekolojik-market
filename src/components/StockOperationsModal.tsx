@@ -10,7 +10,13 @@ import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
 import { formatCurrencyTry } from '../utils/format';
+import {
+  clearStockCountSessionDraft,
+  loadStockCountSessionDraft,
+  saveStockCountSessionDraft,
+} from '../storage/stockCountSession';
 import { normalizeBarcodeScanInput, resolveBarcodeScan } from '../utils/barcodeScan';
+import { formatDateTime } from '../utils/format';
 import './StockOperationsModal.css';
 
 type StockCountLine = {
@@ -141,7 +147,22 @@ export function StockOperationsModal({
   const [countLastProductId, setCountLastProductId] = useState<number | null>(null);
   const [countScanInput, setCountScanInput] = useState('');
   const [countScanError, setCountScanError] = useState<string | null>(null);
+  const [countSessionStartedAt, setCountSessionStartedAt] = useState<string | null>(null);
+  const [countDraftRestored, setCountDraftRestored] = useState(false);
   const countScanInputRef = useRef<HTMLInputElement>(null);
+
+  const applyCountDraftToState = useCallback((draft: ReturnType<typeof loadStockCountSessionDraft>) => {
+    if (!draft || Object.keys(draft.countLines).length === 0) return false;
+    setCountPhase(draft.countPhase);
+    setCountLines(draft.countLines);
+    setCountLastProductId(draft.countLastProductId);
+    setNote(draft.note ?? '');
+    setCountSessionStartedAt(draft.startedAt);
+    setCountScanInput('');
+    setCountScanError(null);
+    setCountDraftRestored(true);
+    return true;
+  }, []);
 
   const resetCountSession = useCallback(() => {
     setCountPhase('scan');
@@ -149,6 +170,9 @@ export function StockOperationsModal({
     setCountLastProductId(null);
     setCountScanInput('');
     setCountScanError(null);
+    setCountSessionStartedAt(null);
+    setCountDraftRestored(false);
+    clearStockCountSessionDraft();
   }, []);
 
   const categoryOptions = useMemo(
@@ -162,9 +186,54 @@ export function StockOperationsModal({
     setProductId(initialProductId ? String(initialProductId) : '');
     setSearch('');
     setQuantity('');
-    setNote('');
-    resetCountSession();
-  }, [open, initialProductId, initialOperation, resetCountSession]);
+    if (initialOperation === 'set') {
+      const draft = loadStockCountSessionDraft();
+      if (!applyCountDraftToState(draft)) {
+        setNote('');
+        setCountPhase('scan');
+        setCountLines({});
+        setCountLastProductId(null);
+        setCountSessionStartedAt(null);
+        setCountDraftRestored(false);
+      }
+    } else {
+      setNote('');
+    }
+  }, [open, initialProductId, initialOperation, applyCountDraftToState]);
+
+  useEffect(() => {
+    if (!open || operation !== 'set') return;
+    if (Object.keys(countLines).length > 0) return;
+    const draft = loadStockCountSessionDraft();
+    applyCountDraftToState(draft);
+  }, [open, operation, countLines, applyCountDraftToState]);
+
+  useEffect(() => {
+    if (!open || operation !== 'set') return;
+    const lineCount = Object.keys(countLines).length;
+    if (lineCount === 0 && countPhase === 'scan' && !countSessionStartedAt) {
+      clearStockCountSessionDraft();
+      return;
+    }
+    if (lineCount === 0) return;
+    const startedAt = countSessionStartedAt ?? new Date().toISOString();
+    if (!countSessionStartedAt) setCountSessionStartedAt(startedAt);
+    saveStockCountSessionDraft({
+      startedAt,
+      countPhase,
+      countLines,
+      countLastProductId,
+      note,
+    });
+  }, [
+    open,
+    operation,
+    countPhase,
+    countLines,
+    countLastProductId,
+    note,
+    countSessionStartedAt,
+  ]);
 
   useEffect(() => {
     if (!open || operation !== 'set' || countPhase !== 'scan') return;
@@ -326,6 +395,7 @@ export function StockOperationsModal({
   );
 
   const registerCountScan = (product: Product) => {
+    setCountDraftRestored(false);
     setCountLines((prev) => {
       const existing = prev[product.id];
       const systemStock = existing?.systemStock ?? product.stock;
@@ -525,7 +595,16 @@ export function StockOperationsModal({
                     <p className="stock-ops-dialog__count-lead">
                       Barkod okuyucu ile ürün okutun. <strong>Sistem stoğu</strong> sayım bitene kadar değişmez;
                       her okutma <strong>sayım adedini</strong> artırır ve konumda kalan miktarı gösterir.
+                      Oturum bu cihazda otomatik kaydedilir (çıkış / şifre ekranı sonrası devam edebilirsiniz).
                     </p>
+                    {countDraftRestored && countLineList.length > 0 && (
+                      <p className="stock-ops-dialog__count-resume" role="status">
+                        Yarım kalan sayım yüklendi
+                        {countSessionStartedAt ? ` · başlangıç ${formatDateTime(countSessionStartedAt)}` : ''}
+                        {' · '}
+                        {countLineList.length} kalem, {countLineList.reduce((s, l) => s + l.scannedQty, 0)} okutma
+                      </p>
+                    )}
                     <form
                       className="stock-ops-dialog__count-scan"
                       onSubmit={(event) => {
