@@ -877,6 +877,81 @@
   font-weight: 600;
 }
 
+.stock-ops-dialog__count-seq-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.stock-ops-dialog__count-seq-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.stock-ops-dialog__count-product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(58vh, 640px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.stock-ops-dialog__count-product-card {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.stock-ops-dialog__count-product-card:not(.is-active) {
+  cursor: pointer;
+}
+
+.stock-ops-dialog__count-product-card.is-active {
+  border-width: 2px;
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.stock-ops-dialog__count-product-card.is-done {
+  opacity: 0.62;
+}
+
+.stock-ops-dialog__count-product-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.stock-ops-dialog__count-qty-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stock-ops-dialog__count-qty-field input {
+  width: 88px;
+  padding: 8px 10px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+}
+
+.stock-ops-dialog__count-next-btn {
+  margin-left: auto;
+}
+
 .stock-ops-dialog__count-hero {
   display: grid;
   grid-template-columns: auto 1fr;
