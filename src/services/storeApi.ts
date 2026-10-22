@@ -1,5 +1,6 @@
 import type { PersistedStoreSnapshot } from '../types/persistedStore';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
+import { reconcileSaleStockInSnapshot } from '../utils/reconcileSaleStockMovements';
 import { mergeServerAuthoritativeSnapshot } from '../utils/serverAuthoritativeSync';
 import { loadPosApiToken, posApiAuthHeaders, posApiFetch } from './posApiAuth';
 
@@ -81,7 +82,9 @@ export async function buildMergedSnapshotForSave(
   local: PersistedStoreSnapshot,
 ): Promise<PersistedStoreSnapshot> {
   const remote = await fetchStoreSnapshot();
-  return remote ? mergeServerAuthoritativeSnapshot(local, remote) : local;
+  const merged = remote ? mergeServerAuthoritativeSnapshot(local, remote) : local;
+  const { snapshot } = reconcileSaleStockInSnapshot(merged);
+  return snapshot;
 }
 
 export async function saveStoreSnapshot(snapshot: PersistedStoreSnapshot): Promise<boolean> {
