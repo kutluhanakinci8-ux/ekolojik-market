@@ -989,20 +989,50 @@
 .stock-ops-dialog__count-apply-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
   padding: 14px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #fff;
-  cursor: pointer;
   text-align: center;
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.stock-ops-dialog__count-apply-card:hover {
-  border-color: #15803d;
-  box-shadow: 0 8px 24px rgba(21, 128, 61, 0.12);
+.stock-ops-dialog__count-apply-card .product-image {
+  margin: 0 auto;
+}
+
+.stock-ops-dialog__count-apply-qty {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  text-align: left;
+  margin-top: 4px;
+}
+
+.stock-ops-dialog__count-apply-qty span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.stock-ops-dialog__count-apply-qty input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.stock-ops-dialog__count-apply-btn {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 13px;
 }
 
 .stock-ops-dialog__count-apply-name {
@@ -1027,15 +1057,6 @@
 
 .stock-ops-dialog__count-apply-diff.is-down {
   color: #b91c1c;
-}
-
-.stock-ops-dialog__count-apply-cta {
-  margin-top: 4px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #15803d;
 }
 
 .stock-ops-dialog__count-table .is-down {

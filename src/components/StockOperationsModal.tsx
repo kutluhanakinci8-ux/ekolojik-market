@@ -180,6 +180,7 @@ export function StockOperationsModal({
   const [countCountedByUsername, setCountCountedByUsername] = useState('');
   const [countResponsiblePersonName, setCountResponsiblePersonName] = useState('');
   const [countEndedAt, setCountEndedAt] = useState<string | null>(null);
+  const [countApplyQtyDraft, setCountApplyQtyDraft] = useState<Record<number, string>>({});
   const countScanInputRef = useRef<HTMLInputElement>(null);
   const countModalWasOpenRef = useRef(false);
 
@@ -220,6 +221,7 @@ export function StockOperationsModal({
     setCountCountedByUsername('');
     setCountResponsiblePersonName('');
     setCountEndedAt(null);
+    setCountApplyQtyDraft({});
     clearStockCountSessionDraft();
   }, []);
 
@@ -483,6 +485,19 @@ export function StockOperationsModal({
     return countDiscrepancyRows.filter((row) => pendingIds.has(row.line.productId));
   }, [activeCountReport, countDiscrepancyRows]);
 
+  useEffect(() => {
+    if (countPhase !== 'apply') return;
+    setCountApplyQtyDraft((prev) => {
+      const next = { ...prev };
+      for (const { line } of countPendingApplyRows) {
+        if (next[line.productId] === undefined) {
+          next[line.productId] = String(line.scannedQty);
+        }
+      }
+      return next;
+    });
+  }, [countPhase, countPendingApplyRows]);
+
   const businessName = settings?.businessName?.trim() || 'Mağaza';
   const receiptPrinterName =
     settings?.receiptPrinter?.windowsPrinterName?.trim() || STANDARD_WINDOWS_ZYWELL_PRINTER_NAME;
@@ -641,18 +656,24 @@ export function StockOperationsModal({
     setCountPhase('apply');
   };
 
-  const applySingleCountCorrection = (productId: number, scannedQty: number) => {
+  const applySingleCountCorrection = (productId: number) => {
     if (!countReportId || !countReportPrinted) return;
     const product = products.find((p) => p.id === productId);
     if (!product) return;
+    const raw = countApplyQtyDraft[productId] ?? '';
+    const newStock = Number.parseInt(raw, 10);
+    if (Number.isNaN(newStock) || newStock < 0) {
+      window.alert('Geçerli bir stok adedi girin (0 veya üzeri tam sayı).');
+      return;
+    }
     const trimmedNote = note.trim() || 'Stok sayımı düzeltmesi (barkod)';
     const label = product.productCode ?? String(product.id);
     if (!window.confirm(
-      `${product.name} (${label})\nSistem stoğu ${product.stock} → sayım ${scannedQty} olarak güncellensin mi?`,
+      `${product.name} (${label})\nSistem stoğu ${product.stock} → ${newStock} olarak güncellensin mi?`,
     )) {
       return;
     }
-    onSetStock(productId, scannedQty, trimmedNote);
+    onSetStock(productId, newStock, trimmedNote);
     onMarkStockCountLineApplied?.(countReportId, productId);
     if (countPendingApplyRows.length <= 1) {
       window.alert('Tüm düzeltmeler uygulandı.');
@@ -983,9 +1004,10 @@ export function StockOperationsModal({
                   </>
                 ) : (
                   <>
-                    <h3 className="stock-ops-dialog__count-report-title">Düzeltme — ürün seçin</h3>
+                    <h3 className="stock-ops-dialog__count-report-title">Düzeltme — adet girin</h3>
                     <p className="stock-ops-dialog__count-lead">
-                      Her kart için stoğu sayım adedine güncelleyin. Kalan: <strong>{countPendingApplyRows.length}</strong> ürün.
+                      Her ürün için <strong>yeni stok miktarını</strong> yazın (varsayılan sayım adedi; gerekirse değiştirin).
+                      Kalan: <strong>{countPendingApplyRows.length}</strong> ürün.
                     </p>
                     {countPendingApplyRows.length === 0 && (
                       <p className="stock-ops-dialog__count-lead">
@@ -994,22 +1016,39 @@ export function StockOperationsModal({
                     )}
                     <div className="stock-ops-dialog__count-apply-grid">
                       {countPendingApplyRows.map(({ line, product, diff }) => (
-                        <button
-                          key={line.productId}
-                          type="button"
-                          className="stock-ops-dialog__count-apply-card"
-                          onClick={() => applySingleCountCorrection(line.productId, line.scannedQty)}
-                        >
+                        <div key={line.productId} className="stock-ops-dialog__count-apply-card">
                           <ProductImage product={product!} size="md" />
                           <strong className="stock-ops-dialog__count-apply-name">{product!.name}</strong>
                           <span className="stock-ops-dialog__count-apply-meta">
-                            Sistem {line.systemStock} → Sayım {line.scannedQty}
+                            Sistem {line.systemStock} · Sayım {line.scannedQty}
                           </span>
                           <span className={`stock-ops-dialog__count-apply-diff ${diff > 0 ? 'is-up' : 'is-down'}`}>
                             Fark {diff > 0 ? `+${diff}` : diff}
                           </span>
-                          <span className="stock-ops-dialog__count-apply-cta">Düzeltmeyi uygula</span>
-                        </button>
+                          <label className="stock-ops-dialog__count-apply-qty">
+                            <span>Yeni stok</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="numeric"
+                              value={countApplyQtyDraft[line.productId] ?? String(line.scannedQty)}
+                              onChange={(event) => {
+                                setCountApplyQtyDraft((prev) => ({
+                                  ...prev,
+                                  [line.productId]: event.target.value,
+                                }));
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="btn btn-primary stock-ops-dialog__count-apply-btn"
+                            onClick={() => applySingleCountCorrection(line.productId)}
+                          >
+                            Düzeltmeyi uygula
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </>
