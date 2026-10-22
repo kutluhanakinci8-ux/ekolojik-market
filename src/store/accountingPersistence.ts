@@ -1,5 +1,6 @@
 import { createDefaultEquityPartners } from '../data/defaultEquityPartners';
 import type { AccountingSnapshot } from '../types/accounting';
+import type { StockCountReport } from '../types/stockCountReport';
 import { EMPTY_ACCOUNTING_SNAPSHOT } from '../types/accounting';
 import { DEFAULT_TENANT_ID, loadTenantId } from '../storage/tenantSession';
 import { tenantLocalStorageSuffix } from '../storage/posLocalStorageKeys';
@@ -74,6 +75,30 @@ export function saveAccountingSnapshot(snapshot: AccountingSnapshot): void {
   localStorage.setItem(storageKey('capitalContributions'), JSON.stringify(snapshot.capitalContributions));
 }
 
+function mergeStockCountReportsById(
+  local: StockCountReport[],
+  remote: StockCountReport[],
+): StockCountReport[] {
+  const map = new Map<string, StockCountReport>();
+  for (const report of remote) {
+    if (report?.id) map.set(report.id, report);
+  }
+  for (const report of local) {
+    if (!report?.id) continue;
+    const prev = map.get(report.id);
+    if (!prev) {
+      map.set(report.id, report);
+      continue;
+    }
+    const localTs = Date.parse(report.inProgressAt ?? report.createdAt);
+    const remoteTs = Date.parse(prev.inProgressAt ?? prev.createdAt);
+    map.set(report.id, localTs >= remoteTs ? report : prev);
+  }
+  return [...map.values()].sort(
+    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  );
+}
+
 export function mergeAccountingFromPersisted(
   remote: Partial<AccountingSnapshot> | undefined,
 ): AccountingSnapshot {
@@ -108,7 +133,10 @@ export function mergeAccountingFromPersisted(
     cashCountVariances: remote.cashCountVariances ?? local.cashCountVariances,
     checkNotes: remote.checkNotes ?? local.checkNotes,
     stockAdjustments: remote.stockAdjustments ?? local.stockAdjustments,
-    stockCountReports: remote.stockCountReports ?? local.stockCountReports,
+    stockCountReports: mergeStockCountReportsById(
+      local.stockCountReports,
+      remote.stockCountReports ?? [],
+    ),
     journalVouchers: remote.journalVouchers ?? local.journalVouchers,
     equityPartners: remote.equityPartners?.length ? remote.equityPartners : local.equityPartners,
     capitalContributions: remote.capitalContributions ?? local.capitalContributions,
