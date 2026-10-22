@@ -390,6 +390,11 @@ async function readStoreData(tenantId = 'main') {
   data = withManualStock;
   if (manualStockChanged) persist = true;
 
+  const { reconcileSaleStockInSnapshot } = await import('./server/reconcileSaleStockMovements.mjs');
+  const { snapshot: withSaleStock, changed: saleStockChanged } = reconcileSaleStockInSnapshot(data);
+  data = withSaleStock;
+  if (saleStockChanged) persist = true;
+
   const { elevateOwnerAdminsInStore } = await import('./server/ownerAdminElevate.mjs');
   const elevated = elevateOwnerAdminsInStore(data);
   if (elevated.changed) {
@@ -429,7 +434,9 @@ async function writeStoreData(data, tenantId = 'main') {
   vault = mergeUsersIntoVault(vault, data?.users);
   const { applyManualStockOverrides } = await import('./server/manualStockOverrides.mjs');
   const { snapshot: withManualStock } = applyManualStockOverrides(data);
-  const toWrite = applyVaultToStoreSnapshot(withManualStock, vault);
+  const { reconcileSaleStockInSnapshot } = await import('./server/reconcileSaleStockMovements.mjs');
+  const { snapshot: withSaleStock } = reconcileSaleStockInSnapshot(withManualStock);
+  const toWrite = applyVaultToStoreSnapshot(withSaleStock, vault);
   await writeTenantStore(DATA_DIR, tenantId, toWrite);
   await writeCredentialVault(DATA_DIR, tenantId, vault);
   data = toWrite;
