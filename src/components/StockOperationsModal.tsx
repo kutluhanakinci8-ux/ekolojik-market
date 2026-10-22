@@ -24,6 +24,7 @@ import { formatDateTime } from '../utils/format';
 import type { StockCountBreakRecord, StockCountReport } from '../types/stockCountReport';
 import {
   buildStockCountReportLines,
+  isStockCountReportComplete,
   newStockCountReportId,
   stockCountReportPendingApply,
 } from '../types/stockCountReport';
@@ -186,6 +187,16 @@ export function StockOperationsModal({
 
   const applyCountDraftToState = useCallback((draft: ReturnType<typeof loadStockCountSessionDraft>) => {
     if (!draft || Object.keys(draft.countLines).length === 0) return false;
+    if (draft.reportId) {
+      const archived = stockCountReports.find((r) => r.id === draft.reportId);
+      if (archived?.abandonedAt || (archived?.completedAt && isStockCountReportComplete(archived))) {
+        clearStockCountSessionDraft();
+        return false;
+      }
+    }
+    const archivedForPrint = draft.reportId
+      ? stockCountReports.find((r) => r.id === draft.reportId)
+      : undefined;
     setCountPhase(draft.countPhase);
     setCountLines(draft.countLines);
     setCountLastProductId(draft.countLastProductId);
@@ -200,10 +211,10 @@ export function StockOperationsModal({
     setCountScanInput('');
     setCountScanError(null);
     setCountPrintMessage(null);
-    setCountLocalPrinted(false);
+    setCountLocalPrinted(Boolean(archivedForPrint?.printedAt));
     setCountDraftRestored(true);
     return true;
-  }, []);
+  }, [stockCountReports]);
 
   const resetCountSession = useCallback(() => {
     setCountPhase('scan');
@@ -603,6 +614,72 @@ export function StockOperationsModal({
     authSession,
   ]);
 
+  const ensureCountReportId = useCallback((): string | null => {
+    if (countReportId) return countReportId;
+    const report = persistCountReport();
+    return report?.id ?? null;
+  }, [countReportId, persistCountReport]);
+
+  const abandonCountSession = useCallback(() => {
+    if (countLineList.length === 0) {
+      resetCountSession();
+      onClose();
+      return;
+    }
+    if (!window.confirm(
+      'Bu sayım yarım bırakılan olarak arşivlenecek. Stok düzeltmesi uygulanmaz; ardından yeni sayım başlatabilirsiniz. Emin misiniz?',
+    )) {
+      return;
+    }
+    const abandonedAt = new Date().toISOString();
+    const report = persistCountReport();
+    if (report) {
+      const noteSuffix = 'Yarım bırakılan sayım';
+      const mergedNote = report.note.trim()
+        ? `${report.note.trim()} (${noteSuffix})`
+        : noteSuffix;
+      onSaveStockCountReport?.({
+        ...report,
+        abandonedAt,
+        note: mergedNote,
+      });
+    }
+    resetCountSession();
+    onClose();
+  }, [countLineList.length, onClose, onSaveStockCountReport, persistCountReport, resetCountSession]);
+
+  const completeCountSession = useCallback((options?: { force?: boolean }) => {
+    const reportId = ensureCountReportId();
+    const report = reportId
+      ? stockCountReports.find((r) => r.id === reportId) ?? persistCountReport()
+      : persistCountReport();
+    if (
+      !options?.force
+      && report
+      && stockCountReportPendingApply(report).length > 0
+    ) {
+      window.alert(
+        'Henüz uygulanmamış düzeltme var. Düzeltmeyi uygulayın veya «Sayımdan çık (yarım bırak)» ile oturumu sonlandırın.',
+      );
+      return;
+    }
+    if (report) {
+      onSaveStockCountReport?.({
+        ...report,
+        completedAt: report.completedAt ?? new Date().toISOString(),
+      });
+    }
+    resetCountSession();
+    onClose();
+  }, [
+    ensureCountReportId,
+    onClose,
+    onSaveStockCountReport,
+    persistCountReport,
+    resetCountSession,
+    stockCountReports,
+  ]);
+
   const finishCountSession = () => {
     if (countLineList.length === 0) {
       setCountScanError('Önce en az bir ürün okutun');
@@ -648,16 +725,24 @@ export function StockOperationsModal({
       window.alert('Önce sayım raporunu fiş yazıcısından yazdırın.');
       return;
     }
+    persistCountReport();
     if (countDiscrepancyRows.length === 0) {
-      resetCountSession();
-      onClose();
+      completeCountSession();
       return;
     }
     setCountPhase('apply');
   };
 
   const applySingleCountCorrection = (productId: number) => {
-    if (!countReportId || !countReportPrinted) return;
+    if (!countReportPrinted) {
+      window.alert('Önce sayım raporunu yazdırın.');
+      return;
+    }
+    const reportId = ensureCountReportId();
+    if (!reportId) {
+      window.alert('Sayım raporu kaydı oluşturulamadı. Rapora dönüp «Sayımı bitir» adımını tekrarlayın.');
+      return;
+    }
     const product = products.find((p) => p.id === productId);
     if (!product) return;
     const raw = countApplyQtyDraft[productId] ?? '';
@@ -669,16 +754,18 @@ export function StockOperationsModal({
     const trimmedNote = note.trim() || 'Stok sayımı düzeltmesi (barkod)';
     const label = product.productCode ?? String(product.id);
     if (!window.confirm(
-      `${product.name} (${label})\nSistem stoğu ${product.stock} → ${newStock} olarak güncellensin mi?`,
+      `${product.name} (${label})\nGüncel stok ${product.stock} → ${newStock} olarak kaydedilsin mi?`,
     )) {
       return;
     }
     onSetStock(productId, newStock, trimmedNote);
-    onMarkStockCountLineApplied?.(countReportId, productId);
-    if (countPendingApplyRows.length <= 1) {
-      window.alert('Tüm düzeltmeler uygulandı.');
-      resetCountSession();
-      onClose();
+    onMarkStockCountLineApplied?.(reportId, productId);
+    const remainingAfter = countPendingApplyRows.filter(
+      (row) => row.line.productId !== productId,
+    ).length;
+    if (remainingAfter === 0) {
+      window.alert('Tüm düzeltmeler işlendi.');
+      completeCountSession({ force: true });
     }
   };
 
@@ -687,8 +774,7 @@ export function StockOperationsModal({
       window.alert('Önce sayım raporunu yazdırın.');
       return;
     }
-    resetCountSession();
-    onClose();
+    completeCountSession();
   };
 
   const applyQuickAmount = (amount: number) => {
@@ -1008,6 +1094,7 @@ export function StockOperationsModal({
                     <p className="stock-ops-dialog__count-lead">
                       Her ürün için <strong>yeni stok miktarını</strong> yazın (varsayılan sayım adedi; gerekirse değiştirin).
                       Kalan: <strong>{countPendingApplyRows.length}</strong> ürün.
+                      Sorunlu sayımda <strong>Sayımdan çık</strong> ile yarım bırakılan olarak arşivleyip yeni sayım başlatın.
                     </p>
                     {countPendingApplyRows.length === 0 && (
                       <p className="stock-ops-dialog__count-lead">
@@ -1113,6 +1200,15 @@ export function StockOperationsModal({
                       >
                         İptal
                       </button>
+                      {countLineList.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-outline stock-ops-dialog__count-btn-abandon"
+                          onClick={abandonCountSession}
+                        >
+                          Sayımdan çık
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-outline"
@@ -1135,6 +1231,13 @@ export function StockOperationsModal({
                     </>
                   ) : countPhase === 'report' ? (
                     <>
+                      <button
+                        type="button"
+                        className="btn btn-outline stock-ops-dialog__count-btn-abandon"
+                        onClick={abandonCountSession}
+                      >
+                        Sayımdan çık
+                      </button>
                       <button
                         type="button"
                         className="btn btn-outline"
@@ -1167,21 +1270,36 @@ export function StockOperationsModal({
                     <>
                       <button
                         type="button"
+                        className="btn btn-outline stock-ops-dialog__count-btn-abandon"
+                        onClick={abandonCountSession}
+                      >
+                        Sayımdan çık
+                      </button>
+                      <button
+                        type="button"
                         className="btn btn-outline"
                         onClick={() => setCountPhase('report')}
                       >
                         Rapora dön
                       </button>
+                      {countPendingApplyRows.length === 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => completeCountSession({ force: true })}
+                        >
+                          Sayımı tamamla
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-outline"
                         onClick={() => {
-                          if (countPendingApplyRows.length > 0 && !window.confirm('Bekleyen düzeltmeler var. Oturumu kapatmak istiyor musunuz?')) return;
-                          resetCountSession();
+                          persistCountReport();
                           onClose();
                         }}
                       >
-                        Sonra devam et
+                        Oturumu kaydet ve kapat
                       </button>
                     </>
                   )}

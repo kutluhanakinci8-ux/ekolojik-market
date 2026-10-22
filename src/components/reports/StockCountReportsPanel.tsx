@@ -99,15 +99,17 @@ export function StockCountReportsPanel({ store }: StockCountReportsPanelProps) {
           {reports.map((report) => {
             const diffCount = stockCountReportDiscrepancies(report).length;
             const pendingCount = stockCountReportPendingApply(report).length;
-            const statusLabel = pendingCount === 0 && diffCount > 0
-              ? 'Düzeltildi'
-              : !report.printedAt
-                ? 'Yazdırılmadı'
-                : pendingCount > 0
-                  ? 'Düzeltme bekliyor'
-                  : diffCount === 0
-                    ? 'Uyumlu'
-                    : 'Tamamlandı';
+            const statusLabel = report.abandonedAt
+              ? 'Yarım bırakıldı'
+              : pendingCount === 0 && diffCount > 0
+                ? 'Düzeltildi'
+                : !report.printedAt
+                  ? 'Yazdırılmadı'
+                  : pendingCount > 0
+                    ? 'Düzeltme bekliyor'
+                    : diffCount === 0
+                      ? 'Uyumlu'
+                      : 'Tamamlandı';
             return (
               <button
                 key={report.id}
