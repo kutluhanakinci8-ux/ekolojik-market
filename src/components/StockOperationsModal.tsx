@@ -11,13 +11,17 @@ import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
 import { formatCurrencyTry } from '../utils/format';
 import {
+  appendStockCountPauseToDraft,
   clearStockCountSessionDraft,
   loadStockCountSessionDraft,
+  resumeStockCountPauseInDraft,
   saveStockCountSessionDraft,
 } from '../storage/stockCountSession';
+import type { AuthSession } from '../types/user';
+import { formatStockCountReportDateTime } from '../utils/stockCountReportFormat';
 import { normalizeBarcodeScanInput, resolveBarcodeScan } from '../utils/barcodeScan';
 import { formatDateTime } from '../utils/format';
-import type { StockCountReport } from '../types/stockCountReport';
+import type { StockCountBreakRecord, StockCountReport } from '../types/stockCountReport';
 import {
   buildStockCountReportLines,
   newStockCountReportId,
@@ -68,6 +72,7 @@ interface StockOperationsModalProps {
   /** Lima / pos-lite: perakende KDV hariç */
   perakendeKdvHaric?: boolean;
   settings?: AppSettings;
+  authSession?: AuthSession | null;
   stockCountReports?: StockCountReport[];
   onSaveStockCountReport?: (report: StockCountReport) => void;
   onMarkStockCountReportPrinted?: (reportId: string) => void;
@@ -140,6 +145,7 @@ export function StockOperationsModal({
   onPricingSaveResult,
   perakendeKdvHaric = false,
   settings,
+  authSession,
   stockCountReports = [],
   onSaveStockCountReport,
   onMarkStockCountReportPrinted,
@@ -168,7 +174,14 @@ export function StockOperationsModal({
   const [countDraftRestored, setCountDraftRestored] = useState(false);
   const [countPrintMessage, setCountPrintMessage] = useState<string | null>(null);
   const [countPrinting, setCountPrinting] = useState(false);
+  const [countLocalPrinted, setCountLocalPrinted] = useState(false);
+  const [countBreaks, setCountBreaks] = useState<StockCountBreakRecord[]>([]);
+  const [countCountedByDisplayName, setCountCountedByDisplayName] = useState('');
+  const [countCountedByUsername, setCountCountedByUsername] = useState('');
+  const [countResponsiblePersonName, setCountResponsiblePersonName] = useState('');
+  const [countEndedAt, setCountEndedAt] = useState<string | null>(null);
   const countScanInputRef = useRef<HTMLInputElement>(null);
+  const countModalWasOpenRef = useRef(false);
 
   const applyCountDraftToState = useCallback((draft: ReturnType<typeof loadStockCountSessionDraft>) => {
     if (!draft || Object.keys(draft.countLines).length === 0) return false;
@@ -178,9 +191,15 @@ export function StockOperationsModal({
     setNote(draft.note ?? '');
     setCountSessionStartedAt(draft.startedAt);
     setCountReportId(draft.reportId ?? null);
+    setCountBreaks(draft.breaks ?? []);
+    setCountCountedByDisplayName(draft.countedByDisplayName ?? '');
+    setCountCountedByUsername(draft.countedByUsername ?? '');
+    setCountResponsiblePersonName(draft.responsiblePersonName ?? '');
+    setCountEndedAt(draft.endedAt ?? null);
     setCountScanInput('');
     setCountScanError(null);
     setCountPrintMessage(null);
+    setCountLocalPrinted(false);
     setCountDraftRestored(true);
     return true;
   }, []);
@@ -195,8 +214,28 @@ export function StockOperationsModal({
     setCountSessionStartedAt(null);
     setCountDraftRestored(false);
     setCountPrintMessage(null);
+    setCountLocalPrinted(false);
+    setCountBreaks([]);
+    setCountCountedByDisplayName('');
+    setCountCountedByUsername('');
+    setCountResponsiblePersonName('');
+    setCountEndedAt(null);
     clearStockCountSessionDraft();
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      if (operation === 'set') {
+        const resumed = resumeStockCountPauseInDraft();
+        setCountBreaks(resumed);
+      }
+      countModalWasOpenRef.current = true;
+      return;
+    }
+    if (!countModalWasOpenRef.current) return;
+    countModalWasOpenRef.current = false;
+    appendStockCountPauseToDraft();
+  }, [open, operation]);
 
   const categoryOptions = useMemo(
     () => listProductCategorySelectOptions(settings),
@@ -248,6 +287,11 @@ export function StockOperationsModal({
       countLastProductId,
       note,
       reportId: countReportId,
+      countedByDisplayName: countCountedByDisplayName || undefined,
+      countedByUsername: countCountedByUsername || undefined,
+      breaks: countBreaks.length ? countBreaks : undefined,
+      responsiblePersonName: countResponsiblePersonName || undefined,
+      endedAt: countEndedAt ?? undefined,
     });
   }, [
     open,
@@ -258,6 +302,11 @@ export function StockOperationsModal({
     note,
     countSessionStartedAt,
     countReportId,
+    countCountedByDisplayName,
+    countCountedByUsername,
+    countBreaks,
+    countResponsiblePersonName,
+    countEndedAt,
   ]);
 
   useEffect(() => {
@@ -424,7 +473,7 @@ export function StockOperationsModal({
     [countReportId, stockCountReports],
   );
 
-  const countReportPrinted = Boolean(activeCountReport?.printedAt);
+  const countReportPrinted = Boolean(activeCountReport?.printedAt || countLocalPrinted);
 
   const countPendingApplyRows = useMemo(() => {
     if (!activeCountReport) return countDiscrepancyRows;
@@ -440,6 +489,10 @@ export function StockOperationsModal({
 
   const registerCountScan = (product: Product) => {
     setCountDraftRestored(false);
+    if (!countCountedByDisplayName && authSession?.displayName) {
+      setCountCountedByDisplayName(authSession.displayName);
+      setCountCountedByUsername(authSession.username);
+    }
     setCountLines((prev) => {
       const existing = prev[product.id];
       const systemStock = existing?.systemStock ?? product.stock;
@@ -489,10 +542,11 @@ export function StockOperationsModal({
     setQuantity('');
   };
 
-  const persistCountReport = useCallback((): string | null => {
+  const persistCountReport = useCallback((endedAtOverride?: string): StockCountReport | null => {
     if (countLineList.length === 0) return null;
     const id = countReportId ?? newStockCountReportId();
     const startedAt = countSessionStartedAt ?? new Date().toISOString();
+    const endedAt = endedAtOverride ?? countEndedAt ?? activeCountReport?.endedAt ?? undefined;
     const baseLines = buildStockCountReportLines(countLineList);
     const lines = baseLines.map((line) => {
       const prev = activeCountReport?.lines.find((item) => item.productId === line.productId);
@@ -501,19 +555,33 @@ export function StockOperationsModal({
     const report: StockCountReport = {
       id,
       startedAt,
+      endedAt,
       createdAt: activeCountReport?.createdAt ?? new Date().toISOString(),
       note: note.trim(),
       lines,
+      countedByDisplayName: countCountedByDisplayName
+        || authSession?.displayName
+        || activeCountReport?.countedByDisplayName,
+      countedByUsername: countCountedByUsername
+        || authSession?.username
+        || activeCountReport?.countedByUsername,
+      breaks: countBreaks.length ? countBreaks : activeCountReport?.breaks,
+      responsiblePersonName: countResponsiblePersonName.trim() || activeCountReport?.responsiblePersonName,
       printedAt: activeCountReport?.printedAt,
       completedAt: activeCountReport?.completedAt,
     };
     onSaveStockCountReport?.(report);
     setCountReportId(id);
-    return id;
+    return report;
   }, [
     activeCountReport,
+    countBreaks,
+    countCountedByDisplayName,
+    countCountedByUsername,
+    countEndedAt,
     countLineList,
     countReportId,
+    countResponsiblePersonName,
     countSessionStartedAt,
     note,
     onSaveStockCountReport,
@@ -524,23 +592,21 @@ export function StockOperationsModal({
       setCountScanError('Önce en az bir ürün okutun');
       return;
     }
-    persistCountReport();
+    if (!countCountedByDisplayName && authSession?.displayName) {
+      setCountCountedByDisplayName(authSession.displayName);
+      setCountCountedByUsername(authSession.username);
+    }
+    const ended = new Date().toISOString();
+    setCountEndedAt(ended);
+    persistCountReport(ended);
     setCountPhase('report');
     setCountScanError(null);
     setCountPrintMessage(null);
   };
 
   const handlePrintCountReport = async () => {
-    const id = persistCountReport();
-    if (!id) return;
-    const fromStore = stockCountReports.find((r) => r.id === id);
-    const report: StockCountReport = fromStore ?? {
-      id,
-      startedAt: countSessionStartedAt ?? new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      note: note.trim(),
-      lines: buildStockCountReportLines(countLineList),
-    };
+    const report = persistCountReport();
+    if (!report) return;
     setCountPrinting(true);
     setCountPrintMessage(null);
     try {
@@ -552,7 +618,8 @@ export function StockOperationsModal({
         printedAt,
       }, receiptPrinterName);
       if (result.printed) {
-        onMarkStockCountReportPrinted?.(id);
+        onMarkStockCountReportPrinted?.(report.id);
+        setCountLocalPrinted(true);
       }
       setCountPrintMessage(result.message ?? (result.printed ? 'Rapor yazdırıldı' : 'Yazdırılamadı'));
     } finally {
@@ -841,6 +908,43 @@ export function StockOperationsModal({
                     {countPrintMessage && (
                       <p className="stock-ops-dialog__count-print-msg" role="status">{countPrintMessage}</p>
                     )}
+                    <div className="stock-ops-dialog__count-meta">
+                      <p>
+                        <strong>Sayım yapan:</strong>{' '}
+                        {countCountedByDisplayName || activeCountReport?.countedByDisplayName || '—'}
+                      </p>
+                      <p>
+                        <strong>Başlangıç:</strong>{' '}
+                        {formatStockCountReportDateTime(countSessionStartedAt ?? activeCountReport?.startedAt ?? new Date().toISOString())}
+                        {' · '}
+                        <strong>Bitiş:</strong>{' '}
+                        {(countEndedAt || activeCountReport?.endedAt)
+                          ? formatStockCountReportDateTime(countEndedAt ?? activeCountReport!.endedAt!)
+                          : '—'}
+                      </p>
+                      {countBreaks.length > 0 && (
+                        <ul className="stock-ops-dialog__count-breaks">
+                          {countBreaks.map((entry, index) => (
+                            <li key={`${entry.pausedAt}-${index}`}>
+                              Ara {index + 1}: {formatStockCountReportDateTime(entry.pausedAt)}
+                              {entry.resumedAt
+                                ? ` → devam ${formatStockCountReportDateTime(entry.resumedAt)}`
+                                : ' → devam bekleniyor'}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <label className="stock-ops-dialog__field">
+                      <span>Sorumlu kişi (fiş imza satırı)</span>
+                      <input
+                        type="text"
+                        value={countResponsiblePersonName}
+                        onChange={(event) => setCountResponsiblePersonName(event.target.value)}
+                        placeholder="Ad soyad — boş bırakılırsa fişte çizgi"
+                        disabled={countReportPrinted}
+                      />
+                    </label>
                     <div className="stock-ops-dialog__count-table-wrap">
                       <table className="stock-ops-dialog__count-table stock-ops-dialog__count-table--report">
                         <thead>

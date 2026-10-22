@@ -845,6 +845,7 @@ export function StockScreen({ store }: StockScreenProps) {
         }}
         perakendeKdvHaric={posLiteStock}
         settings={store.settings}
+        authSession={store.authSession}
         stockCountReports={store.stockCountReports}
         onSaveStockCountReport={(report) => store.saveStockCountReport(report)}
         onMarkStockCountReportPrinted={(reportId) => store.markStockCountReportPrinted(reportId)}

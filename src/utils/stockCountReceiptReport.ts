@@ -1,6 +1,12 @@
 import type { Product } from '../types/product';
 import type { StockCountReport } from '../types/stockCountReport';
 import { stockCountReportDiscrepancies } from '../types/stockCountReport';
+import {
+  formatStockCountBreaksPlain,
+  formatStockCountReportDateTime,
+  stockCountHeaderMetaPlain,
+  stockCountSignatureBlockPlain,
+} from './stockCountReportFormat';
 import { getLastLimaRawPrintError, tryLimaRawReceiptPrint } from './limaRawReceiptPrint';
 import { printHtmlReceipt } from './receiptPrint';
 import { STANDARD_WINDOWS_ZYWELL_PRINTER_NAME } from '../types/receiptPrinter';
@@ -15,13 +21,7 @@ export interface StockCountReceiptReportData {
 }
 
 function formatReceiptDateTime(date: Date): string {
-  return new Intl.DateTimeFormat('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return formatStockCountReportDateTime(date.toISOString());
 }
 
 function plainPadLine(left: string, right: string, width = PLAIN_LINE_WIDTH): string {
@@ -52,13 +52,20 @@ export function buildPlainTextStockCountReceipt(
     'STOK SAYIM RAPORU',
     rule,
     `Rapor: ${data.report.id.slice(0, 18)}`,
-    `Baslangic: ${formatReceiptDateTime(new Date(data.report.startedAt))}`,
+    ...stockCountHeaderMetaPlain(data.report, lineWidth),
     `Yazdirma: ${formatReceiptDateTime(data.printedAt)}`,
+  ];
+  const breakLines = formatStockCountBreaksPlain(data.report.breaks, lineWidth);
+  if (breakLines.length > 0) {
+    lines.push(rule);
+    lines.push(...breakLines);
+  }
+  lines.push(
     rule,
     plainPadLine('Kalem', String(data.report.lines.length), lineWidth),
     plainPadLine('Okutma', String(totalScanned), lineWidth),
     plainPadLine('Farkli urun', String(discrepancies.length), lineWidth),
-  ];
+  );
 
   if (data.report.note.trim()) {
     lines.push(rule);
@@ -80,8 +87,7 @@ export function buildPlainTextStockCountReceipt(
     lines.push('Fark yok — stok uyumlu');
   }
 
-  lines.push(rule);
-  lines.push('Duzeltme: rapor sonrasi urun bazinda');
+  lines.push(...stockCountSignatureBlockPlain(data.report, lineWidth));
   return lines.join('\n');
 }
 
@@ -99,6 +105,17 @@ export function buildStockCountReceiptHtml(data: StockCountReceiptReportData): s
     </tr>`;
   }).join('');
 
+  const endedIso = data.report.endedAt ?? data.report.createdAt;
+  const counter = data.report.countedByDisplayName?.trim() || 'Belirtilmedi';
+  const breaksHtml = (data.report.breaks ?? []).map((entry, index) => `
+    <li>
+      <strong>${index + 1}. Ara verme:</strong> ${formatStockCountReportDateTime(entry.pausedAt)}
+      ${entry.resumedAt
+    ? ` → <strong>Devam:</strong> ${formatStockCountReportDateTime(entry.resumedAt)}`
+    : ' → <em>Devam bekleniyor</em>'}
+    </li>`).join('');
+  const responsible = data.report.responsiblePersonName?.trim() || '';
+
   return `<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -114,15 +131,22 @@ export function buildStockCountReceiptHtml(data: StockCountReceiptReportData): s
     .is-up { color: #15803d; font-weight: 700; }
     .is-down { color: #b91c1c; font-weight: 700; }
     .footer { margin-top: 16px; font-size: 11px; color: #666; }
+    .signatures { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .sign-box { border-top: 1px solid #333; padding-top: 8px; min-height: 72px; }
+    .sign-box strong { display: block; margin-bottom: 6px; }
+    .sign-line { margin: 8px 0; border-bottom: 1px solid #999; min-height: 22px; }
   </style>
 </head>
 <body>
   <h1>${data.businessName} — Stok sayım raporu</h1>
   <div class="meta">
     Rapor ${data.report.id}<br />
-    Başlangıç: ${formatReceiptDateTime(new Date(data.report.startedAt))}<br />
-    Yazdırma: ${formatReceiptDateTime(data.printedAt)}<br />
+    <strong>Sayım yapan:</strong> ${counter}<br />
+    <strong>Başlangıç:</strong> ${formatStockCountReportDateTime(data.report.startedAt)}<br />
+    <strong>Bitiş:</strong> ${formatStockCountReportDateTime(endedIso)}<br />
+    <strong>Yazdırma:</strong> ${formatReceiptDateTime(data.printedAt)}<br />
     ${data.report.lines.length} kalem · ${discrepancies.length} farklı ürün
+    ${breaksHtml ? `<ul>${breaksHtml}</ul>` : ''}
   </div>
   ${discrepancies.length > 0 ? `
   <table>
@@ -130,7 +154,21 @@ export function buildStockCountReceiptHtml(data: StockCountReceiptReportData): s
     <tbody>${rows}</tbody>
   </table>` : '<p>Tüm satırlar sistem stoğu ile uyumlu.</p>'}
   ${data.report.note.trim() ? `<p><strong>Not:</strong> ${data.report.note.trim()}</p>` : ''}
-  <div class="footer">Bilgi amaçlıdır. Düzeltmeler rapor yazdırıldıktan sonra ürün bazında uygulanır.</div>
+  <div class="signatures">
+    <div class="sign-box">
+      <strong>Sayım yapan</strong>
+      <div>${counter}</div>
+      <div class="sign-line">Ad soyad</div>
+      <div class="sign-line">İmza</div>
+    </div>
+    <div class="sign-box">
+      <strong>Sorumlu</strong>
+      <div>${responsible || '&nbsp;'}</div>
+      <div class="sign-line">Ad soyad</div>
+      <div class="sign-line">İmza</div>
+    </div>
+  </div>
+  <div class="footer">Bilgi amaçlıdır.</div>
   <script>window.onload=function(){setTimeout(function(){window.print();},120);};</script>
 </body>
 </html>`;

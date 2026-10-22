@@ -945,6 +945,31 @@
   font-weight: 700;
 }
 
+.stock-ops-dialog__count-meta {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #334155;
+}
+
+.stock-ops-dialog__count-meta p {
+  margin: 0 0 6px;
+}
+
+.stock-ops-dialog__count-meta p:last-child {
+  margin-bottom: 0;
+}
+
+.stock-ops-dialog__count-breaks {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #64748b;
+}
+
 .stock-ops-dialog__count-print-msg {
   margin: 0 0 12px;
   padding: 10px 12px;

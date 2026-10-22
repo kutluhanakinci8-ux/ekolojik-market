@@ -7,12 +7,25 @@ export interface StockCountReportLine {
   appliedAt?: string;
 }
 
+/** Oturum kapatıldığında / tekrar açıldığında ara verme kaydı */
+export interface StockCountBreakRecord {
+  pausedAt: string;
+  resumedAt?: string;
+}
+
 export interface StockCountReport {
   id: string;
   startedAt: string;
+  /** Sayımı bitir (rapor) anı */
+  endedAt?: string;
   createdAt: string;
   note: string;
   lines: StockCountReportLine[];
+  countedByDisplayName?: string;
+  countedByUsername?: string;
+  breaks?: StockCountBreakRecord[];
+  /** Sorumlu kişi (rapor ekranından, imza satırı için) */
+  responsiblePersonName?: string;
   printedAt?: string;
   completedAt?: string;
 }

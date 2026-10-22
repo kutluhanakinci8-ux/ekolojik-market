@@ -6,6 +6,7 @@ import {
   stockCountReportPendingApply,
 } from '../../types/stockCountReport';
 import { formatDateTime } from '../../utils/format';
+import { formatStockCountReportDateTime } from '../../utils/stockCountReportFormat';
 import {
   buildPlainTextStockCountReceipt,
   printStockCountReceiptReport,
@@ -131,9 +132,23 @@ export function StockCountReportsPanel({ store }: StockCountReportsPanelProps) {
               <div>
                 <h3>Sayım raporu</h3>
                 <p>
-                  Başlangıç {formatDateTime(selected.startedAt)}
+                  Sayım yapan: <strong>{selected.countedByDisplayName?.trim() || '—'}</strong>
+                </p>
+                <p>
+                  Başlangıç {formatStockCountReportDateTime(selected.startedAt)}
+                  {selected.endedAt ? ` · Bitiş ${formatStockCountReportDateTime(selected.endedAt)}` : ''}
                   {selected.printedAt ? ` · Yazdırıldı ${formatDateTime(selected.printedAt)}` : ' · Henüz yazdırılmadı'}
                 </p>
+                {(selected.breaks?.length ?? 0) > 0 && (
+                  <ul className="stock-count-reports-breaks">
+                    {selected.breaks!.map((entry, index) => (
+                      <li key={`${entry.pausedAt}-${index}`}>
+                        Ara {index + 1}: {formatStockCountReportDateTime(entry.pausedAt)}
+                        {entry.resumedAt ? ` → ${formatStockCountReportDateTime(entry.resumedAt)}` : ' → (devam kaydı yok)'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <button
                 type="button"
