@@ -791,6 +791,76 @@
   font-weight: 600;
 }
 
+.stock-ops-dialog__count-resume-list {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #c8e6c4;
+  background: #f8fdf7;
+}
+
+.stock-ops-dialog__count-resume-list-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e3a2f;
+}
+
+.stock-ops-dialog__count-resume-items {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stock-ops-dialog__count-resume-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 2px 12px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #c8e6c4;
+  background: #fff;
+  cursor: pointer;
+}
+
+.stock-ops-dialog__count-resume-item.is-active,
+.stock-ops-dialog__count-resume-item:disabled {
+  cursor: default;
+  border-color: #3dad35;
+  background: #ecfdf5;
+}
+
+.stock-ops-dialog__count-resume-item-when {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.stock-ops-dialog__count-resume-item-meta {
+  grid-column: 1;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.stock-ops-dialog__count-resume-item-action {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #15803d;
+  white-space: nowrap;
+}
+
+.stock-ops-dialog__count-new-btn {
+  width: 100%;
+}
+
 .stock-ops-dialog__count-scan input {
   font-size: 16px;
   font-family: ui-monospace, monospace;

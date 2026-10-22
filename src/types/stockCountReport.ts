@@ -32,6 +32,8 @@ export interface StockCountReport {
   abandonedAt?: string;
   /** Okutma devam ediyor — «Sayımı bitir» öncesi arşiv (sunucuya senkron) */
   inProgressAt?: string;
+  /** Son kayıtlı sayım fazı (devam için) */
+  countPhase?: 'scan' | 'report' | 'apply';
 }
 
 export function buildStockCountReportLines(

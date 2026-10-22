@@ -21,6 +21,10 @@ import type { AuthSession } from '../types/user';
 import { formatStockCountReportDateTime } from '../utils/stockCountReportFormat';
 import { normalizeBarcodeScanInput, resolveBarcodeScan } from '../utils/barcodeScan';
 import { formatDateTime } from '../utils/format';
+import {
+  listResumableStockCountSessions,
+  stockCountReportToSessionDraft,
+} from '../utils/stockCountResumableSessions';
 import type { StockCountBreakRecord, StockCountReport } from '../types/stockCountReport';
 import {
   buildStockCountReportLines,
@@ -474,6 +478,45 @@ export function StockOperationsModal({
     setSearch('');
   };
 
+  const resumableCountSessions = useMemo(() => {
+    if (!open || operation !== 'set') return [];
+    const local = loadStockCountSessionDraft();
+    return listResumableStockCountSessions(stockCountReports, local);
+  }, [open, operation, stockCountReports]);
+
+  const resumeStockCountSession = useCallback((sessionReportId: string) => {
+    if (Object.keys(countLines).length > 0) {
+      if (!window.confirm('Açık sayım kapatılacak, seçilen oturum yüklenecek. Emin misiniz?')) {
+        return;
+      }
+    }
+    const local = loadStockCountSessionDraft();
+    let draft: ReturnType<typeof loadStockCountSessionDraft> = null;
+    if (sessionReportId.startsWith('local-') && local) {
+      draft = local;
+    } else {
+      const report = stockCountReports.find((r) => r.id === sessionReportId);
+      if (!report) return;
+      draft = stockCountReportToSessionDraft(report);
+      saveStockCountSessionDraft({
+        startedAt: draft.startedAt,
+        countPhase: draft.countPhase,
+        countLines: draft.countLines,
+        countLastProductId: draft.countLastProductId,
+        note: draft.note,
+        reportId: draft.reportId,
+        countedByDisplayName: draft.countedByDisplayName,
+        countedByUsername: draft.countedByUsername,
+        breaks: draft.breaks,
+        responsiblePersonName: draft.responsiblePersonName,
+        endedAt: draft.endedAt,
+      });
+    }
+    if (!applyCountDraftToState(draft)) {
+      window.alert('Sayım oturumu yüklenemedi.');
+    }
+  }, [applyCountDraftToState, countLines, stockCountReports]);
+
   const countLineList = useMemo(
     () => Object.values(countLines).sort((a, b) => b.scannedQty - a.scannedQty),
     [countLines],
@@ -621,6 +664,7 @@ export function StockOperationsModal({
         countPhase === 'scan' && !endedAt && !activeCountReport?.abandonedAt
           ? (activeCountReport?.inProgressAt ?? new Date().toISOString())
           : undefined,
+      countPhase,
     };
     onSaveStockCountReport?.(report);
     setCountReportId(id);
@@ -973,6 +1017,51 @@ export function StockOperationsModal({
                       her okutma <strong>sayım adedini</strong> artırır ve konumda kalan miktarı gösterir.
                       Oturum bu cihazda otomatik kaydedilir (çıkış / şifre ekranı sonrası devam edebilirsiniz).
                     </p>
+                    {resumableCountSessions.length > 0 && (
+                      <div className="stock-ops-dialog__count-resume-list">
+                        <p className="stock-ops-dialog__count-resume-list-title">
+                          Devam edilebilir sayımlar
+                        </p>
+                        <ul className="stock-ops-dialog__count-resume-items">
+                          {resumableCountSessions.map((session) => {
+                            const isActive = countReportId === session.reportId
+                              || (!countReportId && session.reportId.startsWith('local-') && countLineList.length > 0);
+                            return (
+                              <li key={session.reportId}>
+                                <button
+                                  type="button"
+                                  className={`stock-ops-dialog__count-resume-item ${isActive ? 'is-active' : ''}`}
+                                  onClick={() => resumeStockCountSession(session.reportId)}
+                                  disabled={isActive}
+                                >
+                                  <span className="stock-ops-dialog__count-resume-item-when">
+                                    {formatDateTime(session.startedAt)}
+                                  </span>
+                                  <span className="stock-ops-dialog__count-resume-item-meta">
+                                    {session.lineCount} kalem · {session.scanTotal} okutma · {session.statusLabel}
+                                  </span>
+                                  <span className="stock-ops-dialog__count-resume-item-action">
+                                    {isActive ? 'Açık oturum' : 'Devam et'}
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        {countLineList.length === 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm stock-ops-dialog__count-new-btn"
+                            onClick={() => {
+                              resetCountSession();
+                              setCountSessionStartedAt(new Date().toISOString());
+                            }}
+                          >
+                            Yeni sayım başlat
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {countDraftRestored && countLineList.length > 0 && (
                       <p className="stock-ops-dialog__count-resume" role="status">
                         Yarım kalan sayım yüklendi
