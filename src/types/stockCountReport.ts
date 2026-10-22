@@ -28,6 +28,8 @@ export interface StockCountReport {
   responsiblePersonName?: string;
   printedAt?: string;
   completedAt?: string;
+  /** Kullanıcı sayımdan çıktı — düzeltme uygulanmadı, yeni sayım başlatılabilir */
+  abandonedAt?: string;
 }
 
 export function buildStockCountReportLines(
@@ -50,7 +52,12 @@ export function stockCountReportPendingApply(report: StockCountReport): StockCou
 }
 
 export function isStockCountReportComplete(report: StockCountReport): boolean {
+  if (report.abandonedAt) return true;
   return stockCountReportPendingApply(report).length === 0;
+}
+
+export function isStockCountReportAbandoned(report: StockCountReport): boolean {
+  return Boolean(report.abandonedAt);
 }
 
 export function newStockCountReportId(): string {
