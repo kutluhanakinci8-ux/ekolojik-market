@@ -1200,6 +1200,15 @@ export function StockOperationsModal({
                       >
                         İptal
                       </button>
+                      {countLineList.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-outline stock-ops-dialog__count-btn-abandon"
+                          onClick={abandonCountSession}
+                        >
+                          Sayımdan çık
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-outline"
