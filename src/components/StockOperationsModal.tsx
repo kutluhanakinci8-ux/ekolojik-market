@@ -191,6 +191,7 @@ export function StockOperationsModal({
   const [countApplyQtyDraft, setCountApplyQtyDraft] = useState<Record<number, string>>({});
   const [countAbandonPrompt, setCountAbandonPrompt] = useState(false);
   const [countReadyForNewScan, setCountReadyForNewScan] = useState(false);
+  const [countStatusBanner, setCountStatusBanner] = useState<string | null>(null);
   const [countFocusIndex, setCountFocusIndex] = useState(0);
   const countScanInputRef = useRef<HTMLInputElement>(null);
   const countProductCardRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -248,8 +249,20 @@ export function StockOperationsModal({
     setCountApplyQtyDraft({});
     setCountAbandonPrompt(false);
     setCountReadyForNewScan(false);
+    setCountStatusBanner(null);
     setCountFocusIndex(0);
     clearStockCountSessionDraft();
+  }, []);
+
+  const openFreshCountScanSurface = useCallback(() => {
+    countSkipDraftAutoLoadRef.current = true;
+    setCountSessionStartedAt(new Date().toISOString());
+    setCountReadyForNewScan(true);
+    setCountFocusIndex(0);
+    setCountPhase('scan');
+    setCountScanError(null);
+    setCountPrintMessage(null);
+    window.requestAnimationFrame(() => countScanInputRef.current?.focus());
   }, []);
 
   const startNewStockCountSession = useCallback(() => {
@@ -267,12 +280,9 @@ export function StockOperationsModal({
     }
     countSkipDraftAutoLoadRef.current = true;
     resetCountSession();
-    setCountSessionStartedAt(new Date().toISOString());
-    setCountReadyForNewScan(true);
-    setCountFocusIndex(0);
-    setCountScanError(null);
-    window.requestAnimationFrame(() => countScanInputRef.current?.focus());
-  }, [countDraftRestored, countLines, countPhase, countReportId, resetCountSession]);
+    setCountStatusBanner(null);
+    openFreshCountScanSurface();
+  }, [countDraftRestored, countLines, countPhase, countReportId, openFreshCountScanSurface, resetCountSession]);
 
   useEffect(() => {
     if (open) {
@@ -698,6 +708,7 @@ export function StockOperationsModal({
   const registerCountScan = (product: Product) => {
     setCountDraftRestored(false);
     setCountReadyForNewScan(false);
+    setCountStatusBanner(null);
     if (!countCountedByDisplayName && authSession?.displayName) {
       setCountCountedByDisplayName(authSession.displayName);
       setCountCountedByUsername(authSession.username);
@@ -762,7 +773,9 @@ export function StockOperationsModal({
     if (countLineList.length === 0) return null;
     const id = countReportId ?? newStockCountReportId();
     const startedAt = countSessionStartedAt ?? new Date().toISOString();
-    const endedAt = endedAtOverride ?? countEndedAt ?? activeCountReport?.endedAt ?? undefined;
+    const endedAt = countPhase === 'scan'
+      ? undefined
+      : (endedAtOverride ?? countEndedAt ?? activeCountReport?.endedAt ?? undefined);
     const baseLines = buildStockCountReportLines(countLineList);
     const lines = baseLines.map((line) => {
       const prev = activeCountReport?.lines.find((item) => item.productId === line.productId);
@@ -888,15 +901,27 @@ export function StockOperationsModal({
       });
     }
     resetCountSession();
-    onClose();
+    setCountStatusBanner('Sayım tamamlandı ve kaydedildi. Yeni sayım için barkod okutun veya listeden devam edin.');
+    openFreshCountScanSurface();
   }, [
     ensureCountReportId,
-    onClose,
     onSaveStockCountReport,
+    openFreshCountScanSurface,
     persistCountReport,
     resetCountSession,
     stockCountReports,
   ]);
+
+  const resumeCountFromReportPhase = useCallback(() => {
+    setCountEndedAt(null);
+    setCountStatusBanner(null);
+    setCountPhase('scan');
+    countSkipDraftAutoLoadRef.current = true;
+    window.requestAnimationFrame(() => {
+      persistCountReport();
+      countScanInputRef.current?.focus();
+    });
+  }, [persistCountReport]);
 
   const finishCountSession = () => {
     if (countLineList.length === 0) {
@@ -1184,7 +1209,12 @@ export function StockOperationsModal({
                         </button>
                       </div>
                     )}
-                    {countReadyForNewScan && countLineList.length === 0 && (
+                    {countStatusBanner && (
+                      <p className="stock-ops-dialog__count-resume" role="status">
+                        {countStatusBanner}
+                      </p>
+                    )}
+                    {countReadyForNewScan && countLineList.length === 0 && !countStatusBanner && (
                       <p className="stock-ops-dialog__count-resume" role="status">
                         Yeni sayım hazır — barkod okutun
                         {countSessionStartedAt ? ` · başlangıç ${formatDateTime(countSessionStartedAt)}` : ''}
@@ -1568,6 +1598,13 @@ export function StockOperationsModal({
                     </>
                   ) : countPhase === 'report' ? (
                     <>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={resumeCountFromReportPhase}
+                      >
+                        Sayıma devam et
+                      </button>
                       <button
                         type="button"
                         className="btn btn-outline stock-ops-dialog__count-btn-abandon"
