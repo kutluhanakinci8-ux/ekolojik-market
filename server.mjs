@@ -23,7 +23,10 @@ import {
 import { checkRateLimit } from './server/rateLimit.mjs';
 import { sendContactNotifications, isContactAutoreplyEnabled } from './server/contactMail.mjs';
 import { supportInboxStatus } from './server/platformSupportMailConfig.mjs';
-import { applyIrsaliyeStockToStoreSnapshot } from './server/irsaliyeStock.mjs';
+import {
+  applyIrsaliyeStockToStoreSnapshot,
+  syncIrsaliyeCatalogOnStoreSnapshot,
+} from './server/irsaliyeStock.mjs';
 import { sendCrmEmail, sendCrmSmsOutreach, isCrmSmsConfigured } from './server/crmOutreach.mjs';
 import {
   getEkolojikMailConfig,
@@ -377,7 +380,7 @@ async function readStoreData(tenantId = 'main') {
 
   const { shouldSkipIrsaliyeStockMigration } = await import('./server/tenantStoreGuard.mjs');
   if (data?.products?.length && !shouldSkipIrsaliyeStockMigration(tenantId, data)) {
-    const { snapshot, changed: stockChanged } = applyIrsaliyeStockToStoreSnapshot(data);
+    const { snapshot, changed: stockChanged } = syncIrsaliyeCatalogOnStoreSnapshot(data);
     data = snapshot;
     if (stockChanged) persist = true;
   }
@@ -4890,8 +4893,8 @@ const server = createServer(async (req, res) => {
       withSecrets = applyVaultToStoreSnapshot(withSecrets, credentialVault);
       let toSave = withSecrets;
       if (!shouldSkipIrsaliyeStockMigration(resolvedTenant, existing ?? withSecrets)) {
-        const { snapshot: stockFixed, changed } = applyIrsaliyeStockToStoreSnapshot(withSecrets);
-        toSave = changed ? stockFixed : withSecrets;
+        const { snapshot: catalogFixed, changed } = syncIrsaliyeCatalogOnStoreSnapshot(withSecrets);
+        toSave = changed ? catalogFixed : withSecrets;
       }
       const { elevateOwnerAdminsInStore } = await import('./server/ownerAdminElevate.mjs');
       toSave = elevateOwnerAdminsInStore(toSave).store;

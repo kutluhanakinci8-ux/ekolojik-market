@@ -155,6 +155,41 @@ export function resolveWarehouseStock(productId, productCode, barcode) {
   return Math.max(0, Math.floor(qty));
 }
 
+export function syncIrsaliyeCatalogOnStoreSnapshot(snapshot) {
+  if (!snapshot?.products?.length) {
+    return { snapshot, changed: false };
+  }
+
+  let changed = false;
+  const products = snapshot.products.map((product) => {
+    const code = resolveProductStockCode(product.id, product.productCode);
+    const ean = code ? irsaliyeEanForCode(code) : undefined;
+    const next = {
+      ...product,
+      productCode: code ?? product.productCode,
+      barcode: ean ?? product.barcode ?? code,
+    };
+    if (next.productCode !== product.productCode || next.barcode !== product.barcode) {
+      changed = true;
+    }
+    return next;
+  });
+
+  if (!changed) {
+    return { snapshot, changed: false };
+  }
+
+  return {
+    snapshot: {
+      ...snapshot,
+      products,
+      updatedAt: new Date().toISOString(),
+    },
+    changed: true,
+  };
+}
+
+/** Manuel migrasyon — stokları irsaliye adetlerine çeker. */
 export function applyIrsaliyeStockToStoreSnapshot(snapshot) {
   if (!snapshot?.products?.length) {
     return { snapshot, changed: false };
