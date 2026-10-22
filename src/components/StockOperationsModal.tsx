@@ -80,6 +80,8 @@ interface StockOperationsModalProps {
   onMarkStockCountLineApplied?: (reportId: string, productId: number) => void;
   onUpdateProductCategory?: (productId: number, categoryId: string) => void;
   onManageCategories?: () => void;
+  /** Sekme değişince üst bileşen initialOperation ile uyumlu kalsın (senkron sonrası sıfırlanmayı önler) */
+  onOperationChange?: (operation: StockOperationType) => void;
 }
 
 const OPERATIONS: Array<{
@@ -153,6 +155,7 @@ export function StockOperationsModal({
   onMarkStockCountLineApplied,
   onUpdateProductCategory,
   onManageCategories,
+  onOperationChange,
 }: StockOperationsModalProps) {
   const [operation, setOperation] = useState<StockOperationType>(initialOperation);
   const [productId, setProductId] = useState('');
@@ -185,6 +188,7 @@ export function StockOperationsModal({
   const [countAbandonPrompt, setCountAbandonPrompt] = useState(false);
   const countScanInputRef = useRef<HTMLInputElement>(null);
   const countModalWasOpenRef = useRef(false);
+  const stockOpsWasOpenRef = useRef(false);
 
   const applyCountDraftToState = useCallback((draft: ReturnType<typeof loadStockCountSessionDraft>) => {
     if (!draft || Object.keys(draft.countLines).length === 0) return false;
@@ -258,9 +262,18 @@ export function StockOperationsModal({
   );
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      stockOpsWasOpenRef.current = false;
+      return;
+    }
+    const justOpened = !stockOpsWasOpenRef.current;
+    stockOpsWasOpenRef.current = true;
+    if (!justOpened) {
+      return;
+    }
     setCountAbandonPrompt(false);
     setOperation(initialOperation);
+    onOperationChange?.(initialOperation);
     setProductId(initialProductId ? String(initialProductId) : '');
     setSearch('');
     setQuantity('');
@@ -277,7 +290,7 @@ export function StockOperationsModal({
     } else {
       setNote('');
     }
-  }, [open, initialProductId, initialOperation, applyCountDraftToState]);
+  }, [open, initialProductId, initialOperation, applyCountDraftToState, onOperationChange]);
 
   useEffect(() => {
     if (!open || operation !== 'set') return;
@@ -568,6 +581,11 @@ export function StockOperationsModal({
       resetCountSession();
     }
     setOperation(next);
+    onOperationChange?.(next);
+    if (next === 'set') {
+      const draft = loadStockCountSessionDraft();
+      applyCountDraftToState(draft);
+    }
     setQuantity('');
   };
 

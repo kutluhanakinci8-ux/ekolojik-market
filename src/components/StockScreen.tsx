@@ -800,6 +800,7 @@ export function StockScreen({ store }: StockScreenProps) {
         lowStockThreshold={store.lowStockThreshold}
         initialProductId={stockOpsProductId}
         initialOperation={stockOpsMode}
+        onOperationChange={setStockOpsMode}
         onClose={() => setStockOpsOpen(false)}
         onAdjust={handleStockAdjust}
         onSetStock={handleStockSet}
