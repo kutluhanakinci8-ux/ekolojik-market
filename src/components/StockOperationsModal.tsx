@@ -585,6 +585,7 @@ export function StockOperationsModal({
     countSessionStartedAt,
     note,
     onSaveStockCountReport,
+    authSession,
   ]);
 
   const finishCountSession = () => {
