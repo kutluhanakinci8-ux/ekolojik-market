@@ -1,6 +1,7 @@
 /** Ön muhasebe — cari, banka, dönem, çek/senet, stok düzeltme */
 
 import type { JournalVoucher } from './journalVoucher';
+import type { StockCountReport } from './stockCountReport';
 
 export type PaymentStatus = 'unpaid' | 'partial' | 'paid';
 
@@ -209,6 +210,7 @@ export interface AccountingSnapshot {
   cashCountVariances: CashCountVariance[];
   checkNotes: CheckNote[];
   stockAdjustments: StockAdjustment[];
+  stockCountReports: StockCountReport[];
   journalVouchers: JournalVoucher[];
   equityPartners: EquityPartner[];
   capitalContributions: CapitalContribution[];
@@ -224,6 +226,7 @@ export const EMPTY_ACCOUNTING_SNAPSHOT: AccountingSnapshot = {
   cashCountVariances: [],
   checkNotes: [],
   stockAdjustments: [],
+  stockCountReports: [],
   journalVouchers: [],
   equityPartners: [],
   capitalContributions: [],

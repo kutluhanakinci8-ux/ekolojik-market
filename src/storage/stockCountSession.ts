@@ -10,10 +10,11 @@ export type StockCountSessionDraft = {
   version: 1;
   savedAt: string;
   startedAt: string;
-  countPhase: 'scan' | 'report';
+  countPhase: 'scan' | 'report' | 'apply';
   countLines: Record<number, StockCountLineDraft>;
   countLastProductId: number | null;
   note: string;
+  reportId: string | null;
 };
 
 function storageKey(): string {
@@ -32,7 +33,9 @@ export function loadStockCountSessionDraft(): StockCountSessionDraft | null {
   }
 }
 
-export function saveStockCountSessionDraft(draft: Omit<StockCountSessionDraft, 'version' | 'savedAt'>): void {
+export function saveStockCountSessionDraft(
+  draft: Omit<StockCountSessionDraft, 'version' | 'savedAt'>,
+): void {
   try {
     const payload: StockCountSessionDraft = {
       version: 1,

@@ -845,6 +845,12 @@ export function StockScreen({ store }: StockScreenProps) {
         }}
         perakendeKdvHaric={posLiteStock}
         settings={store.settings}
+        stockCountReports={store.stockCountReports}
+        onSaveStockCountReport={(report) => store.saveStockCountReport(report)}
+        onMarkStockCountReportPrinted={(reportId) => store.markStockCountReportPrinted(reportId)}
+        onMarkStockCountLineApplied={(reportId, productId) => {
+          store.markStockCountLineApplied(reportId, productId);
+        }}
         onUpdateProductCategory={(productId, categoryId) => {
           store.updateProductCategory(productId, categoryId);
           showToast('Kategori kaydedildi');

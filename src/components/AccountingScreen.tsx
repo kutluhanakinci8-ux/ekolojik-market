@@ -29,6 +29,7 @@ import { IncomeReportsPanel } from './reports/IncomeReportsPanel';
 import { SalesDailyReceiptReportPanel } from './reports/SalesDailyReceiptReportPanel';
 import { ExpenseReportsPanel } from './reports/ExpenseReportsPanel';
 import { StockReportsPanel } from './reports/StockReportsPanel';
+import { StockCountReportsPanel } from './reports/StockCountReportsPanel';
 import { SupplierReportsPanel } from './reports/SupplierReportsPanel';
 import { PartnerReportsPanel } from './reports/PartnerReportsPanel';
 import { UserReportsPanel } from './reports/UserReportsPanel';
@@ -44,6 +45,7 @@ export type ReportsSubTab =
   | 'gunluk-satis-fis'
   | 'gider'
   | 'stok'
+  | 'sayim-rapor'
   | 'kasa'
   | 'musteriler'
   | 'tedarikci'
@@ -58,6 +60,7 @@ const REPORTS_PERIOD_SUBTABS: ReportsSubTab[] = [
   'gunluk-satis-fis',
   'gider',
   'stok',
+  'sayim-rapor',
   'kasa',
   'ortaklar',
   'musteriler',
@@ -105,6 +108,7 @@ const REPORTS_SUBTABS: ReportsMenuItem[] = [
   { id: 'gunluk-satis-fis', label: 'Günlük Satış Fişi', icon: '🧾' },
   { id: 'gider', label: 'Gider Raporları', icon: '📉' },
   { id: 'stok', label: 'Stok Raporları', icon: '📦' },
+  { id: 'sayim-rapor', label: 'Sayım Raporları', icon: '📋' },
   { id: 'kasa', label: 'Kasa Raporları', icon: '💰' },
   { id: 'musteriler', label: 'Müşteri Raporları', icon: '👥' },
   { id: 'tedarikci', label: 'Tedarikçi Raporları', icon: '🏭' },
@@ -557,6 +561,10 @@ export function AccountingScreen({
 
           {reportsSubTab === 'stok' && (
             <StockReportsPanel store={store} period={period} />
+          )}
+
+          {reportsSubTab === 'sayim-rapor' && (
+            <StockCountReportsPanel store={store} />
           )}
 
           {reportsSubTab === 'kasa' && (

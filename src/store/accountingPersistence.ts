@@ -16,6 +16,7 @@ type AccountingKeyId =
   | 'cashCountVariances'
   | 'checkNotes'
   | 'stockAdjustments'
+  | 'stockCountReports'
   | 'journalVouchers'
   | 'equityPartners'
   | 'capitalContributions';
@@ -45,6 +46,7 @@ export function loadAccountingSnapshot(): AccountingSnapshot {
     cashCountVariances: loadArray(storageKey('cashCountVariances')),
     checkNotes: loadArray(storageKey('checkNotes')),
     stockAdjustments: loadArray(storageKey('stockAdjustments')),
+    stockCountReports: loadArray(storageKey('stockCountReports')),
     journalVouchers: loadArray(storageKey('journalVouchers')),
     equityPartners: loadEquityPartners(),
     capitalContributions: loadArray(storageKey('capitalContributions')),
@@ -66,6 +68,7 @@ export function saveAccountingSnapshot(snapshot: AccountingSnapshot): void {
   localStorage.setItem(storageKey('cashCountVariances'), JSON.stringify(snapshot.cashCountVariances));
   localStorage.setItem(storageKey('checkNotes'), JSON.stringify(snapshot.checkNotes));
   localStorage.setItem(storageKey('stockAdjustments'), JSON.stringify(snapshot.stockAdjustments));
+  localStorage.setItem(storageKey('stockCountReports'), JSON.stringify(snapshot.stockCountReports));
   localStorage.setItem(storageKey('journalVouchers'), JSON.stringify(snapshot.journalVouchers));
   localStorage.setItem(storageKey('equityPartners'), JSON.stringify(snapshot.equityPartners));
   localStorage.setItem(storageKey('capitalContributions'), JSON.stringify(snapshot.capitalContributions));
@@ -87,6 +90,7 @@ export function mergeAccountingFromPersisted(
       cashCountVariances: remote.cashCountVariances ?? [],
       checkNotes: remote.checkNotes ?? [],
       stockAdjustments: remote.stockAdjustments ?? [],
+      stockCountReports: remote.stockCountReports ?? [],
       journalVouchers: remote.journalVouchers ?? [],
       equityPartners: remote.equityPartners?.length ? remote.equityPartners : createDefaultEquityPartners(),
       capitalContributions: remote.capitalContributions ?? [],
@@ -104,6 +108,7 @@ export function mergeAccountingFromPersisted(
     cashCountVariances: remote.cashCountVariances ?? local.cashCountVariances,
     checkNotes: remote.checkNotes ?? local.checkNotes,
     stockAdjustments: remote.stockAdjustments ?? local.stockAdjustments,
+    stockCountReports: remote.stockCountReports ?? local.stockCountReports,
     journalVouchers: remote.journalVouchers ?? local.journalVouchers,
     equityPartners: remote.equityPartners?.length ? remote.equityPartners : local.equityPartners,
     capitalContributions: remote.capitalContributions ?? local.capitalContributions,

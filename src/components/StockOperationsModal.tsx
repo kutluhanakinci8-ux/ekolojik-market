@@ -17,6 +17,14 @@ import {
 } from '../storage/stockCountSession';
 import { normalizeBarcodeScanInput, resolveBarcodeScan } from '../utils/barcodeScan';
 import { formatDateTime } from '../utils/format';
+import type { StockCountReport } from '../types/stockCountReport';
+import {
+  buildStockCountReportLines,
+  newStockCountReportId,
+  stockCountReportPendingApply,
+} from '../types/stockCountReport';
+import { printStockCountReceiptReport } from '../utils/stockCountReceiptReport';
+import { STANDARD_WINDOWS_ZYWELL_PRINTER_NAME } from '../types/receiptPrinter';
 import './StockOperationsModal.css';
 
 type StockCountLine = {
@@ -60,6 +68,10 @@ interface StockOperationsModalProps {
   /** Lima / pos-lite: perakende KDV hariç */
   perakendeKdvHaric?: boolean;
   settings?: AppSettings;
+  stockCountReports?: StockCountReport[];
+  onSaveStockCountReport?: (report: StockCountReport) => void;
+  onMarkStockCountReportPrinted?: (reportId: string) => void;
+  onMarkStockCountLineApplied?: (reportId: string, productId: number) => void;
   onUpdateProductCategory?: (productId: number, categoryId: string) => void;
   onManageCategories?: () => void;
 }
@@ -128,6 +140,10 @@ export function StockOperationsModal({
   onPricingSaveResult,
   perakendeKdvHaric = false,
   settings,
+  stockCountReports = [],
+  onSaveStockCountReport,
+  onMarkStockCountReportPrinted,
+  onMarkStockCountLineApplied,
   onUpdateProductCategory,
   onManageCategories,
 }: StockOperationsModalProps) {
@@ -142,13 +158,16 @@ export function StockOperationsModal({
   const [couponDraft, setCouponDraft] = useState('');
   const [retailDraft, setRetailDraft] = useState('');
   const [categoryDraft, setCategoryDraft] = useState('');
-  const [countPhase, setCountPhase] = useState<'scan' | 'report'>('scan');
+  const [countPhase, setCountPhase] = useState<'scan' | 'report' | 'apply'>('scan');
   const [countLines, setCountLines] = useState<Record<number, StockCountLine>>({});
   const [countLastProductId, setCountLastProductId] = useState<number | null>(null);
+  const [countReportId, setCountReportId] = useState<string | null>(null);
   const [countScanInput, setCountScanInput] = useState('');
   const [countScanError, setCountScanError] = useState<string | null>(null);
   const [countSessionStartedAt, setCountSessionStartedAt] = useState<string | null>(null);
   const [countDraftRestored, setCountDraftRestored] = useState(false);
+  const [countPrintMessage, setCountPrintMessage] = useState<string | null>(null);
+  const [countPrinting, setCountPrinting] = useState(false);
   const countScanInputRef = useRef<HTMLInputElement>(null);
 
   const applyCountDraftToState = useCallback((draft: ReturnType<typeof loadStockCountSessionDraft>) => {
@@ -158,8 +177,10 @@ export function StockOperationsModal({
     setCountLastProductId(draft.countLastProductId);
     setNote(draft.note ?? '');
     setCountSessionStartedAt(draft.startedAt);
+    setCountReportId(draft.reportId ?? null);
     setCountScanInput('');
     setCountScanError(null);
+    setCountPrintMessage(null);
     setCountDraftRestored(true);
     return true;
   }, []);
@@ -168,10 +189,12 @@ export function StockOperationsModal({
     setCountPhase('scan');
     setCountLines({});
     setCountLastProductId(null);
+    setCountReportId(null);
     setCountScanInput('');
     setCountScanError(null);
     setCountSessionStartedAt(null);
     setCountDraftRestored(false);
+    setCountPrintMessage(null);
     clearStockCountSessionDraft();
   }, []);
 
@@ -224,6 +247,7 @@ export function StockOperationsModal({
       countLines,
       countLastProductId,
       note,
+      reportId: countReportId,
     });
   }, [
     open,
@@ -233,6 +257,7 @@ export function StockOperationsModal({
     countLastProductId,
     note,
     countSessionStartedAt,
+    countReportId,
   ]);
 
   useEffect(() => {
@@ -394,6 +419,25 @@ export function StockOperationsModal({
     [countReportRows],
   );
 
+  const activeCountReport = useMemo(
+    () => (countReportId ? stockCountReports.find((r) => r.id === countReportId) : undefined),
+    [countReportId, stockCountReports],
+  );
+
+  const countReportPrinted = Boolean(activeCountReport?.printedAt);
+
+  const countPendingApplyRows = useMemo(() => {
+    if (!activeCountReport) return countDiscrepancyRows;
+    const pendingIds = new Set(
+      stockCountReportPendingApply(activeCountReport).map((line) => line.productId),
+    );
+    return countDiscrepancyRows.filter((row) => pendingIds.has(row.line.productId));
+  }, [activeCountReport, countDiscrepancyRows]);
+
+  const businessName = settings?.businessName?.trim() || 'Mağaza';
+  const receiptPrinterName =
+    settings?.receiptPrinter?.windowsPrinterName?.trim() || STANDARD_WINDOWS_ZYWELL_PRINTER_NAME;
+
   const registerCountScan = (product: Product) => {
     setCountDraftRestored(false);
     setCountLines((prev) => {
@@ -445,33 +489,114 @@ export function StockOperationsModal({
     setQuantity('');
   };
 
+  const persistCountReport = useCallback((): string | null => {
+    if (countLineList.length === 0) return null;
+    const id = countReportId ?? newStockCountReportId();
+    const startedAt = countSessionStartedAt ?? new Date().toISOString();
+    const baseLines = buildStockCountReportLines(countLineList);
+    const lines = baseLines.map((line) => {
+      const prev = activeCountReport?.lines.find((item) => item.productId === line.productId);
+      return prev?.appliedAt ? { ...line, appliedAt: prev.appliedAt } : line;
+    });
+    const report: StockCountReport = {
+      id,
+      startedAt,
+      createdAt: activeCountReport?.createdAt ?? new Date().toISOString(),
+      note: note.trim(),
+      lines,
+      printedAt: activeCountReport?.printedAt,
+      completedAt: activeCountReport?.completedAt,
+    };
+    onSaveStockCountReport?.(report);
+    setCountReportId(id);
+    return id;
+  }, [
+    activeCountReport,
+    countLineList,
+    countReportId,
+    countSessionStartedAt,
+    note,
+    onSaveStockCountReport,
+  ]);
+
   const finishCountSession = () => {
     if (countLineList.length === 0) {
       setCountScanError('Önce en az bir ürün okutun');
       return;
     }
+    persistCountReport();
     setCountPhase('report');
     setCountScanError(null);
+    setCountPrintMessage(null);
   };
 
-  const applyCountCorrections = () => {
+  const handlePrintCountReport = async () => {
+    const id = persistCountReport();
+    if (!id) return;
+    const fromStore = stockCountReports.find((r) => r.id === id);
+    const report: StockCountReport = fromStore ?? {
+      id,
+      startedAt: countSessionStartedAt ?? new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      note: note.trim(),
+      lines: buildStockCountReportLines(countLineList),
+    };
+    setCountPrinting(true);
+    setCountPrintMessage(null);
+    try {
+      const printedAt = new Date();
+      const result = await printStockCountReceiptReport({
+        businessName,
+        report,
+        products,
+        printedAt,
+      }, receiptPrinterName);
+      if (result.printed) {
+        onMarkStockCountReportPrinted?.(id);
+      }
+      setCountPrintMessage(result.message ?? (result.printed ? 'Rapor yazdırıldı' : 'Yazdırılamadı'));
+    } finally {
+      setCountPrinting(false);
+    }
+  };
+
+  const goToCountApplyPhase = () => {
+    if (!countReportPrinted) {
+      window.alert('Önce sayım raporunu fiş yazıcısından yazdırın.');
+      return;
+    }
     if (countDiscrepancyRows.length === 0) {
-      window.alert('Tutarsızlık yok — stok güncellemesi gerekmiyor.');
       resetCountSession();
       onClose();
       return;
     }
+    setCountPhase('apply');
+  };
+
+  const applySingleCountCorrection = (productId: number, scannedQty: number) => {
+    if (!countReportId || !countReportPrinted) return;
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
     const trimmedNote = note.trim() || 'Stok sayımı düzeltmesi (barkod)';
-    const summary = countDiscrepancyRows
-      .map((row) => `${row.product!.productCode ?? row.product!.id}: ${row.line.systemStock} → ${row.line.scannedQty}`)
-      .join('\n');
+    const label = product.productCode ?? String(product.id);
     if (!window.confirm(
-      `${countDiscrepancyRows.length} üründe fark var. Sistem stoğu sayım adedine güncellensin mi?\n\n${summary}`,
+      `${product.name} (${label})\nSistem stoğu ${product.stock} → sayım ${scannedQty} olarak güncellensin mi?`,
     )) {
       return;
     }
-    for (const row of countDiscrepancyRows) {
-      onSetStock(row.line.productId, row.line.scannedQty, trimmedNote);
+    onSetStock(productId, scannedQty, trimmedNote);
+    onMarkStockCountLineApplied?.(countReportId, productId);
+    if (countPendingApplyRows.length <= 1) {
+      window.alert('Tüm düzeltmeler uygulandı.');
+      resetCountSession();
+      onClose();
+    }
+  };
+
+  const finishCountWithoutCorrections = () => {
+    if (!countReportPrinted) {
+      window.alert('Önce sayım raporunu yazdırın.');
+      return;
     }
     resetCountSession();
     onClose();
@@ -704,14 +829,18 @@ export function StockOperationsModal({
                       </div>
                     )}
                   </>
-                ) : (
+                ) : countPhase === 'report' ? (
                   <>
                     <h3 className="stock-ops-dialog__count-report-title">Sayım raporu</h3>
                     <p className="stock-ops-dialog__count-lead">
+                      Önce raporu fiş yazıcısından yazdırın. Aynı rapor Muhasebe → Raporlar → Sayım Raporları altında saklanır.
                       {countDiscrepancyRows.length === 0
-                        ? 'Tüm okutulan ürünler sistem stoğu ile uyumlu. Stok güncellemesi gerekmez.'
-                        : `${countDiscrepancyRows.length} üründe fark var. Onayladığınızda yalnızca farklı satırlar güncellenir.`}
+                        ? ' Tüm satırlar uyumlu — yazdırdıktan sonra sayımı tamamlayabilirsiniz.'
+                        : ` ${countDiscrepancyRows.length} üründe fark var; yazdırdıktan sonra ürün kartlarından tek tek düzeltme uygulayın.`}
                     </p>
+                    {countPrintMessage && (
+                      <p className="stock-ops-dialog__count-print-msg" role="status">{countPrintMessage}</p>
+                    )}
                     <div className="stock-ops-dialog__count-table-wrap">
                       <table className="stock-ops-dialog__count-table stock-ops-dialog__count-table--report">
                         <thead>
@@ -747,6 +876,38 @@ export function StockOperationsModal({
                       </table>
                     </div>
                   </>
+                ) : (
+                  <>
+                    <h3 className="stock-ops-dialog__count-report-title">Düzeltme — ürün seçin</h3>
+                    <p className="stock-ops-dialog__count-lead">
+                      Her kart için stoğu sayım adedine güncelleyin. Kalan: <strong>{countPendingApplyRows.length}</strong> ürün.
+                    </p>
+                    {countPendingApplyRows.length === 0 && (
+                      <p className="stock-ops-dialog__count-lead">
+                        Bekleyen düzeltme yok. Oturumu kapatabilirsiniz.
+                      </p>
+                    )}
+                    <div className="stock-ops-dialog__count-apply-grid">
+                      {countPendingApplyRows.map(({ line, product, diff }) => (
+                        <button
+                          key={line.productId}
+                          type="button"
+                          className="stock-ops-dialog__count-apply-card"
+                          onClick={() => applySingleCountCorrection(line.productId, line.scannedQty)}
+                        >
+                          <ProductImage product={product!} size="md" />
+                          <strong className="stock-ops-dialog__count-apply-name">{product!.name}</strong>
+                          <span className="stock-ops-dialog__count-apply-meta">
+                            Sistem {line.systemStock} → Sayım {line.scannedQty}
+                          </span>
+                          <span className={`stock-ops-dialog__count-apply-diff ${diff > 0 ? 'is-up' : 'is-down'}`}>
+                            Fark {diff > 0 ? `+${diff}` : diff}
+                          </span>
+                          <span className="stock-ops-dialog__count-apply-cta">Düzeltmeyi uygula</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
                 <label className="stock-ops-dialog__field">
                   <span>Not (düzeltme kaydı)</span>
@@ -755,6 +916,7 @@ export function StockOperationsModal({
                     value={note}
                     onChange={(event) => setNote(event.target.value)}
                     placeholder={defaultNote('set')}
+                    disabled={countPhase !== 'scan' && countReportPrinted}
                   />
                 </label>
               </section>
@@ -777,13 +939,19 @@ export function StockOperationsModal({
                         {countLineList.reduce((sum, line) => sum + line.scannedQty, 0)}
                       </strong>
                     </div>
-                    {countPhase === 'report' && (
-                      <div className="stock-ops-dialog__preview-row">
-                        <span>Farklı ürün</span>
-                        <strong className={countDiscrepancyRows.length ? 'is-down' : ''}>
-                          {countDiscrepancyRows.length}
-                        </strong>
-                      </div>
+                    {countPhase !== 'scan' && (
+                      <>
+                        <div className="stock-ops-dialog__preview-row">
+                          <span>Farklı ürün</span>
+                          <strong className={countDiscrepancyRows.length ? 'is-down' : ''}>
+                            {countDiscrepancyRows.length}
+                          </strong>
+                        </div>
+                        <div className="stock-ops-dialog__preview-row">
+                          <span>Rapor</span>
+                          <strong>{countReportPrinted ? 'Yazdırıldı' : 'Yazdırılmadı'}</strong>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -821,21 +989,55 @@ export function StockOperationsModal({
                         Sayımı bitir
                       </button>
                     </>
+                  ) : countPhase === 'report' ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        disabled={countPrinting}
+                        onClick={() => void handlePrintCountReport()}
+                      >
+                        {countPrinting ? 'Yazdırılıyor…' : 'Fiş yazdır'}
+                      </button>
+                      {countDiscrepancyRows.length > 0 ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          disabled={!countReportPrinted}
+                          onClick={goToCountApplyPhase}
+                        >
+                          Düzeltmelere geç
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          disabled={!countReportPrinted}
+                          onClick={finishCountWithoutCorrections}
+                        >
+                          Sayımı tamamla
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <>
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => setCountPhase('scan')}
+                        onClick={() => setCountPhase('report')}
                       >
-                        Geri (okutmaya dön)
+                        Rapora dön
                       </button>
                       <button
                         type="button"
-                        className="btn btn-primary"
-                        onClick={applyCountCorrections}
+                        className="btn btn-outline"
+                        onClick={() => {
+                          if (countPendingApplyRows.length > 0 && !window.confirm('Bekleyen düzeltmeler var. Oturumu kapatmak istiyor musunuz?')) return;
+                          resetCountSession();
+                          onClose();
+                        }}
                       >
-                        {countDiscrepancyRows.length > 0 ? 'Düzeltmeleri uygula' : 'Kapat'}
+                        Sonra devam et
                       </button>
                     </>
                   )}

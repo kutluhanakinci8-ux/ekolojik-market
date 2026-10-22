@@ -204,6 +204,8 @@ import type {
   SupplierLedgerEntry,
 } from '../types/accounting';
 import type { JournalVoucher } from '../types/journalVoucher';
+import type { StockCountReport } from '../types/stockCountReport';
+import { isStockCountReportComplete } from '../types/stockCountReport';
 import { createAccountingMethods } from './accountingMethods';
 import { loadAccountingSnapshot, mergeAccountingFromPersisted, saveAccountingSnapshot } from './accountingPersistence';
 import {
@@ -870,6 +872,7 @@ function buildLocalSnapshot(
   cashCountVariances: CashCountVariance[],
   checkNotes: CheckNote[],
   stockAdjustments: StockAdjustment[],
+  stockCountReports: StockCountReport[],
   journalVouchers: JournalVoucher[],
   equityPartners: EquityPartner[],
   capitalContributions: CapitalContribution[],
@@ -901,6 +904,7 @@ function buildLocalSnapshot(
     cashCountVariances,
     checkNotes,
     stockAdjustments,
+    stockCountReports,
     journalVouchers,
     equityPartners,
     capitalContributions,
@@ -963,6 +967,7 @@ function hydrateStoreSlicesFromLocalDisk() {
     cashCountVariances: accounting.cashCountVariances,
     checkNotes: accounting.checkNotes,
     stockAdjustments: accounting.stockAdjustments,
+    stockCountReports: accounting.stockCountReports,
     journalVouchers: accounting.journalVouchers,
     equityPartners: accounting.equityPartners,
     capitalContributions: accounting.capitalContributions,
@@ -994,6 +999,9 @@ export function usePosStoreState() {
   const [cashCountVariances, setCashCountVariances] = useState<CashCountVariance[]>(initialAccounting.cashCountVariances);
   const [checkNotes, setCheckNotes] = useState<CheckNote[]>(initialAccounting.checkNotes);
   const [stockAdjustments, setStockAdjustments] = useState<StockAdjustment[]>(initialAccounting.stockAdjustments);
+  const [stockCountReports, setStockCountReports] = useState<StockCountReport[]>(
+    initialAccounting.stockCountReports ?? [],
+  );
   const [journalVouchers, setJournalVouchers] = useState<JournalVoucher[]>(initialAccounting.journalVouchers);
   const [equityPartners, setEquityPartners] = useState<EquityPartner[]>(initialAccounting.equityPartners);
   const [capitalContributions, setCapitalContributions] = useState<CapitalContribution[]>(initialAccounting.capitalContributions);
@@ -1076,6 +1084,7 @@ export function usePosStoreState() {
       cashCountVariances,
       checkNotes,
       stockAdjustments,
+      stockCountReports,
       journalVouchers,
       equityPartners,
       capitalContributions,
@@ -1086,6 +1095,7 @@ export function usePosStoreState() {
     cashHandovers, cashSessions, purchaseInvoices, settings, priceType, users,
     loginAuditLog, activityAuditLog, suppliers, customerLedger, supplierLedger,
     bankAccounts, bankTransactions, periodClosures, cashCountVariances, checkNotes, stockAdjustments,
+    stockCountReports,
     journalVouchers, equityPartners, capitalContributions, crmData,
   ]);
 
@@ -1127,6 +1137,7 @@ export function usePosStoreState() {
     setCashCountVariances(accounting.cashCountVariances);
     setCheckNotes(accounting.checkNotes);
     setStockAdjustments(accounting.stockAdjustments);
+    setStockCountReports(accounting.stockCountReports ?? []);
     setJournalVouchers(accounting.journalVouchers);
     setEquityPartners(accounting.equityPartners);
     setCapitalContributions(accounting.capitalContributions);
@@ -1358,13 +1369,15 @@ export function usePosStoreState() {
       cashCountVariances,
       checkNotes,
       stockAdjustments,
+      stockCountReports,
       journalVouchers,
       equityPartners,
       capitalContributions,
     });
   }, [
     suppliers, customerLedger, supplierLedger, bankAccounts, bankTransactions,
-    periodClosures, cashCountVariances, checkNotes, stockAdjustments, journalVouchers,
+    periodClosures, cashCountVariances, checkNotes, stockAdjustments, stockCountReports,
+    journalVouchers,
     equityPartners, capitalContributions,
   ]);
 
@@ -1661,6 +1674,35 @@ export function usePosStoreState() {
     },
     [products, recordStockChange],
   );
+
+  const saveStockCountReport = useCallback((report: StockCountReport) => {
+    setStockCountReports((prev) => {
+      const without = prev.filter((item) => item.id !== report.id);
+      return [report, ...without];
+    });
+  }, []);
+
+  const markStockCountReportPrinted = useCallback((reportId: string) => {
+    const printedAt = new Date().toISOString();
+    setStockCountReports((prev) => prev.map((report) => (
+      report.id === reportId ? { ...report, printedAt } : report
+    )));
+  }, []);
+
+  const markStockCountLineApplied = useCallback((reportId: string, productId: number) => {
+    const appliedAt = new Date().toISOString();
+    setStockCountReports((prev) => prev.map((report) => {
+      if (report.id !== reportId) return report;
+      const lines = report.lines.map((line) => (
+        line.productId === productId ? { ...line, appliedAt } : line
+      ));
+      const next = { ...report, lines };
+      if (isStockCountReportComplete(next)) {
+        return { ...next, completedAt: appliedAt };
+      }
+      return next;
+    }));
+  }, []);
 
   const adjustProductStock = useCallback(
     (productId: number, delta: number, note?: string) => {
@@ -3590,6 +3632,7 @@ export function usePosStoreState() {
       setCashCountVariances(slices.cashCountVariances);
       setCheckNotes(slices.checkNotes);
       setStockAdjustments(slices.stockAdjustments);
+      setStockCountReports(slices.stockCountReports ?? []);
       setJournalVouchers(slices.journalVouchers);
       setEquityPartners(slices.equityPartners);
       setCapitalContributions(slices.capitalContributions);
@@ -5566,6 +5609,7 @@ export function usePosStoreState() {
     cashCountVariances,
     checkNotes,
     stockAdjustments,
+    stockCountReports,
     journalVouchers,
     equityPartners,
     capitalContributions,
@@ -5625,6 +5669,9 @@ export function usePosStoreState() {
     processSaleReturn,
     updateCompletedSale,
     setProductStock,
+    saveStockCountReport,
+    markStockCountReportPrinted,
+    markStockCountLineApplied,
     updateProductBarcode,
     updateProductCategory,
     saveProductCategoryCatalog,

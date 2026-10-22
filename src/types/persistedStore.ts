@@ -34,6 +34,7 @@ export interface PersistedStoreSnapshot {
   cashCountVariances?: AccountingSnapshot['cashCountVariances'];
   checkNotes?: AccountingSnapshot['checkNotes'];
   stockAdjustments?: AccountingSnapshot['stockAdjustments'];
+  stockCountReports?: AccountingSnapshot['stockCountReports'];
   journalVouchers?: AccountingSnapshot['journalVouchers'];
   equityPartners?: AccountingSnapshot['equityPartners'];
   capitalContributions?: AccountingSnapshot['capitalContributions'];
