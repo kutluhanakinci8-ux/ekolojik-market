@@ -282,3 +282,6 @@ if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
     MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${REPO_ROOT}/scripts/ops-outbox-health.mjs" --process || true
   fi
 fi
+
+echo "==> CARICH CBF014/CBF015 fiziksel stok (deploy bitiş)..."
+FIX_CBF_SKIP_BACKUP=1 node "${APP_SRC}/scripts/fix-carich-cbf014-cbf015-stock.mjs" "${INSTALL_DIR}/data" || true
