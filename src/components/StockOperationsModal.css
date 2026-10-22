@@ -1077,6 +1077,57 @@
   background: #fff7ed;
 }
 
+.stock-ops-dialog__count-abandon-prompt {
+  margin: 0 20px 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 2px solid #fb923c;
+  background: #fff7ed;
+  position: relative;
+  z-index: 5;
+}
+
+.stock-ops-dialog__count-abandon-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #9a3412;
+}
+
+.stock-ops-dialog__count-abandon-desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #7c2d12;
+}
+
+.stock-ops-dialog__count-abandon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stock-ops-dialog__count-btn-abandon-solid {
+  background: #c2410c;
+  border-color: #c2410c;
+  color: #fff;
+}
+
+.stock-ops-dialog__count-btn-abandon-solid:hover {
+  background: #9a3412;
+  border-color: #9a3412;
+}
+
+.stock-ops-dialog__aside--count {
+  overflow-y: auto;
+}
+
+.stock-ops-dialog__aside--count .stock-ops-dialog__footer {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
 .stock-ops-dialog__aside--count .stock-ops-dialog__footer .btn-primary {
   grid-column: 1;
 }
