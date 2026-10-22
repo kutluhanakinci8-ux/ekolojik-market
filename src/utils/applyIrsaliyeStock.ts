@@ -70,6 +70,20 @@ function movementFor(
   };
 }
 
+/** Barkod / stok kodu — operasyonel `stock` alanına dokunmaz. */
+export function syncIrsaliyeCatalogFields(products: Product[]): Product[] {
+  return products.map((product) => {
+    const code = resolveProductStockCode(product.id, product.productCode);
+    const ean = code ? irsaliyeEanForCode(code) : undefined;
+    return {
+      ...product,
+      productCode: code ?? product.productCode,
+      barcode: ean ?? product.barcode ?? code,
+    };
+  });
+}
+
+/** İlk irsaliye girişi — stokları depo adetlerine çeker (tek seferlik migrasyon). */
 export function applyIrsaliyeStockToProducts(products: Product[]): {
   products: Product[];
   movements: StockMovement[];
@@ -101,12 +115,40 @@ export function applyIrsaliyeStockToProducts(products: Product[]): {
   return { products: next, movements };
 }
 
-/** Sunucu store.json — stok + EAN barkod eşlemesi */
+/** Sunucu store.json — yalnızca kod/barkod (stok korunur). */
 export function syncIrsaliyeProductFields(products: Product[]): Product[] {
-  return applyIrsaliyeStockToProducts(products).products;
+  return syncIrsaliyeCatalogFields(products);
 }
 
-/** Sunucu store.json — products dizisini irsaliyeye göre düzeltir */
+/** Canlı sync — stokları ezmez, katalog alanlarını günceller. */
+export function applyIrsaliyeCatalogToStoreSnapshot(snapshot: {
+  products?: Product[];
+  updatedAt?: string;
+}): { snapshot: typeof snapshot; changed: boolean } {
+  if (!snapshot?.products?.length) {
+    return { snapshot, changed: false };
+  }
+  const products = syncIrsaliyeCatalogFields(snapshot.products);
+  const prevById = new Map(snapshot.products.map((p) => [p.id, p]));
+  const fieldsChanged = products.some((p) => {
+    const prev = prevById.get(p.id);
+    if (!prev) return true;
+    return prev.barcode !== p.barcode || prev.productCode !== p.productCode;
+  });
+  if (!fieldsChanged) {
+    return { snapshot, changed: false };
+  }
+  return {
+    snapshot: {
+      ...snapshot,
+      products,
+      updatedAt: new Date().toISOString(),
+    },
+    changed: true,
+  };
+}
+
+/** Manuel script — stokları irsaliye adetlerine sıfırlar. */
 export function applyIrsaliyeStockToStoreSnapshot(snapshot: {
   products?: Product[];
   updatedAt?: string;

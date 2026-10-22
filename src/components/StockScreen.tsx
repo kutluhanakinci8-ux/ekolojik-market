@@ -725,6 +725,8 @@ export function StockScreen({ store }: StockScreenProps) {
                         <div className="stock-timeline-name">{m.productName}</div>
                         <div className="stock-timeline-meta">
                           {m.previousStock} → {m.newStock} · {formatDateTime(m.createdAt)}
+                          {m.saleId ? ` · Fiş ${m.saleId}` : ''}
+                          {m.note ? ` · ${m.note}` : ''}
                         </div>
                       </div>
                     </li>

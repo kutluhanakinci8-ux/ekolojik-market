@@ -18,7 +18,11 @@ import { ALL_APP_PAGES, DEFAULT_CASHIER_TABS } from '../data/navigation';
 import { PRICE_BATCH_1_BY_PRODUCT_ID } from '../data/priceCatalogBatch1';
 import { IRSALIYE_STOCK_MIGRATION_KEY, irsaliyeEanForCode } from '../data/irsaliyeLuy2026000000002';
 import { applyCatalogPricing } from '../utils/productPricing';
-import { applyIrsaliyeStockToProducts, resolveWarehouseStockForProduct } from '../utils/applyIrsaliyeStock';
+import {
+  applyIrsaliyeStockToProducts,
+  resolveWarehouseStockForProduct,
+  syncIrsaliyeCatalogFields,
+} from '../utils/applyIrsaliyeStock';
 import { resetStoreToIrsaliyeWarehouse } from '../utils/warehouseReset';
 import {
   buildMergedSnapshotForSave,
@@ -768,7 +772,7 @@ function createMovement(
   meta?: { saleId?: string; returnId?: string },
 ): StockMovement {
   return {
-    id: `M${Date.now()}-${product.id}`,
+    id: `M${Date.now()}-${product.id}-${Math.random().toString(36).slice(2, 7)}`,
     productId: product.id,
     productName: product.name,
     type,
@@ -1046,7 +1050,7 @@ export function usePosStoreState() {
   }): PersistedStoreSnapshot => {
     const snapshotProducts = isIsolatedStoreContext(settings)
       ? products
-      : applyIrsaliyeStockToProducts(products).products;
+      : syncIrsaliyeCatalogFields(products);
     return buildLocalSnapshot(
       snapshotProducts,
       productSets,
@@ -1200,8 +1204,7 @@ export function usePosStoreState() {
           if (mergedUsers.length !== remoteUsers.length) {
             merged.users = mergedUsers;
           }
-          const { products: migratedRemoteProducts } = applyIrsaliyeStockToProducts(merged.products ?? []);
-          merged.products = migratedRemoteProducts;
+          merged.products = syncIrsaliyeCatalogFields(merged.products ?? []);
         }
         applySnapshot(merged);
         setSyncStatus('synced');
@@ -1223,8 +1226,7 @@ export function usePosStoreState() {
       }
 
       if (hasPersistedStoreData(localSnapshot) && tenant === DEFAULT_TENANT_ID) {
-        const { products: migratedLocal } = applyIrsaliyeStockToProducts(localSnapshot.products ?? []);
-        setProducts(mergeWithSeed(migratedLocal));
+        setProducts(mergeWithSeed(syncIrsaliyeCatalogFields(localSnapshot.products ?? [])));
         setSyncStatus('local-only');
       } else if (remote) {
         applySnapshot(remote);
@@ -4670,28 +4672,63 @@ export function usePosStoreState() {
       };
 
       const saleMovements: StockMovement[] = [];
-      const paidProductItems = paidItems.filter((item) => item.productId != null);
-      const paidSetItems = paidItems.filter((item) => item.setId != null);
+      const sampleQtyByProduct = new Map<number, number>();
+      for (const item of sampleItems) {
+        if (item.productId == null) continue;
+        sampleQtyByProduct.set(
+          item.productId,
+          (sampleQtyByProduct.get(item.productId) ?? 0) + item.quantity,
+        );
+      }
+      const saleQtyByProduct = new Map<number, number>();
+      for (const item of paidItems) {
+        if (item.productId == null) continue;
+        saleQtyByProduct.set(
+          item.productId,
+          (saleQtyByProduct.get(item.productId) ?? 0) + item.quantity,
+        );
+      }
+      const saleQtyBySet = new Map<string, number>();
+      for (const item of paidItems) {
+        if (!item.setId) continue;
+        saleQtyBySet.set(item.setId, (saleQtyBySet.get(item.setId) ?? 0) + item.quantity);
+      }
 
       setProducts((prev) =>
         prev.map((p) => {
-          const sampleItem = sampleItems.find((c) => c.productId === p.id);
-          const paidItem = paidProductItems.find((c) => c.productId === p.id);
-          if (!sampleItem && !paidItem) return p;
+          const sampleQty = sampleQtyByProduct.get(p.id);
+          const saleQty = saleQtyByProduct.get(p.id);
+          if (!sampleQty && !saleQty) return p;
 
           let next = p;
-          if (sampleItem) {
+          if (sampleQty) {
             const prevSample = p.sampleStock ?? 0;
-            const newSample = Math.max(0, prevSample - sampleItem.quantity);
+            const newSample = Math.max(0, prevSample - sampleQty);
             saleMovements.push(
-              createMovement(p, 'sample', sampleItem.quantity, prevSample, newSample, 'Numune çıkışı'),
+              createMovement(
+                p,
+                'sample',
+                sampleQty,
+                prevSample,
+                newSample,
+                `Numune çıkışı — ${sale.id}`,
+                { saleId: sale.id },
+              ),
             );
             next = { ...next, sampleStock: newSample };
           }
-          if (paidItem) {
-            const newStock = Math.max(0, p.stock - paidItem.quantity);
+          if (saleQty) {
+            const newStock = Math.max(0, p.stock - saleQty);
             saleMovements.push(
-              createMovement(p, 'sale', paidItem.quantity, p.stock, newStock, 'Satış'),
+              createMovement(
+                p,
+                'sale',
+                saleQty,
+                p.stock,
+                newStock,
+                `Satış — ${sale.id}`,
+                { saleId: sale.id },
+              ),
             );
             next = { ...next, stock: newStock };
           }
@@ -4699,14 +4736,22 @@ export function usePosStoreState() {
         }),
       );
 
-      if (paidSetItems.length > 0) {
+      if (saleQtyBySet.size > 0) {
         setProductSets((prev) =>
           prev.map((set) => {
-            const paidItem = paidSetItems.find((c) => c.setId === set.id);
-            if (!paidItem) return set;
-            const newStock = Math.max(0, set.stock - paidItem.quantity);
+            const saleQty = saleQtyBySet.get(set.id);
+            if (!saleQty) return set;
+            const newStock = Math.max(0, set.stock - saleQty);
             saleMovements.push(
-              createSetMovement(set, 'set_sale', paidItem.quantity, set.stock, newStock, 'Set satışı'),
+              createSetMovement(
+                set,
+                'set_sale',
+                saleQty,
+                set.stock,
+                newStock,
+                `Set satışı — ${sale.id}`,
+                { saleId: sale.id },
+              ),
             );
             return { ...set, stock: newStock, updatedAt: new Date().toISOString() };
           }),
