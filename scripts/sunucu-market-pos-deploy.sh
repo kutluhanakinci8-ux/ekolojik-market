@@ -134,6 +134,9 @@ MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/fix-receipt-s
 echo "==> KLA128 tekli sanal stok (KLA128T, stok = paket × 10)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/sync-kla128-unit-virtual-stock.mjs" "${INSTALL_DIR}/data" || true
 
+echo "==> CARICH CBF014/CBF015 fiziksel stok (deploy sonrası)..."
+FIX_CBF_SKIP_BACKUP=1 node "${APP_SRC}/scripts/fix-carich-cbf014-cbf015-stock.mjs" "${INSTALL_DIR}/data" || true
+
 echo "==> Mağaza sahibi tam yetki (kutluhan*)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/ensure-owner-admin-on-server.mjs" || true
 

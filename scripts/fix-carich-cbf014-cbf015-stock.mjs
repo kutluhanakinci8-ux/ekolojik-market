@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CARICH CBF015 (6955470951588) / CBF014 (6955470951571) barkod karışıklığı —
- * fiziksel stok: 21 ve 28. İsteğe bağlı satış düzeltmesi: FIX_CBF_SALE_LINES=1
+ * fiziksel stok: CBF015=22, CBF014=28. İsteğe bağlı satış düzeltmesi: FIX_CBF_SALE_LINES=1
  *
  * Kullanım: node scripts/fix-carich-cbf014-cbf015-stock.mjs [/var/www/market-pos/data]
  */
@@ -11,7 +11,7 @@ import { readTenantStore, writeTenantStore } from '../server/tenantAuth.mjs';
 
 const PRODUCT_SHEA = 14; // CBF015 6955470951588
 const PRODUCT_ALOE = 15; // CBF014 6955470951571
-const TARGET_STOCK = { [PRODUCT_SHEA]: 21, [PRODUCT_ALOE]: 28 };
+const TARGET_STOCK = { [PRODUCT_SHEA]: 22, [PRODUCT_ALOE]: 28 };
 
 /** Satış satırı p14 → p15 (Aloe fiilen satılmış, Shea barkodu okunmuş) */
 const SALE_LINE_MOVES = [
@@ -113,11 +113,13 @@ async function main() {
     process.exit(1);
   }
 
-  const backupDir = join(dataDir, 'backups', 'manual-fixes');
-  await mkdir(backupDir, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const storePath = join(dataDir, 'store.json');
-  await copyFile(storePath, join(backupDir, `store-before-cbf014-015-${stamp}.json`));
+  if (process.env.FIX_CBF_SKIP_BACKUP !== '1') {
+    const backupDir = join(dataDir, 'backups', 'manual-fixes');
+    await mkdir(backupDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    await copyFile(storePath, join(backupDir, `store-before-cbf014-015-${stamp}.json`));
+  }
 
   const before14 = productSnapshot(store.products, PRODUCT_SHEA).stock;
   const before15 = productSnapshot(store.products, PRODUCT_ALOE).stock;
@@ -144,6 +146,7 @@ async function main() {
   for (const [productId, stock] of Object.entries(TARGET_STOCK)) {
     const product = productSnapshot(store.products, Number(productId));
     const prev = product.stock;
+    if (prev === stock) continue;
     product.stock = stock;
     const delta = stock - prev;
     const now = new Date().toISOString();
@@ -153,7 +156,7 @@ async function main() {
       productId: Number(productId),
       type: delta >= 0 ? 'in' : 'out',
       quantity: Math.abs(delta),
-      note: 'CBF014/CBF015 barkod karışıklığı — fiziksel sayım düzeltmesi (6955470951588=21, 6955470951571=28)',
+      note: 'CBF014/CBF015 barkod karışıklığı — fiziksel stok (6955470951588=22, 6955470951571=28)',
       createdAt: now,
     });
   }
