@@ -190,9 +190,11 @@ export function StockOperationsModal({
   const [countEndedAt, setCountEndedAt] = useState<string | null>(null);
   const [countApplyQtyDraft, setCountApplyQtyDraft] = useState<Record<number, string>>({});
   const [countAbandonPrompt, setCountAbandonPrompt] = useState(false);
+  const [countReadyForNewScan, setCountReadyForNewScan] = useState(false);
   const countScanInputRef = useRef<HTMLInputElement>(null);
   const countModalWasOpenRef = useRef(false);
   const stockOpsWasOpenRef = useRef(false);
+  const countSkipDraftAutoLoadRef = useRef(false);
 
   const applyCountDraftToState = useCallback((draft: ReturnType<typeof loadStockCountSessionDraft>) => {
     if (!draft || Object.keys(draft.countLines).length === 0) return false;
@@ -243,8 +245,30 @@ export function StockOperationsModal({
     setCountEndedAt(null);
     setCountApplyQtyDraft({});
     setCountAbandonPrompt(false);
+    setCountReadyForNewScan(false);
     clearStockCountSessionDraft();
   }, []);
+
+  const startNewStockCountSession = useCallback(() => {
+    const lineCount = Object.keys(countLines).length;
+    const hasOpenWork =
+      lineCount > 0
+      || countReportId != null
+      || countPhase !== 'scan'
+      || countDraftRestored;
+    if (hasOpenWork) {
+      const ok = window.confirm(
+        'Yeni sayım başlatılır. Bu cihazdaki açık oturum temizlenir; kayıtlı sayımlar listede «Devam et» ile kalır.',
+      );
+      if (!ok) return;
+    }
+    countSkipDraftAutoLoadRef.current = true;
+    resetCountSession();
+    setCountSessionStartedAt(new Date().toISOString());
+    setCountReadyForNewScan(true);
+    setCountScanError(null);
+    window.requestAnimationFrame(() => countScanInputRef.current?.focus());
+  }, [countDraftRestored, countLines, countPhase, countReportId, resetCountSession]);
 
   useEffect(() => {
     if (open) {
@@ -276,6 +300,7 @@ export function StockOperationsModal({
       return;
     }
     setCountAbandonPrompt(false);
+    countSkipDraftAutoLoadRef.current = false;
     setOperation(initialOperation);
     onOperationChange?.(initialOperation);
     setProductId(initialProductId ? String(initialProductId) : '');
@@ -299,6 +324,7 @@ export function StockOperationsModal({
   useEffect(() => {
     if (!open || operation !== 'set') return;
     if (Object.keys(countLines).length > 0) return;
+    if (countSkipDraftAutoLoadRef.current) return;
     const draft = loadStockCountSessionDraft();
     applyCountDraftToState(draft);
   }, [open, operation, countLines, applyCountDraftToState]);
@@ -512,8 +538,11 @@ export function StockOperationsModal({
         endedAt: draft.endedAt,
       });
     }
+    countSkipDraftAutoLoadRef.current = false;
     if (!applyCountDraftToState(draft)) {
       window.alert('Sayım oturumu yüklenemedi.');
+    } else {
+      setCountReadyForNewScan(false);
     }
   }, [applyCountDraftToState, countLines, stockCountReports]);
 
@@ -574,6 +603,7 @@ export function StockOperationsModal({
 
   const registerCountScan = (product: Product) => {
     setCountDraftRestored(false);
+    setCountReadyForNewScan(false);
     if (!countCountedByDisplayName && authSession?.displayName) {
       setCountCountedByDisplayName(authSession.displayName);
       setCountCountedByUsername(authSession.username);
@@ -1048,19 +1078,20 @@ export function StockOperationsModal({
                             );
                           })}
                         </ul>
-                        {countLineList.length === 0 && (
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm stock-ops-dialog__count-new-btn"
-                            onClick={() => {
-                              resetCountSession();
-                              setCountSessionStartedAt(new Date().toISOString());
-                            }}
-                          >
-                            Yeni sayım başlat
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm stock-ops-dialog__count-new-btn"
+                          onClick={startNewStockCountSession}
+                        >
+                          Yeni sayım başlat
+                        </button>
                       </div>
+                    )}
+                    {countReadyForNewScan && countLineList.length === 0 && (
+                      <p className="stock-ops-dialog__count-resume" role="status">
+                        Yeni sayım hazır — barkod okutun
+                        {countSessionStartedAt ? ` · başlangıç ${formatDateTime(countSessionStartedAt)}` : ''}
+                      </p>
                     )}
                     {countDraftRestored && countLineList.length > 0 && (
                       <p className="stock-ops-dialog__count-resume" role="status">
