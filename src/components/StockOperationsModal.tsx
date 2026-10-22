@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategoryLabel } from '../data/categories';
 import type { AppSettings } from '../types/business';
@@ -182,6 +182,7 @@ export function StockOperationsModal({
   const [countResponsiblePersonName, setCountResponsiblePersonName] = useState('');
   const [countEndedAt, setCountEndedAt] = useState<string | null>(null);
   const [countApplyQtyDraft, setCountApplyQtyDraft] = useState<Record<number, string>>({});
+  const [countAbandonPrompt, setCountAbandonPrompt] = useState(false);
   const countScanInputRef = useRef<HTMLInputElement>(null);
   const countModalWasOpenRef = useRef(false);
 
@@ -233,6 +234,7 @@ export function StockOperationsModal({
     setCountResponsiblePersonName('');
     setCountEndedAt(null);
     setCountApplyQtyDraft({});
+    setCountAbandonPrompt(false);
     clearStockCountSessionDraft();
   }, []);
 
@@ -257,6 +259,7 @@ export function StockOperationsModal({
 
   useEffect(() => {
     if (!open) return;
+    setCountAbandonPrompt(false);
     setOperation(initialOperation);
     setProductId(initialProductId ? String(initialProductId) : '');
     setSearch('');
@@ -620,17 +623,19 @@ export function StockOperationsModal({
     return report?.id ?? null;
   }, [countReportId, persistCountReport]);
 
-  const abandonCountSession = useCallback(() => {
+  const requestAbandonCountSession = useCallback((event?: MouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
     if (countLineList.length === 0) {
+      clearStockCountSessionDraft();
       resetCountSession();
       onClose();
       return;
     }
-    if (!window.confirm(
-      'Bu sayım yarım bırakılan olarak arşivlenecek. Stok düzeltmesi uygulanmaz; ardından yeni sayım başlatabilirsiniz. Emin misiniz?',
-    )) {
-      return;
-    }
+    setCountAbandonPrompt(true);
+  }, [countLineList.length, onClose, resetCountSession]);
+
+  const executeAbandonCountSession = useCallback(() => {
     const abandonedAt = new Date().toISOString();
     const report = persistCountReport();
     if (report) {
@@ -644,9 +649,15 @@ export function StockOperationsModal({
         note: mergedNote,
       });
     }
+    clearStockCountSessionDraft();
     resetCountSession();
+    setCountAbandonPrompt(false);
     onClose();
-  }, [countLineList.length, onClose, onSaveStockCountReport, persistCountReport, resetCountSession]);
+  }, [onClose, onSaveStockCountReport, persistCountReport, resetCountSession]);
+
+  const cancelAbandonCountSession = useCallback(() => {
+    setCountAbandonPrompt(false);
+  }, []);
 
   const completeCountSession = useCallback((options?: { force?: boolean }) => {
     const reportId = ensureCountReportId();
@@ -851,6 +862,34 @@ export function StockOperationsModal({
           </div>
           <button type="button" className="stock-ops-dialog__close" onClick={onClose} aria-label="Kapat">×</button>
         </header>
+
+        {operation === 'set' && countAbandonPrompt && (
+          <div
+            className="stock-ops-dialog__count-abandon-prompt"
+            role="alertdialog"
+            aria-labelledby="stock-count-abandon-title"
+            aria-describedby="stock-count-abandon-desc"
+          >
+            <p id="stock-count-abandon-title" className="stock-ops-dialog__count-abandon-title">
+              Sayımdan çıkılsın mı?
+            </p>
+            <p id="stock-count-abandon-desc" className="stock-ops-dialog__count-abandon-desc">
+              Oturum <strong>yarım bırakılan</strong> olarak arşivlenir; stok düzeltilmez. Ardından yeni sayım başlatabilirsiniz.
+            </p>
+            <div className="stock-ops-dialog__count-abandon-actions">
+              <button type="button" className="btn btn-outline" onClick={cancelAbandonCountSession}>
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary stock-ops-dialog__count-btn-abandon-solid"
+                onClick={executeAbandonCountSession}
+              >
+                Evet, sayımdan çık
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="stock-ops-dialog__tabs" role="tablist" aria-label="Stok işlem tipi">
           {OPERATIONS.map((item) => (
@@ -1204,7 +1243,7 @@ export function StockOperationsModal({
                         <button
                           type="button"
                           className="btn btn-outline stock-ops-dialog__count-btn-abandon"
-                          onClick={abandonCountSession}
+                          onClick={(event) => requestAbandonCountSession(event)}
                         >
                           Sayımdan çık
                         </button>
@@ -1234,7 +1273,7 @@ export function StockOperationsModal({
                       <button
                         type="button"
                         className="btn btn-outline stock-ops-dialog__count-btn-abandon"
-                        onClick={abandonCountSession}
+                        onClick={(event) => requestAbandonCountSession(event)}
                       >
                         Sayımdan çık
                       </button>
@@ -1271,7 +1310,7 @@ export function StockOperationsModal({
                       <button
                         type="button"
                         className="btn btn-outline stock-ops-dialog__count-btn-abandon"
-                        onClick={abandonCountSession}
+                        onClick={(event) => requestAbandonCountSession(event)}
                       >
                         Sayımdan çık
                       </button>
