@@ -135,7 +135,13 @@ echo "==> KLA128 tekli sanal stok (KLA128T, stok = paket × 10)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/sync-kla128-unit-virtual-stock.mjs" "${INSTALL_DIR}/data" || true
 
 echo "==> CARICH CBF014/CBF015 fiziksel stok (deploy sonrası)..."
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 stop market-pos 2>/dev/null || true
+fi
 FIX_CBF_SKIP_BACKUP=1 node "${APP_SRC}/scripts/fix-carich-cbf014-cbf015-stock.mjs" "${INSTALL_DIR}/data" || true
+if command -v pm2 >/dev/null 2>&1; then
+  (cd "${INSTALL_DIR}" && PORT="${PORT}" pm2 start ecosystem.config.cjs --only market-pos --update-env) 2>/dev/null || pm2 start market-pos 2>/dev/null || true
+fi
 
 echo "==> Mağaza sahibi tam yetki (kutluhan*)..."
 MARKET_POS_DATA_DIR="${INSTALL_DIR}/data" node "${APP_SRC}/scripts/ensure-owner-admin-on-server.mjs" || true
@@ -284,4 +290,10 @@ if [[ "${EKOLOJIK_SKIP_POST_DEPLOY_VERIFY:-0}" != "1" ]]; then
 fi
 
 echo "==> CARICH CBF014/CBF015 fiziksel stok (deploy bitiş)..."
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 stop market-pos 2>/dev/null || true
+fi
 FIX_CBF_SKIP_BACKUP=1 node "${APP_SRC}/scripts/fix-carich-cbf014-cbf015-stock.mjs" "${INSTALL_DIR}/data" || true
+if command -v pm2 >/dev/null 2>&1; then
+  (cd "${INSTALL_DIR}" && PORT="${PORT}" pm2 start ecosystem.config.cjs --only market-pos --update-env) 2>/dev/null || pm2 start market-pos 2>/dev/null || true
+fi
