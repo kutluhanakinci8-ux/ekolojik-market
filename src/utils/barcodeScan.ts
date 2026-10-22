@@ -78,7 +78,9 @@ export function resolveBarcodeScan(
   raw: string,
   products: Product[],
   sets: ProductSet[],
+  options?: { allowZeroStock?: boolean },
 ): BarcodeScanResolveResult {
+  const allowZeroStock = options?.allowZeroStock === true;
   const normalized = normalizeBarcodeScanInput(raw);
   if (!normalized) {
     return { kind: 'failure', reason: 'empty', message: 'Barkod boş' };
@@ -120,7 +122,7 @@ export function resolveBarcodeScan(
 
   if (productHits.length === 1) {
     const product = productHits[0];
-    if (product.stock <= 0) {
+    if (!allowZeroStock && product.stock <= 0) {
       return {
         kind: 'failure',
         reason: 'out_of_stock',
@@ -131,7 +133,7 @@ export function resolveBarcodeScan(
   }
 
   const set = setHits[0];
-  if (set.stock <= 0) {
+  if (!allowZeroStock && set.stock <= 0) {
     return {
       kind: 'failure',
       reason: 'out_of_stock',

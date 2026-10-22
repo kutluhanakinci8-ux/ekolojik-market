@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategoryLabel } from '../data/categories';
 import type { AppSettings } from '../types/business';
@@ -10,7 +10,15 @@ import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
 import { formatCurrencyTry } from '../utils/format';
+import { normalizeBarcodeScanInput, resolveBarcodeScan } from '../utils/barcodeScan';
 import './StockOperationsModal.css';
+
+type StockCountLine = {
+  productId: number;
+  /** Sayım başladığında sistemdeki stok (değişmez). */
+  systemStock: number;
+  scannedQty: number;
+};
 
 export type StockOperationType = 'in' | 'out' | 'set' | 'clear' | 'bundle';
 
@@ -59,7 +67,7 @@ const OPERATIONS: Array<{
 }> = [
   { id: 'in', label: 'Giriş', hint: 'Stoğa ekle', icon: '↗', tone: 'in' },
   { id: 'out', label: 'Çıkış', hint: 'Stoktan düş', icon: '↘', tone: 'out' },
-  { id: 'set', label: 'Sayım', hint: 'Miktar belirle', icon: '✎', tone: 'set' },
+  { id: 'set', label: 'Sayım', hint: 'Barkod ile sayım', icon: '✎', tone: 'set' },
   { id: 'clear', label: 'Sıfırla', hint: 'Stok = 0', icon: '⊘', tone: 'clear' },
   { id: 'bundle', label: 'Set Oluştur', hint: 'Ürün paketi', icon: '🎁', tone: 'bundle' as const },
 ];
@@ -128,6 +136,20 @@ export function StockOperationsModal({
   const [couponDraft, setCouponDraft] = useState('');
   const [retailDraft, setRetailDraft] = useState('');
   const [categoryDraft, setCategoryDraft] = useState('');
+  const [countPhase, setCountPhase] = useState<'scan' | 'report'>('scan');
+  const [countLines, setCountLines] = useState<Record<number, StockCountLine>>({});
+  const [countLastProductId, setCountLastProductId] = useState<number | null>(null);
+  const [countScanInput, setCountScanInput] = useState('');
+  const [countScanError, setCountScanError] = useState<string | null>(null);
+  const countScanInputRef = useRef<HTMLInputElement>(null);
+
+  const resetCountSession = useCallback(() => {
+    setCountPhase('scan');
+    setCountLines({});
+    setCountLastProductId(null);
+    setCountScanInput('');
+    setCountScanError(null);
+  }, []);
 
   const categoryOptions = useMemo(
     () => listProductCategorySelectOptions(settings),
@@ -141,7 +163,14 @@ export function StockOperationsModal({
     setSearch('');
     setQuantity('');
     setNote('');
-  }, [open, initialProductId, initialOperation]);
+    resetCountSession();
+  }, [open, initialProductId, initialOperation, resetCountSession]);
+
+  useEffect(() => {
+    if (!open || operation !== 'set' || countPhase !== 'scan') return;
+    const t = window.setTimeout(() => countScanInputRef.current?.focus(), 80);
+    return () => window.clearTimeout(t);
+  }, [open, operation, countPhase]);
 
   const selectedProduct = useMemo(() => {
     const id = Number.parseInt(productId, 10);
@@ -273,6 +302,111 @@ export function StockOperationsModal({
     setSearch('');
   };
 
+  const countLineList = useMemo(
+    () => Object.values(countLines).sort((a, b) => b.scannedQty - a.scannedQty),
+    [countLines],
+  );
+
+  const countLastProduct = useMemo(() => {
+    if (countLastProductId == null) return undefined;
+    return products.find((p) => p.id === countLastProductId);
+  }, [countLastProductId, products]);
+
+  const countLastLine = countLastProductId != null ? countLines[countLastProductId] : undefined;
+
+  const countReportRows = useMemo(() => countLineList.map((line) => {
+    const product = products.find((p) => p.id === line.productId);
+    const diff = line.scannedQty - line.systemStock;
+    return { line, product, diff };
+  }).filter((row) => row.product), [countLineList, products]);
+
+  const countDiscrepancyRows = useMemo(
+    () => countReportRows.filter((row) => row.diff !== 0),
+    [countReportRows],
+  );
+
+  const registerCountScan = (product: Product) => {
+    setCountLines((prev) => {
+      const existing = prev[product.id];
+      const systemStock = existing?.systemStock ?? product.stock;
+      return {
+        ...prev,
+        [product.id]: {
+          productId: product.id,
+          systemStock,
+          scannedQty: (existing?.scannedQty ?? 0) + 1,
+        },
+      };
+    });
+    setCountLastProductId(product.id);
+    setCountScanError(null);
+    setCountScanInput('');
+    window.requestAnimationFrame(() => countScanInputRef.current?.focus());
+  };
+
+  const handleCountBarcodeSubmit = () => {
+    const raw = normalizeBarcodeScanInput(countScanInput);
+    if (!raw) return;
+    const result = resolveBarcodeScan(raw, products, productSets, { allowZeroStock: true });
+    if (result.kind === 'product') {
+      const product = products.find((p) => p.id === result.productId);
+      if (!product) {
+        setCountScanError('Ürün bulunamadı');
+        return;
+      }
+      registerCountScan(product);
+      return;
+    }
+    if (result.kind === 'set') {
+      setCountScanError('Set barkodu — stok sayımı için ürün barkodu okutun');
+      return;
+    }
+    setCountScanError(result.message);
+  };
+
+  const switchOperation = (next: StockOperationType) => {
+    if (operation === 'set' && next !== 'set' && countLineList.length > 0) {
+      if (!window.confirm('Devam eden sayım oturumu var. Sekmeyi değiştirmek oturumu siler. Emin misiniz?')) {
+        return;
+      }
+      resetCountSession();
+    }
+    setOperation(next);
+    setQuantity('');
+  };
+
+  const finishCountSession = () => {
+    if (countLineList.length === 0) {
+      setCountScanError('Önce en az bir ürün okutun');
+      return;
+    }
+    setCountPhase('report');
+    setCountScanError(null);
+  };
+
+  const applyCountCorrections = () => {
+    if (countDiscrepancyRows.length === 0) {
+      window.alert('Tutarsızlık yok — stok güncellemesi gerekmiyor.');
+      resetCountSession();
+      onClose();
+      return;
+    }
+    const trimmedNote = note.trim() || 'Stok sayımı düzeltmesi (barkod)';
+    const summary = countDiscrepancyRows
+      .map((row) => `${row.product!.productCode ?? row.product!.id}: ${row.line.systemStock} → ${row.line.scannedQty}`)
+      .join('\n');
+    if (!window.confirm(
+      `${countDiscrepancyRows.length} üründe fark var. Sistem stoğu sayım adedine güncellensin mi?\n\n${summary}`,
+    )) {
+      return;
+    }
+    for (const row of countDiscrepancyRows) {
+      onSetStock(row.line.productId, row.line.scannedQty, trimmedNote);
+    }
+    resetCountSession();
+    onClose();
+  };
+
   const applyQuickAmount = (amount: number) => {
     if (operation === 'set') {
       setQuantity(String(amount));
@@ -356,10 +490,7 @@ export function StockOperationsModal({
               role="tab"
               aria-selected={operation === item.id}
               className={`stock-ops-dialog__tab stock-ops-dialog__tab--${item.tone} ${operation === item.id ? 'is-active' : ''}`}
-              onClick={() => {
-                setOperation(item.id);
-                setQuantity('');
-              }}
+              onClick={() => switchOperation(item.id)}
             >
               <span className="stock-ops-dialog__tab-icon" aria-hidden>{item.icon}</span>
               <span className="stock-ops-dialog__tab-text">
@@ -385,7 +516,255 @@ export function StockOperationsModal({
             </div>
           </div>
         ) : (
-        <div className="stock-ops-dialog__body">
+        <div className={`stock-ops-dialog__body${operation === 'set' ? ' stock-ops-dialog__body--count' : ''}`}>
+          {operation === 'set' ? (
+            <>
+              <section className="stock-ops-dialog__main stock-ops-dialog__main--count">
+                {countPhase === 'scan' ? (
+                  <>
+                    <p className="stock-ops-dialog__count-lead">
+                      Barkod okuyucu ile ürün okutun. <strong>Sistem stoğu</strong> sayım bitene kadar değişmez;
+                      her okutma <strong>sayım adedini</strong> artırır ve konumda kalan miktarı gösterir.
+                    </p>
+                    <form
+                      className="stock-ops-dialog__count-scan"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        handleCountBarcodeSubmit();
+                      }}
+                    >
+                      <label className="stock-ops-dialog__field stock-ops-dialog__field--scan">
+                        <span>Barkod okut</span>
+                        <input
+                          ref={countScanInputRef}
+                          type="text"
+                          autoComplete="off"
+                          spellCheck={false}
+                          value={countScanInput}
+                          onChange={(event) => {
+                            setCountScanInput(event.target.value);
+                            setCountScanError(null);
+                          }}
+                          placeholder="Okuyucu buraya odaklı — barkod + Enter"
+                        />
+                      </label>
+                    </form>
+                    {countScanError && (
+                      <p className="stock-ops-dialog__count-error" role="alert">{countScanError}</p>
+                    )}
+                    {countLastProduct && countLastLine && (
+                      <div className="stock-ops-dialog__count-hero">
+                        <div className="stock-ops-dialog__count-hero-photo">
+                          <ProductImage product={countLastProduct} size="lg" />
+                        </div>
+                        <div className="stock-ops-dialog__count-hero-info">
+                          <h3 className="stock-ops-dialog__count-hero-title">{countLastProduct.name}</h3>
+                          <p className="stock-ops-dialog__count-hero-meta">
+                            {countLastProduct.productCode?.trim() || `No ${countLastProduct.id}`}
+                            {countLastProduct.barcode ? ` · ${countLastProduct.barcode}` : ''}
+                          </p>
+                          <div className="stock-ops-dialog__count-stats">
+                            <div className="stock-ops-dialog__count-stat">
+                              <span>Mevcut (sistem)</span>
+                              <strong>{countLastLine.systemStock}</strong>
+                            </div>
+                            <div className="stock-ops-dialog__count-stat stock-ops-dialog__count-stat--accent">
+                              <span>Sayım adeti</span>
+                              <strong>{countLastLine.scannedQty}</strong>
+                            </div>
+                            <div className="stock-ops-dialog__count-stat">
+                              <span>Konumda kalan</span>
+                              <strong>
+                                {Math.max(0, countLastLine.systemStock - countLastLine.scannedQty)}
+                              </strong>
+                            </div>
+                          </div>
+                          {countLastLine.scannedQty > countLastLine.systemStock && (
+                            <p className="stock-ops-dialog__count-warn">
+                              Sistem stoğundan fazla okutma — raporda fazla görünecek.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {countLineList.length > 0 && (
+                      <div className="stock-ops-dialog__count-table-wrap">
+                        <table className="stock-ops-dialog__count-table">
+                          <thead>
+                            <tr>
+                              <th>Ürün</th>
+                              <th>Sistem</th>
+                              <th>Sayım</th>
+                              <th>Kalan</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {countLineList.map((line) => {
+                              const product = products.find((p) => p.id === line.productId);
+                              if (!product) return null;
+                              const remaining = Math.max(0, line.systemStock - line.scannedQty);
+                              return (
+                                <tr
+                                  key={line.productId}
+                                  className={line.productId === countLastProductId ? 'is-last' : ''}
+                                >
+                                  <td>
+                                    <span className="stock-ops-dialog__count-table-name">{product.name}</span>
+                                    <span className="stock-ops-dialog__count-table-code">
+                                      {product.productCode ?? product.id}
+                                    </span>
+                                  </td>
+                                  <td>{line.systemStock}</td>
+                                  <td><strong>{line.scannedQty}</strong></td>
+                                  <td>{remaining}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <h3 className="stock-ops-dialog__count-report-title">Sayım raporu</h3>
+                    <p className="stock-ops-dialog__count-lead">
+                      {countDiscrepancyRows.length === 0
+                        ? 'Tüm okutulan ürünler sistem stoğu ile uyumlu. Stok güncellemesi gerekmez.'
+                        : `${countDiscrepancyRows.length} üründe fark var. Onayladığınızda yalnızca farklı satırlar güncellenir.`}
+                    </p>
+                    <div className="stock-ops-dialog__count-table-wrap">
+                      <table className="stock-ops-dialog__count-table stock-ops-dialog__count-table--report">
+                        <thead>
+                          <tr>
+                            <th>Ürün</th>
+                            <th>Sistem</th>
+                            <th>Sayım</th>
+                            <th>Fark</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {countReportRows.map(({ line, product, diff }) => (
+                            <tr key={line.productId} className={diff !== 0 ? 'has-diff' : ''}>
+                              <td>
+                                <div className="stock-ops-dialog__count-report-product">
+                                  <ProductImage product={product!} size="sm" />
+                                  <div>
+                                    <span className="stock-ops-dialog__count-table-name">{product!.name}</span>
+                                    <span className="stock-ops-dialog__count-table-code">
+                                      {product!.productCode ?? product!.id}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>{line.systemStock}</td>
+                              <td><strong>{line.scannedQty}</strong></td>
+                              <td className={diff > 0 ? 'is-up' : diff < 0 ? 'is-down' : ''}>
+                                {diff > 0 ? `+${diff}` : diff}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+                <label className="stock-ops-dialog__field">
+                  <span>Not (düzeltme kaydı)</span>
+                  <input
+                    type="text"
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder={defaultNote('set')}
+                  />
+                </label>
+              </section>
+              <aside className="stock-ops-dialog__aside stock-ops-dialog__aside--count">
+                <div className="stock-ops-dialog__preview">
+                  <div className="stock-ops-dialog__preview-head">
+                    <p className="stock-ops-dialog__preview-label">Sayım oturumu</p>
+                    <span className="stock-ops-dialog__preview-badge stock-ops-dialog__preview-badge--set">
+                      ✎ Sayım
+                    </span>
+                  </div>
+                  <div className="stock-ops-dialog__preview-body">
+                    <div className="stock-ops-dialog__preview-row">
+                      <span>Okutulan kalem</span>
+                      <strong>{countLineList.length}</strong>
+                    </div>
+                    <div className="stock-ops-dialog__preview-row">
+                      <span>Toplam okutma</span>
+                      <strong>
+                        {countLineList.reduce((sum, line) => sum + line.scannedQty, 0)}
+                      </strong>
+                    </div>
+                    {countPhase === 'report' && (
+                      <div className="stock-ops-dialog__preview-row">
+                        <span>Farklı ürün</span>
+                        <strong className={countDiscrepancyRows.length ? 'is-down' : ''}>
+                          {countDiscrepancyRows.length}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="stock-ops-dialog__footer">
+                  {countPhase === 'scan' ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => {
+                          if (countLineList.length > 0 && !window.confirm('Sayım oturumu silinsin mi?')) return;
+                          resetCountSession();
+                          onClose();
+                        }}
+                      >
+                        İptal
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        disabled={countLineList.length === 0}
+                        onClick={() => {
+                          if (!window.confirm('Sayım listesi temizlensin mi?')) return;
+                          resetCountSession();
+                        }}
+                      >
+                        Oturumu sıfırla
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={countLineList.length === 0}
+                        onClick={finishCountSession}
+                      >
+                        Sayımı bitir
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setCountPhase('scan')}
+                      >
+                        Geri (okutmaya dön)
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={applyCountCorrections}
+                      >
+                        {countDiscrepancyRows.length > 0 ? 'Düzeltmeleri uygula' : 'Kapat'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </aside>
+            </>
+          ) : (
+          <>
           <section className="stock-ops-dialog__main">
             <div className="stock-ops-dialog__search">
               <span className="stock-ops-dialog__search-icon" aria-hidden>🔍</span>
@@ -611,7 +990,7 @@ export function StockOperationsModal({
                     min="1"
                     value={quantity}
                     onChange={(event) => setQuantity(event.target.value)}
-                    placeholder={operation === 'set' ? 'Örn. 120' : 'Örn. 50'}
+                    placeholder="Örn. 50"
                   />
                 </label>
                 <div className="stock-ops-dialog__chips" aria-label="Hızlı miktar">
@@ -622,7 +1001,7 @@ export function StockOperationsModal({
                       className="stock-ops-dialog__chip"
                       onClick={() => applyQuickAmount(amount)}
                     >
-                      {operation === 'set' ? amount : `+${amount}`}
+                      {`+${amount}`}
                     </button>
                   ))}
                 </div>
@@ -704,7 +1083,6 @@ export function StockOperationsModal({
                       <p className="stock-ops-dialog__preview-hint">
                         {operation === 'in' && `+${parsedQty} adet giriş`}
                         {operation === 'out' && `−${parsedQty} adet çıkış`}
-                        {operation === 'set' && `Sayım: ${parsedQty} adet`}
                       </p>
                     )}
                     {operation === 'clear' && (
@@ -774,6 +1152,8 @@ export function StockOperationsModal({
               </button>
             </div>
           </aside>
+          </>
+          )}
         </div>
         )}
       </div>
