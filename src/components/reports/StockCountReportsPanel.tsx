@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Store } from '../../store/useStore';
 import type { Product } from '../../types/product';
 import {
+  isStockCountReportInProgress,
   stockCountReportDiscrepancies,
   stockCountReportPendingApply,
 } from '../../types/stockCountReport';
@@ -77,8 +78,9 @@ export function StockCountReportsPanel({ store }: StockCountReportsPanelProps) {
     return (
       <div className="stock-count-reports">
         <p className="module-hint">
-          Barkod sayımı bittiğinde oluşturulan raporlar burada listelenir. Önce fiş yazıcısından raporu yazdırın,
-          ardından stok işlemlerinden ürün bazında düzeltme uygulayın.
+          Tamamlanan ve yarım bırakılan sayımlar burada listelenir. Okutma hâlâ sürüyorsa durum
+          <strong> Sayım sürüyor</strong> görünür — devam için <strong>Stok → Sayım</strong>.
+          Rapor fazında önce fiş yazdırın, sonra düzeltme uygulayın.
         </p>
         <p className="stock-count-reports-empty">Henüz arşivlenmiş sayım raporu yok.</p>
       </div>
@@ -91,7 +93,8 @@ export function StockCountReportsPanel({ store }: StockCountReportsPanelProps) {
   return (
     <div className="stock-count-reports">
       <p className="module-hint">
-        Sayım oturumu bitince kaydedilen raporlar. Fiş yazıcısından tekrar basabilir; düzeltme durumunu satır satır takip edebilirsiniz.
+        Bitmiş, yarım bırakılan ve hâlâ okutulan sayımlar. Okutma devam ediyorsa <strong>Stok → Sayım</strong> veya
+        stok ekranındaki <strong>Sayıma devam et</strong> ile kaldığınız yerden devam edin.
       </p>
 
       <div className="stock-count-reports-layout">
@@ -99,7 +102,9 @@ export function StockCountReportsPanel({ store }: StockCountReportsPanelProps) {
           {reports.map((report) => {
             const diffCount = stockCountReportDiscrepancies(report).length;
             const pendingCount = stockCountReportPendingApply(report).length;
-            const statusLabel = report.abandonedAt
+            const statusLabel = isStockCountReportInProgress(report)
+              ? 'Sayım sürüyor'
+              : report.abandonedAt
               ? 'Yarım bırakıldı'
               : pendingCount === 0 && diffCount > 0
                 ? 'Düzeltildi'

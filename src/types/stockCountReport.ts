@@ -30,6 +30,8 @@ export interface StockCountReport {
   completedAt?: string;
   /** Kullanıcı sayımdan çıktı — düzeltme uygulanmadı, yeni sayım başlatılabilir */
   abandonedAt?: string;
+  /** Okutma devam ediyor — «Sayımı bitir» öncesi arşiv (sunucuya senkron) */
+  inProgressAt?: string;
 }
 
 export function buildStockCountReportLines(
@@ -58,6 +60,10 @@ export function isStockCountReportComplete(report: StockCountReport): boolean {
 
 export function isStockCountReportAbandoned(report: StockCountReport): boolean {
   return Boolean(report.abandonedAt);
+}
+
+export function isStockCountReportInProgress(report: StockCountReport): boolean {
+  return Boolean(report.inProgressAt) && !report.endedAt && !report.abandonedAt && !report.completedAt;
 }
 
 export function newStockCountReportId(): string {

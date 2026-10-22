@@ -616,6 +616,11 @@ export function StockOperationsModal({
       responsiblePersonName: countResponsiblePersonName.trim() || activeCountReport?.responsiblePersonName,
       printedAt: activeCountReport?.printedAt,
       completedAt: activeCountReport?.completedAt,
+      abandonedAt: activeCountReport?.abandonedAt,
+      inProgressAt:
+        countPhase === 'scan' && !endedAt && !activeCountReport?.abandonedAt
+          ? (activeCountReport?.inProgressAt ?? new Date().toISOString())
+          : undefined,
     };
     onSaveStockCountReport?.(report);
     setCountReportId(id);
@@ -630,9 +635,23 @@ export function StockOperationsModal({
     countReportId,
     countResponsiblePersonName,
     countSessionStartedAt,
+    countPhase,
     note,
     onSaveStockCountReport,
     authSession,
+  ]);
+
+  useEffect(() => {
+    if (!open || operation !== 'set') return;
+    if (Object.keys(countLines).length === 0) return;
+    persistCountReport();
+  }, [
+    open,
+    operation,
+    countLines,
+    countPhase,
+    countEndedAt,
+    persistCountReport,
   ]);
 
   const ensureCountReportId = useCallback((): string | null => {
