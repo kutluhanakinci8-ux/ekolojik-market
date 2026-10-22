@@ -154,9 +154,8 @@ function mergeProductsById(
       continue;
     }
     const catalogBase = preferLocal ? p : remoteP;
-    const stock = p.stock !== remoteP.stock
-      ? Math.min(p.stock, remoteP.stock)
-      : catalogBase.stock;
+    // Sunucu otoriteli eşitleme: stok sunucudan gelir (yerel 16 / sunucu 22 → 22).
+    const stock = remoteP.stock;
     const pricing = mergeProductPricingFields(p, remoteP);
     map.set(p.id, mergeProductImageUrl(p, { ...catalogBase, ...pricing, stock }));
   }
