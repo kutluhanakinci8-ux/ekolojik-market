@@ -1817,15 +1817,13 @@ export function usePosStoreState() {
     return { ok: true };
   }, [authSession, logActivity]);
 
-  const updateProductPricing = useCallback((productId: number, input: ProductPricingInput) => {
+  const updateProductPricing = useCallback(async (productId: number, input: ProductPricingInput) => {
     const retailNet = usesNetRetailWithVatBreakdown(settings);
     const product = products.find((p) => p.id === productId);
-    let mergedLocal: Product | undefined;
     setProducts((prev) => {
       const next = prev.map((p) => {
         if (p.id !== productId) return p;
-        mergedLocal = mergeProductPricing(p, input, retailNet);
-        return mergedLocal;
+        return mergeProductPricing(p, input, retailNet);
       });
       setCart((cartPrev) =>
         cartPrev.map((item) => {
@@ -1840,23 +1838,33 @@ export function usePosStoreState() {
       );
       return next;
     });
-    void (async () => {
-      const remote = await patchProductPricingOnServer(productId, input);
-      if (remote.ok && remote.product) {
-        setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, ...remote.product! } : p)));
-        setSyncStatus('synced');
-        return;
+    const remote = await patchProductPricingOnServer(productId, input);
+    if (remote.ok && remote.product) {
+      setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, ...remote.product! } : p)));
+      setSyncStatus('synced');
+      if (authSession && product) {
+        logActivity(authSession, 'settings_update', `Ürün fiyatları güncellendi: ${product.name}`, {
+          urun: product.name,
+        });
       }
-      if (tenantAutoSaveArmedRef.current) {
-        const saved = await persistStoreNowRef.current();
-        if (saved) setSyncStatus('synced');
-      }
-    })();
-    if (authSession && product) {
-      logActivity(authSession, 'settings_update', `Ürün fiyatları güncellendi: ${product.name}`, {
-        urun: product.name,
-      });
+      return { ok: true as const };
     }
+    if (tenantAutoSaveArmedRef.current) {
+      const saved = await persistStoreNowRef.current();
+      if (saved) {
+        setSyncStatus('synced');
+        if (authSession && product) {
+          logActivity(authSession, 'settings_update', `Ürün fiyatları güncellendi: ${product.name}`, {
+            urun: product.name,
+          });
+        }
+        return { ok: true as const };
+      }
+    }
+    return {
+      ok: false as const,
+      error: remote.error ?? 'Fiyat sunucuya kaydedilemedi',
+    };
   }, [authSession, logActivity, products, settings]);
 
   const setProductSampleFlag = useCallback((productId: number, isSample: boolean) => {

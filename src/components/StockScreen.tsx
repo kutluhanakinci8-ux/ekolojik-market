@@ -837,15 +837,17 @@ export function StockScreen({ store }: StockScreenProps) {
           store.removeProductImage(productId);
           showToast('Ürün fotoğrafı kaldırıldı');
         }}
-        onUpdatePricing={(productId, input) => {
-          store.updateProductPricing(productId, input);
-        }}
-        onPricingSaveResult={(saved) => {
-          showToast(
-            saved
-              ? 'Ürün fiyatları kaydedildi (sunucu)'
-              : 'Fiyat değişmedi — perakende alanını güncelleyip tekrar deneyin',
-          );
+        onUpdatePricing={(productId, input) => store.updateProductPricing(productId, input)}
+        onPricingSaveResult={(result) => {
+          if (result.ok) {
+            showToast('Ürün fiyatları kaydedildi (sunucu)');
+            return;
+          }
+          if (result.reason === 'unchanged') {
+            showToast('Kaydedilecek fiyat değişikliği yok — alanları güncelleyip tekrar deneyin');
+            return;
+          }
+          showToast(result.error ?? 'Fiyat sunucuya kaydedilemedi — yetki veya bağlantıyı kontrol edin');
         }}
         perakendeKdvHaric={posLiteStock}
         settings={store.settings}

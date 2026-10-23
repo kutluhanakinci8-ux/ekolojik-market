@@ -77,8 +77,15 @@ interface StockOperationsModalProps {
   onUpdateBarcode?: (productId: number, barcode: string) => void;
   onUploadImage?: (productId: number, imageUrl: string) => void;
   onRemoveImage?: (productId: number) => void;
-  onUpdatePricing?: (productId: number, input: ProductPricingInput) => void;
-  onPricingSaveResult?: (saved: boolean) => void;
+  onUpdatePricing?: (
+    productId: number,
+    input: ProductPricingInput,
+  ) => Promise<{ ok: boolean; error?: string }> | void;
+  onPricingSaveResult?: (result: {
+    ok: boolean;
+    reason?: 'unchanged' | 'server' | 'network';
+    error?: string;
+  }) => void;
   /** Lima / pos-lite: perakende KDV hariç */
   perakendeKdvHaric?: boolean;
   settings?: AppSettings;
@@ -403,6 +410,22 @@ export function StockOperationsModal({
   }, [selectedProduct?.id, selectedProduct?.category]);
 
   const pricingDraftBoundProductIdRef = useRef<number | null>(null);
+  const pricingBaselineRef = useRef<{
+    purchasePrice: number;
+    partnerPrice: number;
+    couponPrice: number;
+    fullSalePrice: number;
+    kasaGross: number;
+  } | null>(null);
+  const [pricingSaveBusy, setPricingSaveBusy] = useState(false);
+
+  const snapshotPricingBaseline = (product: Product) => ({
+    purchasePrice: product.purchasePrice,
+    partnerPrice: product.partnerPrice,
+    couponPrice: product.couponPrice ?? product.partnerPrice,
+    fullSalePrice: product.fullSalePrice,
+    kasaGross: resolveStockEntryKasaGross(product),
+  });
 
   useEffect(() => {
     if (!open) {
@@ -416,12 +439,14 @@ export function StockOperationsModal({
       setRetailDraft('');
       setKasaDraft('');
       pricingDraftBoundProductIdRef.current = null;
+      pricingBaselineRef.current = null;
       return;
     }
     if (pricingDraftBoundProductIdRef.current === selectedProduct.id) {
       return;
     }
     pricingDraftBoundProductIdRef.current = selectedProduct.id;
+    pricingBaselineRef.current = snapshotPricingBaseline(selectedProduct);
     setPurchaseDraft(selectedProduct.purchasePrice > 0 ? String(selectedProduct.purchasePrice) : '');
     setPartnerDraft(selectedProduct.partnerPrice > 0 ? String(selectedProduct.partnerPrice) : '');
     setCouponDraft(
@@ -447,22 +472,27 @@ export function StockOperationsModal({
 
   const buildPricingPatch = (): ProductPricingInput | null => {
     if (!selectedProduct || !onUpdatePricing) return null;
-    const patch: ProductPricingInput = {};
+    const baseline = pricingBaselineRef.current ?? snapshotPricingBaseline(selectedProduct);
     const purchase = parsePriceDraft(purchaseDraft);
     const partner = parsePriceDraft(partnerDraft);
     const coupon = parsePriceDraft(couponDraft);
     const retail = parsePriceDraft(retailDraft);
     const kasa = parsePriceDraft(kasaDraft);
-    if (priceDraftChanged(purchase, selectedProduct.purchasePrice)) patch.purchasePrice = purchase;
-    if (priceDraftChanged(partner, selectedProduct.partnerPrice)) patch.partnerPrice = partner;
-    const couponBase = selectedProduct.couponPrice ?? selectedProduct.partnerPrice;
-    if (priceDraftChanged(coupon, couponBase)) patch.couponPrice = coupon;
-    if (priceDraftChanged(retail, selectedProduct.fullSalePrice)) patch.fullSalePrice = retail;
-    const baselineKasa = resolveStockEntryKasaGross(selectedProduct);
-    if (kasa != null && priceDraftChanged(kasa, baselineKasa)) {
-      patch.ourPriceWithVat = kasa;
-    }
-    return Object.keys(patch).length > 0 ? patch : null;
+    const dirty =
+      priceDraftChanged(purchase, baseline.purchasePrice)
+      || priceDraftChanged(partner, baseline.partnerPrice)
+      || priceDraftChanged(coupon, baseline.couponPrice)
+      || priceDraftChanged(retail, baseline.fullSalePrice)
+      || (kasa != null && priceDraftChanged(kasa, baseline.kasaGross));
+    if (!dirty) return null;
+
+    const patch: ProductPricingInput = {};
+    if (purchase != null) patch.purchasePrice = purchase;
+    if (partner != null) patch.partnerPrice = partner;
+    if (coupon != null) patch.couponPrice = coupon;
+    if (retail != null) patch.fullSalePrice = retail;
+    if (kasa != null) patch.ourPriceWithVat = kasa;
+    return patch;
   };
 
   const applyDerivedPricesFromKasa = (kasa: number) => {
@@ -486,13 +516,44 @@ export function StockOperationsModal({
     }
   };
 
-  const applyPricingDraft = (): boolean => {
+  const applyPricingDraft = async (): Promise<{
+    ok: boolean;
+    reason?: 'unchanged' | 'server' | 'network';
+    error?: string;
+  }> => {
     const id = Number.parseInt(productId, 10);
-    if (Number.isNaN(id) || !onUpdatePricing) return false;
+    if (Number.isNaN(id) || !onUpdatePricing) {
+      return { ok: false, reason: 'unchanged' };
+    }
     const patch = buildPricingPatch();
-    if (!patch) return false;
-    onUpdatePricing(id, patch);
-    return true;
+    if (!patch) return { ok: false, reason: 'unchanged' };
+    setPricingSaveBusy(true);
+    try {
+      const result = await onUpdatePricing(id, patch);
+      if (result && !result.ok) {
+        return { ok: false, reason: 'server', error: result.error };
+      }
+      const purchase = parsePriceDraft(purchaseDraft);
+      const partner = parsePriceDraft(partnerDraft);
+      const coupon = parsePriceDraft(couponDraft);
+      const retail = parsePriceDraft(retailDraft);
+      const kasa = parsePriceDraft(kasaDraft);
+      const baseline = pricingBaselineRef.current;
+      if (baseline) {
+        pricingBaselineRef.current = {
+          purchasePrice: purchase ?? baseline.purchasePrice,
+          partnerPrice: partner ?? baseline.partnerPrice,
+          couponPrice: coupon ?? baseline.couponPrice,
+          fullSalePrice: retail ?? baseline.fullSalePrice,
+          kasaGross: kasa ?? baseline.kasaGross,
+        };
+      }
+      return { ok: true, reason: 'server' };
+    } catch {
+      return { ok: false, reason: 'network', error: 'Bağlantı hatası' };
+    } finally {
+      setPricingSaveBusy(false);
+    }
   };
 
   const searchResults = useMemo(() => {
@@ -1110,7 +1171,7 @@ export function StockOperationsModal({
     const id = Number.parseInt(productId, 10);
     if (Number.isNaN(id) || !selectedProduct) return;
 
-    applyPricingDraft();
+    void applyPricingDraft();
 
     const trimmedNote = note.trim() || defaultNote(operation);
 
@@ -1994,9 +2055,12 @@ export function StockOperationsModal({
                 <button
                   type="button"
                   className="stock-ops-dialog__pricing-save"
-                  onClick={() => onPricingSaveResult?.(applyPricingDraft())}
+                  disabled={pricingSaveBusy}
+                  onClick={() => {
+                    void applyPricingDraft().then((result) => onPricingSaveResult?.(result));
+                  }}
                 >
-                  Fiyatları kaydet
+                  {pricingSaveBusy ? 'Kaydediliyor…' : 'Fiyatları kaydet'}
                 </button>
               </fieldset>
             )}
