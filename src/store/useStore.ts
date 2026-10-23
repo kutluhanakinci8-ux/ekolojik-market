@@ -1272,12 +1272,14 @@ export function usePosStoreState() {
   }, [productSets, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().cart, JSON.stringify(cart));
-  }, [cart]);
+  }, [cart, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().priceType, priceType);
-  }, [priceType]);
+  }, [priceType, syncReady]);
 
   useEffect(() => {
     if (!syncReady) return;
@@ -1293,20 +1295,24 @@ export function usePosStoreState() {
   }, [sales, customers, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().sales, JSON.stringify(sales));
-  }, [sales]);
+  }, [sales, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().saleReturns, JSON.stringify(saleReturns));
-  }, [saleReturns]);
+  }, [saleReturns, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().stockMovements, JSON.stringify(stockMovements));
-  }, [stockMovements]);
+  }, [stockMovements, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().customers, JSON.stringify(customers));
-  }, [customers]);
+  }, [customers, syncReady]);
 
   useEffect(() => {
     if (!syncReady) return;
@@ -1319,20 +1325,24 @@ export function usePosStoreState() {
   }, [heldPosSales, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().expenses, JSON.stringify(expenses));
-  }, [expenses]);
+  }, [expenses, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().cashHandovers, JSON.stringify(cashHandovers));
-  }, [cashHandovers]);
+  }, [cashHandovers, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().cashSessions, JSON.stringify(cashSessions));
-  }, [cashSessions]);
+  }, [cashSessions, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().purchaseInvoices, JSON.stringify(purchaseInvoices));
-  }, [purchaseInvoices]);
+  }, [purchaseInvoices, syncReady]);
 
   useEffect(() => {
     if (!syncReady) return;
@@ -1343,22 +1353,27 @@ export function usePosStoreState() {
   }, [syncReady, sales, saleReturns, expenses, cashHandovers, journalVouchers]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().settings, JSON.stringify(settings));
-  }, [settings]);
+  }, [settings, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().users, JSON.stringify(users));
-  }, [users]);
+  }, [users, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().loginAuditLog, JSON.stringify(loginAuditLog));
-  }, [loginAuditLog]);
+  }, [loginAuditLog, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     localStorage.setItem(storageKeys().activityAuditLog, JSON.stringify(activityAuditLog));
-  }, [activityAuditLog]);
+  }, [activityAuditLog, syncReady]);
 
   useEffect(() => {
+    if (!syncReady) return;
     saveAccountingSnapshot({
       suppliers,
       customerLedger,
@@ -1378,7 +1393,7 @@ export function usePosStoreState() {
     suppliers, customerLedger, supplierLedger, bankAccounts, bankTransactions,
     periodClosures, cashCountVariances, checkNotes, stockAdjustments, stockCountReports,
     journalVouchers,
-    equityPartners, capitalContributions,
+    equityPartners, capitalContributions, syncReady,
   ]);
 
   useEffect(() => {
@@ -3510,7 +3525,7 @@ export function usePosStoreState() {
       saveAuthSession(session);
       setAuthSession(session);
       saveLastQuickUser(user.username);
-      await appendLoginAudit({
+      void appendLoginAudit({
         userId: user.id,
         username: user.username,
         displayName: user.displayName,

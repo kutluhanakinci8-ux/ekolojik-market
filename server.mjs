@@ -403,7 +403,9 @@ async function readStoreData(tenantId = 'main') {
   }
 
   if (persist) {
-    await writeStoreData(data, tenantId);
+    void writeStoreData(data, tenantId).catch((err) => {
+      console.error('[readStoreData] arka plan kayıt hatası:', err);
+    });
   }
   return data;
 }
