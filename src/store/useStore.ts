@@ -3505,6 +3505,7 @@ export function usePosStoreState() {
         setSyncReady(true);
       }
 
+      postLoginSyncSessionRef.current = sessionId;
       const session = buildAuthSession(user, sessionId, sessionSettings);
       saveAuthSession(session);
       setAuthSession(session);
@@ -3748,21 +3749,6 @@ export function usePosStoreState() {
           syncPosLocalStorageKeys();
         }
         syncPosApiTokenToCurrentTenant(authTenant);
-        const remote = await fetchStoreSnapshot();
-        if (remote) {
-          if (remote.users?.length) {
-            const remoteUsers = remote.users.map((u) =>
-              normalizeUser(u as unknown as Record<string, unknown>),
-            );
-            setUsers(remoteUsers);
-            user = remoteUsers.find((item) => item.username === normalized) ?? user;
-            if (!user && claims?.userId) {
-              user = remoteUsers.find((item) => item.id === claims.userId);
-            }
-          }
-          const localSnapshot = buildSnapshotFromStorage();
-          applySnapshot(mergeServerAuthoritativeSnapshot(localSnapshot, remote));
-        }
       } else if (import.meta.env.DEV) {
         user = users.find((item) => item.username === normalized);
         const passwordOk =
@@ -3918,21 +3904,6 @@ export function usePosStoreState() {
           syncPosLocalStorageKeys();
         }
         syncPosApiTokenToCurrentTenant(authTenant);
-        const remote = await fetchStoreSnapshot();
-        if (remote) {
-          if (remote.users?.length) {
-            const remoteUsers = remote.users.map((u) =>
-              normalizeUser(u as unknown as Record<string, unknown>),
-            );
-            setUsers(remoteUsers);
-            user = remoteUsers.find((item) => item.username === normalized) ?? user;
-            if (!user && claims?.userId) {
-              user = remoteUsers.find((item) => item.id === claims.userId);
-            }
-          }
-          const localSnapshot = buildSnapshotFromStorage();
-          applySnapshot(mergeServerAuthoritativeSnapshot(localSnapshot, remote));
-        }
       } else if (import.meta.env.DEV) {
         user = users.find((item) => item.username === normalized);
         const pinOk = Boolean(user?.pinHash) && verifyPin(pinTrimmed, user!.pinHash);

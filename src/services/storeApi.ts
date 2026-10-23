@@ -31,7 +31,7 @@ export async function fetchStoreSnapshotWithDiagnostics(): Promise<{
     try {
       const res = await posApiFetch(apiUrl(), {
         headers: posApiAuthHeaders(),
-        signal: AbortSignal.timeout(12_000),
+        signal: AbortSignal.timeout(45_000),
       });
       if (res.status === 401) {
         return { snapshot: null, error: 'unauthorized', httpStatus: 401 };

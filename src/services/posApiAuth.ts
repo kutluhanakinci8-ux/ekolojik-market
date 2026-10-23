@@ -207,6 +207,7 @@ export async function exchangePosApiToken(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(credentials),
+      signal: AbortSignal.timeout(20_000),
     });
     const data = (await res.json()) as {
       ok?: boolean;

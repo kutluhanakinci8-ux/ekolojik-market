@@ -163,8 +163,10 @@ export function LoginScreen({ store }: LoginScreenProps) {
               />
             )}
 
-            {store.syncStatus === 'loading' && (
-              <p className="login-sync-hint">Veriler sunucudan yükleniyor...</p>
+            {busy && store.syncStatus === 'loading' && (
+              <p className="login-sync-hint">
+                Mağaza verisi indiriliyor… Büyük veride 1–2 dakika sürebilir; sayfayı kapatmayın.
+              </p>
             )}
 
             {error && <p className="login-error" role="alert">{error}</p>}
