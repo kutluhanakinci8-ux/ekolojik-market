@@ -22,6 +22,11 @@ export function kasaGrossFromRetailNet(retailNet: number): number {
   return round2(retailNet / RETAIL_NET_FROM_KASA_FACTOR);
 }
 
+/** Partner / kupon = kasa (KDV dahil) fiyatının %50'si */
+export function partnerPriceFromKasaGross(kasaGross: number): number {
+  return round2(Math.max(0, kasaGross) * 0.5);
+}
+
 /**
  * Perakende kasa birim fiyatı.
  * Greenleaf: fullSalePrice = net liste, ourPriceWithVat = KDV dahil tahsilat.
