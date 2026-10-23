@@ -22,9 +22,9 @@ export function kasaGrossFromRetailNet(retailNet: number): number {
   return round2(retailNet / RETAIL_NET_FROM_KASA_FACTOR);
 }
 
-/** Partner / kupon: kasa (KDV dahil) brütünden %20 düşülür (perakende net ile aynı kural). */
+/** @deprecated Stok girişi: partner/kupon perakende netin %50'si — `partnerPriceFromRetail` kullanın. */
 export function partnerPriceFromKasaGross(kasaGross: number): number {
-  return retailNetFromKasaGross(kasaGross);
+  return partnerPriceFromRetail(retailNetFromKasaGross(kasaGross));
 }
 
 /**

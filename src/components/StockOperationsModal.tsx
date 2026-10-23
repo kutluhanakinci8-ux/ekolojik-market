@@ -6,7 +6,7 @@ import { listProductCategorySelectOptions } from '../utils/productCategories';
 import type { Product, WholesalePrices } from '../types/product';
 import {
   kasaGrossFromRetailNet,
-  partnerPriceFromKasaGross,
+  partnerPriceFromRetail,
   retailNetFromKasaGross,
   type ProductPricingInput,
 } from '../utils/productPricing';
@@ -464,11 +464,16 @@ export function StockOperationsModal({
     return Object.keys(patch).length > 0 ? patch : null;
   };
 
-  const applyDerivedPricesFromKasa = (kasa: number) => {
-    const partner = partnerPriceFromKasaGross(kasa);
-    setRetailDraft(String(retailNetFromKasaGross(kasa)));
+  const syncPartnerCouponFromRetail = (retail: number) => {
+    const partner = partnerPriceFromRetail(retail);
     setPartnerDraft(String(partner));
     setCouponDraft(String(partner));
+  };
+
+  const applyDerivedPricesFromKasa = (kasa: number) => {
+    const retail = retailNetFromKasaGross(kasa);
+    setRetailDraft(String(retail));
+    syncPartnerCouponFromRetail(retail);
   };
 
   const handleKasaDraftChange = (value: string) => {
@@ -483,9 +488,8 @@ export function StockOperationsModal({
     setRetailDraft(value);
     const retail = parsePriceDraft(value);
     if (retail != null) {
-      const kasa = kasaGrossFromRetailNet(retail);
-      setKasaDraft(String(kasa));
-      applyDerivedPricesFromKasa(kasa);
+      setKasaDraft(String(kasaGrossFromRetailNet(retail)));
+      syncPartnerCouponFromRetail(retail);
     }
   };
 
@@ -1943,8 +1947,8 @@ export function StockOperationsModal({
                 <legend>Fiyatlar (₺)</legend>
                 <p className="stock-ops-dialog__pricing-hint">
                   Mevcut ürün ve stok girişinde aynı kayıt güncellenir.
-                  Kasa (KDV dahil) yazıldığında perakende, partner ve kupon = kasadan %20 düşülür
-                  (×0,80 — KDV hariç liste).
+                  Kasa yazıldığında perakende = kasadan %20 düşülür (×0,80). Partner ve kupon =
+                  perakendenin %50&apos;si.
                 </p>
                 <div className="stock-ops-dialog__pricing-grid">
                   <label className="stock-ops-dialog__field">
