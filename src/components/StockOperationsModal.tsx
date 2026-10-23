@@ -382,12 +382,6 @@ export function StockOperationsModal({
     countEndedAt,
   ]);
 
-  useEffect(() => {
-    if (!open || operation !== 'set' || countPhase !== 'scan') return;
-    const t = window.setTimeout(() => countScanInputRef.current?.focus(), 80);
-    return () => window.clearTimeout(t);
-  }, [open, operation, countPhase]);
-
   const selectedProduct = useMemo(() => {
     const id = Number.parseInt(productId, 10);
     if (Number.isNaN(id)) return undefined;
@@ -664,6 +658,26 @@ export function StockOperationsModal({
     countSequentialListVisible,
   ]);
 
+  useEffect(() => {
+    if (!open || operation !== 'set' || countPhase !== 'scan') return;
+    if (
+      countLineList.length === 0
+      && !countSequentialListVisible
+      && resumableCountSessions.length > 0
+    ) {
+      return;
+    }
+    const t = window.setTimeout(() => countScanInputRef.current?.focus(), 80);
+    return () => window.clearTimeout(t);
+  }, [
+    open,
+    operation,
+    countPhase,
+    countLineList.length,
+    countSequentialListVisible,
+    resumableCountSessions.length,
+  ]);
+
   const countReportRows = useMemo(() => countLineList.map((line) => {
     const product = products.find((p) => p.id === line.productId);
     const diff = line.scannedQty - line.systemStock;
@@ -756,11 +770,15 @@ export function StockOperationsModal({
   };
 
   const switchOperation = (next: StockOperationType) => {
-    if (operation === 'set' && next !== 'set' && countLineList.length > 0) {
-      if (!window.confirm('Devam eden sayım oturumu var. Sekmeyi değiştirmek oturumu siler. Emin misiniz?')) {
-        return;
+    if (operation === 'set' && next !== 'set') {
+      if (countLineList.length > 0) {
+        if (!window.confirm('Devam eden sayım oturumu var. Sekmeyi değiştirmek oturumu siler. Emin misiniz?')) {
+          return;
+        }
+        resetCountSession();
       }
-      resetCountSession();
+      countSkipDraftAutoLoadRef.current = true;
+      setCountAbandonPrompt(false);
     }
     setOperation(next);
     onOperationChange?.(next);
@@ -845,17 +863,31 @@ export function StockOperationsModal({
     return report?.id ?? null;
   }, [countReportId, persistCountReport]);
 
+  const handleCloseModal = useCallback(() => {
+    countSkipDraftAutoLoadRef.current = true;
+    setCountAbandonPrompt(false);
+    onOperationChange?.('in');
+    onClose();
+  }, [onClose, onOperationChange]);
+
+  const leaveCountForOtherStockOps = useCallback(() => {
+    countSkipDraftAutoLoadRef.current = true;
+    setCountAbandonPrompt(false);
+    resetCountSession();
+    setOperation('in');
+    onOperationChange?.('in');
+  }, [onOperationChange, resetCountSession]);
+
   const requestAbandonCountSession = useCallback((event?: MouseEvent<HTMLButtonElement>) => {
     event?.preventDefault();
     event?.stopPropagation();
     if (countLineList.length === 0) {
       clearStockCountSessionDraft();
-      resetCountSession();
-      onClose();
+      leaveCountForOtherStockOps();
       return;
     }
     setCountAbandonPrompt(true);
-  }, [countLineList.length, onClose, resetCountSession]);
+  }, [countLineList.length, leaveCountForOtherStockOps]);
 
   const executeAbandonCountSession = useCallback(() => {
     const abandonedAt = new Date().toISOString();
@@ -874,8 +906,9 @@ export function StockOperationsModal({
     clearStockCountSessionDraft();
     resetCountSession();
     setCountAbandonPrompt(false);
+    onOperationChange?.('in');
     onClose();
-  }, [onClose, onSaveStockCountReport, persistCountReport, resetCountSession]);
+  }, [onClose, onOperationChange, onSaveStockCountReport, persistCountReport, resetCountSession]);
 
   const cancelAbandonCountSession = useCallback(() => {
     setCountAbandonPrompt(false);
@@ -1083,7 +1116,7 @@ export function StockOperationsModal({
   const selectedStatus = selectedProduct ? getStockStatus(selectedProduct, lowStockThreshold) : null;
 
   return createPortal(
-    <div className="stock-ops-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+    <div className="stock-ops-overlay" role="dialog" aria-modal="true" onClick={handleCloseModal}>
       <div
         className="stock-ops-dialog"
         style={{ width: 'min(960px, calc(100vw - 48px))', maxWidth: '960px' }}
@@ -1094,7 +1127,7 @@ export function StockOperationsModal({
             <p className="stock-ops-dialog__eyebrow">Stok Merkezi</p>
             <h2>Stok İşlemleri</h2>
           </div>
-          <button type="button" className="stock-ops-dialog__close" onClick={onClose} aria-label="Kapat">×</button>
+          <button type="button" className="stock-ops-dialog__close" onClick={handleCloseModal} aria-label="Kapat">×</button>
         </header>
 
         {operation === 'set' && countAbandonPrompt && (
@@ -1165,6 +1198,22 @@ export function StockOperationsModal({
               <section className="stock-ops-dialog__main stock-ops-dialog__main--count">
                 {countPhase === 'scan' ? (
                   <>
+                    <div className="stock-ops-dialog__count-exit-bar">
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => switchOperation('in')}
+                      >
+                        ← Giriş / çıkış işlemleri
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={handleCloseModal}
+                      >
+                        Sayım penceresini kapat
+                      </button>
+                    </div>
                     <p className="stock-ops-dialog__count-lead">
                       Yalnızca <strong>sistemde stoğu olan</strong> ürünler, ürün kodu sırasıyla alt alta listelenir;
                       rafta bulduğunuz ürünü sayın (barkod veya adet), sonra <strong>Sonraki ürün</strong> ile
@@ -1566,30 +1615,31 @@ export function StockOperationsModal({
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => {
-                          if (countLineList.length > 0 && !window.confirm('Sayım oturumu silinsin mi?')) return;
-                          resetCountSession();
-                          onClose();
-                        }}
+                        onClick={() => switchOperation('in')}
                       >
-                        İptal
+                        Giriş / çıkış
                       </button>
-                      {countLineList.length > 0 && (
-                        <button
-                          type="button"
-                          className="btn btn-outline stock-ops-dialog__count-btn-abandon"
-                          onClick={(event) => requestAbandonCountSession(event)}
-                        >
-                          Sayımdan çık
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="btn btn-outline stock-ops-dialog__count-btn-abandon"
+                        onClick={(event) => requestAbandonCountSession(event)}
+                      >
+                        Sayımdan çık
+                      </button>
                       <button
                         type="button"
                         className="btn btn-outline"
-                        disabled={countLineList.length === 0}
+                        onClick={handleCloseModal}
+                      >
+                        Kapat
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
                         onClick={() => {
                           if (!window.confirm('Sayım listesi temizlensin mi?')) return;
                           resetCountSession();
+                          countSkipDraftAutoLoadRef.current = true;
                         }}
                       >
                         Oturumu sıfırla

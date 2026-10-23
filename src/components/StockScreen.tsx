@@ -801,7 +801,10 @@ export function StockScreen({ store }: StockScreenProps) {
         initialProductId={stockOpsProductId}
         initialOperation={stockOpsMode}
         onOperationChange={setStockOpsMode}
-        onClose={() => setStockOpsOpen(false)}
+        onClose={() => {
+          setStockOpsOpen(false);
+          setStockOpsMode('in');
+        }}
         onAdjust={handleStockAdjust}
         onSetStock={handleStockSet}
         onSaveSet={(data) => {

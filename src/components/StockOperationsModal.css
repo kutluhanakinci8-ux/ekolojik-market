@@ -773,6 +773,13 @@
   gap: 16px;
 }
 
+.stock-ops-dialog__count-exit-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .stock-ops-dialog__count-lead {
   margin: 0;
   font-size: 13px;
