@@ -7,6 +7,7 @@ import type { Product, WholesalePrices } from '../types/product';
 import {
   kasaGrossFromRetailNet,
   partnerPriceFromRetail,
+  resolveStockEntryKasaGross,
   retailNetFromKasaGross,
   type ProductPricingInput,
 } from '../utils/productPricing';
@@ -417,11 +418,7 @@ export function StockOperationsModal({
       (selectedProduct.couponPrice ?? 0) > 0 ? String(selectedProduct.couponPrice) : '',
     );
     setRetailDraft(selectedProduct.fullSalePrice > 0 ? String(selectedProduct.fullSalePrice) : '');
-    const storedKasa = selectedProduct.ourPriceWithVat;
-    const kasaFromNet = kasaGrossFromRetailNet(selectedProduct.fullSalePrice);
-    const kasa = storedKasa > selectedProduct.fullSalePrice * 1.05
-      ? storedKasa
-      : kasaFromNet;
+    const kasa = resolveStockEntryKasaGross(selectedProduct);
     setKasaDraft(kasa > 0 ? String(kasa) : '');
   }, [
     selectedProduct?.id,
@@ -458,7 +455,8 @@ export function StockOperationsModal({
     const couponBase = selectedProduct.couponPrice ?? selectedProduct.partnerPrice;
     if (priceDraftChanged(coupon, couponBase)) patch.couponPrice = coupon;
     if (priceDraftChanged(retail, selectedProduct.fullSalePrice)) patch.fullSalePrice = retail;
-    if (kasa != null && priceDraftChanged(kasa, selectedProduct.ourPriceWithVat)) {
+    const baselineKasa = resolveStockEntryKasaGross(selectedProduct);
+    if (kasa != null && priceDraftChanged(kasa, baselineKasa)) {
       patch.ourPriceWithVat = kasa;
     }
     return Object.keys(patch).length > 0 ? patch : null;
@@ -541,11 +539,7 @@ export function StockOperationsModal({
       partner: parsePriceDraft(partnerDraft) ?? selectedProduct.partnerPrice,
       coupon: parsePriceDraft(couponDraft) ?? selectedProduct.couponPrice ?? selectedProduct.partnerPrice,
       retail: parsePriceDraft(retailDraft) ?? selectedProduct.fullSalePrice,
-      kasa: parsePriceDraft(kasaDraft) ?? (
-        selectedProduct.ourPriceWithVat > selectedProduct.fullSalePrice * 1.05
-          ? selectedProduct.ourPriceWithVat
-          : kasaGrossFromRetailNet(selectedProduct.fullSalePrice)
-      ),
+      kasa: parsePriceDraft(kasaDraft) ?? resolveStockEntryKasaGross(selectedProduct),
     };
   }, [selectedProduct, purchaseDraft, partnerDraft, couponDraft, retailDraft, kasaDraft]);
 

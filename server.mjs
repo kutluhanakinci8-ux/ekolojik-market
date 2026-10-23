@@ -4838,6 +4838,7 @@ const server = createServer(async (req, res) => {
           partnerPrice: body?.partnerPrice,
           couponPrice: body?.couponPrice,
           fullSalePrice: body?.fullSalePrice,
+          ourPriceWithVat: body?.ourPriceWithVat,
         },
         existingForAuth?.settings,
       );

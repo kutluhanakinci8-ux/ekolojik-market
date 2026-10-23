@@ -22,6 +22,15 @@ export function kasaGrossFromRetailNet(retailNet: number): number {
   return round2(retailNet / RETAIL_NET_FROM_KASA_FACTOR);
 }
 
+/** Stok girişi kasa alanı — kayıtlı brüt veya perakende netten türetilmiş brüt */
+export function resolveStockEntryKasaGross(
+  product: Pick<Product, 'fullSalePrice' | 'ourPriceWithVat'>,
+): number {
+  const storedKasa = product.ourPriceWithVat;
+  const kasaFromNet = kasaGrossFromRetailNet(product.fullSalePrice);
+  return storedKasa > product.fullSalePrice * 1.05 ? storedKasa : kasaFromNet;
+}
+
 /** @deprecated Stok girişi: partner/kupon perakende netin %50'si — `partnerPriceFromRetail` kullanın. */
 export function partnerPriceFromKasaGross(kasaGross: number): number {
   return partnerPriceFromRetail(retailNetFromKasaGross(kasaGross));

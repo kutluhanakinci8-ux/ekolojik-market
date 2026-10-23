@@ -3,6 +3,8 @@
 import { readTenantStore, writeTenantStore } from './tenantAuth.mjs';
 
 const DEFAULT_VAT = 20;
+/** Stok girişi kasa alanı — perakende net = kasa brüt × 0,8 (istemci ile aynı) */
+const RETAIL_NET_FROM_KASA_FACTOR = 0.8;
 
 function round2(value) {
   return Math.round(Number(value) * 100) / 100;
@@ -11,6 +13,15 @@ function round2(value) {
 function applyRetailVat(netPrice, vatRate = DEFAULT_VAT) {
   if (netPrice <= 0) return 0;
   return round2(netPrice * (1 + vatRate / 100));
+}
+
+function retailNetFromKasaGross(kasaGross) {
+  return round2(Math.max(0, kasaGross) * RETAIL_NET_FROM_KASA_FACTOR);
+}
+
+function kasaGrossFromRetailNet(retailNet) {
+  if (retailNet <= 0) return 0;
+  return round2(retailNet / RETAIL_NET_FROM_KASA_FACTOR);
 }
 
 function usesNetRetailWithVatBreakdown(settings) {
@@ -38,14 +49,35 @@ export function applyPartnerHalfRetailPricing(product, settings) {
 }
 
 export function applyProductPricingPatch(product, patch, settings) {
-  const retailNet = usesNetRetailWithVatBreakdown(settings);
+  const posLiteRetailNet = usesNetRetailWithVatBreakdown(settings);
   const purchasePrice = round2(Math.max(0, patch.purchasePrice ?? product.purchasePrice ?? 0));
-  const partnerPrice = round2(Math.max(0, patch.partnerPrice ?? product.partnerPrice ?? 0));
-  const couponPrice = round2(Math.max(0, patch.couponPrice ?? product.couponPrice ?? partnerPrice));
-  const fullSalePrice = round2(Math.max(0, patch.fullSalePrice ?? product.fullSalePrice ?? 0));
-  const ourPriceWithVat = patch.ourPriceWithVat != null
-    ? round2(Math.max(0, patch.ourPriceWithVat))
-    : applyRetailVat(fullSalePrice);
+  let partnerPrice = round2(Math.max(0, patch.partnerPrice ?? product.partnerPrice ?? 0));
+  let couponPrice = round2(Math.max(0, patch.couponPrice ?? product.couponPrice ?? partnerPrice));
+  const hasKasa = patch.ourPriceWithVat != null;
+  const hasRetail = patch.fullSalePrice != null;
+  let fullSalePrice;
+  let ourPriceWithVat;
+
+  if (hasKasa && hasRetail) {
+    fullSalePrice = round2(Math.max(0, patch.fullSalePrice));
+    ourPriceWithVat = round2(Math.max(0, patch.ourPriceWithVat));
+  } else if (hasKasa) {
+    ourPriceWithVat = round2(Math.max(0, patch.ourPriceWithVat));
+    fullSalePrice = retailNetFromKasaGross(ourPriceWithVat);
+  } else if (hasRetail) {
+    fullSalePrice = round2(Math.max(0, patch.fullSalePrice));
+    ourPriceWithVat = posLiteRetailNet
+      ? kasaGrossFromRetailNet(fullSalePrice)
+      : applyRetailVat(fullSalePrice);
+  } else {
+    fullSalePrice = round2(Math.max(0, product.fullSalePrice ?? 0));
+    ourPriceWithVat = round2(Math.max(0, product.ourPriceWithVat ?? 0));
+  }
+
+  if (hasKasa && patch.partnerPrice == null && fullSalePrice > 0) {
+    partnerPrice = round2(fullSalePrice / 2);
+    couponPrice = round2(fullSalePrice / 2);
+  }
   const partnerPriceWithVat = applyRetailVat(partnerPrice);
   const ourPercent = purchasePrice > 0
     ? round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100)
