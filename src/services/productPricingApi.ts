@@ -10,6 +10,8 @@ function pricingApiUrl(): string {
   return `${base}?tenant=${encodeURIComponent(tenant)}`;
 }
 
+const PRICING_PATCH_TIMEOUT_MS = 20_000;
+
 export async function patchProductPricingOnServer(
   productId: number,
   input: ProductPricingInput,
@@ -19,7 +21,7 @@ export async function patchProductPricingOnServer(
       method: 'PATCH',
       headers: posApiAuthHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
       body: JSON.stringify({ productId, ...input }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(PRICING_PATCH_TIMEOUT_MS),
     });
     const data = (await res.json()) as {
       ok?: boolean;
@@ -35,7 +37,13 @@ export async function patchProductPricingOnServer(
       };
     }
     return { ok: true, product: data.product };
-  } catch {
-    return { ok: false, error: 'Bağlantı hatası — fiyat sunucuya yazılamadı' };
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === 'TimeoutError';
+    return {
+      ok: false,
+      error: timedOut
+        ? 'Sunucu yanıt vermedi (20 sn) — sayfayı yenileyip tekrar deneyin'
+        : 'Bağlantı hatası — fiyat sunucuya yazılamadı',
+    };
   }
 }

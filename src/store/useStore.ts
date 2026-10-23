@@ -1849,18 +1849,6 @@ export function usePosStoreState() {
       }
       return { ok: true as const };
     }
-    if (tenantAutoSaveArmedRef.current) {
-      const saved = await persistStoreNowRef.current();
-      if (saved) {
-        setSyncStatus('synced');
-        if (authSession && product) {
-          logActivity(authSession, 'settings_update', `Ürün fiyatları güncellendi: ${product.name}`, {
-            urun: product.name,
-          });
-        }
-        return { ok: true as const };
-      }
-    }
     return {
       ok: false as const,
       error: remote.error ?? 'Fiyat sunucuya kaydedilemedi',

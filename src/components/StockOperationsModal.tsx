@@ -528,8 +528,17 @@ export function StockOperationsModal({
     const patch = buildPricingPatch();
     if (!patch) return { ok: false, reason: 'unchanged' };
     setPricingSaveBusy(true);
+    const saveTimeoutMs = 25_000;
     try {
-      const result = await onUpdatePricing(id, patch);
+      const result = await Promise.race([
+        onUpdatePricing(id, patch),
+        new Promise<{ ok: false; error: string }>((resolve) => {
+          window.setTimeout(
+            () => resolve({ ok: false, error: 'Kayıt zaman aşımı — bağlantıyı kontrol edip tekrar deneyin' }),
+            saveTimeoutMs,
+          );
+        }),
+      ]);
       if (result && !result.ok) {
         return { ok: false, reason: 'server', error: result.error };
       }
