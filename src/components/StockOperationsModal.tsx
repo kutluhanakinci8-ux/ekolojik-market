@@ -402,15 +402,26 @@ export function StockOperationsModal({
     setCategoryDraft(selectedProduct?.category ?? '');
   }, [selectedProduct?.id, selectedProduct?.category]);
 
+  const pricingDraftBoundProductIdRef = useRef<number | null>(null);
+
   useEffect(() => {
+    if (!open) {
+      pricingDraftBoundProductIdRef.current = null;
+      return;
+    }
     if (!selectedProduct) {
       setPurchaseDraft('');
       setPartnerDraft('');
       setCouponDraft('');
       setRetailDraft('');
       setKasaDraft('');
+      pricingDraftBoundProductIdRef.current = null;
       return;
     }
+    if (pricingDraftBoundProductIdRef.current === selectedProduct.id) {
+      return;
+    }
+    pricingDraftBoundProductIdRef.current = selectedProduct.id;
     setPurchaseDraft(selectedProduct.purchasePrice > 0 ? String(selectedProduct.purchasePrice) : '');
     setPartnerDraft(selectedProduct.partnerPrice > 0 ? String(selectedProduct.partnerPrice) : '');
     setCouponDraft(
@@ -419,14 +430,7 @@ export function StockOperationsModal({
     setRetailDraft(selectedProduct.fullSalePrice > 0 ? String(selectedProduct.fullSalePrice) : '');
     const kasa = resolveStockEntryKasaGross(selectedProduct);
     setKasaDraft(kasa > 0 ? String(kasa) : '');
-  }, [
-    selectedProduct?.id,
-    selectedProduct?.purchasePrice,
-    selectedProduct?.partnerPrice,
-    selectedProduct?.couponPrice,
-    selectedProduct?.fullSalePrice,
-    selectedProduct?.ourPriceWithVat,
-  ]);
+  }, [open, selectedProduct]);
 
   const parsePriceDraft = (draft: string): number | undefined => {
     const normalized = draft.trim().replace(',', '.');

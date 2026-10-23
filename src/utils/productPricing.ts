@@ -119,11 +119,16 @@ export function mergeProductPricing(
   const partnerPrice = round2(Math.max(0, input.partnerPrice ?? product.partnerPrice));
   const couponPrice = round2(Math.max(0, input.couponPrice ?? product.couponPrice ?? partnerPrice));
   const fullSalePrice = round2(Math.max(0, input.fullSalePrice ?? product.fullSalePrice));
-  const ourPriceWithVat = input.ourPriceWithVat != null
-    ? round2(Math.max(0, input.ourPriceWithVat))
-    : retailNetEqualsSale
-      ? applyRetailVat(fullSalePrice)
+  let ourPriceWithVat: number;
+  if (input.ourPriceWithVat != null) {
+    ourPriceWithVat = round2(Math.max(0, input.ourPriceWithVat));
+  } else if (input.fullSalePrice != null) {
+    ourPriceWithVat = retailNetEqualsSale
+      ? kasaGrossFromRetailNet(fullSalePrice)
       : applyRetailVat(fullSalePrice);
+  } else {
+    ourPriceWithVat = round2(Math.max(0, product.ourPriceWithVat));
+  }
   const partnerPriceWithVat = applyRetailVat(partnerPrice);
   const ourPercent = purchasePrice > 0
     ? round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100)
