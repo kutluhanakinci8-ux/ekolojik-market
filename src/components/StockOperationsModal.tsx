@@ -6,7 +6,6 @@ import { listProductCategorySelectOptions } from '../utils/productCategories';
 import type { Product, WholesalePrices } from '../types/product';
 import {
   kasaGrossFromRetailNet,
-  partnerPriceFromRetail,
   resolveStockEntryKasaGross,
   retailNetFromKasaGross,
   type ProductPricingInput,
@@ -462,16 +461,9 @@ export function StockOperationsModal({
     return Object.keys(patch).length > 0 ? patch : null;
   };
 
-  const syncPartnerCouponFromRetail = (retail: number) => {
-    const partner = partnerPriceFromRetail(retail);
-    setPartnerDraft(String(partner));
-    setCouponDraft(String(partner));
-  };
-
   const applyDerivedPricesFromKasa = (kasa: number) => {
     const retail = retailNetFromKasaGross(kasa);
     setRetailDraft(String(retail));
-    syncPartnerCouponFromRetail(retail);
   };
 
   const handleKasaDraftChange = (value: string) => {
@@ -487,7 +479,6 @@ export function StockOperationsModal({
     const retail = parsePriceDraft(value);
     if (retail != null) {
       setKasaDraft(String(kasaGrossFromRetailNet(retail)));
-      syncPartnerCouponFromRetail(retail);
     }
   };
 
@@ -1941,8 +1932,8 @@ export function StockOperationsModal({
                 <legend>Fiyatlar (₺)</legend>
                 <p className="stock-ops-dialog__pricing-hint">
                   Mevcut ürün ve stok girişinde aynı kayıt güncellenir.
-                  Kasa yazıldığında perakende = kasadan %20 düşülür (×0,80). Partner ve kupon =
-                  perakendenin %50&apos;si.
+                  Kasa ve perakende birbirini günceller (×0,80). Partner ve kupon alanlarını
+                  ayrı ayrı elle girebilirsiniz.
                 </p>
                 <div className="stock-ops-dialog__pricing-grid">
                   <label className="stock-ops-dialog__field">

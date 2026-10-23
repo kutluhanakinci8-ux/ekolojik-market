@@ -74,10 +74,6 @@ export function applyProductPricingPatch(product, patch, settings) {
     ourPriceWithVat = round2(Math.max(0, product.ourPriceWithVat ?? 0));
   }
 
-  if (hasKasa && patch.partnerPrice == null && fullSalePrice > 0) {
-    partnerPrice = round2(fullSalePrice / 2);
-    couponPrice = round2(fullSalePrice / 2);
-  }
   const partnerPriceWithVat = applyRetailVat(partnerPrice);
   const ourPercent = purchasePrice > 0
     ? round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100)
