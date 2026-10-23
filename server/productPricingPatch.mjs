@@ -43,7 +43,9 @@ export function applyProductPricingPatch(product, patch, settings) {
   const partnerPrice = round2(Math.max(0, patch.partnerPrice ?? product.partnerPrice ?? 0));
   const couponPrice = round2(Math.max(0, patch.couponPrice ?? product.couponPrice ?? partnerPrice));
   const fullSalePrice = round2(Math.max(0, patch.fullSalePrice ?? product.fullSalePrice ?? 0));
-  const ourPriceWithVat = retailNet ? fullSalePrice : applyRetailVat(fullSalePrice);
+  const ourPriceWithVat = patch.ourPriceWithVat != null
+    ? round2(Math.max(0, patch.ourPriceWithVat))
+    : applyRetailVat(fullSalePrice);
   const partnerPriceWithVat = applyRetailVat(partnerPrice);
   const ourPercent = purchasePrice > 0
     ? round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100)

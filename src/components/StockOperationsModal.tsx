@@ -4,7 +4,11 @@ import { getCategoryLabel } from '../data/categories';
 import type { AppSettings } from '../types/business';
 import { listProductCategorySelectOptions } from '../utils/productCategories';
 import type { Product, WholesalePrices } from '../types/product';
-import type { ProductPricingInput } from '../utils/productPricing';
+import {
+  kasaGrossFromRetailNet,
+  retailNetFromKasaGross,
+  type ProductPricingInput,
+} from '../utils/productPricing';
 import type { ProductSet, ProductSetItem } from '../types/productSet';
 import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
@@ -171,6 +175,7 @@ export function StockOperationsModal({
   const [partnerDraft, setPartnerDraft] = useState('');
   const [couponDraft, setCouponDraft] = useState('');
   const [retailDraft, setRetailDraft] = useState('');
+  const [kasaDraft, setKasaDraft] = useState('');
   const [categoryDraft, setCategoryDraft] = useState('');
   const [countPhase, setCountPhase] = useState<'scan' | 'report' | 'apply'>('scan');
   const [countLines, setCountLines] = useState<Record<number, StockCountLine>>({});
@@ -402,6 +407,7 @@ export function StockOperationsModal({
       setPartnerDraft('');
       setCouponDraft('');
       setRetailDraft('');
+      setKasaDraft('');
       return;
     }
     setPurchaseDraft(selectedProduct.purchasePrice > 0 ? String(selectedProduct.purchasePrice) : '');
@@ -410,12 +416,19 @@ export function StockOperationsModal({
       (selectedProduct.couponPrice ?? 0) > 0 ? String(selectedProduct.couponPrice) : '',
     );
     setRetailDraft(selectedProduct.fullSalePrice > 0 ? String(selectedProduct.fullSalePrice) : '');
+    const storedKasa = selectedProduct.ourPriceWithVat;
+    const kasaFromNet = kasaGrossFromRetailNet(selectedProduct.fullSalePrice);
+    const kasa = storedKasa > selectedProduct.fullSalePrice * 1.05
+      ? storedKasa
+      : kasaFromNet;
+    setKasaDraft(kasa > 0 ? String(kasa) : '');
   }, [
     selectedProduct?.id,
     selectedProduct?.purchasePrice,
     selectedProduct?.partnerPrice,
     selectedProduct?.couponPrice,
     selectedProduct?.fullSalePrice,
+    selectedProduct?.ourPriceWithVat,
   ]);
 
   const parsePriceDraft = (draft: string): number | undefined => {
@@ -438,12 +451,32 @@ export function StockOperationsModal({
     const partner = parsePriceDraft(partnerDraft);
     const coupon = parsePriceDraft(couponDraft);
     const retail = parsePriceDraft(retailDraft);
+    const kasa = parsePriceDraft(kasaDraft);
     if (priceDraftChanged(purchase, selectedProduct.purchasePrice)) patch.purchasePrice = purchase;
     if (priceDraftChanged(partner, selectedProduct.partnerPrice)) patch.partnerPrice = partner;
     const couponBase = selectedProduct.couponPrice ?? selectedProduct.partnerPrice;
     if (priceDraftChanged(coupon, couponBase)) patch.couponPrice = coupon;
     if (priceDraftChanged(retail, selectedProduct.fullSalePrice)) patch.fullSalePrice = retail;
+    if (kasa != null && priceDraftChanged(kasa, selectedProduct.ourPriceWithVat)) {
+      patch.ourPriceWithVat = kasa;
+    }
     return Object.keys(patch).length > 0 ? patch : null;
+  };
+
+  const handleKasaDraftChange = (value: string) => {
+    setKasaDraft(value);
+    const kasa = parsePriceDraft(value);
+    if (kasa != null) {
+      setRetailDraft(String(retailNetFromKasaGross(kasa)));
+    }
+  };
+
+  const handleRetailDraftChange = (value: string) => {
+    setRetailDraft(value);
+    const retail = parsePriceDraft(value);
+    if (retail != null) {
+      setKasaDraft(String(kasaGrossFromRetailNet(retail)));
+    }
   };
 
   const applyPricingDraft = (): boolean => {
@@ -494,8 +527,13 @@ export function StockOperationsModal({
       partner: parsePriceDraft(partnerDraft) ?? selectedProduct.partnerPrice,
       coupon: parsePriceDraft(couponDraft) ?? selectedProduct.couponPrice ?? selectedProduct.partnerPrice,
       retail: parsePriceDraft(retailDraft) ?? selectedProduct.fullSalePrice,
+      kasa: parsePriceDraft(kasaDraft) ?? (
+        selectedProduct.ourPriceWithVat > selectedProduct.fullSalePrice * 1.05
+          ? selectedProduct.ourPriceWithVat
+          : kasaGrossFromRetailNet(selectedProduct.fullSalePrice)
+      ),
     };
-  }, [selectedProduct, purchaseDraft, partnerDraft, couponDraft, retailDraft]);
+  }, [selectedProduct, purchaseDraft, partnerDraft, couponDraft, retailDraft, kasaDraft]);
 
   const previewStockValue = useMemo(() => {
     if (!previewPricing || previewStock == null) return null;
@@ -1895,7 +1933,7 @@ export function StockOperationsModal({
                 <legend>Fiyatlar (₺)</legend>
                 <p className="stock-ops-dialog__pricing-hint">
                   Mevcut ürün ve stok girişinde aynı kayıt güncellenir.
-                  {perakendeKdvHaric ? ' Perakende — KDV hariç (kasa ile uyumlu).' : ' Perakende — liste (KDV hariç); kasa KDV dahil.'}
+                  Kasa (KDV dahil) yazıldığında perakende (KDV hariç) otomatik hesaplanır (kasanın %20&apos;si düşülür).
                 </p>
                 <div className="stock-ops-dialog__pricing-grid">
                   <label className="stock-ops-dialog__field">
@@ -1928,14 +1966,24 @@ export function StockOperationsModal({
                       onChange={(e) => setCouponDraft(e.target.value)}
                     />
                   </label>
+                  <label className="stock-ops-dialog__field stock-ops-dialog__field--accent">
+                    <span>Kasa (KDV dahil)</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={kasaDraft}
+                      placeholder="0,00"
+                      onChange={(e) => handleKasaDraftChange(e.target.value)}
+                    />
+                  </label>
                   <label className="stock-ops-dialog__field">
-                    <span>{perakendeKdvHaric ? 'Perakende (KDV hariç)' : 'Perakende'}</span>
+                    <span>Perakende (KDV hariç)</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={retailDraft}
                       placeholder="0,00"
-                      onChange={(e) => setRetailDraft(e.target.value)}
+                      onChange={(e) => handleRetailDraftChange(e.target.value)}
                     />
                   </label>
                 </div>
@@ -2090,7 +2138,11 @@ export function StockOperationsModal({
                           <strong>{formatCurrencyTry(previewPricing.coupon)}</strong>
                         </div>
                         <div className="stock-ops-dialog__preview-row stock-ops-dialog__preview-row--accent">
-                          <span>Perakende</span>
+                          <span>Kasa (KDV dahil)</span>
+                          <strong>{formatCurrencyTry(previewPricing.kasa)}</strong>
+                        </div>
+                        <div className="stock-ops-dialog__preview-row">
+                          <span>Perakende (KDV hariç)</span>
                           <strong>{formatCurrencyTry(previewPricing.retail)}</strong>
                         </div>
                       </div>

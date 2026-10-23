@@ -10,6 +10,18 @@ export function applyRetailVat(netPrice: number, vatRate = DEFAULT_VAT_RATE): nu
   return round2(netPrice * (1 + vatRate / 100));
 }
 
+/** Stok girişi: kasa (KDV dahil) yazıldığında perakende net = brütün %20'si düşülür. */
+export const RETAIL_NET_FROM_KASA_FACTOR = 0.8;
+
+export function retailNetFromKasaGross(kasaGross: number): number {
+  return round2(Math.max(0, kasaGross) * RETAIL_NET_FROM_KASA_FACTOR);
+}
+
+export function kasaGrossFromRetailNet(retailNet: number): number {
+  if (retailNet <= 0) return 0;
+  return round2(retailNet / RETAIL_NET_FROM_KASA_FACTOR);
+}
+
 /**
  * Perakende kasa birim fiyatı.
  * Greenleaf: fullSalePrice = net liste, ourPriceWithVat = KDV dahil tahsilat.
@@ -46,6 +58,8 @@ export interface ProductPricingInput {
   partnerPrice?: number;
   couponPrice?: number;
   fullSalePrice?: number;
+  /** Kasa / fiş — KDV dahil tahsilat (stok girişi kasa alanından) */
+  ourPriceWithVat?: number;
 }
 
 /** Stok ekranı / giriş — alış, partner, perakende; KDV alanları otomatik */
@@ -91,7 +105,11 @@ export function mergeProductPricing(
   const partnerPrice = round2(Math.max(0, input.partnerPrice ?? product.partnerPrice));
   const couponPrice = round2(Math.max(0, input.couponPrice ?? product.couponPrice ?? partnerPrice));
   const fullSalePrice = round2(Math.max(0, input.fullSalePrice ?? product.fullSalePrice));
-  const ourPriceWithVat = retailNetEqualsSale ? fullSalePrice : applyRetailVat(fullSalePrice);
+  const ourPriceWithVat = input.ourPriceWithVat != null
+    ? round2(Math.max(0, input.ourPriceWithVat))
+    : retailNetEqualsSale
+      ? applyRetailVat(fullSalePrice)
+      : applyRetailVat(fullSalePrice);
   const partnerPriceWithVat = applyRetailVat(partnerPrice);
   const ourPercent = purchasePrice > 0
     ? round2(((fullSalePrice - purchasePrice) / purchasePrice) * 100)

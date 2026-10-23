@@ -361,6 +361,11 @@
   gap: 10px 12px;
 }
 
+.stock-ops-dialog__pricing-grid .stock-ops-dialog__field--accent span {
+  color: #15803d;
+  font-weight: 800;
+}
+
 .stock-ops-dialog__pricing-save {
   margin-top: 10px;
   padding: 8px 12px;
