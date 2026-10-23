@@ -1943,8 +1943,8 @@ export function StockOperationsModal({
                 <legend>Fiyatlar (₺)</legend>
                 <p className="stock-ops-dialog__pricing-hint">
                   Mevcut ürün ve stok girişinde aynı kayıt güncellenir.
-                  Kasa (KDV dahil) yazıldığında: perakende = kasanın %80&apos;i (KDV hariç);
-                  partner ve kupon = kasanın %50&apos;si.
+                  Kasa (KDV dahil) yazıldığında perakende, partner ve kupon = kasadan %20 düşülür
+                  (×0,80 — KDV hariç liste).
                 </p>
                 <div className="stock-ops-dialog__pricing-grid">
                   <label className="stock-ops-dialog__field">
