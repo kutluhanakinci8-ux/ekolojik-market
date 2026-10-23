@@ -3473,10 +3473,9 @@ export function usePosStoreState() {
     ) => {
       clearLoginLockout(user.username);
       const sessionId = `S${Date.now()}`;
-      postLoginSyncSessionRef.current = null;
+      postLoginSyncSessionRef.current = sessionId;
       lastTrackedPageRef.current = null;
       setSyncStatus('loading');
-      setSyncReady(false);
 
       if (credentials?.apiToken?.trim()) {
         savePosApiToken(credentials.apiToken.trim(), loadTenantId());
@@ -3488,6 +3487,7 @@ export function usePosStoreState() {
         setSyncFetchError('no_token');
         setSyncServerReachable(false);
         setSyncReady(true);
+        postLoginSyncSessionRef.current = null;
         throw new Error('API oturumu oluşturulamadı — tekrar giriş yapın');
       }
 
@@ -3497,30 +3497,12 @@ export function usePosStoreState() {
       }
       syncPosLocalStorageKeys();
 
-      let sessionSettings = settings;
-      try {
-        const { snapshot: remote, error } = await fetchStoreSnapshotWithDiagnostics();
-        setSyncFetchError(error ?? null);
-        setSyncServerReachable(remote != null);
-        if (remote) {
-          const localSnapshot = buildSnapshotFromStorage();
-          const merged = mergeServerAuthoritativeSnapshot(localSnapshot, remote);
-          applySnapshot(merged);
-          sessionSettings = snapshotMergedSettings(merged);
-          setSyncStatus('synced');
-          setSyncFetchError(null);
-        } else {
-          setSyncStatus('local-only');
-        }
-      } finally {
-        setSyncReady(true);
-      }
-
-      postLoginSyncSessionRef.current = sessionId;
-      const session = buildAuthSession(user, sessionId, sessionSettings);
+      const session = buildAuthSession(user, sessionId, settings);
       saveAuthSession(session);
       setAuthSession(session);
       saveLastQuickUser(user.username);
+      setSyncReady(true);
+
       void appendLoginAudit({
         userId: user.id,
         username: user.username,
@@ -3535,6 +3517,24 @@ export function usePosStoreState() {
         `${method === 'pin' ? 'PIN' : 'Şifre'} ile oturum başlatıldı`,
         { method },
       );
+
+      void (async () => {
+        const { snapshot: remote, error } = await fetchStoreSnapshotWithDiagnostics({
+          maxAttempts: 2,
+          timeoutMs: 35_000,
+        });
+        setSyncFetchError(error ?? null);
+        setSyncServerReachable(remote != null);
+        if (remote) {
+          const localSnapshot = buildSnapshotFromStorage();
+          const merged = mergeServerAuthoritativeSnapshot(localSnapshot, remote);
+          applySnapshot(merged);
+          setSyncStatus('synced');
+          setSyncFetchError(null);
+        } else {
+          setSyncStatus('local-only');
+        }
+      })();
     },
     [appendLoginAudit, logActivity, applySnapshot, settings],
   );

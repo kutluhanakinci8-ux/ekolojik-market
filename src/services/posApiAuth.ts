@@ -201,15 +201,18 @@ export async function exchangePosApiToken(
   tenantId?: string;
   user?: Record<string, unknown>;
 }> {
-  try {
-    const authTenant = tenantId ?? loadTenantId();
-    const res = await fetch(`/api/auth/pos-token${tenantQuery(authTenant)}`, {
+  const authTenant = tenantId ?? loadTenantId();
+  const tokenUrl = `/api/auth/pos-token${tenantQuery(authTenant)}`;
+  const TOKEN_TIMEOUT_MS = 25_000;
+
+  const requestOnce = async () => {
+    const res = await fetch(tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(credentials),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     });
-    const data = (await res.json()) as {
+    let data: {
       ok?: boolean;
       token?: string;
       message?: string;
@@ -217,9 +220,20 @@ export async function exchangePosApiToken(
       tenantId?: string;
       user?: Record<string, unknown>;
     };
+    try {
+      data = (await res.json()) as typeof data;
+    } catch {
+      return {
+        ok: false as const,
+        httpStatus: res.status,
+        error: res.ok
+          ? 'Sunucu yanıtı okunamadı — sayfayı yenileyip tekrar deneyin'
+          : `Sunucu hatası (${res.status}) — biraz sonra tekrar deneyin`,
+      };
+    }
     if (!res.ok || !data.ok || !data.token) {
       return {
-        ok: false,
+        ok: false as const,
         httpStatus: res.status,
         error: data.message ?? 'API token alınamadı',
       };
@@ -233,13 +247,32 @@ export async function exchangePosApiToken(
     syncPosApiTokenToCurrentTenant(tokenTenant);
     startPosApiTokenRefreshScheduler();
     return {
-      ok: true,
+      ok: true as const,
       token: data.token,
       role: data.role,
       tenantId: data.tenantId ?? tokenTenant,
       user: data.user,
     };
-  } catch {
-    return { ok: false, error: 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.' };
+  };
+
+  try {
+    return await requestOnce();
+  } catch (firstErr) {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      return await requestOnce();
+    } catch (secondErr) {
+      const err = secondErr ?? firstErr;
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        return {
+          ok: false,
+          error: 'Sunucu yanıt vermedi (25 sn). Ağı kontrol edip tekrar deneyin.',
+        };
+      }
+      return {
+        ok: false,
+        error: 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.',
+      };
+    }
   }
 }

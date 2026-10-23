@@ -19,7 +19,15 @@ export type StoreSnapshotFetchError =
   | 'invalid_payload'
   | 'network';
 
-export async function fetchStoreSnapshotWithDiagnostics(): Promise<{
+export type FetchStoreSnapshotOptions = {
+  maxAttempts?: number;
+  timeoutMs?: number;
+  retryDelayMs?: number;
+};
+
+export async function fetchStoreSnapshotWithDiagnostics(
+  options?: FetchStoreSnapshotOptions,
+): Promise<{
   snapshot: PersistedStoreSnapshot | null;
   error?: StoreSnapshotFetchError;
   httpStatus?: number;
@@ -27,11 +35,14 @@ export async function fetchStoreSnapshotWithDiagnostics(): Promise<{
   if (!loadPosApiToken()) {
     return { snapshot: null, error: 'no_token' };
   }
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const maxAttempts = Math.max(1, options?.maxAttempts ?? 3);
+  const timeoutMs = options?.timeoutMs ?? 45_000;
+  const retryDelayMs = options?.retryDelayMs ?? 600;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const res = await posApiFetch(apiUrl(), {
         headers: posApiAuthHeaders(),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (res.status === 401) {
         return { snapshot: null, error: 'unauthorized', httpStatus: 401 };
@@ -51,8 +62,8 @@ export async function fetchStoreSnapshotWithDiagnostics(): Promise<{
       }
       return { snapshot: data as PersistedStoreSnapshot };
     } catch {
-      if (attempt < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+      if (attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)));
       }
     }
   }
