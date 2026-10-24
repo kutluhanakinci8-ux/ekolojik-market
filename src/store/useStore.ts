@@ -1024,6 +1024,8 @@ export function usePosStoreState() {
     (overrides?: { users?: PosUser[]; cashSessions?: DailyCashSession[] }) => Promise<boolean>
   >(async () => false);
   const serverSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stockServerPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleStockServerPersistRef = useRef<() => void>(() => {});
   const tenantAutoSaveArmedRef = useRef(false);
   const [crmData, setCrmData] = useState<CrmPersistedData>(loadCrmData);
   const [saleCouponCode, setSaleCouponCode] = useState('');
@@ -1673,6 +1675,7 @@ export function usePosStoreState() {
           tip: type,
         });
       }
+      scheduleStockServerPersistRef.current();
     },
     [products, authSession, logActivity],
   );
@@ -3303,6 +3306,23 @@ export function usePosStoreState() {
       void persistStoreNowRef.current();
     }, 5000);
   }, [authSession, syncReady]);
+
+  /** Stok giriş/çıkış — sunucuya gecikmeden yaz (birleştirme hatası + sekme kapanması riski). */
+  const scheduleStockServerPersist = useCallback(() => {
+    if (!syncReady || !tenantAutoSaveArmedRef.current) return;
+    if (!authSession || authSession.role !== 'admin') return;
+    if (!loadPosApiToken()) return;
+    const tenant = loadTenantId();
+    const claims = decodePosApiTokenClaims(loadPosApiToken());
+    if ((claims?.tenantId ?? DEFAULT_TENANT_ID) !== tenant) return;
+    if (!canPushTenantDataToServer(authSession.username, tenant)) return;
+    if (stockServerPersistTimerRef.current) clearTimeout(stockServerPersistTimerRef.current);
+    stockServerPersistTimerRef.current = setTimeout(() => {
+      stockServerPersistTimerRef.current = null;
+      void persistStoreNowRef.current();
+    }, 2000);
+  }, [authSession, syncReady]);
+  scheduleStockServerPersistRef.current = scheduleStockServerPersist;
 
   /** Sayfa açılışından sonra yönetici mağaza verisi değişince otomatik sunucu kaydı (tenant bazlı). */
   useEffect(() => {

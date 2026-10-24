@@ -63,7 +63,7 @@ function mergeSaleReturnsById(local: SaleReturn[], remote: SaleReturn[]): SaleRe
   return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-function mergeStockMovementsById(local: StockMovement[], remote: StockMovement[]): StockMovement[] {
+export function mergeStockMovementsById(local: StockMovement[], remote: StockMovement[]): StockMovement[] {
   const map = new Map<string, StockMovement>();
   for (const m of remote) map.set(m.id, m);
   for (const m of local) {
@@ -71,6 +71,47 @@ function mergeStockMovementsById(local: StockMovement[], remote: StockMovement[]
     if (!prev || ts(m.createdAt) >= ts(prev.createdAt)) map.set(m.id, m);
   }
   return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function latestStockMovementForProduct(
+  movements: StockMovement[],
+  productId: number,
+): StockMovement | undefined {
+  let best: StockMovement | undefined;
+  let bestTs = 0;
+  for (const m of movements) {
+    if (Number(m.productId) !== Number(productId)) continue;
+    const movementTs = ts(m.createdAt);
+    if (movementTs >= bestTs) {
+      bestTs = movementTs;
+      best = m;
+    }
+  }
+  return best;
+}
+
+/** Stok: en son hareket kazanır; hareket yoksa daha yeni snapshot tarafı (kaydet birleştirmesi). */
+export function mergeProductStockLevel(
+  localP: Product,
+  remoteP: Product,
+  localMovements: StockMovement[],
+  remoteMovements: StockMovement[],
+  preferLocalSnapshot: boolean,
+): number {
+  const localMv = latestStockMovementForProduct(localMovements, localP.id);
+  const remoteMv = latestStockMovementForProduct(remoteMovements, remoteP.id);
+  const localMvTs = ts(localMv?.createdAt);
+  const remoteMvTs = ts(remoteMv?.createdAt);
+  if (localMvTs > remoteMvTs && localMv) {
+    return typeof localMv.newStock === 'number' ? localMv.newStock : localP.stock;
+  }
+  if (remoteMvTs > localMvTs && remoteMv) {
+    return typeof remoteMv.newStock === 'number' ? remoteMv.newStock : remoteP.stock;
+  }
+  if (preferLocalSnapshot && localP.stock !== remoteP.stock) {
+    return localP.stock;
+  }
+  return remoteP.stock;
 }
 
 function mergeCurrencySettings(
@@ -142,9 +183,15 @@ function mergeProductPricingFields(local: Product, remote: Product): Pick<
 function mergeProductsById(
   local: Product[],
   remote: Product[],
-  options?: { preferLocalCatalog?: boolean },
+  options?: {
+    preferLocalCatalog?: boolean;
+    localMovements?: StockMovement[];
+    remoteMovements?: StockMovement[];
+  },
 ): Product[] {
   const preferLocal = options?.preferLocalCatalog ?? false;
+  const localMovements = options?.localMovements ?? [];
+  const remoteMovements = options?.remoteMovements ?? [];
   const map = new Map<number, Product>();
   for (const p of remote) map.set(p.id, p);
   for (const p of local) {
@@ -154,8 +201,13 @@ function mergeProductsById(
       continue;
     }
     const catalogBase = preferLocal ? p : remoteP;
-    // Sunucu otoriteli eşitleme: stok sunucudan gelir (yerel 16 / sunucu 22 → 22).
-    const stock = remoteP.stock;
+    const stock = mergeProductStockLevel(
+      p,
+      remoteP,
+      localMovements,
+      remoteMovements,
+      preferLocal,
+    );
     const pricing = mergeProductPricingFields(p, remoteP);
     map.set(p.id, mergeProductImageUrl(p, { ...catalogBase, ...pricing, stock }));
   }
@@ -221,6 +273,8 @@ export function mergeStoreSnapshots(
     customers: mergeCustomersById(localClean.customers ?? [], remoteClean.customers ?? []),
     products: mergeProductsById(localClean.products ?? [], remoteClean.products ?? [], {
       preferLocalCatalog,
+      localMovements: localClean.stockMovements ?? [],
+      remoteMovements: remoteClean.stockMovements ?? [],
     }),
     productSets: remoteClean.productSets?.length ? remoteClean.productSets : localClean.productSets,
     priceType: local.priceType ?? remote.priceType,
