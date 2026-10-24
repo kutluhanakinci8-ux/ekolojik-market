@@ -37,18 +37,19 @@ export function ProfitMarginReportPanel({ store }: ProfitMarginReportPanelProps)
   const businessName = store.settings.businessName?.trim() || 'Mağaza';
 
   const handlePrintPdf = () => {
+    if (rows.length === 0) return;
     openProfitMarginReportPrint({
       businessName,
       generatedAt: new Date(),
-      rows: allRows,
+      rows,
     });
   };
 
   return (
     <div className="profit-margin-report">
       <p className="module-hint">
-        Tüm ürünlerin alış (KDV hariç), partner ve perakende fiyatları ile alış maliyetine göre kar marjları.
-        <strong> PDF / A4 yazdır</strong> tarayıcıda «PDF olarak kaydet» veya yazıcı seçerek kullanılır.
+        Alış (KDV hariç), partner ve perakende fiyatları ile kar marjları.
+        <strong> PDF / A4 yazdır</strong> tablodaki filtreyle aynı ürünleri basar (arama + stoklu seçimi).
       </p>
 
       <div className="profit-margin-report-toolbar">
@@ -67,10 +68,15 @@ export function ProfitMarginReportPanel({ store }: ProfitMarginReportPanelProps)
             checked={onlyInStock}
             onChange={(e) => setOnlyInStock(e.target.checked)}
           />
-          Sadece stoklu ürünler (ekranda)
+          Sadece stoklu ürünler
         </label>
-        <button type="button" className="btn btn-primary" onClick={handlePrintPdf}>
-          PDF / A4 yazdır
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={rows.length === 0}
+          onClick={handlePrintPdf}
+        >
+          PDF / A4 yazdır ({rows.length})
         </button>
         <span className="profit-margin-report-count">
           {rows.length} / {allRows.length} ürün
