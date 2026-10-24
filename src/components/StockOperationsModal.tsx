@@ -15,6 +15,7 @@ import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
 import { formatCurrencyTry } from '../utils/format';
+import { splitGrossAmount } from '../utils/vatAnalytics';
 import {
   appendStockCountPauseToDraft,
   clearStockCountSessionDraft,
@@ -518,6 +519,13 @@ export function StockOperationsModal({
       : 'stock-ops-dialog__field--price-saved';
     return ['stock-ops-dialog__field', extra, tone].filter(Boolean).join(' ');
   };
+
+  /** Alış alanı KDV dahil girilir; yanında bilgi amaçlı KDV hariç (brüt ÷ 1,20). */
+  const purchaseExVatHint = useMemo(() => {
+    const gross = parsePriceDraft(purchaseDraft);
+    if (gross == null || gross <= 0) return null;
+    return splitGrossAmount(gross).netAmount;
+  }, [purchaseDraft]);
 
   const buildPricingPatch = (): ProductPricingInput | null => {
     if (!selectedProduct || !onUpdatePricing) return null;
@@ -2066,17 +2074,28 @@ export function StockOperationsModal({
                   </strong>
                 </p>
                 <div className="stock-ops-dialog__pricing-grid">
-                  <label className={pricingFieldClassName('purchase')}>
+                  <label className={pricingFieldClassName('purchase', 'stock-ops-dialog__field--purchase')}>
                     <span>Alış</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={purchaseDraft}
-                      placeholder="0,00"
-                      aria-label="Alış fiyatı"
-                      data-pricing-state={pricingFieldStatuses.purchase}
-                      onChange={(e) => setPurchaseDraft(e.target.value)}
-                    />
+                    <div className="stock-ops-dialog__purchase-row">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={purchaseDraft}
+                        placeholder="0,00"
+                        aria-label="Alış fiyatı (KDV dahil)"
+                        data-pricing-state={pricingFieldStatuses.purchase}
+                        onChange={(e) => setPurchaseDraft(e.target.value)}
+                      />
+                      <span
+                        className="stock-ops-dialog__purchase-net-hint"
+                        title="Bilgi amaçlı — kayda yazılmaz"
+                        aria-live="polite"
+                      >
+                        {purchaseExVatHint != null
+                          ? `${formatCurrencyTry(purchaseExVatHint)} KDV hariç`
+                          : '—'}
+                      </span>
+                    </div>
                   </label>
                   <label className={pricingFieldClassName('partner')}>
                     <span>Partner</span>
