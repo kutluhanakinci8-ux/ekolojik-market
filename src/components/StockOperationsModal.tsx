@@ -327,7 +327,7 @@ export function StockOperationsModal({
       return;
     }
     setCountAbandonPrompt(false);
-    countSkipDraftAutoLoadRef.current = false;
+    countSkipDraftAutoLoadRef.current = initialOperation !== 'set';
     setOperation(initialOperation);
     onOperationChange?.(initialOperation);
     setProductId(initialProductId ? String(initialProductId) : '');
@@ -539,8 +539,12 @@ export function StockOperationsModal({
           );
         }),
       ]);
-      if (result && !result.ok) {
-        return { ok: false, reason: 'server', error: result.error };
+      if (!result || result.ok === false) {
+        return {
+          ok: false,
+          reason: 'server',
+          error: result?.error ?? 'Kayıt yanıtı alınamadı',
+        };
       }
       const purchase = parsePriceDraft(purchaseDraft);
       const partner = parsePriceDraft(partnerDraft);

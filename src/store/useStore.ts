@@ -1698,6 +1698,7 @@ export function usePosStoreState() {
       const without = prev.filter((item) => item.id !== report.id);
       return [report, ...without];
     });
+    scheduleStockServerPersistRef.current();
   }, []);
 
   const markStockCountReportPrinted = useCallback((reportId: string) => {
@@ -3349,6 +3350,7 @@ export function usePosStoreState() {
     purchaseInvoices,
     cashSessions,
     cashHandovers,
+    stockCountReports,
     scheduleAdminServerSync,
   ]);
 

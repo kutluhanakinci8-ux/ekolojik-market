@@ -264,8 +264,9 @@ export function StockScreen({ store }: StockScreenProps) {
     showToast(`${filtered.length} ürünün toptan fiyatları güncellendi`);
   };
 
+  /** Ürün kartı / Düzenle → stok girişi (sayım sekmesi açılmaz). */
   const openEditProduct = (product: Product) => {
-    openStockOps(product.id, 'set');
+    openStockOps(product.id, 'in');
   };
 
   const toggleSort = (key: SortKey) => {
@@ -347,6 +348,14 @@ export function StockScreen({ store }: StockScreenProps) {
             </button>
             <button type="button" className="btn btn-outline" onClick={() => openStockOps()}>
               ＋ Stok İşlemleri
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => openStockOps(undefined, 'set')}
+              title="Barkod ile stok sayımı"
+            >
+              Sayım
             </button>
             <button type="button" className="btn btn-primary" onClick={openBulkWholesale}>
               Toplu Fiyat
