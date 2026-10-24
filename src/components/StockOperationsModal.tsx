@@ -15,7 +15,7 @@ import { ProductImage } from './ProductImage';
 import { isCustomImage } from '../utils/productImage';
 import { ProductSetPanel } from './ProductSetPanel';
 import { formatCurrencyTry } from '../utils/format';
-import { splitGrossAmount } from '../utils/vatAnalytics';
+import { DEFAULT_VAT_RATE, splitGrossAmount } from '../utils/vatAnalytics';
 import {
   appendStockCountPauseToDraft,
   clearStockCountSessionDraft,
@@ -524,7 +524,7 @@ export function StockOperationsModal({
   const purchaseExVatHint = useMemo(() => {
     const gross = parsePriceDraft(purchaseDraft);
     if (gross == null || gross <= 0) return null;
-    return splitGrossAmount(gross).netAmount;
+    return splitGrossAmount(gross, DEFAULT_VAT_RATE).netAmount;
   }, [purchaseDraft]);
 
   const buildPricingPatch = (): ProductPricingInput | null => {
