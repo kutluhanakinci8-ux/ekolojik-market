@@ -527,14 +527,26 @@ export function StockOperationsModal({
     return splitGrossAmount(gross, DEFAULT_VAT_RATE).netAmount;
   }, [purchaseDraft]);
 
-  /** Partner satışı, alışın KDV hariç maliyetine göre kar yüzdesi (bilgi amaçlı). */
-  const partnerMarginOnCostHint = useMemo(() => {
-    const costNet = purchaseExVatHint;
-    const partner = parsePriceDraft(partnerDraft);
-    if (costNet == null || costNet <= 0 || partner == null || partner <= 0) return null;
-    const pct = ((partner - costNet) / costNet) * 100;
+  const marginPercentOnPurchaseNet = (
+    costNet: number | null,
+    saleNet: number | undefined,
+  ): number | null => {
+    if (costNet == null || costNet <= 0 || saleNet == null || saleNet <= 0) return null;
+    const pct = ((saleNet - costNet) / costNet) * 100;
     return Math.round(pct * 10) / 10;
-  }, [purchaseExVatHint, partnerDraft]);
+  };
+
+  /** Partner satışı, alışın KDV hariç maliyetine göre kar yüzdesi (bilgi amaçlı). */
+  const partnerMarginOnCostHint = useMemo(
+    () => marginPercentOnPurchaseNet(purchaseExVatHint, parsePriceDraft(partnerDraft)),
+    [purchaseExVatHint, partnerDraft],
+  );
+
+  /** Perakende (KDV hariç), alış KDV hariç maliyetine göre kar yüzdesi (bilgi amaçlı). */
+  const retailMarginOnCostHint = useMemo(
+    () => marginPercentOnPurchaseNet(purchaseExVatHint, parsePriceDraft(retailDraft)),
+    [purchaseExVatHint, retailDraft],
+  );
 
   const buildPricingPatch = (): ProductPricingInput | null => {
     if (!selectedProduct || !onUpdatePricing) return null;
@@ -2157,17 +2169,32 @@ export function StockOperationsModal({
                       onChange={(e) => handleKasaDraftChange(e.target.value)}
                     />
                   </label>
-                  <label className={pricingFieldClassName('retail')}>
+                  <label className={pricingFieldClassName('retail', 'stock-ops-dialog__field--retail')}>
                     <span>Perakende (KDV hariç)</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={retailDraft}
-                      placeholder="0,00"
-                      aria-label="Perakende fiyatı KDV hariç"
-                      data-pricing-state={pricingFieldStatuses.retail}
-                      onChange={(e) => handleRetailDraftChange(e.target.value)}
-                    />
+                    <div className="stock-ops-dialog__purchase-row">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={retailDraft}
+                        placeholder="0,00"
+                        aria-label="Perakende fiyatı KDV hariç"
+                        data-pricing-state={pricingFieldStatuses.retail}
+                        onChange={(e) => handleRetailDraftChange(e.target.value)}
+                      />
+                      <span
+                        className={`stock-ops-dialog__partner-margin-hint${
+                          retailMarginOnCostHint != null && retailMarginOnCostHint < 0
+                            ? ' stock-ops-dialog__partner-margin-hint--loss'
+                            : ''
+                        }`}
+                        title="Alış KDV hariç maliyete göre kar yüzdesi — bilgi amaçlı, kayda yazılmaz"
+                        aria-live="polite"
+                      >
+                        {retailMarginOnCostHint != null
+                          ? `%${retailMarginOnCostHint.toFixed(1).replace('.', ',')} kar`
+                          : '—'}
+                      </span>
+                    </div>
                   </label>
                 </div>
                 <button
