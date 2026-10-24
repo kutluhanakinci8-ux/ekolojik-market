@@ -355,6 +355,46 @@
   color: #5b7a58;
 }
 
+.stock-ops-dialog__pricing-legend {
+  display: block;
+  margin-top: 6px;
+  font-weight: 700;
+  color: #3d5c3a;
+}
+
+.stock-ops-dialog__field--price-saved input {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #065f46;
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.25);
+}
+
+.stock-ops-dialog__field--price-dirty input {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #991b1b;
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.28);
+}
+
+.stock-ops-dialog__field--price-saved > span,
+.stock-ops-dialog__field--price-dirty > span {
+  font-weight: 700;
+}
+
+.stock-ops-dialog__field--price-saved > span::after {
+  content: ' · kayıtlı';
+  font-weight: 600;
+  font-size: 10px;
+  color: #059669;
+}
+
+.stock-ops-dialog__field--price-dirty > span::after {
+  content: ' · kaydedin';
+  font-weight: 600;
+  font-size: 10px;
+  color: #dc2626;
+}
+
 .stock-ops-dialog__pricing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

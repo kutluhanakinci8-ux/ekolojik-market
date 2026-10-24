@@ -410,13 +410,15 @@ export function StockOperationsModal({
   }, [selectedProduct?.id, selectedProduct?.category]);
 
   const pricingDraftBoundProductIdRef = useRef<number | null>(null);
-  const pricingBaselineRef = useRef<{
+  type PricingBaseline = {
     purchasePrice: number;
     partnerPrice: number;
     couponPrice: number;
     fullSalePrice: number;
     kasaGross: number;
-  } | null>(null);
+  };
+  type StockPricingFieldKey = 'purchase' | 'partner' | 'coupon' | 'kasa' | 'retail';
+  const [pricingBaseline, setPricingBaseline] = useState<PricingBaseline | null>(null);
   const [pricingSaveBusy, setPricingSaveBusy] = useState(false);
 
   const snapshotPricingBaseline = (product: Product) => ({
@@ -439,14 +441,14 @@ export function StockOperationsModal({
       setRetailDraft('');
       setKasaDraft('');
       pricingDraftBoundProductIdRef.current = null;
-      pricingBaselineRef.current = null;
+      setPricingBaseline(null);
       return;
     }
     if (pricingDraftBoundProductIdRef.current === selectedProduct.id) {
       return;
     }
     pricingDraftBoundProductIdRef.current = selectedProduct.id;
-    pricingBaselineRef.current = snapshotPricingBaseline(selectedProduct);
+    setPricingBaseline(snapshotPricingBaseline(selectedProduct));
     setPurchaseDraft(selectedProduct.purchasePrice > 0 ? String(selectedProduct.purchasePrice) : '');
     setPartnerDraft(selectedProduct.partnerPrice > 0 ? String(selectedProduct.partnerPrice) : '');
     setCouponDraft(
@@ -470,9 +472,56 @@ export function StockOperationsModal({
     return Math.abs(draft - current) > 0.004;
   };
 
+  const pricingFieldDirty = (draft: string, baselineValue: number) => {
+    const parsed = parsePriceDraft(draft);
+    if (parsed == null) {
+      return draft.trim() !== '' || baselineValue > 0.004;
+    }
+    return priceDraftChanged(parsed, baselineValue);
+  };
+
+  const pricingFieldStatuses = useMemo((): Record<StockPricingFieldKey, 'saved' | 'dirty'> => {
+    const baseline = pricingBaseline
+      ?? (selectedProduct ? snapshotPricingBaseline(selectedProduct) : null);
+    if (!baseline) {
+      return {
+        purchase: 'saved',
+        partner: 'saved',
+        coupon: 'saved',
+        kasa: 'saved',
+        retail: 'saved',
+      };
+    }
+    return {
+      purchase: pricingFieldDirty(purchaseDraft, baseline.purchasePrice) ? 'dirty' : 'saved',
+      partner: pricingFieldDirty(partnerDraft, baseline.partnerPrice) ? 'dirty' : 'saved',
+      coupon: pricingFieldDirty(couponDraft, baseline.couponPrice) ? 'dirty' : 'saved',
+      kasa: pricingFieldDirty(kasaDraft, baseline.kasaGross) ? 'dirty' : 'saved',
+      retail: pricingFieldDirty(retailDraft, baseline.fullSalePrice) ? 'dirty' : 'saved',
+    };
+  }, [
+    pricingBaseline,
+    selectedProduct,
+    purchaseDraft,
+    partnerDraft,
+    couponDraft,
+    retailDraft,
+    kasaDraft,
+  ]);
+
+  const pricingFieldClassName = (
+    key: StockPricingFieldKey,
+    extra?: string,
+  ) => {
+    const tone = pricingFieldStatuses[key] === 'dirty'
+      ? 'stock-ops-dialog__field--price-dirty'
+      : 'stock-ops-dialog__field--price-saved';
+    return ['stock-ops-dialog__field', extra, tone].filter(Boolean).join(' ');
+  };
+
   const buildPricingPatch = (): ProductPricingInput | null => {
     if (!selectedProduct || !onUpdatePricing) return null;
-    const baseline = pricingBaselineRef.current ?? snapshotPricingBaseline(selectedProduct);
+    const baseline = pricingBaseline ?? snapshotPricingBaseline(selectedProduct);
     const purchase = parsePriceDraft(purchaseDraft);
     const partner = parsePriceDraft(partnerDraft);
     const coupon = parsePriceDraft(couponDraft);
@@ -551,16 +600,16 @@ export function StockOperationsModal({
       const coupon = parsePriceDraft(couponDraft);
       const retail = parsePriceDraft(retailDraft);
       const kasa = parsePriceDraft(kasaDraft);
-      const baseline = pricingBaselineRef.current;
-      if (baseline) {
-        pricingBaselineRef.current = {
+      setPricingBaseline((prev) => {
+        const baseline = prev ?? snapshotPricingBaseline(selectedProduct!);
+        return {
           purchasePrice: purchase ?? baseline.purchasePrice,
           partnerPrice: partner ?? baseline.partnerPrice,
           couponPrice: coupon ?? baseline.couponPrice,
           fullSalePrice: retail ?? baseline.fullSalePrice,
           kasaGross: kasa ?? baseline.kasaGross,
         };
-      }
+      });
       return { ok: true, reason: 'server' };
     } catch {
       return { ok: false, reason: 'network', error: 'Bağlantı hatası' };
@@ -2012,55 +2061,68 @@ export function StockOperationsModal({
                   Mevcut ürün ve stok girişinde aynı kayıt güncellenir.
                   Kasa ve perakende birbirini günceller (×0,80). Partner ve kupon alanlarını
                   ayrı ayrı elle girebilirsiniz.
+                  <strong className="stock-ops-dialog__pricing-legend">
+                    Yeşil: sunucuya kayıtlı sabit fiyat · Kırmızı: kaydedilmemiş değişiklik
+                  </strong>
                 </p>
                 <div className="stock-ops-dialog__pricing-grid">
-                  <label className="stock-ops-dialog__field">
+                  <label className={pricingFieldClassName('purchase')}>
                     <span>Alış</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={purchaseDraft}
                       placeholder="0,00"
+                      aria-label="Alış fiyatı"
+                      data-pricing-state={pricingFieldStatuses.purchase}
                       onChange={(e) => setPurchaseDraft(e.target.value)}
                     />
                   </label>
-                  <label className="stock-ops-dialog__field">
+                  <label className={pricingFieldClassName('partner')}>
                     <span>Partner</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={partnerDraft}
                       placeholder="0,00"
+                      aria-label="Partner fiyatı"
+                      data-pricing-state={pricingFieldStatuses.partner}
                       onChange={(e) => setPartnerDraft(e.target.value)}
                     />
                   </label>
-                  <label className="stock-ops-dialog__field">
+                  <label className={pricingFieldClassName('coupon')}>
                     <span>Kupon</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={couponDraft}
                       placeholder="0,00"
+                      aria-label="Kupon fiyatı"
+                      data-pricing-state={pricingFieldStatuses.coupon}
                       onChange={(e) => setCouponDraft(e.target.value)}
                     />
                   </label>
-                  <label className="stock-ops-dialog__field stock-ops-dialog__field--accent">
+                  <label className={pricingFieldClassName('kasa', 'stock-ops-dialog__field--accent')}>
                     <span>Kasa (KDV dahil)</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={kasaDraft}
                       placeholder="0,00"
+                      aria-label="Kasa fiyatı KDV dahil"
+                      data-pricing-state={pricingFieldStatuses.kasa}
                       onChange={(e) => handleKasaDraftChange(e.target.value)}
                     />
                   </label>
-                  <label className="stock-ops-dialog__field">
+                  <label className={pricingFieldClassName('retail')}>
                     <span>Perakende (KDV hariç)</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={retailDraft}
                       placeholder="0,00"
+                      aria-label="Perakende fiyatı KDV hariç"
+                      data-pricing-state={pricingFieldStatuses.retail}
                       onChange={(e) => handleRetailDraftChange(e.target.value)}
                     />
                   </label>
