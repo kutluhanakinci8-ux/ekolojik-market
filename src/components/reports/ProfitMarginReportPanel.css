@@ -1,0 +1,65 @@
+.profit-margin-report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin-bottom: 14px;
+}
+
+.profit-margin-report-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+  flex: 1 1 200px;
+}
+
+.profit-margin-report-search span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #5b7a58;
+}
+
+.profit-margin-report-search input {
+  padding: 8px 10px;
+  border: 1px solid #c8e6c4;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.profit-margin-report-stock-filter {
+  margin: 0;
+  align-self: center;
+}
+
+.profit-margin-report-count {
+  font-size: 12px;
+  color: #5b7a58;
+  margin-left: auto;
+}
+
+.profit-margin-report-table-wrap {
+  overflow: auto;
+  max-height: min(70vh, 720px);
+  padding: 0;
+}
+
+.profit-margin-report-table {
+  font-size: 12px;
+}
+
+.profit-margin-report-table th.num,
+.profit-margin-report-table td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.profit-margin-report-table td.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.profit-margin-report-table .is-loss {
+  color: #b91c1c;
+  font-weight: 700;
+}

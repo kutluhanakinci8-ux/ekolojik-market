@@ -22,6 +22,7 @@ export const POS_LITE_REPORT_SUBTABS: ReportsSubTab[] = [
   'gunluk-satis-fis',
   'gider',
   'stok',
+  'kar-marji',
   'kasa',
   'islemler',
 ];
