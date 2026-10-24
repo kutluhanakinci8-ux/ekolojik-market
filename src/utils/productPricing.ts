@@ -107,6 +107,7 @@ export function overlayStoredProductPricing<T extends ProductPricingOverlay>(
     ourPercent: stored.ourPercent,
     pv: stored.pv,
     wholesalePrices: stored.wholesalePrices ?? catalog.wholesalePrices,
+    pricingUpdatedAt: stored.pricingUpdatedAt,
   };
 }
 

@@ -151,8 +151,7 @@ function mergeProductImageUrl(local: Product, chosen: Product): Product {
   return { ...chosen, imageUrl: localUrl };
 }
 
-/** Sunucuda kaydedilen fiyat, eski tarayıcı önbelleğini ezer */
-function mergeProductPricingFields(local: Product, remote: Product): Pick<
+function pickProductPricingFields(source: Product): Pick<
   Product,
   | 'purchasePrice'
   | 'partnerPrice'
@@ -164,9 +163,6 @@ function mergeProductPricingFields(local: Product, remote: Product): Pick<
   | 'wholesalePrices'
   | 'pricingUpdatedAt'
 > {
-  const localTs = ts(local.pricingUpdatedAt);
-  const remoteTs = ts(remote.pricingUpdatedAt);
-  const source = remoteTs >= localTs ? remote : local;
   return {
     purchasePrice: source.purchasePrice,
     partnerPrice: source.partnerPrice,
@@ -178,6 +174,18 @@ function mergeProductPricingFields(local: Product, remote: Product): Pick<
     wholesalePrices: source.wholesalePrices,
     pricingUpdatedAt: source.pricingUpdatedAt,
   };
+}
+
+/** Sunucuda kaydedilen fiyat, eski tarayıcı önbelleğini ezer — eşitlikte yerel kazanır (aktif sekme). */
+export function mergeProductPricingFields(
+  local: Product,
+  remote: Product,
+): ReturnType<typeof pickProductPricingFields> {
+  const localTs = ts(local.pricingUpdatedAt);
+  const remoteTs = ts(remote.pricingUpdatedAt);
+  if (localTs > remoteTs) return pickProductPricingFields(local);
+  if (remoteTs > localTs) return pickProductPricingFields(remote);
+  return pickProductPricingFields(local);
 }
 
 function mergeProductsById(

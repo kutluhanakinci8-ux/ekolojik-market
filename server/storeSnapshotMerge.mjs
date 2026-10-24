@@ -87,7 +87,8 @@ function mergeStoreProducts(incomingProducts, existingProducts, incomingTs, exis
     const prevPriceTs = ts(prev.pricingUpdatedAt);
     if (nextPriceTs > prevPriceTs) map.set(id, p);
     else if (prevPriceTs > nextPriceTs) map.set(id, prev);
-    else map.set(id, incomingTs >= existingTs ? p : prev);
+    // Eşit pricingUpdatedAt: diskteki kayıt kazanır (PATCH sonrası gecikmiş tam PUT eski fiyat taşımasın).
+    else map.set(id, prev);
   }
   return [...map.values()];
 }

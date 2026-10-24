@@ -45,4 +45,26 @@ const merged2 = mergeIncomingStoreWithExisting(newerIncoming, existing);
 const row2 = merged2.sales.find((s) => s.id === saleId);
 assert.equal(row2.paymentMethod, 'card', 'newer payment correction from client must persist');
 
+const existingPricing = {
+  updatedAt: '2026-10-24T10:00:00.000Z',
+  products: [{
+    id: 19,
+    partnerPrice: 150,
+    couponPrice: 150,
+    pricingUpdatedAt: '2026-10-24T10:05:00.000Z',
+  }],
+};
+const stalePricingPut = {
+  updatedAt: '2026-10-24T10:10:00.000Z',
+  products: [{
+    id: 19,
+    partnerPrice: 127.6,
+    couponPrice: 127.6,
+    pricingUpdatedAt: '2026-10-24T10:05:00.000Z',
+  }],
+};
+const mergedPricing = mergeIncomingStoreWithExisting(stalePricingPut, existingPricing);
+const p19 = mergedPricing.products.find((p) => Number(p.id) === 19);
+assert.equal(p19.partnerPrice, 150, 'equal pricingUpdatedAt must keep disk (PATCH) prices over stale PUT');
+
 console.log('store-snapshot-merge-smoke: ok');

@@ -1027,6 +1027,8 @@ export function usePosStoreState() {
   const stockServerPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleStockServerPersistRef = useRef<() => void>(() => {});
   const tenantAutoSaveArmedRef = useRef(false);
+  /** PATCH fiyat kaydından sonra gecikmiş tam PUT eski partner/kupon göndermesin */
+  const pricingPatchCooldownUntilRef = useRef(0);
   const [crmData, setCrmData] = useState<CrmPersistedData>(loadCrmData);
   const [saleCouponCode, setSaleCouponCode] = useState('');
   const [saleLoyaltyPointsToRedeem, setSaleLoyaltyPointsToRedeem] = useState(0);
@@ -1844,7 +1846,23 @@ export function usePosStoreState() {
     });
     const remote = await patchProductPricingOnServer(productId, input);
     if (remote.ok && remote.product) {
-      setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, ...remote.product! } : p)));
+      pricingPatchCooldownUntilRef.current = Date.now() + 15_000;
+      if (serverSyncTimerRef.current) {
+        clearTimeout(serverSyncTimerRef.current);
+        serverSyncTimerRef.current = null;
+      }
+      setProducts((prev) => {
+        const next = prev.map((p) => (p.id === productId ? { ...p, ...remote.product! } : p));
+        if (syncReady) {
+          try {
+            const toSave = next.map(({ imageUrl: _, ...rest }) => rest);
+            localStorage.setItem(storageKeys().products, JSON.stringify(toSave));
+          } catch {
+            /* ignore quota */
+          }
+        }
+        return next;
+      });
       setSyncStatus('synced');
       if (authSession && product) {
         logActivity(authSession, 'settings_update', `Ürün fiyatları güncellendi: ${product.name}`, {
@@ -1857,7 +1875,7 @@ export function usePosStoreState() {
       ok: false as const,
       error: remote.error ?? 'Fiyat sunucuya kaydedilemedi',
     };
-  }, [authSession, logActivity, products, settings]);
+  }, [authSession, logActivity, products, settings, syncReady]);
 
   const setProductSampleFlag = useCallback((productId: number, isSample: boolean) => {
     setProducts((prev) =>
@@ -3294,6 +3312,7 @@ export function usePosStoreState() {
 
   const scheduleAdminServerSync = useCallback(() => {
     if (!syncReady) return;
+    if (Date.now() < pricingPatchCooldownUntilRef.current) return;
     if (!authSession || authSession.role !== 'admin') return;
     if (!loadPosApiToken()) return;
     const claims = decodePosApiTokenClaims(loadPosApiToken());
