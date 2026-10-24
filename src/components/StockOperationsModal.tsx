@@ -527,6 +527,15 @@ export function StockOperationsModal({
     return splitGrossAmount(gross, DEFAULT_VAT_RATE).netAmount;
   }, [purchaseDraft]);
 
+  /** Partner satışı, alışın KDV hariç maliyetine göre kar yüzdesi (bilgi amaçlı). */
+  const partnerMarginOnCostHint = useMemo(() => {
+    const costNet = purchaseExVatHint;
+    const partner = parsePriceDraft(partnerDraft);
+    if (costNet == null || costNet <= 0 || partner == null || partner <= 0) return null;
+    const pct = ((partner - costNet) / costNet) * 100;
+    return Math.round(pct * 10) / 10;
+  }, [purchaseExVatHint, partnerDraft]);
+
   const buildPricingPatch = (): ProductPricingInput | null => {
     if (!selectedProduct || !onUpdatePricing) return null;
     const baseline = pricingBaseline ?? snapshotPricingBaseline(selectedProduct);
@@ -2097,17 +2106,32 @@ export function StockOperationsModal({
                       </span>
                     </div>
                   </label>
-                  <label className={pricingFieldClassName('partner')}>
+                  <label className={pricingFieldClassName('partner', 'stock-ops-dialog__field--partner')}>
                     <span>Partner</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={partnerDraft}
-                      placeholder="0,00"
-                      aria-label="Partner fiyatı"
-                      data-pricing-state={pricingFieldStatuses.partner}
-                      onChange={(e) => setPartnerDraft(e.target.value)}
-                    />
+                    <div className="stock-ops-dialog__purchase-row">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={partnerDraft}
+                        placeholder="0,00"
+                        aria-label="Partner fiyatı"
+                        data-pricing-state={pricingFieldStatuses.partner}
+                        onChange={(e) => setPartnerDraft(e.target.value)}
+                      />
+                      <span
+                        className={`stock-ops-dialog__partner-margin-hint${
+                          partnerMarginOnCostHint != null && partnerMarginOnCostHint < 0
+                            ? ' stock-ops-dialog__partner-margin-hint--loss'
+                            : ''
+                        }`}
+                        title="Alış KDV hariç maliyete göre kar yüzdesi — bilgi amaçlı, kayda yazılmaz"
+                        aria-live="polite"
+                      >
+                        {partnerMarginOnCostHint != null
+                          ? `%${partnerMarginOnCostHint.toFixed(1).replace('.', ',')} kar`
+                          : '—'}
+                      </span>
+                    </div>
                   </label>
                   <label className={pricingFieldClassName('coupon')}>
                     <span>Kupon</span>

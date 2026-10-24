@@ -430,6 +430,35 @@
   border-color: #a78bfa;
 }
 
+.stock-ops-dialog__field--partner {
+  grid-column: 1 / -1;
+}
+
+.stock-ops-dialog__partner-margin-hint {
+  flex: 0 1 auto;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.stock-ops-dialog__field--price-dirty .stock-ops-dialog__partner-margin-hint {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #34d399;
+}
+
+.stock-ops-dialog__partner-margin-hint--loss {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
 .stock-ops-dialog__pricing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
