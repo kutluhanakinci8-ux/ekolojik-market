@@ -3173,7 +3173,7 @@ export function usePosStoreState() {
 
   const scheduleAdminServerSync = useCallback(() => {
     if (!syncReady) return;
-    if (!authSession || authSession.role !== 'admin') return;
+    if (!authSession) return;
     if (!loadPosApiToken()) return;
     const claims = decodePosApiTokenClaims(loadPosApiToken());
     const tenant = loadTenantId();
@@ -3187,7 +3187,7 @@ export function usePosStoreState() {
     }, 5000);
   }, [authSession, syncReady]);
 
-  /** Sayfa açılışından sonra yönetici mağaza verisi değişince otomatik sunucu kaydı (tenant bazlı). */
+  /** Sayfa açılışından sonra mağaza verisi değişince otomatik sunucu kaydı (API token + tenant yazma izni). */
   useEffect(() => {
     if (!syncReady) return;
     const id = window.setTimeout(() => {
@@ -4591,6 +4591,9 @@ export function usePosStoreState() {
       setSaleCustomerName('');
       setSaleCouponCode('');
       setSaleLoyaltyPointsToRedeem(0);
+      window.setTimeout(() => {
+        void persistStoreNowRef.current();
+      }, 250);
       return sale;
     },
     [
