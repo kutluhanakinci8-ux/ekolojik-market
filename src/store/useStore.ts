@@ -812,6 +812,14 @@ function createSetMovement(
   };
 }
 
+/** Sunucuya PUT — boş hash alanları diskteki şifreyi silmesin */
+function usersForServerSnapshot(users: PosUser[]): PosUser[] {
+  return users.map((user) => {
+    const { passwordHash: _p, pinHash: _pin, totpSecret: _t, ...safe } = user;
+    return safe as PosUser;
+  });
+}
+
 function serializeProductsForSnapshot(products: Product[], settings: AppSettings): Product[] {
   const isolated = isTenantCatalogIsolated(undefined, settings);
   const localImages = isolated ? {} : loadAllImages();
@@ -892,7 +900,7 @@ function buildLocalSnapshot(
     purchaseInvoices,
     settings,
     priceType,
-    users,
+    users: usersForServerSnapshot(users),
     loginAuditLog,
     activityAuditLog,
     suppliers,
@@ -3313,7 +3321,7 @@ export function usePosStoreState() {
   const scheduleAdminServerSync = useCallback(() => {
     if (!syncReady) return;
     if (Date.now() < pricingPatchCooldownUntilRef.current) return;
-    if (!authSession || authSession.role !== 'admin') return;
+    if (!authSession) return;
     if (!loadPosApiToken()) return;
     const claims = decodePosApiTokenClaims(loadPosApiToken());
     const tenant = loadTenantId();
@@ -3330,7 +3338,7 @@ export function usePosStoreState() {
   /** Stok giriş/çıkış — sunucuya gecikmeden yaz (birleştirme hatası + sekme kapanması riski). */
   const scheduleStockServerPersist = useCallback(() => {
     if (!syncReady || !tenantAutoSaveArmedRef.current) return;
-    if (!authSession || authSession.role !== 'admin') return;
+    if (!authSession) return;
     if (!loadPosApiToken()) return;
     const tenant = loadTenantId();
     const claims = decodePosApiTokenClaims(loadPosApiToken());
@@ -3344,7 +3352,7 @@ export function usePosStoreState() {
   }, [authSession, syncReady]);
   scheduleStockServerPersistRef.current = scheduleStockServerPersist;
 
-  /** Sayfa açılışından sonra yönetici mağaza verisi değişince otomatik sunucu kaydı (tenant bazlı). */
+  /** Sayfa açılışından sonra mağaza verisi değişince otomatik sunucu kaydı (API token + tenant yazma izni). */
   useEffect(() => {
     if (!syncReady) return;
     const id = window.setTimeout(() => {
@@ -4895,6 +4903,9 @@ export function usePosStoreState() {
       setSaleCustomerName('');
       setSaleCouponCode('');
       setSaleLoyaltyPointsToRedeem(0);
+      window.setTimeout(() => {
+        void persistStoreNowRef.current();
+      }, 250);
       return sale;
     },
     [
