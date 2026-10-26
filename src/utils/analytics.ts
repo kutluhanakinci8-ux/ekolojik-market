@@ -54,7 +54,12 @@ export function getPaymentBreakdown(sales: Sale[], saleReturns: SaleReturn[] = [
           breakdown[split.method] += split.amount;
         }
       }
-    } else if (sale.paymentMethod !== 'split' && sale.paymentMethod in breakdown) {
+    } else if (
+      sale.paymentMethod === 'cash'
+      || sale.paymentMethod === 'card'
+      || sale.paymentMethod === 'transfer'
+      || sale.paymentMethod === 'credit'
+    ) {
       breakdown[sale.paymentMethod] += sale.total;
     }
   }

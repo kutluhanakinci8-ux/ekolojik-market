@@ -23,6 +23,7 @@ const PAYMENT_SHORT: Record<Sale['paymentMethod'], string> = {
   transfer: 'Havale',
   credit: 'Veresiye',
   split: 'Bolunmus',
+  gift: 'Hediye',
 };
 
 function formatReceiptMoney(amount: number): string {

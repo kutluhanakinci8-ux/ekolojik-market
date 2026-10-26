@@ -8,6 +8,7 @@ import { resolveSaleBarcode } from '../utils/productBarcode';
 import { foldTurkish } from '../utils/productSearch';
 import { resolveRetailSaleUnitPrice } from '../utils/productPricing';
 import { formatSalePaymentLabel, sumSaleLineTotal, type CompletedSalePatch } from '../store/saleAdmin';
+import { isGiftSale, resolveGiftRetailGross } from '../utils/giftSale';
 import './AccountingSalesPanel.css';
 
 const PAYMENT_LABELS: Record<Sale['paymentMethod'], string> = {
@@ -16,6 +17,7 @@ const PAYMENT_LABELS: Record<Sale['paymentMethod'], string> = {
   transfer: 'Havale',
   credit: 'Veresiye',
   split: 'Bölünmüş',
+  gift: 'Hediye',
 };
 
 interface AccountingSalesPanelProps {
@@ -140,8 +142,12 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
 
   useEffect(() => {
     if (!editing) return;
+    if (paymentMethod === 'gift') {
+      setTotalInput(formatMoneyInput(0));
+      return;
+    }
     setTotalInput(formatMoneyInput(computedLinesTotal));
-  }, [computedLinesTotal, editing]);
+  }, [computedLinesTotal, editing, paymentMethod]);
 
   const openEdit = (sale: Sale) => {
     setEditing(sale);
@@ -263,7 +269,9 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
     ];
     const patch: CompletedSalePatch = {
       paymentMethod,
-      total: Number.isNaN(manualTotal) ? undefined : manualTotal,
+      total: paymentMethod === 'gift'
+        ? 0
+        : (Number.isNaN(manualTotal) ? undefined : manualTotal),
       customerName,
       greenleafNumber,
       businessDate,
@@ -344,7 +352,14 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                         : PAYMENT_LABELS[sale.paymentMethod]}
                     </span>
                   </td>
-                  <td className="num">{formatCurrency(sale.total)}</td>
+                  <td className="num">
+                    {formatCurrency(sale.total)}
+                    {isGiftSale(sale) ? (
+                      <small className="accounting-sales-gift-value">
+                        hediye {formatCurrency(resolveGiftRetailGross(sale))}
+                      </small>
+                    ) : null}
+                  </td>
                   <td className="accounting-sales-items">{saleItemSummary(sale, productNameById)}</td>
                   <td className="accounting-sales-actions">
                     <button type="button" className="btn btn-outline btn-sm" onClick={() => openEdit(sale)}>
@@ -384,6 +399,7 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                   <option value="transfer">Havale</option>
                   <option value="credit">Veresiye</option>
                   <option value="split">Nakit + Kart (bölünmüş)</option>
+                  <option value="gift">Hediye (ücretsiz — raporda zarar)</option>
                 </select>
               </label>
               {paymentMethod === 'split' && (
@@ -414,9 +430,13 @@ export function AccountingSalesPanel({ store }: AccountingSalesPanelProps) {
                   value={totalInput}
                   onChange={(e) => setTotalInput(e.target.value)}
                   inputMode="decimal"
+                  readOnly={paymentMethod === 'gift'}
+                  disabled={paymentMethod === 'gift'}
                 />
                 <span className="accounting-sales-field-hint">
-                  Satır toplamı: {formatCurrency(computedLinesTotal)}
+                  {paymentMethod === 'gift'
+                    ? `Hediye: müşteri 0 ₺ öder. Zarar raporu: ${formatCurrency(computedLinesTotal)} (satır toplamı)`
+                    : `Satır toplamı: ${formatCurrency(computedLinesTotal)}`}
                 </span>
               </label>
               <label>

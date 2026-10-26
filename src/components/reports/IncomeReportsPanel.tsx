@@ -90,6 +90,13 @@ export function IncomeReportsPanel({ store, period }: IncomeReportsPanelProps) {
           <strong>{formatCurrency(dashboard.returnsGrossTotal)}</strong>
           <em>{dashboard.returnCount} işlem</em>
         </div>
+        {dashboard.giftSaleCount > 0 ? (
+          <div className="accounting-partner-profit-kpi">
+            <span className="accounting-partner-profit-kpi-label">Hediye zararı (KDV dahil)</span>
+            <strong className="accounting-partner-profit-warn">{formatCurrency(dashboard.giftLossGross)}</strong>
+            <em>{dashboard.giftSaleCount} hediye satış · tahsilat 0 ₺</em>
+          </div>
+        ) : null}
       </div>
 
       <div className="module-grid-2 income-reports-charts">

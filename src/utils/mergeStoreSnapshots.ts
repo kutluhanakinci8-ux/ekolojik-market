@@ -34,6 +34,7 @@ function mergeSaleRecord(local: Sale, remote: Sale): Sale {
       changeGiven: paymentSource.changeGiven,
       paymentCorrectedAt: paymentSource.paymentCorrectedAt,
       paymentCorrectionNote: paymentSource.paymentCorrectionNote,
+      giftRetailTotal: paymentSource.giftRetailTotal,
     };
   }
   return chosen;

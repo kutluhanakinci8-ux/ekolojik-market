@@ -70,7 +70,7 @@ interface CustomersScreenProps {
   embedded?: boolean;
 }
 
-const PAYMENT_LABELS = { cash: 'Nakit', card: 'Kart', transfer: 'Havale', credit: 'Veresiye', split: 'Bölünmüş' };
+const PAYMENT_LABELS = { cash: 'Nakit', card: 'Kart', transfer: 'Havale', credit: 'Veresiye', split: 'Bölünmüş', gift: 'Hediye' };
 
 const SALE_STATUS_LABELS = {
   completed: 'Tamamlandı',

@@ -16,6 +16,7 @@ import {
 import { formatCurrency } from './format';
 import { getBusinessDateKeyFromIso } from './businessDate';
 import { filterReturnsByPeriod, getSaleNetTotal } from './saleReturn';
+import { sumGiftRetailGross } from './giftSale';
 import { roundMoney, sumGrossCollections } from './vatAnalytics';
 
 export interface IncomeChartRow {
@@ -44,6 +45,9 @@ export interface IncomeReportDashboard {
   paymentChart: IncomeChartRow[];
   categoryChart: IncomeChartRow[];
   dailyTrend: IncomeDailyTrendPoint[];
+  /** Dönemde hediye olarak verilen ürünlerin perakende tutarı (KDV dahil, tahsilat 0) */
+  giftLossGross: number;
+  giftSaleCount: number;
 }
 
 const PAYMENT_LABELS: Record<'cash' | 'card' | 'transfer' | 'credit', string> = {
@@ -152,6 +156,8 @@ export function buildIncomeReportDashboard(
     filteredReturns.reduce((sum, row) => sum + row.refundTotal, 0),
   );
   const collectionsGross = sumGrossCollections(filteredSales, filteredReturns);
+  const giftLossGross = sumGiftRetailGross(filteredSales);
+  const giftSaleCount = filteredSales.filter((s) => s.paymentMethod === 'gift').length;
 
   const netMarginPercent = profitLoss.netRevenue > 0
     ? (profitLoss.netProfit / profitLoss.netRevenue) * 100
@@ -168,5 +174,7 @@ export function buildIncomeReportDashboard(
     paymentChart: buildPaymentChart(filteredSales, filteredReturns),
     categoryChart: buildCategoryChart(filteredSales, products),
     dailyTrend: buildDailyTrend(sales, saleReturns, period),
+    giftLossGross,
+    giftSaleCount,
   };
 }

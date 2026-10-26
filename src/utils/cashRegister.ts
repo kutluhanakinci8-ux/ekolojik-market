@@ -119,6 +119,7 @@ const PAYMENT_LABELS = {
   transfer: 'Havale',
   credit: 'Veresiye',
   split: 'Bölünmüş',
+  gift: 'Hediye',
 } as const;
 
 function saleCashImpact(sale: Sale): number {

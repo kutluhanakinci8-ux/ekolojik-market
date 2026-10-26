@@ -61,7 +61,7 @@ export interface Sale {
   total: number;
   /** Ücretli satış, ücretsiz numune veya karışık */
   saleKind?: 'sale' | 'sample' | 'mixed';
-  paymentMethod: 'cash' | 'card' | 'transfer' | 'credit' | 'split';
+  paymentMethod: 'cash' | 'card' | 'transfer' | 'credit' | 'split' | 'gift';
   /** Bölünmüş ödeme (nakit + kart vb.) */
   paymentSplits?: Array<{ method: 'cash' | 'card' | 'transfer'; amount: number }>;
   /** Nakit ödeme: müşterinin verdiği tutar */
@@ -89,6 +89,8 @@ export interface Sale {
   /** Sunucu / operasyon düzeltmesi — ödeme tipi birleştirmede korunur */
   paymentCorrectedAt?: string;
   paymentCorrectionNote?: string;
+  /** Hediye ödeme: müşteri 0 ₺ öder; raporlarda zarar için perakende tutar */
+  giftRetailTotal?: number;
 }
 
 export type StockMovementType =

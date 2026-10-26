@@ -52,12 +52,17 @@ export function validateCompletedSalePatch(
       return 'Birim fiyat geçerli olmalı';
     }
   }
-  const total = patch.total != null ? roundMoney(patch.total) : sumSaleLineTotal(items);
-  if (total <= 0 || Number.isNaN(total)) {
+  const method = patch.paymentMethod ?? sale.paymentMethod;
+  const lineTotal = sumSaleLineTotal(items);
+  const total = patch.total != null ? roundMoney(patch.total) : lineTotal;
+  if (method === 'gift') {
+    if (lineTotal <= 0 || Number.isNaN(lineTotal)) {
+      return 'Hediye için ürün satırları ve birim fiyatları gerekli';
+    }
+  } else if (total <= 0 || Number.isNaN(total)) {
     return 'Geçerli tutar girin';
   }
 
-  const method = patch.paymentMethod ?? sale.paymentMethod;
   if (method === 'split') {
     const splits = patch.paymentSplits ?? sale.paymentSplits;
     if (!splits?.length) {
@@ -73,8 +78,11 @@ export function validateCompletedSalePatch(
 export function applyCompletedSalePatch(sale: Sale, patch: CompletedSalePatch): Sale {
   const items = patch.items ? normalizeCartItems(patch.items) : sale.items;
   const derivedTotal = sumSaleLineTotal(items);
-  const total = patch.total != null ? roundMoney(patch.total) : derivedTotal;
   const paymentMethod = patch.paymentMethod ?? sale.paymentMethod;
+  const total = paymentMethod === 'gift'
+    ? 0
+    : (patch.total != null ? roundMoney(patch.total) : derivedTotal);
+  const giftRetailTotal = paymentMethod === 'gift' ? derivedTotal : undefined;
 
   let paymentSplits: Sale['paymentSplits'];
   if (paymentMethod === 'split') {
@@ -112,6 +120,7 @@ export function applyCompletedSalePatch(sale: Sale, patch: CompletedSalePatch): 
     businessDate: patch.businessDate?.trim() || sale.businessDate,
     paymentCorrectedAt: new Date().toISOString(),
     paymentCorrectionNote: patch.note?.trim() || sale.paymentCorrectionNote || 'Muhasebe satış düzenleme',
+    giftRetailTotal,
   };
 }
 
@@ -129,6 +138,7 @@ export function formatSalePaymentLabel(sale: Sale): string {
     transfer: 'Havale',
     credit: 'Veresiye',
     split: 'Bölünmüş',
+    gift: 'Hediye',
   };
   return map[sale.paymentMethod];
 }

@@ -29,7 +29,7 @@ interface TransactionsScreenProps {
   onTransactionsTabChange?: (tab: TransactionsTab) => void;
 }
 
-const PAYMENT_LABELS = { cash: '💵 Nakit', card: '💳 Kart', transfer: '🏦 Havale', credit: '📝 Veresiye', split: '🔀 Bölünmüş' };
+const PAYMENT_LABELS = { cash: '💵 Nakit', card: '💳 Kart', transfer: '🏦 Havale', credit: '📝 Veresiye', split: '🔀 Bölünmüş', gift: '🎁 Hediye' };
 
 export type TransactionsTab = 'sales' | 'returns' | 'purchases';
 
@@ -134,7 +134,12 @@ export function TransactionsScreen({
         for (const split of sale.paymentSplits) {
           if (split.method in mix) mix[split.method] += split.amount;
         }
-      } else if (sale.paymentMethod !== 'split' && sale.paymentMethod in mix) {
+      } else if (
+        sale.paymentMethod === 'cash'
+        || sale.paymentMethod === 'card'
+        || sale.paymentMethod === 'transfer'
+        || sale.paymentMethod === 'credit'
+      ) {
         mix[sale.paymentMethod] += net;
       }
     }

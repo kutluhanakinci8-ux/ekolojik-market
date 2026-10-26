@@ -97,6 +97,19 @@
   color: #6b21a8;
 }
 
+.accounting-sales-pay--gift {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.accounting-sales-gift-value {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #c2410c;
+  font-weight: 600;
+}
+
 .accounting-sales-modal-backdrop {
   position: fixed;
   inset: 0;

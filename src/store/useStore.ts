@@ -5014,7 +5014,11 @@ export function usePosStoreState() {
     const built = buildReturnLines(sale, saleReturns, requestedLines);
     if (!built.ok) return { ok: false, message: built.message };
 
-    const normalizedRefund = refundMethod === 'split' ? 'cash' : refundMethod;
+    if (sale.paymentMethod === 'gift') {
+      return { ok: false, message: 'Hediye satış için iade bu ekrandan yapılamaz.' };
+    }
+
+    const normalizedRefund = refundMethod === 'split' || refundMethod === 'gift' ? 'cash' : refundMethod;
 
     const returnRecord: SaleReturn = {
       id: `R${Date.now()}`,
@@ -5160,8 +5164,12 @@ export function usePosStoreState() {
         : updated.paymentMethod === 'cash' ? 'Nakit'
           : updated.paymentMethod === 'card' ? 'Kart'
             : updated.paymentMethod === 'credit' ? 'Veresiye'
-              : 'Havale';
-      logActivity(authSession, 'sale_update', `Satış düzenlendi — ${formatCurrencyTry(updated.total)}`, {
+              : updated.paymentMethod === 'gift' ? 'Hediye'
+                : 'Havale';
+      const summaryAmount = updated.paymentMethod === 'gift'
+        ? `Hediye (zarar ${formatCurrencyTry(updated.giftRetailTotal ?? updated.total)})`
+        : formatCurrencyTry(updated.total);
+      logActivity(authSession, 'sale_update', `Satış düzenlendi — ${summaryAmount}`, {
         satisId: saleId,
         odeme: paymentLabel,
         kasiyer: authSession.displayName,
